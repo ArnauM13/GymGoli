@@ -1,16 +1,15 @@
-import { Component, computed, inject, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Component, ViewChild, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
-import { Exercise, CATEGORY_COLORS, CATEGORY_LABELS } from '../../core/models/exercise.model';
-import { FEELING_EMOJI, FEELING_LABEL, FeelingLevel, Workout, WorkoutEntry } from '../../core/models/workout.model';
-import { ExerciseService } from '../../core/services/exercise.service';
+import { Exercise } from '../../core/models/exercise.model';
+import { FEELING_EMOJI, FeelingLevel, Workout } from '../../core/models/workout.model';
 import { WorkoutService } from '../../core/services/workout.service';
+import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
 import { ExercisePickerDialogComponent } from '../today/components/exercise-picker-dialog.component';
 
-// ── Calendar day cell ────────────────────────────────────────────────────────
+// ── Calendar day cell ─────────────────────────────────────────────────────────
 interface CalDay {
   date:       string;
   day:        number;
@@ -28,7 +27,7 @@ const MONTHS_CA = [
 @Component({
   selector: 'app-history',
   standalone: true,
-  imports: [ReactiveFormsModule, MatButtonModule],
+  imports: [MatButtonModule, WorkoutEditorComponent],
   template: `
     <div class="page">
 
@@ -123,117 +122,14 @@ const MONTHS_CA = [
             </div>
           }
 
-          <!-- Workout entries for selected day -->
-          @if (selectedWorkout(); as sw) {
-            <div class="entries">
-              @for (entry of sw.entries; track entry.exerciseId) {
-                <div class="entry-card">
-
-                  <div class="entry-header">
-                    <div class="entry-title">
-                      <span class="category-badge" [style.background]="getCatColor(entry)">
-                        {{ getCatLabel(entry) }}
-                      </span>
-                      <span class="entry-name">{{ entry.exerciseName }}</span>
-                    </div>
-                    @if (editMode()) {
-                      <button mat-icon-button class="remove-btn" (click)="removeEntry(entry.exerciseId)">
-                        <span class="material-symbols-outlined">close</span>
-                      </button>
-                    }
-                  </div>
-
-                  @if (entry.sets.length > 0) {
-                    <table class="sets-table">
-                      <thead><tr>
-                        <th>#</th><th>Pes</th><th>Reps</th><th>Estat</th>
-                        @if (editMode()) { <th></th> }
-                      </tr></thead>
-                      <tbody>
-                        @for (set of entry.sets; track $index) {
-                          <tr>
-                            <td class="set-num">{{ $index + 1 }}</td>
-                            <td class="set-weight">{{ set.weight }}<small>kg</small></td>
-                            <td class="set-reps">{{ set.reps }}<small>r</small></td>
-                            <td class="set-feeling">{{ getFeelingEmoji(set.feeling) }}</td>
-                            @if (editMode()) {
-                              <td>
-                                <button class="icon-btn-sm" (click)="removeSet(entry.exerciseId, $index)">
-                                  <span class="material-symbols-outlined">close</span>
-                                </button>
-                              </td>
-                            }
-                          </tr>
-                        }
-                      </tbody>
-                    </table>
-                  } @else if (!editMode()) {
-                    <p class="no-sets-hint">Sense sèries</p>
-                  }
-
-                  @if (editMode()) {
-                    @if (addingFor() === entry.exerciseId) {
-                      <form [formGroup]="setForm" (ngSubmit)="submitSets(entry.exerciseId)" class="set-form">
-                        <div class="set-inputs">
-                          <div class="input-group">
-                            <label>Pes (kg)</label>
-                            <div class="number-input">
-                              <button type="button" (click)="adjustWeight(-2.5)">−</button>
-                              <input type="number" formControlName="weight" min="0" step="2.5">
-                              <button type="button" (click)="adjustWeight(2.5)">+</button>
-                            </div>
-                          </div>
-                          <div class="input-group">
-                            <label>Repeticions</label>
-                            <div class="number-input">
-                              <button type="button" (click)="adjustReps(-1)">−</button>
-                              <input type="number" formControlName="reps" min="1" step="1">
-                              <button type="button" (click)="adjustReps(1)">+</button>
-                            </div>
-                          </div>
-                          <div class="input-group">
-                            <label>Sèries</label>
-                            <div class="number-input">
-                              <button type="button" (click)="adjustSeries(-1)">−</button>
-                              <input type="number" formControlName="series" min="1" step="1">
-                              <button type="button" (click)="adjustSeries(1)">+</button>
-                            </div>
-                          </div>
-                        </div>
-                        <div class="feeling-selector">
-                          @for (level of feelingLevels; track level) {
-                            <button type="button" class="feeling-btn"
-                              [class.selected]="setForm.value.feeling === level"
-                              [title]="getFeelingLabel(level)"
-                              (click)="setFeeling(level)"
-                            >{{ getFeelingEmoji(level) }}</button>
-                          }
-                        </div>
-                        <div class="set-form-actions">
-                          <button type="button" mat-button (click)="cancelSet()">Cancel·lar</button>
-                          <button type="submit" mat-flat-button [disabled]="setForm.invalid">
-                            {{ addSetsLabel }}
-                          </button>
-                        </div>
-                      </form>
-                    } @else {
-                      <button class="add-set-btn" (click)="startAddSet(entry)">
-                        <span class="material-symbols-outlined">add</span>
-                        Afegir sèries
-                      </button>
-                    }
-                  }
-
-                </div>
-              }
-
-              @if (editMode()) {
-                <button class="add-exercise-btn" (click)="openPicker()">
-                  <span class="material-symbols-outlined">add</span>
-                  Afegir exercici
-                </button>
-              }
-            </div>
+          <!-- Shared workout editor -->
+          @if (selectedWorkout()) {
+            <app-workout-editor
+              #editor
+              [workout]="selectedWorkout()"
+              [editMode]="editMode()"
+              (requestAddExercise)="openPicker()"
+            />
           }
 
         </div>
@@ -400,6 +296,7 @@ const MONTHS_CA = [
       border-radius: 16px;
       box-shadow: 0 2px 12px rgba(0,0,0,0.08);
       overflow: hidden;
+      padding-bottom: 4px;
     }
 
     .detail-header {
@@ -438,92 +335,8 @@ const MONTHS_CA = [
       display: flex; align-items: center; gap: 4px;
     }
 
-    /* Entry cards inside detail */
-    .entries { padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 10px; }
-
-    .entry-card {
-      background: #fafafa; border-radius: 12px;
-      border: 1px solid #f0f0f0; overflow: hidden;
-    }
-
-    .entry-header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 8px 6px 12px;
-    }
-
-    .entry-title { display: flex; flex-direction: column; gap: 3px; }
-    .entry-name { font-size: 15px; font-weight: 600; color: #1a1a1a; }
-
-    .category-badge {
-      display: inline-block; padding: 1px 7px; border-radius: 8px;
-      font-size: 10px; font-weight: 600; color: white; width: fit-content;
-    }
-    .remove-btn { color: #ccc; }
-
-    .no-sets-hint { margin: 0; padding: 4px 12px 10px; font-size: 12px; color: #bbb; font-style: italic; }
-
-    .sets-table {
-      width: 100%; border-collapse: collapse; font-size: 13px;
-      th { padding: 3px 10px; font-size: 10px; color: #aaa; font-weight: 500; text-align: left; border-bottom: 1px solid #eee; }
-      td { padding: 7px 10px; border-bottom: 1px solid #f5f5f5; }
-      .set-num    { color: #aaa; font-size: 11px; width: 22px; }
-      .set-weight { font-weight: 600; small { font-size: 9px; color: #aaa; margin-left: 1px; } }
-      .set-reps   { small { font-size: 9px; color: #aaa; margin-left: 1px; } }
-      .set-feeling { font-size: 16px; }
-    }
-
-    .icon-btn-sm {
-      background: none; border: none; cursor: pointer; color: #ccc; padding: 2px;
-      display: flex; align-items: center;
-      .material-symbols-outlined { font-size: 15px; }
-      &:hover { color: #ef5350; }
-    }
-
-    .set-form {
-      padding: 10px 12px; background: #f0f0f0; border-top: 1px solid #e8e8e8;
-      display: flex; flex-direction: column; gap: 10px;
-    }
-
-    .set-inputs { display: flex; gap: 8px; }
-
-    .input-group {
-      flex: 1; display: flex; flex-direction: column; gap: 3px;
-      label { font-size: 11px; color: #666; font-weight: 500; }
-    }
-
-    .number-input {
-      display: flex; align-items: center;
-      border: 1.5px solid #e0e0e0; border-radius: 8px; overflow: hidden; background: white;
-      button { width: 28px; height: 34px; border: none; background: #f5f5f5; font-size: 16px; cursor: pointer; color: #333; &:hover { background: #e8e8e8; } }
-      input  { flex: 1; border: none; text-align: center; font-size: 14px; font-weight: 600; outline: none; width: 0; min-width: 0; padding: 6px 0; background: white; }
-    }
-
-    .feeling-selector { display: flex; gap: 6px; justify-content: center; }
-
-    .feeling-btn {
-      font-size: 20px; width: 40px; height: 40px; border: 2px solid transparent;
-      border-radius: 50%; background: #e8e8e8; cursor: pointer; transition: all 0.15s;
-      display: flex; align-items: center; justify-content: center; line-height: 1;
-      &:hover { transform: scale(1.1); }
-      &.selected { border-color: #006874; background: rgba(0,104,116,0.1); transform: scale(1.1); }
-    }
-
-    .set-form-actions { display: flex; justify-content: flex-end; gap: 8px; }
-
-    .add-set-btn {
-      display: flex; align-items: center; gap: 6px; width: 100%; padding: 10px 12px;
-      border: none; background: transparent; color: #006874; font-size: 13px;
-      font-weight: 500; cursor: pointer; border-top: 1px solid #e8e8e8;
-      &:hover { background: rgba(0,104,116,0.05); }
-    }
-
-    .add-exercise-btn {
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      width: 100%; padding: 12px; border: 2px dashed #d0d0d0; border-radius: 10px;
-      background: transparent; color: #888; font-size: 14px; font-weight: 500;
-      cursor: pointer; transition: all 0.2s;
-      &:hover { border-color: #006874; color: #006874; }
-    }
+    /* Spacing for the shared editor inside detail-section */
+    app-workout-editor { display: block; padding: 8px 0 8px; }
 
     /* ════════════════════════════════
        WORKOUT LIST
@@ -572,9 +385,7 @@ const MONTHS_CA = [
     }
 
     .entry-row { display: flex; flex-direction: column; gap: 4px; }
-
     .entry-name-row { font-size: 13px; font-weight: 600; color: #444; }
-
     .sets-list { display: flex; flex-wrap: wrap; gap: 5px; }
 
     .set-pill {
@@ -586,9 +397,7 @@ const MONTHS_CA = [
     }
 
     .no-sets { font-size: 12px; color: #bbb; font-style: italic; }
-
     .detail-footer { display: flex; justify-content: flex-end; padding: 2px 0 6px; }
-
     .edit-from-list-btn { color: #006874 !important; font-size: 13px !important; }
 
     /* ── Empty state ── */
@@ -603,21 +412,19 @@ const MONTHS_CA = [
 })
 export class HistoryComponent {
   private workoutService = inject(WorkoutService);
-  private exerciseService = inject(ExerciseService);
-  private dialog          = inject(MatDialog);
-  private snackBar        = inject(MatSnackBar);
-  private fb              = inject(FormBuilder);
+  private dialog         = inject(MatDialog);
+  private snackBar       = inject(MatSnackBar);
+
+  @ViewChild('editor') editor?: WorkoutEditorComponent;
 
   // ── Calendar state ────────────────────────────────────────────
-  readonly calYear   = signal(new Date().getFullYear());
-  readonly calMonth  = signal(new Date().getMonth()); // 0-indexed
+  readonly calYear      = signal(new Date().getFullYear());
+  readonly calMonth     = signal(new Date().getMonth()); // 0-indexed
   readonly selectedDate = signal<string | null>(null);
 
   // ── Edit state ────────────────────────────────────────────────
   readonly editMode   = signal(false);
-  readonly addingFor  = signal<string | null>(null);
   readonly expandedId = signal<string | null>(null);
-  readonly feelingLevels: FeelingLevel[] = [1, 2, 3, 4, 5];
 
   readonly dayNames = ['dl', 'dm', 'dc', 'dj', 'dv', 'ds', 'dg'];
 
@@ -636,8 +443,8 @@ export class HistoryComponent {
 
   /** Grid of calendar cells (null = padding) */
   readonly calDays = computed((): (CalDay | null)[] => {
-    const y   = this.calYear();
-    const m   = this.calMonth();
+    const y     = this.calYear();
+    const m     = this.calMonth();
     const today = this.workoutService.todayDateString();
     const sel   = this.selectedDate();
     const workoutDates = new Set(this.allWorkouts().map(w => w.date));
@@ -683,80 +490,8 @@ export class HistoryComponent {
     return label.charAt(0).toUpperCase() + label.slice(1);
   });
 
-  // ── Form (4 sèries per defecte) ──────────────────────────────
-  readonly setForm = this.fb.group({
-    weight:  [0,              [Validators.required, Validators.min(0)]],
-    reps:    [8,              [Validators.required, Validators.min(1)]],
-    series:  [4,              [Validators.required, Validators.min(1)]],
-    feeling: [3 as FeelingLevel, Validators.required],
-  });
-
-  get addSetsLabel(): string {
-    const n = this.setForm.value.series ?? 4;
-    return `Afegir ${n} ${n === 1 ? 'sèrie' : 'sèries'}`;
-  }
-
-  // ── Calendar navigation ───────────────────────────────────────
-  navigateCal(delta: number): void {
-    let m = this.calMonth() + delta;
-    let y = this.calYear();
-    if (m < 0)  { m = 11; y--; }
-    if (m > 11) { m = 0;  y++; }
-    this.calMonth.set(m);
-    this.calYear.set(y);
-  }
-
-  selectDate(date: string): void {
-    // Toggle deselection
-    this.selectedDate.set(this.selectedDate() === date ? null : date);
-    this._resetEditState();
-  }
-
-  /** Called from the workout list "Editar" button */
-  selectDateFromList(date: string): void {
-    const d = new Date(date + 'T00:00:00');
-    this.calYear.set(d.getFullYear());
-    this.calMonth.set(d.getMonth());
-    this.selectedDate.set(date);
-    this._resetEditState();
-    // Scroll calendar into view (best-effort)
-    setTimeout(() => document.querySelector('.calendar-card')?.scrollIntoView({ behavior: 'smooth' }), 50);
-  }
-
-  // ── Edit mode ─────────────────────────────────────────────────
-  toggleEditMode(): void {
-    const next = !this.editMode();
-    this.editMode.set(next);
-    if (!next) this._resetForm();
-  }
-
-  private _resetEditState(): void {
-    this.editMode.set(false);
-    this._resetForm();
-  }
-
-  private _resetForm(): void {
-    this.addingFor.set(null);
-    this.setForm.reset({ weight: 0, reps: 8, series: 4, feeling: 3 });
-  }
-
-  toggleExpanded(id: string): void {
-    this.expandedId.set(this.expandedId() === id ? null : id);
-  }
-
   // ── Helpers ───────────────────────────────────────────────────
   getFeelingEmoji(level: FeelingLevel): string { return FEELING_EMOJI[level]; }
-  getFeelingLabel(level: FeelingLevel): string { return FEELING_LABEL[level]; }
-
-  getCatColor(entry: WorkoutEntry): string {
-    const ex = this.exerciseService.getById(entry.exerciseId);
-    return ex ? CATEGORY_COLORS[ex.category] : '#bbb';
-  }
-
-  getCatLabel(entry: WorkoutEntry): string {
-    const ex = this.exerciseService.getById(entry.exerciseId);
-    return ex ? CATEGORY_LABELS[ex.category] : '';
-  }
 
   getDay(date: string): string {
     return new Date(date + 'T12:00:00').toLocaleDateString('ca-ES', { day: 'numeric' });
@@ -770,68 +505,45 @@ export class HistoryComponent {
     return workout.entries.reduce((s, e) => s + e.sets.length, 0);
   }
 
-  // ── Form adjusters ────────────────────────────────────────────
-  adjustWeight(delta: number): void {
-    const v = (this.setForm.value.weight ?? 0) + delta;
-    this.setForm.patchValue({ weight: Math.max(0, Math.round(v * 4) / 4) });
-  }
-  adjustReps(delta: number): void {
-    const v = (this.setForm.value.reps ?? 1) + delta;
-    this.setForm.patchValue({ reps: Math.max(1, v) });
-  }
-  adjustSeries(delta: number): void {
-    const v = (this.setForm.value.series ?? 1) + delta;
-    this.setForm.patchValue({ series: Math.max(1, v) });
-  }
-  setFeeling(level: FeelingLevel): void {
-    this.setForm.patchValue({ feeling: level });
+  // ── Calendar navigation ───────────────────────────────────────
+  navigateCal(delta: number): void {
+    let m = this.calMonth() + delta;
+    let y = this.calYear();
+    if (m < 0)  { m = 11; y--; }
+    if (m > 11) { m = 0;  y++; }
+    this.calMonth.set(m);
+    this.calYear.set(y);
   }
 
-  // ── Set actions ───────────────────────────────────────────────
-  startAddSet(entry: WorkoutEntry): void {
-    this.addingFor.set(entry.exerciseId);
-    const last = entry.sets.at(-1);
-    if (last) this.setForm.patchValue({ weight: last.weight, reps: last.reps });
+  selectDate(date: string): void {
+    this.selectedDate.set(this.selectedDate() === date ? null : date);
+    this._resetEditState();
   }
 
-  cancelSet(): void { this._resetForm(); }
-
-  async submitSets(exerciseId: string): Promise<void> {
-    if (this.setForm.invalid) return;
-    const { weight, reps, series, feeling } = this.setForm.value;
-    const w = this.selectedWorkout();
-    if (!w) return;
-
-    const sets = Array.from({ length: series! }, () => ({
-      weight: weight!, reps: reps!, feeling: feeling as FeelingLevel,
-    }));
-
-    try {
-      await this.workoutService.addSetsToEntry(w.id, exerciseId, sets);
-      this.cancelSet();
-    } catch {
-      this.snackBar.open('Error en afegir les sèries', '', { duration: 3000 });
-    }
+  /** Called from the workout list "Editar" button */
+  selectDateFromList(date: string): void {
+    const d = new Date(date + 'T00:00:00');
+    this.calYear.set(d.getFullYear());
+    this.calMonth.set(d.getMonth());
+    this.selectedDate.set(date);
+    this._resetEditState();
+    setTimeout(() => document.querySelector('.calendar-card')?.scrollIntoView({ behavior: 'smooth' }), 50);
   }
 
-  async removeSet(exerciseId: string, index: number): Promise<void> {
-    const w = this.selectedWorkout();
-    if (!w) return;
-    try {
-      await this.workoutService.removeSetFromEntry(w.id, exerciseId, index);
-    } catch {
-      this.snackBar.open('Error en eliminar', '', { duration: 2000 });
-    }
+  toggleExpanded(id: string): void {
+    this.expandedId.set(this.expandedId() === id ? null : id);
   }
 
-  async removeEntry(exerciseId: string): Promise<void> {
-    const w = this.selectedWorkout();
-    if (!w) return;
-    try {
-      await this.workoutService.removeEntryFromWorkout(w.id, exerciseId);
-    } catch {
-      this.snackBar.open('Error en eliminar', '', { duration: 2000 });
-    }
+  // ── Edit mode ─────────────────────────────────────────────────
+  toggleEditMode(): void {
+    const next = !this.editMode();
+    this.editMode.set(next);
+    if (!next) this.editor?.reset();
+  }
+
+  private _resetEditState(): void {
+    this.editMode.set(false);
+    this.editor?.reset();
   }
 
   async deleteSelectedWorkout(): Promise<void> {
@@ -862,11 +574,17 @@ export class HistoryComponent {
       try {
         let workoutId = workout?.id;
         if (!workoutId) workoutId = await this.workoutService.createWorkoutForDate(date);
+
         await this.workoutService.addExerciseToWorkout(workoutId, {
           exerciseId: exercise.id, exerciseName: exercise.name, sets: [],
         });
+
         this.editMode.set(true);
-        this.startAddSet({ exerciseId: exercise.id, exerciseName: exercise.name, sets: [] });
+
+        // After Firestore write, let Angular re-render the editor then open add-sets form
+        setTimeout(() => {
+          this.editor?.startAddSet({ exerciseId: exercise.id, exerciseName: exercise.name, sets: [] });
+        }, 0);
       } catch {
         this.snackBar.open('Error en afegir l\'exercici', '', { duration: 3000 });
       }

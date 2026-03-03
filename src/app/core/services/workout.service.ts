@@ -90,6 +90,19 @@ export class WorkoutService {
     await updateDoc(doc(this.firestore, 'workouts', workoutId), { entries });
   }
 
+  /** Replace a single set at the given index with updated values */
+  async updateSetInEntry(workoutId: string, exerciseId: string, setIndex: number, updated: WorkoutSet): Promise<void> {
+    const workout = this.workouts().find(w => w.id === workoutId);
+    if (!workout) return;
+    const entries = workout.entries.map(e => {
+      if (e.exerciseId !== exerciseId) return e;
+      const sets = [...e.sets];
+      sets[setIndex] = updated;
+      return { ...e, sets };
+    });
+    await updateDoc(doc(this.firestore, 'workouts', workoutId), { entries });
+  }
+
   async removeSetFromEntry(workoutId: string, exerciseId: string, setIndex: number): Promise<void> {
     const workout = this.workouts().find(w => w.id === workoutId);
     if (!workout) return;
