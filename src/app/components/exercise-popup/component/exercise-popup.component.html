@@ -1,0 +1,34 @@
+<div class="popup">
+    <mat-card class="content">
+        <mat-card-header>
+            <mat-card-title>{{ selectedExercise.title }}</mat-card-title>
+            <button mat-icon-button (click)="closePopup()">
+                <mat-icon>close</mat-icon>
+            </button>
+        </mat-card-header>
+        <mat-card-content>
+            <form class="form-container" [formGroup]="exerciseForm" (ngSubmit)="updateExercise()">
+                <div class="form-group">
+                    <label for="weight">Pes</label>
+                    <input type="number" id="weight" formControlName="weight">
+                </div>
+                <div class="form-group">
+                    <label>Reps</label>
+                    <input type="number" id="reps" formControlName="reps">
+                </div>
+                <div class="form-group">
+                    <label>Series</label>
+                    <input type="number" id="series" formControlName="series">
+                </div>
+                <div class="buttons">
+                    <div class="like-dislike-buttons">
+                        <button type="button" class="like-button">👍</button>
+                        <button type="button" class="dislike-button">👎</button>
+                    </div>
+                    <button type="submit" [disabled]="!exerciseForm.valid">Guardar</button>
+                </div>
+            </form>
+        </mat-card-content>
+    </mat-card>
+</div>
+  
