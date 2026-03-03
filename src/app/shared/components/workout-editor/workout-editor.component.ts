@@ -316,7 +316,7 @@ import { WorkoutService } from '../../../core/services/workout.service';
 
     .we-number-input.compact {
       button { width: 26px; height: 30px; font-size: 15px; }
-      input  { font-size: 13px; font-weight: 600; padding: 4px 0; }
+      input  { font-size: 13px; font-weight: 600; padding: 4px 0; min-width: 48px; }
     }
 
     .we-feeling-selector.compact {
