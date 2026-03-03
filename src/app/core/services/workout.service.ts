@@ -50,19 +50,27 @@ export class WorkoutService {
     return new Date().toISOString().split('T')[0];
   }
 
+  getWorkoutForDate(date: string): Workout | null {
+    return this.workouts().find(w => w.date === date) ?? null;
+  }
+
   getWorkoutsForExercise(exerciseId: string): Workout[] {
     return this.workouts()
       .filter(w => w.entries.some(e => e.exerciseId === exerciseId))
       .sort((a, b) => a.date.localeCompare(b.date));
   }
 
-  async createTodayWorkout(): Promise<string> {
+  async createWorkoutForDate(date: string): Promise<string> {
     const ref = await addDoc(this.col, {
-      date: this.todayDateString(),
+      date,
       entries: [],
       createdAt: Timestamp.now(),
     });
     return ref.id;
+  }
+
+  async createTodayWorkout(): Promise<string> {
+    return this.createWorkoutForDate(this.todayDateString());
   }
 
   async addExerciseToWorkout(workoutId: string, entry: WorkoutEntry): Promise<void> {
@@ -72,11 +80,12 @@ export class WorkoutService {
     await updateDoc(doc(this.firestore, 'workouts', workoutId), { entries });
   }
 
-  async addSetToEntry(workoutId: string, exerciseId: string, set: WorkoutSet): Promise<void> {
+  /** Add multiple sets in a single Firestore write */
+  async addSetsToEntry(workoutId: string, exerciseId: string, sets: WorkoutSet[]): Promise<void> {
     const workout = this.workouts().find(w => w.id === workoutId);
     if (!workout) return;
     const entries = workout.entries.map(e =>
-      e.exerciseId === exerciseId ? { ...e, sets: [...e.sets, set] } : e
+      e.exerciseId === exerciseId ? { ...e, sets: [...e.sets, ...sets] } : e
     );
     await updateDoc(doc(this.firestore, 'workouts', workoutId), { entries });
   }
@@ -86,8 +95,7 @@ export class WorkoutService {
     if (!workout) return;
     const entries = workout.entries.map(e => {
       if (e.exerciseId !== exerciseId) return e;
-      const sets = e.sets.filter((_, i) => i !== setIndex);
-      return { ...e, sets };
+      return { ...e, sets: e.sets.filter((_, i) => i !== setIndex) };
     });
     await updateDoc(doc(this.firestore, 'workouts', workoutId), { entries });
   }
