@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -17,34 +17,23 @@ import { ExercisePickerDialogComponent } from './components/exercise-picker-dial
   template: `
     <div class="page">
 
-      <!-- ── Header: date navigation + edit toggle ── -->
+      <!-- ── Header ── -->
       <header class="page-header">
-        <div class="date-nav">
-          <button class="nav-btn" (click)="navigateDate(-1)" aria-label="Dia anterior">
-            <span class="material-symbols-outlined">chevron_left</span>
-          </button>
-          <div class="date-info">
-            <h1>{{ dateLabel() }}</h1>
-            @if (!isToday()) {
-              <p class="date-sub">{{ fullDateLabel() }}</p>
-            }
-          </div>
-          <button class="nav-btn" (click)="navigateDate(1)" [disabled]="isToday()" aria-label="Dia següent">
-            <span class="material-symbols-outlined">chevron_right</span>
-          </button>
+        <div class="date-info">
+          <h1>Avui</h1>
+          <p class="date-sub">{{ todayLabel }}</p>
         </div>
-
         <div class="header-actions">
-          @if (selectedWorkout() && !editMode()) {
-            <button class="action-btn edit-btn" (click)="toggleEditMode()" aria-label="Editar entrenament">
+          @if (workout() && !editMode()) {
+            <button class="action-btn edit-btn" (click)="toggleEditMode()" aria-label="Editar">
               <span class="material-symbols-outlined">edit</span>
             </button>
           }
           @if (editMode()) {
-            <button class="action-btn delete-btn" (click)="deleteWorkout()" aria-label="Eliminar entrenament">
+            <button class="action-btn delete-btn" (click)="deleteWorkout()" aria-label="Eliminar">
               <span class="material-symbols-outlined">delete</span>
             </button>
-            <button class="action-btn done-btn" (click)="toggleEditMode()" aria-label="Finalitzar edició">
+            <button class="action-btn done-btn" (click)="toggleEditMode()" aria-label="Acabar edició">
               <span class="material-symbols-outlined">check_circle</span>
             </button>
           }
@@ -52,16 +41,11 @@ import { ExercisePickerDialogComponent } from './components/exercise-picker-dial
       </header>
 
       <!-- ── Empty state ── -->
-      @if (!selectedWorkout()) {
+      @if (!workout()) {
         <div class="empty-state">
           <span class="material-symbols-outlined empty-icon">fitness_center</span>
-          @if (isToday()) {
-            <h2>Cap entrenament avui</h2>
-            <p>Comença afegint el primer exercici</p>
-          } @else {
-            <h2>Sense entrenament</h2>
-            <p>No hi ha cap registre per aquest dia</p>
-          }
+          <h2>Cap entrenament avui</h2>
+          <p>Comença afegint el primer exercici</p>
           <button mat-flat-button class="start-btn" (click)="openPicker()">
             <span class="material-symbols-outlined">add</span>
             Afegir exercici
@@ -70,12 +54,11 @@ import { ExercisePickerDialogComponent } from './components/exercise-picker-dial
       }
 
       <!-- ── Workout entries ── -->
-      @if (selectedWorkout(); as workout) {
+      @if (workout(); as w) {
         <div class="entries">
-          @for (entry of workout.entries; track entry.exerciseId) {
+          @for (entry of w.entries; track entry.exerciseId) {
             <div class="entry-card">
 
-              <!-- Exercise header -->
               <div class="entry-header">
                 <div class="entry-title">
                   <span class="category-badge" [style.background]="getCatColor(entry)">
@@ -84,24 +67,18 @@ import { ExercisePickerDialogComponent } from './components/exercise-picker-dial
                   <span class="entry-name">{{ entry.exerciseName }}</span>
                 </div>
                 @if (editMode()) {
-                  <button mat-icon-button class="remove-btn" (click)="removeEntry(entry.exerciseId)" aria-label="Eliminar exercici">
+                  <button mat-icon-button class="remove-btn" (click)="removeEntry(entry.exerciseId)">
                     <span class="material-symbols-outlined">close</span>
                   </button>
                 }
               </div>
 
-              <!-- Sets table -->
               @if (entry.sets.length > 0) {
                 <table class="sets-table">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Pes</th>
-                      <th>Reps</th>
-                      <th>Estat</th>
-                      @if (editMode()) { <th></th> }
-                    </tr>
-                  </thead>
+                  <thead><tr>
+                    <th>#</th><th>Pes</th><th>Reps</th><th>Estat</th>
+                    @if (editMode()) { <th></th> }
+                  </tr></thead>
                   <tbody>
                     @for (set of entry.sets; track $index) {
                       <tr>
@@ -111,7 +88,7 @@ import { ExercisePickerDialogComponent } from './components/exercise-picker-dial
                         <td class="set-feeling">{{ getFeelingEmoji(set.feeling) }}</td>
                         @if (editMode()) {
                           <td>
-                            <button class="icon-btn-sm" (click)="removeSet(entry.exerciseId, $index)" aria-label="Eliminar sèrie">
+                            <button class="icon-btn-sm" (click)="removeSet(entry.exerciseId, $index)">
                               <span class="material-symbols-outlined">close</span>
                             </button>
                           </td>
@@ -124,7 +101,6 @@ import { ExercisePickerDialogComponent } from './components/exercise-picker-dial
                 <p class="no-sets-hint">Sense sèries registrades</p>
               }
 
-              <!-- Add-set form — edit mode only -->
               @if (editMode()) {
                 @if (addingFor() === entry.exerciseId) {
                   <form [formGroup]="setForm" (ngSubmit)="submitSets(entry.exerciseId)" class="set-form">
@@ -154,19 +130,15 @@ import { ExercisePickerDialogComponent } from './components/exercise-picker-dial
                         </div>
                       </div>
                     </div>
-
                     <div class="feeling-selector">
                       @for (level of feelingLevels; track level) {
-                        <button
-                          type="button"
-                          class="feeling-btn"
+                        <button type="button" class="feeling-btn"
                           [class.selected]="setForm.value.feeling === level"
                           [title]="getFeelingLabel(level)"
                           (click)="setFeeling(level)"
                         >{{ getFeelingEmoji(level) }}</button>
                       }
                     </div>
-
                     <div class="set-form-actions">
                       <button type="button" mat-button (click)="cancelSet()">Cancel·lar</button>
                       <button type="submit" mat-flat-button [disabled]="setForm.invalid">
@@ -185,7 +157,6 @@ import { ExercisePickerDialogComponent } from './components/exercise-picker-dial
             </div>
           }
 
-          <!-- Add exercise — edit mode only -->
           @if (editMode()) {
             <button class="add-exercise-btn" (click)="openPicker()">
               <span class="material-symbols-outlined">add</span>
@@ -200,116 +171,52 @@ import { ExercisePickerDialogComponent } from './components/exercise-picker-dial
   styles: [`
     .page { padding: 0 0 80px; }
 
-    /* ── Header ── */
     .page-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 12px 8px 8px;
-      gap: 8px;
+      padding: 16px 12px 12px;
+
+      h1 { margin: 0; font-size: 24px; font-weight: 700; }
+      .date-sub { margin: 2px 0 0; font-size: 13px; color: #888; text-transform: capitalize; }
     }
 
-    .date-nav {
-      display: flex;
-      align-items: center;
-      gap: 2px;
-      flex: 1;
-      min-width: 0;
-    }
-
-    .date-info {
-      flex: 1;
-      min-width: 0;
-      text-align: center;
-
-      h1 { margin: 0; font-size: 20px; font-weight: 700; }
-      .date-sub { margin: 2px 0 0; font-size: 12px; color: #888; }
-    }
-
-    .nav-btn {
-      width: 40px;
-      height: 40px;
-      flex-shrink: 0;
-      border: none;
-      background: transparent;
-      border-radius: 50%;
-      cursor: pointer;
-      color: #555;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.15s;
-
-      &:hover:not(:disabled) { background: rgba(0,0,0,0.06); }
-      &:disabled { color: #ccc; cursor: default; }
-      .material-symbols-outlined { font-size: 26px; }
-    }
-
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      flex-shrink: 0;
-    }
+    .header-actions { display: flex; align-items: center; gap: 4px; }
 
     .action-btn {
-      width: 40px;
-      height: 40px;
-      border: none;
-      border-radius: 50%;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      width: 40px; height: 40px;
+      border: none; border-radius: 50%; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
       transition: background 0.15s, color 0.15s;
       .material-symbols-outlined { font-size: 22px; }
     }
-
     .edit-btn   { background: rgba(0,104,116,0.1);  color: #006874; &:hover { background: rgba(0,104,116,0.18); } }
     .done-btn   { background: rgba(0,150,80,0.12);  color: #00966e; &:hover { background: rgba(0,150,80,0.2);   } }
     .delete-btn { background: transparent; color: #bbb; &:hover { background: rgba(239,83,80,0.1); color: #ef5350; } }
 
-    /* ── Empty state ── */
     .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 10px;
-      padding: 60px 24px;
-      text-align: center;
-
+      display: flex; flex-direction: column; align-items: center;
+      gap: 10px; padding: 60px 24px; text-align: center;
       .empty-icon { font-size: 64px; color: #ddd; }
       h2 { margin: 0; font-size: 20px; font-weight: 600; color: #444; }
       p  { margin: 0; color: #888; }
     }
 
     .start-btn {
-      margin-top: 8px;
-      background: #006874;
-      color: white;
-      border-radius: 24px;
-      padding: 0 24px;
-      height: 48px;
-      font-size: 15px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
+      margin-top: 8px; background: #006874; color: white;
+      border-radius: 24px; padding: 0 24px; height: 48px;
+      font-size: 15px; display: flex; align-items: center; gap: 6px;
     }
 
-    /* ── Entry cards ── */
     .entries { padding: 0 16px; display: flex; flex-direction: column; gap: 12px; }
 
     .entry-card {
-      background: white;
-      border-radius: 14px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      overflow: hidden;
+      background: white; border-radius: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08); overflow: hidden;
     }
 
     .entry-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      display: flex; align-items: center; justify-content: space-between;
       padding: 12px 8px 8px 14px;
     }
 
@@ -317,41 +224,20 @@ import { ExercisePickerDialogComponent } from './components/exercise-picker-dial
     .entry-name { font-size: 16px; font-weight: 600; color: #1a1a1a; }
 
     .category-badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 10px;
-      font-size: 11px;
-      font-weight: 600;
-      color: white;
-      width: fit-content;
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-size: 11px; font-weight: 600; color: white; width: fit-content;
     }
-
     .remove-btn { color: #bbb; }
 
     .no-sets-hint {
-      margin: 0;
-      padding: 6px 14px 12px;
-      font-size: 13px;
-      color: #bbb;
-      font-style: italic;
+      margin: 0; padding: 6px 14px 12px;
+      font-size: 13px; color: #bbb; font-style: italic;
     }
 
-    /* ── Sets table ── */
     .sets-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 14px;
-
-      th {
-        padding: 4px 10px;
-        font-size: 11px;
-        color: #aaa;
-        font-weight: 500;
-        text-align: left;
-        border-bottom: 1px solid #f0f0f0;
-      }
+      width: 100%; border-collapse: collapse; font-size: 14px;
+      th { padding: 4px 10px; font-size: 11px; color: #aaa; font-weight: 500; text-align: left; border-bottom: 1px solid #f0f0f0; }
       td { padding: 8px 10px; border-bottom: 1px solid #fafafa; }
-
       .set-num    { color: #aaa; font-size: 12px; width: 24px; }
       .set-weight { font-weight: 600; small { font-size: 10px; color: #aaa; margin-left: 2px; } }
       .set-reps   { small { font-size: 10px; color: #aaa; margin-left: 2px; } }
@@ -359,135 +245,55 @@ import { ExercisePickerDialogComponent } from './components/exercise-picker-dial
     }
 
     .icon-btn-sm {
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: #ccc;
-      padding: 2px;
-      display: flex;
-      align-items: center;
+      background: none; border: none; cursor: pointer; color: #ccc; padding: 2px;
+      display: flex; align-items: center;
       .material-symbols-outlined { font-size: 16px; }
       &:hover { color: #ef5350; }
     }
 
-    /* ── Set form ── */
     .set-form {
-      padding: 12px 14px;
-      background: #fafafa;
-      border-top: 1px solid #f0f0f0;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
+      padding: 12px 14px; background: #fafafa; border-top: 1px solid #f0f0f0;
+      display: flex; flex-direction: column; gap: 12px;
     }
 
     .set-inputs { display: flex; gap: 10px; }
 
     .input-group {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-
+      flex: 1; display: flex; flex-direction: column; gap: 4px;
       label { font-size: 12px; color: #666; font-weight: 500; }
     }
 
     .number-input {
-      display: flex;
-      align-items: center;
-      border: 1.5px solid #e0e0e0;
-      border-radius: 8px;
-      overflow: hidden;
-      background: white;
-
-      button {
-        width: 30px;
-        height: 38px;
-        border: none;
-        background: #f5f5f5;
-        font-size: 18px;
-        cursor: pointer;
-        color: #333;
-        &:hover  { background: #e8e8e8; }
-        &:active { background: #ddd; }
-      }
-
-      input {
-        flex: 1;
-        border: none;
-        text-align: center;
-        font-size: 15px;
-        font-weight: 600;
-        outline: none;
-        width: 0;
-        min-width: 0;
-        padding: 8px 0;
-        background: white;
-      }
+      display: flex; align-items: center;
+      border: 1.5px solid #e0e0e0; border-radius: 8px; overflow: hidden; background: white;
+      button { width: 30px; height: 38px; border: none; background: #f5f5f5; font-size: 18px; cursor: pointer; color: #333; &:hover { background: #e8e8e8; } &:active { background: #ddd; } }
+      input { flex: 1; border: none; text-align: center; font-size: 15px; font-weight: 600; outline: none; width: 0; min-width: 0; padding: 8px 0; background: white; }
     }
 
-    .feeling-selector {
-      display: flex;
-      gap: 6px;
-      justify-content: center;
-    }
+    .feeling-selector { display: flex; gap: 6px; justify-content: center; }
 
     .feeling-btn {
-      font-size: 22px;
-      width: 44px;
-      height: 44px;
-      border: 2px solid transparent;
-      border-radius: 50%;
-      background: #f0f0f0;
-      cursor: pointer;
-      transition: all 0.15s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      line-height: 1;
-
+      font-size: 22px; width: 44px; height: 44px; border: 2px solid transparent;
+      border-radius: 50%; background: #f0f0f0; cursor: pointer; transition: all 0.15s;
+      display: flex; align-items: center; justify-content: center; line-height: 1;
       &:hover { transform: scale(1.1); }
       &.selected { border-color: #006874; background: rgba(0,104,116,0.1); transform: scale(1.15); }
     }
 
-    .set-form-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-    }
+    .set-form-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
     .add-set-btn {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      width: 100%;
-      padding: 12px 14px;
-      border: none;
-      background: transparent;
-      color: #006874;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      border-top: 1px solid #f0f0f0;
+      display: flex; align-items: center; gap: 6px; width: 100%; padding: 12px 14px;
+      border: none; background: transparent; color: #006874; font-size: 14px;
+      font-weight: 500; cursor: pointer; border-top: 1px solid #f0f0f0;
       &:hover { background: rgba(0,104,116,0.05); }
     }
 
     .add-exercise-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      width: 100%;
-      padding: 14px;
-      border: 2px dashed #d0d0d0;
-      border-radius: 14px;
-      background: transparent;
-      color: #888;
-      font-size: 15px;
-      font-weight: 500;
-      cursor: pointer;
-      margin-top: 4px;
-      transition: all 0.2s;
-
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; padding: 14px; border: 2px dashed #d0d0d0; border-radius: 14px;
+      background: transparent; color: #888; font-size: 15px; font-weight: 500;
+      cursor: pointer; margin-top: 4px; transition: all 0.2s;
       &:hover { border-color: #006874; color: #006874; background: rgba(0,104,116,0.04); }
     }
   `],
@@ -495,87 +301,43 @@ import { ExercisePickerDialogComponent } from './components/exercise-picker-dial
 export class TodayComponent {
   private workoutService = inject(WorkoutService);
   private exerciseService = inject(ExerciseService);
-  private dialog = inject(MatDialog);
-  private snackBar = inject(MatSnackBar);
-  private fb = inject(FormBuilder);
+  private dialog         = inject(MatDialog);
+  private snackBar       = inject(MatSnackBar);
+  private fb             = inject(FormBuilder);
 
   // ── State ────────────────────────────────────────────────────
-  readonly selectedDate = signal(this.workoutService.todayDateString());
-  readonly editMode     = signal(false);
-  readonly addingFor    = signal<string | null>(null);
+  readonly workout       = this.workoutService.todayWorkout;
+  readonly editMode      = signal(false);
+  readonly addingFor     = signal<string | null>(null);
   readonly feelingLevels: FeelingLevel[] = [1, 2, 3, 4, 5];
 
-  // ── Derived ──────────────────────────────────────────────────
-  readonly selectedWorkout = computed(() =>
-    this.workoutService.getWorkoutForDate(this.selectedDate())
-  );
-
-  readonly isToday = computed(() =>
-    this.selectedDate() === this.workoutService.todayDateString()
-  );
-
-  /** "Avui" / "Ahir" / weekday / "5 mar" */
-  readonly dateLabel = computed(() => {
-    const today = this.workoutService.todayDateString();
-    const sel   = this.selectedDate();
-    if (sel === today) return 'Avui';
-
-    const d      = new Date(sel   + 'T00:00:00');
-    const todayD = new Date(today + 'T00:00:00');
-    const diff   = Math.round((todayD.getTime() - d.getTime()) / 86_400_000);
-
-    if (diff === 1) return 'Ahir';
-    if (diff < 7) {
-      const name = d.toLocaleDateString('ca-ES', { weekday: 'long' });
-      return name.charAt(0).toUpperCase() + name.slice(1);
-    }
-    return d.toLocaleDateString('ca-ES', { day: 'numeric', month: 'short' });
+  readonly todayLabel = new Date().toLocaleDateString('ca-ES', {
+    weekday: 'long', day: 'numeric', month: 'long',
   });
 
-  /** Full date shown as subtitle when not today */
-  readonly fullDateLabel = computed(() =>
-    new Date(this.selectedDate() + 'T00:00:00')
-      .toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'long' })
-  );
-
-  // ── Form ─────────────────────────────────────────────────────
+  // ── Form (4 sèries per defecte) ──────────────────────────────
   readonly setForm = this.fb.group({
     weight:  [0,              [Validators.required, Validators.min(0)]],
     reps:    [8,              [Validators.required, Validators.min(1)]],
-    series:  [3,              [Validators.required, Validators.min(1)]],
+    series:  [4,              [Validators.required, Validators.min(1)]],
     feeling: [3 as FeelingLevel, Validators.required],
   });
 
   get addSetsLabel(): string {
-    const n = this.setForm.value.series ?? 3;
+    const n = this.setForm.value.series ?? 4;
     return `Afegir ${n} ${n === 1 ? 'sèrie' : 'sèries'}`;
   }
 
-  // ── Date navigation ──────────────────────────────────────────
-  navigateDate(delta: number): void {
-    const d = new Date(this.selectedDate() + 'T00:00:00');
-    d.setDate(d.getDate() + delta);
-    const next  = d.toISOString().split('T')[0];
-    const today = this.workoutService.todayDateString();
-    if (next > today) return;            // no future dates
-    this.selectedDate.set(next);
-    this._resetEditState();
-  }
-
+  // ── Edit mode ────────────────────────────────────────────────
   toggleEditMode(): void {
     const next = !this.editMode();
     this.editMode.set(next);
     if (!next) this._resetForm();
   }
 
-  private _resetEditState(): void {
-    this.editMode.set(false);
-    this._resetForm();
-  }
-
   private _resetForm(): void {
     this.addingFor.set(null);
-    this.setForm.reset({ weight: 0, reps: 8, series: 3, feeling: 3 });
+    this.setForm.reset({ weight: 0, reps: 8, series: 4, feeling: 3 });
   }
 
   // ── Helpers ──────────────────────────────────────────────────
@@ -597,17 +359,14 @@ export class TodayComponent {
     const v = (this.setForm.value.weight ?? 0) + delta;
     this.setForm.patchValue({ weight: Math.max(0, Math.round(v * 4) / 4) });
   }
-
   adjustReps(delta: number): void {
     const v = (this.setForm.value.reps ?? 1) + delta;
     this.setForm.patchValue({ reps: Math.max(1, v) });
   }
-
   adjustSeries(delta: number): void {
     const v = (this.setForm.value.series ?? 1) + delta;
     this.setForm.patchValue({ series: Math.max(1, v) });
   }
-
   setFeeling(level: FeelingLevel): void {
     this.setForm.patchValue({ feeling: level });
   }
@@ -621,21 +380,18 @@ export class TodayComponent {
 
   cancelSet(): void { this._resetForm(); }
 
-  /** Creates N identical sets in a single Firestore write */
   async submitSets(exerciseId: string): Promise<void> {
     if (this.setForm.invalid) return;
     const { weight, reps, series, feeling } = this.setForm.value;
-    const workout = this.selectedWorkout();
-    if (!workout) return;
+    const w = this.workout();
+    if (!w) return;
 
     const sets = Array.from({ length: series! }, () => ({
-      weight:  weight!,
-      reps:    reps!,
-      feeling: feeling as FeelingLevel,
+      weight: weight!, reps: reps!, feeling: feeling as FeelingLevel,
     }));
 
     try {
-      await this.workoutService.addSetsToEntry(workout.id, exerciseId, sets);
+      await this.workoutService.addSetsToEntry(w.id, exerciseId, sets);
       this.cancelSet();
     } catch {
       this.snackBar.open('Error en afegir les sèries', '', { duration: 3000 });
@@ -643,31 +399,31 @@ export class TodayComponent {
   }
 
   async removeSet(exerciseId: string, index: number): Promise<void> {
-    const workout = this.selectedWorkout();
-    if (!workout) return;
+    const w = this.workout();
+    if (!w) return;
     try {
-      await this.workoutService.removeSetFromEntry(workout.id, exerciseId, index);
+      await this.workoutService.removeSetFromEntry(w.id, exerciseId, index);
     } catch {
       this.snackBar.open('Error en eliminar', '', { duration: 2000 });
     }
   }
 
   async removeEntry(exerciseId: string): Promise<void> {
-    const workout = this.selectedWorkout();
-    if (!workout) return;
+    const w = this.workout();
+    if (!w) return;
     try {
-      await this.workoutService.removeEntryFromWorkout(workout.id, exerciseId);
+      await this.workoutService.removeEntryFromWorkout(w.id, exerciseId);
     } catch {
       this.snackBar.open('Error en eliminar', '', { duration: 2000 });
     }
   }
 
   async deleteWorkout(): Promise<void> {
-    if (!confirm('Eliminar aquest entrenament?')) return;
-    const workout = this.selectedWorkout();
-    if (!workout) return;
+    if (!confirm('Eliminar l\'entrenament d\'avui?')) return;
+    const w = this.workout();
+    if (!w) return;
     try {
-      await this.workoutService.deleteWorkout(workout.id);
+      await this.workoutService.deleteWorkout(w.id);
       this.editMode.set(false);
     } catch {
       this.snackBar.open('Error en eliminar', '', { duration: 2000 });
@@ -676,26 +432,20 @@ export class TodayComponent {
 
   // ── Exercise picker ──────────────────────────────────────────
   openPicker(): void {
-    const workout    = this.selectedWorkout();
-    const excludeIds = workout?.entries.map(e => e.exerciseId) ?? [];
+    const w          = this.workout();
+    const excludeIds = w?.entries.map(e => e.exerciseId) ?? [];
 
     const ref = this.dialog.open(ExercisePickerDialogComponent, {
-      data: { excludeIds },
-      width: '420px',
-      maxHeight: '80vh',
+      data: { excludeIds }, width: '420px', maxHeight: '80vh',
     });
 
     ref.afterClosed().subscribe(async (exercise: Exercise | undefined) => {
       if (!exercise) return;
       try {
-        let workoutId = workout?.id;
-        if (!workoutId) {
-          workoutId = await this.workoutService.createWorkoutForDate(this.selectedDate());
-        }
+        let workoutId = w?.id;
+        if (!workoutId) workoutId = await this.workoutService.createTodayWorkout();
         await this.workoutService.addExerciseToWorkout(workoutId, {
-          exerciseId:   exercise.id,
-          exerciseName: exercise.name,
-          sets: [],
+          exerciseId: exercise.id, exerciseName: exercise.name, sets: [],
         });
         this.editMode.set(true);
         this.startAddSet({ exerciseId: exercise.id, exerciseName: exercise.name, sets: [] });
