@@ -18,14 +18,15 @@ export const FEELING_LABEL: Record<FeelingLevel, string> = {
 
 export interface WorkoutSet {
   weight: number;
-  reps: number;
-  feeling: FeelingLevel;
+  reps:   number;
+  // feeling moved to WorkoutEntry level
 }
 
 export interface WorkoutEntry {
-  exerciseId: string;
+  exerciseId:   string;
   exerciseName: string;
-  sets: WorkoutSet[];
+  sets:         WorkoutSet[];
+  feeling?:     FeelingLevel; // general feeling for this exercise session
 }
 
 export interface Workout {

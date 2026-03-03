@@ -43,7 +43,15 @@ import { WorkoutService } from '../../../core/services/workout.service';
                 <span class="we-category-badge" [style.background]="getCatColor(entry)">
                   {{ getCatLabel(entry) }}
                 </span>
-                <span class="we-entry-name">{{ entry.exerciseName }}</span>
+                <div class="we-entry-name-row">
+                  <span class="we-entry-name">{{ entry.exerciseName }}</span>
+                  <!-- Feeling emoji next to the name in view mode -->
+                  @if (!editMode() && entry.feeling) {
+                    <span class="we-entry-feeling-inline" [title]="getFeelingLabel(entry.feeling)">
+                      {{ getFeelingEmoji(entry.feeling) }}
+                    </span>
+                  }
+                </div>
               </div>
               @if (editMode()) {
                 <button mat-icon-button class="we-remove-btn" (click)="removeEntry(entry.exerciseId)">
@@ -52,11 +60,25 @@ import { WorkoutService } from '../../../core/services/workout.service';
               }
             </div>
 
+            <!-- Feeling picker row (only in edit mode) -->
+            @if (editMode()) {
+              <div class="we-entry-feeling-row edit">
+                <span class="we-feeling-label">Sensació</span>
+                @for (level of feelingLevels; track level) {
+                  <button type="button" class="we-feeling-btn sm"
+                    [class.selected]="entry.feeling === level"
+                    [title]="getFeelingLabel(level)"
+                    (click)="setEntryFeeling(entry, level)"
+                  >{{ getFeelingEmoji(level) }}</button>
+                }
+              </div>
+            }
+
             <!-- Sets table -->
             @if (entry.sets.length > 0) {
               <table class="we-sets-table">
                 <thead><tr>
-                  <th>#</th><th>Pes</th><th>Reps</th><th>Estat</th>
+                  <th>#</th><th>Pes</th><th>Reps</th>
                   @if (editMode()) { <th></th> }
                 </tr></thead>
                 <tbody>
@@ -65,7 +87,7 @@ import { WorkoutService } from '../../../core/services/workout.service';
                       <!-- Inline edit row -->
                       <tr class="we-edit-set-row">
                         <td class="we-set-num">{{ $index + 1 }}</td>
-                        <td colspan="4">
+                        <td colspan="3">
                           <form [formGroup]="editSetForm" (ngSubmit)="saveEditSet()" class="we-inline-edit">
                             <div class="we-inline-inputs">
                               <div class="we-inline-group">
@@ -84,15 +106,6 @@ import { WorkoutService } from '../../../core/services/workout.service';
                                   <button type="button" (click)="adjustEditReps(1)">+</button>
                                 </div>
                               </div>
-                              <div class="we-feeling-selector compact">
-                                @for (level of feelingLevels; track level) {
-                                  <button type="button" class="we-feeling-btn sm"
-                                    [class.selected]="editSetForm.value.feeling === level"
-                                    [title]="getFeelingLabel(level)"
-                                    (click)="setEditFeeling(level)"
-                                  >{{ getFeelingEmoji(level) }}</button>
-                                }
-                              </div>
                             </div>
                             <div class="we-inline-actions">
                               <button type="button" mat-button (click)="cancelEditSet()">Cancel·lar</button>
@@ -107,7 +120,6 @@ import { WorkoutService } from '../../../core/services/workout.service';
                         <td class="we-set-num">{{ $index + 1 }}</td>
                         <td class="we-set-weight">{{ set.weight }}<small>kg</small></td>
                         <td class="we-set-reps">{{ set.reps }}<small>r</small></td>
-                        <td class="we-set-feeling">{{ getFeelingEmoji(set.feeling) }}</td>
                         @if (editMode()) {
                           <td class="we-set-actions">
                             <button class="we-icon-btn-sm"
@@ -161,15 +173,6 @@ import { WorkoutService } from '../../../core/services/workout.service';
                       </div>
                     </div>
                   </div>
-                  <div class="we-feeling-selector">
-                    @for (level of feelingLevels; track level) {
-                      <button type="button" class="we-feeling-btn"
-                        [class.selected]="setForm.value.feeling === level"
-                        [title]="getFeelingLabel(level)"
-                        (click)="setFeeling(level)"
-                      >{{ getFeelingEmoji(level) }}</button>
-                    }
-                  </div>
                   <div class="we-set-form-actions">
                     <button type="button" mat-button (click)="cancelSet()">Cancel·lar</button>
                     <button type="submit" mat-flat-button [disabled]="setForm.invalid">
@@ -222,7 +225,7 @@ import { WorkoutService } from '../../../core/services/workout.service';
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 12px 8px 8px 14px;
+      padding: 12px 8px 6px 14px;
     }
 
     .we-entry-title { display: flex; flex-direction: column; gap: 4px; }
@@ -240,9 +243,56 @@ import { WorkoutService } from '../../../core/services/workout.service';
 
     .we-remove-btn { color: #bbb; }
 
+    /* ── Entry feeling row ── */
+    .we-entry-feeling-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 14px 8px;
+      min-height: 36px;
+
+      &.edit {
+        padding: 4px 14px 6px;
+        border-bottom: 1px solid #f0f0f0;
+      }
+    }
+
+    .we-feeling-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #aaa;
+      margin-right: 4px;
+      white-space: nowrap;
+    }
+
+    .we-entry-feeling-badge {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 18px;
+      small { font-size: 11px; color: #888; }
+    }
+
+    /* ── Feeling buttons (shared for entry-level feeling) ── */
+    .we-feeling-btn {
+      font-size: 22px; width: 44px; height: 44px;
+      border: 2px solid transparent; border-radius: 50%;
+      background: #f0f0f0; cursor: pointer; transition: all 0.15s;
+      display: flex; align-items: center; justify-content: center; line-height: 1;
+
+      &:hover   { transform: scale(1.1); }
+      &.selected {
+        border-color: #006874;
+        background: rgba(0,104,116,0.1);
+        transform: scale(1.15);
+      }
+
+      &.sm { font-size: 20px; width: 36px; height: 36px; }
+    }
+
     .we-no-sets-hint {
       margin: 0;
-      padding: 6px 14px 12px;
+      padding: 4px 14px 12px;
       font-size: 13px;
       color: #bbb;
       font-style: italic;
@@ -267,10 +317,9 @@ import { WorkoutService } from '../../../core/services/workout.service';
         border-bottom: 1px solid #fafafa;
       }
 
-      .we-set-num     { color: #aaa; font-size: 12px; width: 24px; }
-      .we-set-weight  { font-weight: 600; small { font-size: 10px; color: #aaa; margin-left: 2px; } }
-      .we-set-reps    { small { font-size: 10px; color: #aaa; margin-left: 2px; } }
-      .we-set-feeling { font-size: 18px; }
+      .we-set-num    { color: #aaa; font-size: 12px; width: 24px; }
+      .we-set-weight { font-weight: 600; small { font-size: 10px; color: #aaa; margin-left: 2px; } }
+      .we-set-reps   { small { font-size: 10px; color: #aaa; margin-left: 2px; } }
     }
 
     /* ── Set action buttons ── */
@@ -284,7 +333,7 @@ import { WorkoutService } from '../../../core/services/workout.service';
       align-items: center;
 
       .material-symbols-outlined { font-size: 16px; }
-      &:hover       { color: #aaa; }
+      &:hover        { color: #aaa; }
       &.danger:hover { color: #ef5350; }
     }
 
@@ -318,14 +367,6 @@ import { WorkoutService } from '../../../core/services/workout.service';
       button { width: 26px; height: 30px; font-size: 15px; }
       input  { font-size: 13px; font-weight: 600; padding: 4px 0; min-width: 48px; }
     }
-
-    .we-feeling-selector.compact {
-      display: flex;
-      gap: 4px;
-      align-self: flex-end;
-      padding-bottom: 2px;
-    }
-    .we-feeling-btn.sm { font-size: 18px; width: 32px; height: 32px; }
 
     .we-inline-actions { display: flex; justify-content: flex-end; gap: 6px; }
 
@@ -371,22 +412,6 @@ import { WorkoutService } from '../../../core/services/workout.service';
       }
     }
 
-    .we-feeling-selector { display: flex; gap: 6px; justify-content: center; }
-
-    .we-feeling-btn {
-      font-size: 22px; width: 44px; height: 44px;
-      border: 2px solid transparent; border-radius: 50%;
-      background: #f0f0f0; cursor: pointer; transition: all 0.15s;
-      display: flex; align-items: center; justify-content: center; line-height: 1;
-
-      &:hover   { transform: scale(1.1); }
-      &.selected {
-        border-color: #006874;
-        background: rgba(0,104,116,0.1);
-        transform: scale(1.15);
-      }
-    }
-
     .we-set-form-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
     /* ── Add-set button ── */
@@ -429,19 +454,17 @@ export class WorkoutEditorComponent {
   readonly editingSet = signal<{ exerciseId: string; index: number } | null>(null);
   readonly feelingLevels: FeelingLevel[] = [1, 2, 3, 4, 5];
 
-  // ── Add-sets form (4 sèries per defecte) ────────────────────
+  // ── Add-sets form (4 sèries per defecte, sense feeling) ─────
   readonly setForm = this.fb.group({
-    weight:  [0,                 [Validators.required, Validators.min(0)]],
-    reps:    [8,                 [Validators.required, Validators.min(1)]],
-    series:  [4,                 [Validators.required, Validators.min(1)]],
-    feeling: [3 as FeelingLevel, Validators.required],
+    weight: [0, [Validators.required, Validators.min(0)]],
+    reps:   [8, [Validators.required, Validators.min(1)]],
+    series: [4, [Validators.required, Validators.min(1)]],
   });
 
-  // ── Edit-single-set form ─────────────────────────────────────
+  // ── Edit-single-set form (sense feeling) ────────────────────
   readonly editSetForm = this.fb.group({
-    weight:  [0, [Validators.required, Validators.min(0)]],
-    reps:    [8, [Validators.required, Validators.min(1)]],
-    feeling: [3 as FeelingLevel, Validators.required],
+    weight: [0, [Validators.required, Validators.min(0)]],
+    reps:   [8, [Validators.required, Validators.min(1)]],
   });
 
   get addSetsLabel(): string {
@@ -455,7 +478,7 @@ export class WorkoutEditorComponent {
   private _resetForm(): void {
     this.addingFor.set(null);
     this.editingSet.set(null);
-    this.setForm.reset({ weight: 0, reps: 8, series: 4, feeling: 3 });
+    this.setForm.reset({ weight: 0, reps: 8, series: 4 });
   }
 
   // ── Helpers ───────────────────────────────────────────────────
@@ -485,9 +508,6 @@ export class WorkoutEditorComponent {
     const v = (this.setForm.value.series ?? 1) + delta;
     this.setForm.patchValue({ series: Math.max(1, v) });
   }
-  setFeeling(level: FeelingLevel): void {
-    this.setForm.patchValue({ feeling: level });
-  }
 
   // ── Form adjusters (edit-set) ─────────────────────────────────
   adjustEditWeight(delta: number): void {
@@ -498,8 +518,18 @@ export class WorkoutEditorComponent {
     const v = (this.editSetForm.value.reps ?? 1) + delta;
     this.editSetForm.patchValue({ reps: Math.max(1, v) });
   }
-  setEditFeeling(level: FeelingLevel): void {
-    this.editSetForm.patchValue({ feeling: level });
+
+  // ── Entry-level feeling ───────────────────────────────────────
+  async setEntryFeeling(entry: WorkoutEntry, level: FeelingLevel): Promise<void> {
+    const w = this.workout();
+    if (!w) return;
+    // Toggle: clicking the active level clears it
+    const newFeeling = entry.feeling === level ? undefined : level;
+    try {
+      await this.workoutService.updateEntryFeeling(w.id, entry.exerciseId, newFeeling);
+    } catch {
+      this.snackBar.open('Error en actualitzar la sensació', '', { duration: 2000 });
+    }
   }
 
   // ── Set actions ───────────────────────────────────────────────
@@ -522,7 +552,7 @@ export class WorkoutEditorComponent {
   startEditSet(exerciseId: string, index: number, set: WorkoutSet): void {
     this.addingFor.set(null);
     this.editingSet.set({ exerciseId, index });
-    this.editSetForm.setValue({ weight: set.weight, reps: set.reps, feeling: set.feeling });
+    this.editSetForm.setValue({ weight: set.weight, reps: set.reps });
   }
 
   cancelEditSet(): void { this.editingSet.set(null); }
@@ -531,12 +561,12 @@ export class WorkoutEditorComponent {
     if (this.editSetForm.invalid) return;
     const es = this.editingSet();
     if (!es) return;
-    const { weight, reps, feeling } = this.editSetForm.value;
+    const { weight, reps } = this.editSetForm.value;
     const w = this.workout();
     if (!w) return;
     try {
       await this.workoutService.updateSetInEntry(w.id, es.exerciseId, es.index, {
-        weight: weight!, reps: reps!, feeling: feeling as FeelingLevel,
+        weight: weight!, reps: reps!,
       });
       this.cancelEditSet();
     } catch {
@@ -546,12 +576,12 @@ export class WorkoutEditorComponent {
 
   async submitSets(exerciseId: string): Promise<void> {
     if (this.setForm.invalid) return;
-    const { weight, reps, series, feeling } = this.setForm.value;
+    const { weight, reps, series } = this.setForm.value;
     const w = this.workout();
     if (!w) return;
 
     const sets = Array.from({ length: series! }, () => ({
-      weight: weight!, reps: reps!, feeling: feeling as FeelingLevel,
+      weight: weight!, reps: reps!,
     }));
 
     try {

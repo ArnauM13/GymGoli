@@ -23,7 +23,7 @@ import {
 } from 'chart.js';
 
 import { Exercise } from '../../core/models/exercise.model';
-import { FeelingLevel, Workout } from '../../core/models/workout.model';
+import { Workout } from '../../core/models/workout.model';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { WorkoutService } from '../../core/services/workout.service';
 
@@ -251,10 +251,10 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
     if (!this.selectedExerciseId) return [];
     const workouts = this.workoutService.getWorkoutsForExercise(this.selectedExerciseId);
     const metric = this.selectedMetric();
-    return workouts.map(w => ({
-      date: w.date,
-      value: this.extractMetric(w, this.selectedExerciseId, metric),
-    }));
+    return workouts
+      .map(w => ({ date: w.date, value: this.extractMetric(w, this.selectedExerciseId, metric) }))
+      // For 'feeling', skip workouts where no feeling was set (value=0)
+      .filter(p => metric !== 'feeling' || p.value > 0);
   });
 
   readonly stats = computed(() => {
@@ -295,16 +295,13 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
 
   private extractMetric(workout: Workout, exerciseId: string, metric: Metric): number {
     const entry = workout.entries.find(e => e.exerciseId === exerciseId);
-    if (!entry || entry.sets.length === 0) return 0;
-
-    switch (metric) {
-      case 'weight':
-        return Math.max(...entry.sets.map(s => s.weight));
-      case 'volume':
-        return entry.sets.reduce((sum, s) => sum + s.weight * s.reps, 0);
-      case 'feeling':
-        return Math.round((entry.sets.reduce((sum, s) => sum + s.feeling, 0) / entry.sets.length) * 10) / 10;
-    }
+    if (!entry) return 0;
+    // Feeling is now an entry-level property (not per-set)
+    if (metric === 'feeling') return entry.feeling ?? 0;
+    if (entry.sets.length === 0) return 0;
+    if (metric === 'weight') return Math.max(...entry.sets.map(s => s.weight));
+    if (metric === 'volume') return entry.sets.reduce((sum, s) => sum + s.weight * s.reps, 0);
+    return 0;
   }
 
   private getMetricLabel(metric: Metric): string {
@@ -366,11 +363,19 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
         scales: {
           x: {
             grid: { display: false },
-            ticks: { font: { size: 11 }, color: '#888', maxRotation: 45 },
+            ticks: {
+              font: { size: 11 },
+              color: '#888',
+              maxRotation: 40,
+              // Always show all labels (important for single-point charts)
+              autoSkip: false,
+            },
           },
           y: {
             grid: { color: '#f0f0f0' },
             ticks: { font: { size: 11 }, color: '#888' },
+            // Ensure Y axis has visible range even with a single data point
+            beginAtZero: false,
           },
         },
       },
@@ -378,9 +383,8 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
   }
 
   private formatDate(dateStr: string): string {
-    return new Date(dateStr + 'T12:00:00').toLocaleDateString('ca-ES', {
-      day: 'numeric',
-      month: 'short',
-    });
+    const d = new Date(dateStr + 'T12:00:00');
+    // "3 feb" → readable day label on X axis
+    return d.toLocaleDateString('ca-ES', { day: 'numeric', month: 'short' });
   }
 }

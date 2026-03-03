@@ -173,7 +173,11 @@ const MONTHS_CA = [
                               <div class="set-pill">
                                 <span class="set-weight">{{ set.weight }}kg</span>
                                 <span class="set-reps">× {{ set.reps }}</span>
-                                <span class="set-feeling">{{ getFeelingEmoji(set.feeling) }}</span>
+                              </div>
+                            }
+                            @if (entry.feeling) {
+                              <div class="set-pill feeling-pill">
+                                {{ getFeelingEmoji(entry.feeling) }}
                               </div>
                             }
                           </div>
@@ -393,8 +397,8 @@ const MONTHS_CA = [
       padding: 3px 9px; background: #f5f5f5; border-radius: 16px; font-size: 12px;
       .set-weight { font-weight: 600; color: #333; }
       .set-reps { color: #666; }
-      .set-feeling { font-size: 12px; }
     }
+    .feeling-pill { font-size: 16px; padding: 2px 7px; }
 
     .no-sets { font-size: 12px; color: #bbb; font-style: italic; }
     .detail-footer { display: flex; justify-content: flex-end; padding: 2px 0 6px; }

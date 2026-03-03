@@ -14,7 +14,7 @@ import {
 } from '@angular/fire/firestore';
 import { Observable, map } from 'rxjs';
 
-import { Workout, WorkoutEntry, WorkoutSet } from '../models/workout.model';
+import { FeelingLevel, Workout, WorkoutEntry, WorkoutSet } from '../models/workout.model';
 
 @Injectable({ providedIn: 'root' })
 export class WorkoutService {
@@ -117,6 +117,22 @@ export class WorkoutService {
     const workout = this.workouts().find(w => w.id === workoutId);
     if (!workout) return;
     const entries = workout.entries.filter(e => e.exerciseId !== exerciseId);
+    await updateDoc(doc(this.firestore, 'workouts', workoutId), { entries });
+  }
+
+  /** Set (or clear) the general feeling for an exercise entry */
+  async updateEntryFeeling(workoutId: string, exerciseId: string, feeling: FeelingLevel | undefined): Promise<void> {
+    const workout = this.workouts().find(w => w.id === workoutId);
+    if (!workout) return;
+    const entries = workout.entries.map(e => {
+      if (e.exerciseId !== exerciseId) return e;
+      if (feeling === undefined) {
+        // Remove the feeling field entirely
+        const { feeling: _removed, ...rest } = e as WorkoutEntry & { feeling?: FeelingLevel };
+        return rest as WorkoutEntry;
+      }
+      return { ...e, feeling };
+    });
     await updateDoc(doc(this.firestore, 'workouts', workoutId), { entries });
   }
 

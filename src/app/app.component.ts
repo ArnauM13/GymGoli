@@ -53,7 +53,7 @@ import { NavBarComponent } from './shared/components/nav-bar/nav-bar.component';
     .app-name {
       font-size: 17px;
       font-weight: 700;
-      color: #006874;
+      color: #1a1a1a;
       letter-spacing: -0.3px;
     }
 
