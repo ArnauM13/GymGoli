@@ -1,0 +1,8 @@
+# Never upload local environment files — credentials must come from Vercel env vars
+src/environments/environment.ts
+src/environments/environment.prod.ts
+
+# Don't upload local build artifacts
+dist/
+node_modules/
+.angular/cache/
