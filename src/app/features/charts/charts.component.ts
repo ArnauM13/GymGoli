@@ -236,7 +236,9 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
   private workoutService = inject(WorkoutService);
 
   readonly exercises = this.exerciseService.exercises;
-  selectedExerciseId = '';
+  private _selectedExerciseId = signal('');
+  get selectedExerciseId(): string { return this._selectedExerciseId(); }
+  set selectedExerciseId(v: string) { this._selectedExerciseId.set(v); }
   readonly selectedMetric = signal<Metric>('weight');
 
   readonly metrics: { value: Metric; label: string }[] = [
@@ -248,12 +250,12 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
   private chart: Chart | null = null;
 
   readonly chartData = computed<ChartPoint[]>(() => {
-    if (!this.selectedExerciseId) return [];
-    const workouts = this.workoutService.getWorkoutsForExercise(this.selectedExerciseId);
+    const exId = this._selectedExerciseId();
+    if (!exId) return [];
+    const workouts = this.workoutService.getWorkoutsForExercise(exId);
     const metric = this.selectedMetric();
     return workouts
-      .map(w => ({ date: w.date, value: this.extractMetric(w, this.selectedExerciseId, metric) }))
-      // For 'feeling', skip workouts where no feeling was set (value=0)
+      .map(w => ({ date: w.date, value: this.extractMetric(w, exId, metric) }))
       .filter(p => metric !== 'feeling' || p.value > 0);
   });
 
@@ -309,9 +311,12 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
   }
 
   private updateChart(data: ChartPoint[], metric: Metric): void {
-    if (!this.canvasRef) return;
     if (data.length === 0) { this.chart?.destroy(); this.chart = null; return; }
-
+    // Canvas may not be in DOM yet (rendered by @if after data arrives) — retry after render
+    if (!this.canvasRef) {
+      setTimeout(() => this.updateChart(data, metric), 0);
+      return;
+    }
     if (this.chart) {
       this.chart.data.labels = data.map(d => this.formatDate(d.date));
       this.chart.data.datasets[0].data = data.map(d => d.value);

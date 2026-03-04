@@ -7,6 +7,7 @@ import {
   collection,
   collectionData,
   deleteDoc,
+  deleteField,
   doc,
   orderBy,
   query,
@@ -49,11 +50,19 @@ export class ExerciseService {
   }
 
   async create(data: Omit<Exercise, 'id' | 'createdAt'>): Promise<void> {
-    await addDoc(this.col, { ...data, createdAt: Timestamp.now() });
+    // Firestore rejects undefined values — strip optional fields that weren't set
+    const clean = Object.fromEntries(
+      Object.entries(data).filter(([, v]) => v !== undefined)
+    );
+    await addDoc(this.col, { ...clean, createdAt: Timestamp.now() });
   }
 
   async update(id: string, data: Partial<Omit<Exercise, 'id' | 'createdAt'>>): Promise<void> {
-    await updateDoc(doc(this.firestore, 'exercises', id), data);
+    // Replace undefined with deleteField() so clearing optional fields removes them in Firestore
+    const updateData = Object.fromEntries(
+      Object.entries(data).map(([k, v]) => [k, v === undefined ? deleteField() : v])
+    );
+    await updateDoc(doc(this.firestore, 'exercises', id), updateData);
   }
 
   async delete(id: string): Promise<void> {
