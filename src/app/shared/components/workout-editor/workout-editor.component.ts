@@ -374,17 +374,22 @@ import { WorkoutService } from '../../../core/services/workout.service';
 
     /* ── Set action buttons ── */
     .we-icon-btn-sm {
-      background: none;
-      border: none;
+      background: #f5f5f5;
+      border: 1px solid #e8e8e8;
+      border-radius: 8px;
       cursor: pointer;
-      color: #ccc;
-      padding: 2px;
+      color: #999;
+      padding: 7px 10px;
       display: flex;
       align-items: center;
+      min-width: 40px;
+      min-height: 36px;
+      justify-content: center;
 
-      .material-symbols-outlined { font-size: 16px; }
-      &:hover        { color: #aaa; }
-      &.danger:hover { color: #ef5350; }
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover        { background: #eee; color: #666; }
+      &.danger       { background: rgba(239,83,80,0.08); border-color: rgba(239,83,80,0.2); color: #ef5350; }
+      &.danger:hover { background: rgba(239,83,80,0.16); }
     }
 
     .we-set-actions { display: flex; gap: 2px; align-items: center; }

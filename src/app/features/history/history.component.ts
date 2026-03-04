@@ -11,12 +11,13 @@ import { ExercisePickerDialogComponent } from '../today/components/exercise-pick
 
 // ── Calendar day cell ─────────────────────────────────────────────────────────
 interface CalDay {
-  date:       string;
-  day:        number;
-  hasWorkout: boolean;
-  isToday:    boolean;
-  isFuture:   boolean;
-  isSelected: boolean;
+  date:            string;
+  day:             number;
+  hasWorkout:      boolean;
+  workoutCategory: string | undefined; // for coloring the calendar dot
+  isToday:         boolean;
+  isFuture:        boolean;
+  isSelected:      boolean;
 }
 
 const MONTHS_CA = [
@@ -83,7 +84,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               >
                 <span class="day-num">{{ cell.day }}</span>
                 @if (cell.hasWorkout) {
-                  <span class="workout-dot"></span>
+                  <span class="workout-dot" [style.background]="getCatDotColor(cell.workoutCategory)"></span>
                 }
               </button>
             }
@@ -163,6 +164,11 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
                     <span class="month-year">{{ getMonthYear(workout.date) }}</span>
                   </div>
                   <div class="workout-summary">
+                    @if (workout.category) {
+                      <span class="workout-type-badge" [style.background]="getCatColor(workout.category)">
+                        {{ getCatLabel(workout.category) }}
+                      </span>
+                    }
                     <span class="exercise-count">
                       {{ workout.entries.length }} exercici{{ workout.entries.length !== 1 ? 's' : '' }}
                     </span>
@@ -297,10 +303,10 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .day-num { line-height: 1; }
 
     .workout-dot {
-      width: 5px; height: 5px; border-radius: 50%; background: #006874; flex-shrink: 0;
+      width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+      /* background set inline via [style.background]=getCatDotColor() */
     }
-    .is-selected .workout-dot { background: rgba(255,255,255,0.75); }
-    .is-today:not(.is-selected) .workout-dot { background: #006874; }
+    .is-selected .workout-dot { background: rgba(255,255,255,0.85) !important; }
 
     /* ════════════════════════════════
        SELECTED DATE DETAIL
@@ -409,9 +415,19 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
 
     .workout-summary {
-      flex: 1; display: flex; flex-direction: column; gap: 3px;
+      flex: 1; display: flex; flex-direction: column; gap: 4px;
       .exercise-count { font-size: 14px; font-weight: 600; color: #1a1a1a; }
       .set-count { font-size: 12px; color: #888; }
+    }
+
+    .workout-type-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      color: white;
+      width: fit-content;
     }
 
     .chevron { color: #bbb; font-size: 20px; flex-shrink: 0; }
@@ -486,7 +502,7 @@ export class HistoryComponent {
     const m     = this.calMonth();
     const today = this.workoutService.todayDateString();
     const sel   = this.selectedDate();
-    const workoutDates = new Set(this.allWorkouts().map(w => w.date));
+    const workoutByDate = new Map(this.allWorkouts().map(w => [w.date, w]));
 
     const firstDay    = new Date(y, m, 1);
     const daysInMonth = new Date(y, m + 1, 0).getDate();
@@ -497,9 +513,11 @@ export class HistoryComponent {
     for (let i = 0; i < startPad; i++) cells.push(null);
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const w = workoutByDate.get(dateStr);
       cells.push({
         date: dateStr, day: d,
-        hasWorkout: workoutDates.has(dateStr),
+        hasWorkout:      !!w,
+        workoutCategory: w?.category,
         isToday:    dateStr === today,
         isFuture:   dateStr > today,
         isSelected: dateStr === sel,
@@ -531,6 +549,17 @@ export class HistoryComponent {
 
   // ── Helpers ───────────────────────────────────────────────────
   getFeelingEmoji(level: FeelingLevel): string { return FEELING_EMOJI[level]; }
+
+  getCatColor(cat: string): string {
+    return CATEGORY_COLORS[cat as ExerciseCategory] ?? '#bbb';
+  }
+  getCatLabel(cat: string): string {
+    return CATEGORY_LABELS[cat as ExerciseCategory] ?? cat;
+  }
+  getCatDotColor(cat: string | undefined): string {
+    if (!cat) return '#006874'; // default teal for old workouts without category
+    return CATEGORY_COLORS[cat as ExerciseCategory] ?? '#006874';
+  }
 
   getDay(date: string): string {
     return new Date(date + 'T12:00:00').toLocaleDateString('ca-ES', { day: 'numeric' });
