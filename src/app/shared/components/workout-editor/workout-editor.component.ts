@@ -1,9 +1,10 @@
 import { Component, ViewEncapsulation, inject, input, output, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
-import { CATEGORY_COLORS, CATEGORY_LABELS } from '../../../core/models/exercise.model';
+import { CATEGORY_COLORS, CATEGORY_LABELS, SUBCATEGORY_LABELS } from '../../../core/models/exercise.model';
 import { FEELING_EMOJI, FEELING_LABEL, FeelingLevel, Workout, WorkoutEntry, WorkoutSet } from '../../../core/models/workout.model';
 import { ExerciseService } from '../../../core/services/exercise.service';
 import { WorkoutService } from '../../../core/services/workout.service';
@@ -28,21 +29,32 @@ import { WorkoutService } from '../../../core/services/workout.service';
 @Component({
   selector: 'app-workout-editor',
   standalone: true,
-  imports: [ReactiveFormsModule, MatButtonModule],
+  imports: [ReactiveFormsModule, MatButtonModule, DragDropModule],
   encapsulation: ViewEncapsulation.None,
   template: `
     @if (workout(); as w) {
-      <div class="we-entries">
+      <div class="we-entries" cdkDropList (cdkDropListDropped)="onDrop($event)">
 
         @for (entry of w.entries; track entry.exerciseId) {
-          <div class="we-entry-card">
+          <div class="we-entry-card" cdkDrag [cdkDragDisabled]="!editMode()">
+
+            <!-- Drag placeholder -->
+            <div class="we-drag-placeholder" *cdkDragPlaceholder></div>
 
             <!-- Entry header -->
             <div class="we-entry-header">
+              @if (editMode()) {
+                <span class="we-drag-handle material-symbols-outlined" cdkDragHandle>drag_indicator</span>
+              }
               <div class="we-entry-title">
-                <span class="we-category-badge" [style.background]="getCatColor(entry)">
-                  {{ getCatLabel(entry) }}
-                </span>
+                <div class="we-entry-badges">
+                  <span class="we-category-badge" [style.background]="getCatColor(entry)">
+                    {{ getCatLabel(entry) }}
+                  </span>
+                  @if (getSubLabel(entry)) {
+                    <span class="we-subcategory-badge">{{ getSubLabel(entry) }}</span>
+                  }
+                </div>
                 <div class="we-entry-name-row">
                   <span class="we-entry-name">{{ entry.exerciseName }}</span>
                   <!-- Feeling emoji next to the name in view mode -->
@@ -228,8 +240,35 @@ import { WorkoutService } from '../../../core/services/workout.service';
       padding: 12px 8px 6px 14px;
     }
 
-    .we-entry-title { display: flex; flex-direction: column; gap: 4px; }
+    /* ── Drag handle ── */
+    .we-drag-handle {
+      font-size: 20px;
+      color: #ccc;
+      cursor: grab;
+      padding: 4px 4px 4px 0;
+      flex-shrink: 0;
+      user-select: none;
+      &:active { cursor: grabbing; }
+    }
+
+    /* ── CDK drag states ── */
+    .we-entry-card.cdk-drag-preview {
+      box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+      border-radius: 14px;
+      opacity: 0.95;
+    }
+    .we-drag-placeholder {
+      height: 60px;
+      border: 2px dashed #d0e8ea;
+      border-radius: 14px;
+      background: rgba(0,104,116,0.04);
+    }
+    .cdk-drag-animating .we-entry-card { transition: transform 200ms ease; }
+
+    .we-entry-title { display: flex; flex-direction: column; gap: 4px; flex: 1; }
     .we-entry-name  { font-size: 16px; font-weight: 600; color: #1a1a1a; }
+
+    .we-entry-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
     .we-category-badge {
       display: inline-block;
@@ -241,7 +280,18 @@ import { WorkoutService } from '../../../core/services/workout.service';
       width: fit-content;
     }
 
-    .we-remove-btn { color: #bbb; }
+    .we-subcategory-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 500;
+      color: #666;
+      background: #f0f0f0;
+      width: fit-content;
+    }
+
+    .we-remove-btn { color: #bbb; flex-shrink: 0; }
 
     /* ── Entry feeling row ── */
     .we-entry-feeling-row {
@@ -432,6 +482,7 @@ import { WorkoutService } from '../../../core/services/workout.service';
       background: transparent; color: #888;
       font-size: 15px; font-weight: 500; cursor: pointer;
       margin-top: 4px; transition: all 0.2s;
+      .material-symbols-outlined { font-size: 20px; line-height: 1; vertical-align: middle; }
       &:hover { border-color: #006874; color: #006874; background: rgba(0,104,116,0.04); }
     }
   `],
@@ -493,6 +544,24 @@ export class WorkoutEditorComponent {
   getCatLabel(entry: WorkoutEntry): string {
     const ex = this.exerciseService.getById(entry.exerciseId);
     return ex ? CATEGORY_LABELS[ex.category] : '';
+  }
+
+  getSubLabel(entry: WorkoutEntry): string {
+    const ex = this.exerciseService.getById(entry.exerciseId);
+    return ex?.subcategory ? (SUBCATEGORY_LABELS[ex.subcategory] ?? ex.subcategory) : '';
+  }
+
+  async onDrop(event: CdkDragDrop<WorkoutEntry[]>): Promise<void> {
+    if (event.previousIndex === event.currentIndex) return;
+    const w = this.workout();
+    if (!w) return;
+    const entries = [...w.entries];
+    moveItemInArray(entries, event.previousIndex, event.currentIndex);
+    try {
+      await this.workoutService.reorderEntries(w.id, entries);
+    } catch {
+      this.snackBar.open('Error en reordenar', '', { duration: 2000 });
+    }
   }
 
   // ── Form adjusters (add-sets) ─────────────────────────────────

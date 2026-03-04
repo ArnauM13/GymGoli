@@ -33,6 +33,7 @@ export interface Workout {
   id: string;
   date: string; // YYYY-MM-DD
   entries: WorkoutEntry[];
+  category?: string; // ExerciseCategory — filters exercise picker to this type
   notes?: string;
   createdAt: Date;
 }

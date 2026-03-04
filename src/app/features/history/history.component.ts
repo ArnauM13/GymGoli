@@ -3,7 +3,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
-import { Exercise } from '../../core/models/exercise.model';
+import { Exercise, ExerciseCategory, CATEGORY_LABELS, CATEGORY_ICONS, CATEGORY_COLORS } from '../../core/models/exercise.model';
 import { FEELING_EMOJI, FeelingLevel, Workout } from '../../core/models/workout.model';
 import { WorkoutService } from '../../core/services/workout.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
@@ -22,6 +22,12 @@ interface CalDay {
 const MONTHS_CA = [
   'Gener','Febrer','Març','Abril','Maig','Juny',
   'Juliol','Agost','Setembre','Octubre','Novembre','Desembre',
+];
+
+const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; color: string }[] = [
+  { value: 'push', label: CATEGORY_LABELS.push, icon: CATEGORY_ICONS.push, color: CATEGORY_COLORS.push },
+  { value: 'pull', label: CATEGORY_LABELS.pull, icon: CATEGORY_ICONS.pull, color: CATEGORY_COLORS.pull },
+  { value: 'legs', label: CATEGORY_LABELS.legs, icon: CATEGORY_ICONS.legs, color: CATEGORY_COLORS.legs },
 ];
 
 @Component({
@@ -110,15 +116,20 @@ const MONTHS_CA = [
             </div>
           </div>
 
-          <!-- No workout for this day -->
+          <!-- No workout for this day: choose type first -->
           @if (!selectedWorkout()) {
             <div class="detail-empty">
               <span class="material-symbols-outlined empty-icon">fitness_center</span>
               <p>Cap entrenament registrat</p>
-              <button mat-flat-button class="add-btn" (click)="openPicker()">
-                <span class="material-symbols-outlined">add</span>
-                Afegir exercici
-              </button>
+              <p class="type-hint">Selecciona el tipus:</p>
+              <div class="type-grid-sm">
+                @for (cat of workoutTypes; track cat.value) {
+                  <button class="type-chip-btn" [style.--cat-color]="cat.color" (click)="selectType(cat.value)">
+                    <span class="material-symbols-outlined">{{ cat.icon }}</span>
+                    {{ cat.label }}
+                  </button>
+                }
+              </div>
             </div>
           }
 
@@ -333,10 +344,32 @@ const MONTHS_CA = [
       p { margin: 0; font-size: 14px; color: #aaa; }
     }
 
-    .add-btn {
-      background: #006874; color: white; border-radius: 20px;
-      padding: 0 20px; height: 40px; font-size: 14px;
-      display: flex; align-items: center; gap: 4px;
+    .type-hint { font-size: 12px; color: #bbb; margin-top: 4px; }
+
+    .type-grid-sm {
+      display: flex;
+      gap: 8px;
+      width: 100%;
+      max-width: 300px;
+    }
+
+    .type-chip-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      padding: 12px 6px;
+      border: 1.5px solid var(--cat-color);
+      border-radius: 12px;
+      background: white;
+      cursor: pointer;
+      color: var(--cat-color);
+      font-size: 11px;
+      font-weight: 600;
+      transition: all 0.15s;
+      .material-symbols-outlined { font-size: 20px; }
+      &:hover { background: color-mix(in srgb, var(--cat-color) 10%, white); }
     }
 
     /* Spacing for the shared editor inside detail-section */
@@ -420,6 +453,8 @@ export class HistoryComponent {
   private snackBar       = inject(MatSnackBar);
 
   @ViewChild('editor') editor?: WorkoutEditorComponent;
+
+  readonly workoutTypes = WORKOUT_TYPES;
 
   // ── Calendar state ────────────────────────────────────────────
   readonly calYear      = signal(new Date().getFullYear());
@@ -563,21 +598,27 @@ export class HistoryComponent {
     }
   }
 
+  /** Called from the detail-empty type selector buttons */
+  selectType(category: ExerciseCategory): void {
+    this.openPicker(category);
+  }
+
   // ── Exercise picker ───────────────────────────────────────────
-  openPicker(): void {
+  openPicker(newCategory?: ExerciseCategory): void {
     const workout    = this.selectedWorkout();
     const date       = this.selectedDate()!;
     const excludeIds = workout?.entries.map(e => e.exerciseId) ?? [];
+    const filterCategory = (newCategory ?? workout?.category) as ExerciseCategory | undefined;
 
     const ref = this.dialog.open(ExercisePickerDialogComponent, {
-      data: { excludeIds }, width: '420px', maxHeight: '80vh',
+      data: { excludeIds, filterCategory }, width: '420px', maxHeight: '80vh',
     });
 
     ref.afterClosed().subscribe(async (exercise: Exercise | undefined) => {
       if (!exercise) return;
       try {
         let workoutId = workout?.id;
-        if (!workoutId) workoutId = await this.workoutService.createWorkoutForDate(date);
+        if (!workoutId) workoutId = await this.workoutService.createWorkoutForDate(date, filterCategory);
 
         await this.workoutService.addExerciseToWorkout(workoutId, {
           exerciseId: exercise.id, exerciseName: exercise.name, sets: [],
@@ -585,7 +626,6 @@ export class HistoryComponent {
 
         this.editMode.set(true);
 
-        // After Firestore write, let Angular re-render the editor then open add-sets form
         setTimeout(() => {
           this.editor?.startAddSet({ exerciseId: exercise.id, exerciseName: exercise.name, sets: [] });
         }, 0);

@@ -10,6 +10,7 @@ import { ExerciseService } from '../../../core/services/exercise.service';
 
 export interface ExercisePickerData {
   excludeIds?: string[];
+  filterCategory?: ExerciseCategory; // when set, locks the picker to this category
 }
 
 @Component({
@@ -17,7 +18,14 @@ export interface ExercisePickerData {
   standalone: true,
   imports: [FormsModule, MatDialogModule, MatButtonModule, MatInputModule, MatFormFieldModule],
   template: `
-    <h2 mat-dialog-title>Selecciona exercici</h2>
+    <h2 mat-dialog-title>
+      Selecciona exercici
+      @if (data.filterCategory) {
+        <span class="cat-badge" [style.background]="getCategoryColor(data.filterCategory)">
+          {{ getCategoryLabel(data.filterCategory) }}
+        </span>
+      }
+    </h2>
 
     <div class="search-bar">
       <mat-form-field appearance="outline" class="search-field">
@@ -26,14 +34,16 @@ export interface ExercisePickerData {
       </mat-form-field>
     </div>
 
-    <div class="filter-bar">
-      <button class="chip" [class.active]="!catFilter()" (click)="catFilter.set(null)">Tots</button>
-      @for (cat of categories; track cat.value) {
-        <button class="chip" [class.active]="catFilter() === cat.value" (click)="catFilter.set(cat.value)">
-          {{ cat.label }}
-        </button>
-      }
-    </div>
+    @if (!data.filterCategory) {
+      <div class="filter-bar">
+        <button class="chip" [class.active]="!catFilter()" (click)="catFilter.set(null)">Tots</button>
+        @for (cat of categories; track cat.value) {
+          <button class="chip" [class.active]="catFilter() === cat.value" (click)="catFilter.set(cat.value)">
+            {{ cat.label }}
+          </button>
+        }
+      </div>
+    }
 
     <mat-dialog-content class="exercise-list">
       @if (filtered().length === 0) {
@@ -58,6 +68,16 @@ export interface ExercisePickerData {
     </mat-dialog-actions>
   `,
   styles: [`
+    h2[mat-dialog-title] { display: flex; align-items: center; gap: 10px; }
+
+    .cat-badge {
+      padding: 2px 10px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: white;
+    }
+
     .search-bar { padding: 0 24px 4px; }
     .search-field { width: 100%; }
 
@@ -114,7 +134,7 @@ export class ExercisePickerDialogComponent {
   readonly data: ExercisePickerData = inject(MAT_DIALOG_DATA);
 
   searchTerm = '';
-  readonly catFilter = signal<ExerciseCategory | null>(null);
+  readonly catFilter = signal<ExerciseCategory | null>(this.data.filterCategory ?? null);
 
   readonly categories = (Object.keys(CATEGORY_LABELS) as ExerciseCategory[]).map(v => ({
     value: v,
@@ -132,11 +152,7 @@ export class ExercisePickerDialogComponent {
       .filter(e => !term || e.name.toLowerCase().includes(term));
   });
 
-  getCategoryColor(cat: ExerciseCategory): string {
-    const colors: Record<ExerciseCategory, string> = { push: '#e57373', pull: '#64b5f6', legs: '#81c784' };
-    return colors[cat];
-  }
-
+  getCategoryColor(cat: ExerciseCategory): string { return CATEGORY_COLORS[cat] ?? '#bbb'; }
   getCategoryLabel(cat: ExerciseCategory): string { return CATEGORY_LABELS[cat]; }
   getSubLabel(sub: string): string { return SUBCATEGORY_LABELS[sub as keyof typeof SUBCATEGORY_LABELS] ?? sub; }
 

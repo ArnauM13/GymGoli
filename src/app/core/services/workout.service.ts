@@ -60,17 +60,15 @@ export class WorkoutService {
       .sort((a, b) => a.date.localeCompare(b.date));
   }
 
-  async createWorkoutForDate(date: string): Promise<string> {
-    const ref = await addDoc(this.col, {
-      date,
-      entries: [],
-      createdAt: Timestamp.now(),
-    });
+  async createWorkoutForDate(date: string, category?: string): Promise<string> {
+    const data: Record<string, unknown> = { date, entries: [], createdAt: Timestamp.now() };
+    if (category) data['category'] = category;
+    const ref = await addDoc(this.col, data);
     return ref.id;
   }
 
-  async createTodayWorkout(): Promise<string> {
-    return this.createWorkoutForDate(this.todayDateString());
+  async createTodayWorkout(category?: string): Promise<string> {
+    return this.createWorkoutForDate(this.todayDateString(), category);
   }
 
   async addExerciseToWorkout(workoutId: string, entry: WorkoutEntry): Promise<void> {
@@ -133,6 +131,10 @@ export class WorkoutService {
       }
       return { ...e, feeling };
     });
+    await updateDoc(doc(this.firestore, 'workouts', workoutId), { entries });
+  }
+
+  async reorderEntries(workoutId: string, entries: WorkoutEntry[]): Promise<void> {
     await updateDoc(doc(this.firestore, 'workouts', workoutId), { entries });
   }
 
