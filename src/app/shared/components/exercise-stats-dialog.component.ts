@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 
@@ -13,21 +13,23 @@ interface SessionPoint {
 }
 
 @Component({
-  selector: 'app-exercise-stats-dialog',
+  selector: 'app-exercise-stats',
   standalone: true,
   imports: [MatButtonModule],
   template: `
-    <div class="esd-wrap">
-      <!-- Header -->
-      <div class="esd-header">
-        <div class="esd-title-block">
-          <span class="material-symbols-outlined esd-title-icon">bar_chart</span>
-          <h2 class="esd-title">{{ data.exerciseName }}</h2>
+    <div class="esd-wrap" [class.esd-inline]="isInline()">
+      <!-- Header (dialog mode only) -->
+      @if (!isInline()) {
+        <div class="esd-header">
+          <div class="esd-title-block">
+            <span class="material-symbols-outlined esd-title-icon">bar_chart</span>
+            <h2 class="esd-title">{{ resolvedName() }}</h2>
+          </div>
+          <button mat-icon-button class="esd-close-btn" (click)="close()">
+            <span class="material-symbols-outlined">close</span>
+          </button>
         </div>
-        <button mat-icon-button class="esd-close-btn" (click)="close()">
-          <span class="material-symbols-outlined">close</span>
-        </button>
-      </div>
+      }
 
       @if (isLoading()) {
         <div class="esd-loading-bar-wrap">
@@ -92,9 +94,14 @@ interface SessionPoint {
   styles: [`
     .esd-wrap {
       display: flex; flex-direction: column;
-      min-width: min(340px, 90vw);
       max-height: 80vh;
       overflow: hidden;
+    }
+    .esd-wrap:not(.esd-inline) {
+      min-width: min(340px, 90vw);
+    }
+    .esd-inline {
+      padding: 0;
     }
 
     /* ── Header ── */
@@ -134,6 +141,9 @@ interface SessionPoint {
       display: grid; grid-template-columns: repeat(4, 1fr);
       gap: 8px; padding: 0 16px 16px;
     }
+    .esd-inline .esd-stats-row {
+      padding: 12px 12px 12px;
+    }
     .esd-stat {
       background: #f7f7f7; border-radius: 10px; padding: 10px 6px;
       display: flex; flex-direction: column; align-items: center; gap: 3px;
@@ -147,6 +157,9 @@ interface SessionPoint {
     .esd-sessions {
       overflow-y: auto; padding: 0 16px 16px;
       display: flex; flex-direction: column; gap: 8px;
+    }
+    .esd-inline .esd-sessions {
+      padding: 0 12px 12px;
     }
     .esd-session-row {
       display: flex; align-items: center; gap: 10px;
@@ -171,18 +184,28 @@ interface SessionPoint {
   `],
 })
 export class ExerciseStatsDialogComponent {
-  private dialogRef  = inject(MatDialogRef<ExerciseStatsDialogComponent>);
-  readonly data: { exerciseId: string; exerciseName: string } = inject(MAT_DIALOG_DATA);
+  private dialogRef = inject(MatDialogRef<ExerciseStatsDialogComponent>, { optional: true });
+  readonly data: { exerciseId: string; exerciseName: string } | null = inject(MAT_DIALOG_DATA, { optional: true });
   private workoutService = inject(WorkoutService);
+
+  readonly inlineExerciseId   = input<string | null>(null);
+  readonly inlineExerciseName = input<string | null>(null);
+
+  readonly resolvedId   = computed(() => this.data?.exerciseId   ?? this.inlineExerciseId()   ?? '');
+  readonly resolvedName = computed(() => this.data?.exerciseName ?? this.inlineExerciseName() ?? '');
+
+  readonly isInline = computed(() => !this.data);
 
   readonly isLoading = this.workoutService.isLoading;
 
   readonly sessions = computed((): SessionPoint[] => {
-    const workouts = this.workoutService.getWorkoutsForExercise(this.data.exerciseId);
+    const id = this.resolvedId();
+    if (!id) return [];
+    const workouts = this.workoutService.getWorkoutsForExercise(id);
     type Raw = { date: string; maxWeight: number; feeling?: FeelingLevel };
     const points: Raw[] = [];
     for (const w of workouts) {
-      const entry = w.entries.find(e => e.exerciseId === this.data.exerciseId);
+      const entry = w.entries.find(e => e.exerciseId === id);
       if (!entry || !entry.sets.length) continue;
       points.push({ date: w.date, maxWeight: Math.max(...entry.sets.map(s => s.weight)), feeling: entry.feeling });
     }
@@ -205,11 +228,11 @@ export class ExerciseStatsDialogComponent {
   });
 
   constructor() {
-    // Ensure full history is loaded for accurate stats
+    if (!this.data) return; // inline mode — parent loads data
     this.workoutService.loadAllWorkouts();
   }
 
-  close(): void { this.dialogRef.close(); }
+  close(): void { this.dialogRef?.close(); }
 
   getFeelingEmoji(level: FeelingLevel): string { return FEELING_EMOJI[level]; }
   getFeelingLabel(level: FeelingLevel): string  { return FEELING_LABEL[level]; }
