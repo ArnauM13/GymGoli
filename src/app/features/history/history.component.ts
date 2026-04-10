@@ -1,14 +1,16 @@
 import { Component, computed, inject, signal } from '@angular/core';
 
 import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
-import { FEELING_EMOJI, FeelingLevel, Workout } from '../../core/models/workout.model';
+import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry } from '../../core/models/workout.model';
 import { WorkoutService } from '../../core/services/workout.service';
+import { ExerciseService } from '../../core/services/exercise.service';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
+import { ExerciseStatsDialogComponent } from '../../shared/components/exercise-stats-dialog.component';
 
 @Component({
   selector: 'app-history',
   standalone: true,
-  imports: [CalendarComponent],
+  imports: [CalendarComponent, ExerciseStatsDialogComponent],
   template: `
     <div class="page">
 
@@ -41,32 +43,58 @@ import { CalendarComponent } from '../../shared/components/calendar/calendar.com
               <p>Cap entrenament registrat</p>
             </div>
           } @else {
-            <div class="detail-body">
-              @for (entry of selectedWorkout()!.entries; track entry.exerciseId) {
-                <div class="entry-row">
-                  <div class="entry-name-row">
-                    <span class="entry-name">{{ entry.exerciseName }}</span>
-                    @if (entry.feeling) {
-                      <span class="entry-feeling">{{ getFeelingEmoji(entry.feeling) }}</span>
-                    }
-                  </div>
-                  @if (entry.sets.length > 0) {
-                    <div class="sets-list">
-                      @for (set of entry.sets; track $index) {
-                        <div class="set-pill">
-                          <span class="set-weight">{{ set.weight }}kg</span>
-                          <span class="set-reps">× {{ set.reps }}</span>
-                        </div>
-                      }
-                    </div>
-                  } @else {
-                    <span class="no-sets">Cap sèrie registrada</span>
-                  }
-                </div>
-              }
-            </div>
-          }
 
+            <!-- Two-column: exercise list + sets panel -->
+            <div class="ex-layout">
+
+              <!-- Left column: exercise chips -->
+              <div class="ex-list">
+                @for (entry of selectedWorkout()!.entries; track entry.exerciseId) {
+                  <button class="ex-chip"
+                    [class.active]="selectedExerciseId() === entry.exerciseId"
+                    [style.--cat]="getEntryCatColor(entry)"
+                    (click)="selectExercise(entry.exerciseId)">
+                    <span class="ex-chip-dot"></span>
+                    <span class="ex-chip-name">{{ entry.exerciseName }}</span>
+                    <div class="ex-chip-meta">
+                      @if (entry.feeling) {
+                        <span>{{ getFeelingEmoji(entry.feeling) }}</span>
+                      }
+                      <span>{{ entry.sets.length }}s · {{ getMaxWeight(entry) }}kg</span>
+                    </div>
+                  </button>
+                }
+              </div>
+
+              <!-- Right column: sets for selected exercise -->
+              <div class="ex-sets-panel">
+                @if (!selectedEntry()) {
+                  <div class="ex-sets-hint">← Selecciona un exercici</div>
+                } @else if (selectedEntry()!.sets.length === 0) {
+                  <p class="ex-sets-empty">Sense sèries</p>
+                } @else {
+                  @for (set of selectedEntry()!.sets; track $index) {
+                    <div class="ex-set-row">
+                      <span class="ex-set-num">{{ $index + 1 }}</span>
+                      <span class="ex-set-weight">{{ set.weight }}<small>kg</small></span>
+                      <span class="ex-set-reps">× {{ set.reps }}</span>
+                    </div>
+                  }
+                }
+              </div>
+
+            </div>
+
+            <!-- Analysis panel (shown when an exercise is selected) -->
+            @if (selectedExerciseId()) {
+              <div class="ex-analysis">
+                <app-exercise-stats
+                  [inlineExerciseId]="selectedExerciseId()"
+                  [inlineExerciseName]="selectedEntry()?.exerciseName ?? null" />
+              </div>
+            }
+
+          }
         </div>
       }
 
@@ -184,7 +212,6 @@ import { CalendarComponent } from '../../shared/components/calendar/calendar.com
       padding: 14px 16px 10px;
       border-bottom: 1px solid #f5f5f5;
     }
-
     .detail-title {
       margin: 0; font-size: 16px; font-weight: 700; color: #1a1a1a;
       text-transform: capitalize;
@@ -197,9 +224,68 @@ import { CalendarComponent } from '../../shared/components/calendar/calendar.com
       p { margin: 0; font-size: 14px; color: #aaa; }
     }
 
-    .detail-body {
-      padding: 8px 16px 12px;
-      display: flex; flex-direction: column; gap: 14px;
+    /* Two-column exercise layout */
+    .ex-layout {
+      display: grid;
+      grid-template-columns: 45% 55%;
+      min-height: 120px;
+    }
+
+    .ex-list {
+      padding: 10px 8px 10px 12px;
+      display: flex; flex-direction: column; gap: 4px;
+      border-right: 1px solid #f0f0f0;
+    }
+
+    .ex-chip {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+      padding: 8px 8px 8px 10px;
+      border-radius: 10px; border: none; background: transparent;
+      cursor: pointer; text-align: left; width: 100%;
+      border-left: 3px solid transparent;
+      transition: background 0.15s, border-color 0.15s;
+      &:hover { background: #f5f5f5; }
+      &.active {
+        background: color-mix(in srgb, var(--cat) 8%, white);
+        border-left-color: var(--cat);
+      }
+    }
+    .ex-chip-dot {
+      display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+      background: var(--cat); margin-bottom: 2px;
+    }
+    .ex-chip-name {
+      font-size: 12px; font-weight: 700; color: #1a1a1a;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      max-width: 100%;
+    }
+    .ex-chip-meta {
+      font-size: 11px; color: #888; display: flex; align-items: center; gap: 3px;
+    }
+
+    /* Sets panel (right column) */
+    .ex-sets-panel {
+      padding: 10px 12px 10px 10px;
+      display: flex; flex-direction: column; gap: 6px;
+      justify-content: flex-start;
+    }
+    .ex-sets-hint {
+      color: #ccc; font-size: 12px; font-style: italic;
+      display: flex; align-items: center; justify-content: center;
+      height: 100%; text-align: center; padding: 16px 8px;
+    }
+    .ex-set-row {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .ex-set-num { font-size: 11px; font-weight: 700; color: #ccc; min-width: 14px; }
+    .ex-set-weight { font-size: 14px; font-weight: 700; color: #1a1a1a; }
+    .ex-set-weight small { font-size: 10px; font-weight: 500; color: #888; }
+    .ex-set-reps { font-size: 12px; color: #666; }
+    .ex-sets-empty { font-size: 12px; color: #bbb; font-style: italic; margin: 0; }
+
+    /* Analysis panel */
+    .ex-analysis {
+      border-top: 1px solid #f0f0f0;
     }
 
     /* ════════════════════════════════
@@ -247,7 +333,6 @@ import { CalendarComponent } from '../../shared/components/calendar/calendar.com
       display: inline-block; padding: 2px 8px; border-radius: 8px;
       font-size: 11px; font-weight: 600; color: white; width: fit-content;
     }
-
     .workout-hybrid-badge {
       background: linear-gradient(90deg, #ef5350 0%, #9c27b0 50%, #2196f3 100%) !important;
     }
@@ -259,7 +344,6 @@ import { CalendarComponent } from '../../shared/components/calendar/calendar.com
       display: flex; flex-direction: column; gap: 14px;
     }
 
-    /* ── Shared entry styles (detail + list) ── */
     .entry-row {
       display: flex; flex-direction: column; gap: 6px;
       padding-bottom: 14px; border-bottom: 1px solid #f5f5f5;
@@ -288,16 +372,26 @@ import { CalendarComponent } from '../../shared/components/calendar/calendar.com
   `],
 })
 export class HistoryComponent {
-  private workoutService = inject(WorkoutService);
+  private workoutService  = inject(WorkoutService);
+  private exerciseService = inject(ExerciseService);
 
   readonly selectedDate = signal<string | null>(null);
   readonly expandedId   = signal<string | null>(null);
+
+  readonly selectedExerciseId = signal<string | null>(null);
 
   readonly allWorkouts = this.workoutService.workouts;
 
   readonly selectedWorkout = computed(() => {
     const d = this.selectedDate();
     return d ? this.workoutService.getWorkoutForDate(d) : null;
+  });
+
+  readonly selectedEntry = computed((): WorkoutEntry | null => {
+    const id = this.selectedExerciseId();
+    const w  = this.selectedWorkout();
+    if (!id || !w) return null;
+    return w.entries.find(e => e.exerciseId === id) ?? null;
   });
 
   readonly selectedDateLabel = computed(() => {
@@ -321,6 +415,17 @@ export class HistoryComponent {
   getCatColor(cat: string): string { return CATEGORY_COLORS[cat as ExerciseCategory] ?? '#bbb'; }
   getCatLabel(cat: string): string { return CATEGORY_LABELS[cat as ExerciseCategory] ?? cat; }
 
+  getEntryCategory(entry: WorkoutEntry): ExerciseCategory {
+    return this.exerciseService.getById(entry.exerciseId)?.category ?? 'push';
+  }
+  getEntryCatColor(entry: WorkoutEntry): string {
+    return CATEGORY_COLORS[this.getEntryCategory(entry)] ?? '#bbb';
+  }
+  getMaxWeight(entry: WorkoutEntry): number {
+    if (!entry.sets.length) return 0;
+    return Math.max(...entry.sets.map(s => s.weight));
+  }
+
   getDay(date: string): string {
     return new Date(date + 'T12:00:00').toLocaleDateString('ca-ES', { day: 'numeric' });
   }
@@ -334,6 +439,13 @@ export class HistoryComponent {
 
   selectDate(date: string): void {
     this.selectedDate.set(this.selectedDate() === date ? null : date);
+    this.selectedExerciseId.set(null);
+  }
+
+  selectExercise(exerciseId: string): void {
+    const next = this.selectedExerciseId() === exerciseId ? null : exerciseId;
+    this.selectedExerciseId.set(next);
+    if (next) this.workoutService.loadAllWorkouts();
   }
 
   toggleExpanded(id: string): void {
