@@ -49,12 +49,19 @@ interface ChartPoint {
       <!-- Exercise selector -->
       <div class="section">
         <label class="select-label">Exercici</label>
-        <select class="exercise-select" [(ngModel)]="selectedExerciseId" (ngModelChange)="onExerciseChange()">
-          <option value="">Selecciona un exercici...</option>
-          @for (ex of exercises(); track ex.id) {
-            <option [value]="ex.id">{{ ex.name }}</option>
+        <div class="select-wrap">
+          <select class="exercise-select" [(ngModel)]="selectedExerciseId" (ngModelChange)="onExerciseChange()">
+            <option value="">Selecciona un exercici...</option>
+            @for (ex of exercises(); track ex.id) {
+              <option [value]="ex.id">{{ ex.name }}</option>
+            }
+          </select>
+          @if (isLoading()) {
+            <span class="select-loading" title="Carregant historial...">
+              <span class="loading-dot"></span>
+            </span>
           }
-        </select>
+        </div>
       </div>
 
       @if (selectedExerciseId) {
@@ -124,6 +131,22 @@ interface ChartPoint {
     .section { padding: 8px 16px; }
 
     .select-label { display: block; font-size: 12px; color: #666; font-weight: 500; margin-bottom: 6px; }
+
+    .select-wrap { position: relative; }
+
+    .select-loading {
+      position: absolute; right: 36px; top: 50%; transform: translateY(-50%);
+      pointer-events: none;
+    }
+    .loading-dot {
+      display: block; width: 8px; height: 8px; border-radius: 50%;
+      background: #006874;
+      animation: pulse-dot 1s ease-in-out infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 0.3; transform: scale(0.8); }
+      50%       { opacity: 1;   transform: scale(1.2); }
+    }
 
     .exercise-select {
       width: 100%;
@@ -235,7 +258,13 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
   private exerciseService = inject(ExerciseService);
   private workoutService = inject(WorkoutService);
 
-  readonly exercises = this.exerciseService.exercises;
+  /** Only show exercises that have at least one set recorded in loaded workouts */
+  readonly exercises = computed(() => {
+    const withData = this.workoutService.exercisesWithData();
+    return this.exerciseService.exercises().filter(e => withData.has(e.id));
+  });
+  readonly isLoading  = this.workoutService.isLoading;
+
   private _selectedExerciseId = signal('');
   get selectedExerciseId(): string { return this._selectedExerciseId(); }
   set selectedExerciseId(v: string) { this._selectedExerciseId.set(v); }
@@ -273,6 +302,9 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
   });
 
   constructor() {
+    // Load all workout history once (lazy, cached — no-op if already loaded)
+    this.workoutService.loadAllWorkouts();
+
     effect(() => {
       const data = this.chartData();
       const metric = this.selectedMetric();

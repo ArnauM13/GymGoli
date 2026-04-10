@@ -10,7 +10,13 @@ import { ExerciseService } from '../../../core/services/exercise.service';
 
 export interface ExercisePickerData {
   excludeIds?: string[];
-  filterCategory?: ExerciseCategory; // when set, locks the picker to this category
+  /**
+   * When set, this category is pre-selected in the filter bar
+   * but the user can freely switch to any other category.
+   * If the user picks an exercise from a different category,
+   * WorkoutService will mark the workout as hybrid.
+   */
+  defaultCategory?: ExerciseCategory;
 }
 
 @Component({
@@ -18,14 +24,7 @@ export interface ExercisePickerData {
   standalone: true,
   imports: [FormsModule, MatDialogModule, MatButtonModule, MatInputModule, MatFormFieldModule],
   template: `
-    <h2 mat-dialog-title>
-      Selecciona exercici
-      @if (data.filterCategory) {
-        <span class="cat-badge" [style.background]="getCategoryColor(data.filterCategory)">
-          {{ getCategoryLabel(data.filterCategory) }}
-        </span>
-      }
-    </h2>
+    <h2 mat-dialog-title>Selecciona exercici</h2>
 
     <div class="search-bar">
       <mat-form-field appearance="outline" class="search-field">
@@ -34,16 +33,16 @@ export interface ExercisePickerData {
       </mat-form-field>
     </div>
 
-    @if (!data.filterCategory) {
-      <div class="filter-bar">
-        <button class="chip" [class.active]="!catFilter()" (click)="catFilter.set(null)">Tots</button>
-        @for (cat of categories; track cat.value) {
-          <button class="chip" [class.active]="catFilter() === cat.value" (click)="catFilter.set(cat.value)">
-            {{ cat.label }}
-          </button>
-        }
-      </div>
-    }
+    <div class="filter-bar">
+      <button class="chip" [class.active]="!catFilter()" (click)="catFilter.set(null)">Tots</button>
+      @for (cat of categories; track cat.value) {
+        <button class="chip" [class.active]="catFilter() === cat.value"
+                [style.--cat-c]="cat.color"
+                (click)="catFilter.set(cat.value)">
+          {{ cat.label }}
+        </button>
+      }
+    </div>
 
     <mat-dialog-content class="exercise-list">
       @if (filtered().length === 0) {
@@ -68,15 +67,7 @@ export interface ExercisePickerData {
     </mat-dialog-actions>
   `,
   styles: [`
-    h2[mat-dialog-title] { display: flex; align-items: center; gap: 10px; }
-
-    .cat-badge {
-      padding: 2px 10px;
-      border-radius: 10px;
-      font-size: 12px;
-      font-weight: 600;
-      color: white;
-    }
+    h2[mat-dialog-title] { margin-bottom: 0; }
 
     .search-bar { padding: 0 24px 4px; }
     .search-field { width: 100%; }
@@ -87,17 +78,28 @@ export interface ExercisePickerData {
       padding: 0 24px 8px;
       overflow-x: auto;
       scrollbar-width: none;
+      &::-webkit-scrollbar { display: none; }
     }
 
     .chip {
-      padding: 4px 12px;
+      padding: 5px 12px;
       border: 1.5px solid #e0e0e0;
       border-radius: 16px;
       background: white;
       font-size: 12px;
+      font-weight: 500;
       cursor: pointer;
       white-space: nowrap;
-      &.active { background: #006874; color: white; border-color: #006874; }
+      transition: all 0.15s;
+      color: #555;
+      touch-action: manipulation;
+
+      &.active {
+        background: var(--cat-c, #006874);
+        color: white;
+        border-color: var(--cat-c, #006874);
+      }
+      &:hover:not(.active) { border-color: #006874; color: #006874; }
     }
 
     .exercise-list { padding: 0 !important; min-height: 200px; max-height: 50vh; }
@@ -113,6 +115,7 @@ export interface ExercisePickerData {
       cursor: pointer;
       text-align: left;
       transition: background 0.15s;
+      touch-action: manipulation;
 
       &:hover { background: #f5f5f5; }
     }
@@ -129,21 +132,22 @@ export interface ExercisePickerData {
   `],
 })
 export class ExercisePickerDialogComponent {
-  private dialogRef = inject(MatDialogRef<ExercisePickerDialogComponent>);
+  private dialogRef      = inject(MatDialogRef<ExercisePickerDialogComponent>);
   private exerciseService = inject(ExerciseService);
   readonly data: ExercisePickerData = inject(MAT_DIALOG_DATA);
 
   searchTerm = '';
-  readonly catFilter = signal<ExerciseCategory | null>(this.data.filterCategory ?? null);
+  readonly catFilter = signal<ExerciseCategory | null>(this.data.defaultCategory ?? null);
 
   readonly categories = (Object.keys(CATEGORY_LABELS) as ExerciseCategory[]).map(v => ({
     value: v,
     label: CATEGORY_LABELS[v],
+    color: CATEGORY_COLORS[v],
   }));
 
   readonly filtered = computed(() => {
-    const term = this.searchTerm.toLowerCase();
-    const cat = this.catFilter();
+    const term     = this.searchTerm.toLowerCase();
+    const cat      = this.catFilter();
     const excluded = this.data.excludeIds ?? [];
     return this.exerciseService
       .exercises()

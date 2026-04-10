@@ -20,7 +20,9 @@ interface NavItem {
           class="nav-item"
           [attr.aria-label]="item.label"
         >
-          <span class="material-symbols-outlined nav-icon">{{ item.icon }}</span>
+          <span class="nav-icon-wrap">
+            <span class="material-symbols-outlined nav-icon">{{ item.icon }}</span>
+          </span>
           <span class="nav-label">{{ item.label }}</span>
         </a>
       }
@@ -44,24 +46,34 @@ interface NavItem {
       justify-content: center;
       gap: 2px;
       text-decoration: none;
-      color: #757575;
+      color: #9e9e9e;
       transition: color 0.2s ease;
       cursor: pointer;
-      border-radius: 12px;
-      margin: 4px;
+      touch-action: manipulation;
 
-      &:hover {
-        color: #006874;
-        background: rgba(0, 104, 116, 0.06);
-      }
+      &:hover { color: #006874; }
 
       &.active {
         color: #006874;
 
+        .nav-icon-wrap {
+          background: rgba(0, 104, 116, 0.12);
+        }
+
         .nav-icon {
-          font-variation-settings: 'FILL' 1;
+          font-variation-settings: 'FILL' 1, 'wght' 400;
         }
       }
+    }
+
+    .nav-icon-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 56px;
+      height: 30px;
+      border-radius: 15px;
+      transition: background 0.2s ease;
     }
 
     .nav-icon {

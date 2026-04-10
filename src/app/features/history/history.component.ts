@@ -1,4 +1,4 @@
-import { Component, ViewChild, computed, inject, signal } from '@angular/core';
+import { Component, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -11,13 +11,14 @@ import { ExercisePickerDialogComponent } from '../today/components/exercise-pick
 
 // ── Calendar day cell ─────────────────────────────────────────────────────────
 interface CalDay {
-  date:            string;
-  day:             number;
-  hasWorkout:      boolean;
-  workoutCategory: string | undefined; // for coloring the calendar dot
-  isToday:         boolean;
-  isFuture:        boolean;
-  isSelected:      boolean;
+  date:              string;
+  day:               number;
+  hasWorkout:        boolean;
+  workoutCategory:   string | undefined;
+  workoutCategories: string[]; // all categories (length > 1 = hybrid)
+  isToday:           boolean;
+  isFuture:          boolean;
+  isSelected:        boolean;
 }
 
 const MONTHS_CA = [
@@ -61,6 +62,13 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           </button>
         </div>
 
+        <!-- Loading indicator -->
+        @if (isLoading()) {
+          <div class="cal-loading">
+            <span class="cal-loading-bar"></span>
+          </div>
+        }
+
         <!-- Day-of-week headers -->
         <div class="cal-grid">
           @for (dow of dayNames; track dow) {
@@ -84,7 +92,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               >
                 <span class="day-num">{{ cell.day }}</span>
                 @if (cell.hasWorkout) {
-                  <span class="workout-dot" [style.background]="getCatDotColor(cell.workoutCategory)"></span>
+                  <span class="workout-dot" [style.background]="getCatDotBackground(cell.workoutCategories)"></span>
                 }
               </button>
             }
@@ -102,16 +110,18 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             <h2 class="detail-title">{{ selectedDateLabel() }}</h2>
             <div class="detail-actions">
               @if (selectedWorkout() && !editMode()) {
-                <button class="action-btn edit-btn" (click)="toggleEditMode()" aria-label="Editar">
+                <button class="btn-edit" (click)="toggleEditMode()">
                   <span class="material-symbols-outlined">edit</span>
+                  Editar
                 </button>
               }
               @if (editMode()) {
-                <button class="action-btn delete-btn" (click)="deleteSelectedWorkout()" aria-label="Eliminar">
+                <button class="btn-delete" (click)="deleteSelectedWorkout()" aria-label="Eliminar entrenament">
                   <span class="material-symbols-outlined">delete</span>
                 </button>
-                <button class="action-btn done-btn" (click)="toggleEditMode()" aria-label="Finalitzar edició">
-                  <span class="material-symbols-outlined">check_circle</span>
+                <button class="btn-done" (click)="toggleEditMode()">
+                  <span class="material-symbols-outlined">check</span>
+                  Fet
                 </button>
               }
             </div>
@@ -164,10 +174,15 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
                     <span class="month-year">{{ getMonthYear(workout.date) }}</span>
                   </div>
                   <div class="workout-summary">
-                    @if (workout.category) {
-                      <span class="workout-type-badge" [style.background]="getCatColor(workout.category)">
-                        {{ getCatLabel(workout.category) }}
-                      </span>
+                    @if ((workout.categories ?? (workout.category ? [workout.category] : [])).length > 0) {
+                      <div class="workout-badges-row">
+                        @for (cat of (workout.categories ?? (workout.category ? [workout.category] : [])); track cat) {
+                          <span class="workout-type-badge" [style.background]="getCatColor(cat)">{{ getCatLabel(cat) }}</span>
+                        }
+                        @if ((workout.categories ?? []).length > 1) {
+                          <span class="workout-type-badge workout-hybrid-badge">Híbrid</span>
+                        }
+                      </div>
                     }
                     <span class="exercise-count">
                       {{ workout.entries.length }} exercici{{ workout.entries.length !== 1 ? 's' : '' }}
@@ -183,18 +198,18 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
                   <div class="workout-detail">
                     @for (entry of workout.entries; track entry.exerciseId) {
                       <div class="entry-row">
-                        <div class="entry-name-row">{{ entry.exerciseName }}</div>
+                        <div class="entry-name-row">
+                          <span class="entry-name">{{ entry.exerciseName }}</span>
+                          @if (entry.feeling) {
+                            <span class="entry-feeling">{{ getFeelingEmoji(entry.feeling) }}</span>
+                          }
+                        </div>
                         @if (entry.sets.length > 0) {
                           <div class="sets-list">
                             @for (set of entry.sets; track $index) {
                               <div class="set-pill">
                                 <span class="set-weight">{{ set.weight }}kg</span>
                                 <span class="set-reps">× {{ set.reps }}</span>
-                              </div>
-                            }
-                            @if (entry.feeling) {
-                              <div class="set-pill feeling-pill">
-                                {{ getFeelingEmoji(entry.feeling) }}
                               </div>
                             }
                           </div>
@@ -204,8 +219,8 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
                       </div>
                     }
                     <div class="detail-footer">
-                      <button mat-button class="edit-from-list-btn" (click)="selectDateFromList(workout.date)">
-                        <span class="material-symbols-outlined">edit_calendar</span>
+                      <button class="edit-from-list-btn" (click)="editFromList(workout.date)">
+                        <span class="material-symbols-outlined">edit</span>
                         Editar
                       </button>
                     </div>
@@ -277,6 +292,21 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       color: #aaa; padding: 4px 0; text-transform: uppercase;
     }
 
+    /* Loading bar */
+    .cal-loading {
+      height: 3px; margin: 0 8px 6px; border-radius: 2px;
+      background: rgba(0,104,116,0.1); overflow: hidden;
+    }
+    .cal-loading-bar {
+      display: block; height: 100%; width: 40%;
+      background: #006874; border-radius: 2px;
+      animation: cal-slide 1.2s ease-in-out infinite;
+    }
+    @keyframes cal-slide {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(350%); }
+    }
+
     .cal-day {
       display: flex; flex-direction: column; align-items: center;
       justify-content: center; gap: 3px;
@@ -331,17 +361,39 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       text-transform: capitalize;
     }
 
-    .detail-actions { display: flex; align-items: center; gap: 4px; }
+    .detail-actions { display: flex; align-items: center; gap: 8px; }
 
-    .action-btn {
-      width: 38px; height: 38px; border: none; border-radius: 50%; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      transition: background 0.15s, color 0.15s;
-      .material-symbols-outlined { font-size: 20px; }
+    .btn-edit {
+      display: flex; align-items: center; gap: 5px;
+      padding: 7px 14px;
+      border: 1.5px solid rgba(0,104,116,0.35); border-radius: 20px;
+      background: rgba(0,104,116,0.08); color: #006874;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: background 0.15s;
+      .material-symbols-outlined { font-size: 17px; }
+      &:hover { background: rgba(0,104,116,0.14); }
     }
-    .edit-btn   { background: rgba(0,104,116,0.1);  color: #006874; &:hover { background: rgba(0,104,116,0.18); } }
-    .done-btn   { background: rgba(0,150,80,0.12);  color: #00966e; &:hover { background: rgba(0,150,80,0.2);   } }
-    .delete-btn { background: transparent; color: #ccc; &:hover { background: rgba(239,83,80,0.1); color: #ef5350; } }
+
+    .btn-done {
+      display: flex; align-items: center; gap: 5px;
+      padding: 7px 16px;
+      border: none; border-radius: 20px;
+      background: #006874; color: white;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: background 0.15s;
+      .material-symbols-outlined { font-size: 17px; }
+      &:hover { background: #005a63; }
+    }
+
+    .btn-delete {
+      width: 36px; height: 36px;
+      border: none; border-radius: 50%;
+      background: transparent; color: #ccc;
+      cursor: pointer; transition: background 0.15s, color 0.15s;
+      display: flex; align-items: center; justify-content: center;
+      .material-symbols-outlined { font-size: 20px; }
+      &:hover { background: rgba(239,83,80,0.1); color: #ef5350; }
+    }
 
     .detail-empty {
       display: flex; flex-direction: column; align-items: center;
@@ -420,6 +472,8 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .set-count { font-size: 12px; color: #888; }
     }
 
+    .workout-badges-row { display: flex; flex-wrap: wrap; gap: 4px; }
+
     .workout-type-badge {
       display: inline-block;
       padding: 2px 8px;
@@ -430,15 +484,26 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       width: fit-content;
     }
 
+    .workout-hybrid-badge {
+      background: linear-gradient(90deg, #ef5350 0%, #9c27b0 50%, #2196f3 100%) !important;
+    }
+
     .chevron { color: #bbb; font-size: 20px; flex-shrink: 0; }
 
     .workout-detail {
-      border-top: 1px solid #f0f0f0; padding: 10px 14px 4px;
-      display: flex; flex-direction: column; gap: 8px;
+      border-top: 1px solid #f0f0f0; padding: 12px 14px 4px;
+      display: flex; flex-direction: column; gap: 14px;
     }
 
-    .entry-row { display: flex; flex-direction: column; gap: 4px; }
-    .entry-name-row { font-size: 13px; font-weight: 600; color: #444; }
+    .entry-row {
+      display: flex; flex-direction: column; gap: 6px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid #f5f5f5;
+      &:last-child { border-bottom: none; padding-bottom: 0; }
+    }
+    .entry-name-row { display: flex; align-items: center; gap: 7px; }
+    .entry-name { font-size: 13px; font-weight: 600; color: #333; }
+    .entry-feeling { font-size: 17px; line-height: 1; }
     .sets-list { display: flex; flex-wrap: wrap; gap: 5px; }
 
     .set-pill {
@@ -447,11 +512,22 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .set-weight { font-weight: 600; color: #333; }
       .set-reps { color: #666; }
     }
-    .feeling-pill { font-size: 16px; padding: 2px 7px; }
-
     .no-sets { font-size: 12px; color: #bbb; font-style: italic; }
-    .detail-footer { display: flex; justify-content: flex-end; padding: 2px 0 6px; }
-    .edit-from-list-btn { color: #006874 !important; font-size: 13px !important; }
+    .detail-footer { display: flex; justify-content: flex-end; padding: 4px 0 8px; }
+
+    .edit-from-list-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 18px;
+      border: 1.5px solid #006874;
+      border-radius: 20px;
+      background: transparent;
+      color: #006874;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      .material-symbols-outlined { font-size: 17px; }
+      &:hover { background: rgba(0,104,116,0.08); }
+    }
 
     /* ── Empty state ── */
     .empty-state {
@@ -482,6 +558,18 @@ export class HistoryComponent {
   readonly expandedId = signal<string | null>(null);
 
   readonly dayNames = ['dl', 'dm', 'dc', 'dj', 'dv', 'ds', 'dg'];
+
+  // ── Loading indicator from service ────────────────────────────
+  readonly isLoading = this.workoutService.isLoading;
+
+  constructor() {
+    // Lazy-load workouts whenever the displayed calendar month changes
+    effect(() => {
+      const year  = this.calYear();
+      const month = this.calMonth();
+      this.workoutService.ensureMonthLoaded(year, month);
+    });
+  }
 
   // ── Computed ──────────────────────────────────────────────────
   readonly allWorkouts = this.workoutService.workouts;
@@ -516,8 +604,9 @@ export class HistoryComponent {
       const w = workoutByDate.get(dateStr);
       cells.push({
         date: dateStr, day: d,
-        hasWorkout:      !!w,
-        workoutCategory: w?.category,
+        hasWorkout:        !!w,
+        workoutCategory:   w?.category,
+        workoutCategories: w?.categories ?? (w?.category ? [w.category] : []),
         isToday:    dateStr === today,
         isFuture:   dateStr > today,
         isSelected: dateStr === sel,
@@ -556,9 +645,13 @@ export class HistoryComponent {
   getCatLabel(cat: string): string {
     return CATEGORY_LABELS[cat as ExerciseCategory] ?? cat;
   }
-  getCatDotColor(cat: string | undefined): string {
-    if (!cat) return '#006874'; // default teal for old workouts without category
-    return CATEGORY_COLORS[cat as ExerciseCategory] ?? '#006874';
+  getCatDotBackground(cats: string[]): string {
+    if (!cats || cats.length === 0) return '#006874';
+    if (cats.length === 1) return CATEGORY_COLORS[cats[0] as ExerciseCategory] ?? '#006874';
+    const colors = cats.map(c => CATEGORY_COLORS[c as ExerciseCategory] ?? '#bbb');
+    const step = 100 / colors.length;
+    const stops = colors.map((c, i) => `${c} ${Math.round(i * step)}% ${Math.round((i + 1) * step)}%`).join(', ');
+    return `conic-gradient(${stops})`;
   }
 
   getDay(date: string): string {
@@ -588,14 +681,14 @@ export class HistoryComponent {
     this._resetEditState();
   }
 
-  /** Called from the workout list "Editar" button */
-  selectDateFromList(date: string): void {
+  /** Called from the workout list "Editar" button — enters edit mode directly */
+  editFromList(date: string): void {
     const d = new Date(date + 'T00:00:00');
     this.calYear.set(d.getFullYear());
     this.calMonth.set(d.getMonth());
     this.selectedDate.set(date);
-    this._resetEditState();
-    setTimeout(() => document.querySelector('.calendar-card')?.scrollIntoView({ behavior: 'smooth' }), 50);
+    this.editMode.set(true);
+    setTimeout(() => document.querySelector('.detail-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   }
 
   toggleExpanded(id: string): void {
@@ -634,20 +727,20 @@ export class HistoryComponent {
 
   // ── Exercise picker ───────────────────────────────────────────
   openPicker(newCategory?: ExerciseCategory): void {
-    const workout    = this.selectedWorkout();
-    const date       = this.selectedDate()!;
-    const excludeIds = workout?.entries.map(e => e.exerciseId) ?? [];
-    const filterCategory = (newCategory ?? workout?.category) as ExerciseCategory | undefined;
+    const workout         = this.selectedWorkout();
+    const date            = this.selectedDate()!;
+    const excludeIds      = workout?.entries.map(e => e.exerciseId) ?? [];
+    const defaultCategory = (newCategory ?? workout?.category) as ExerciseCategory | undefined;
 
     const ref = this.dialog.open(ExercisePickerDialogComponent, {
-      data: { excludeIds, filterCategory }, width: '420px', maxHeight: '80vh',
+      data: { excludeIds, defaultCategory }, width: '420px', maxHeight: '80vh',
     });
 
     ref.afterClosed().subscribe(async (exercise: Exercise | undefined) => {
       if (!exercise) return;
       try {
         let workoutId = workout?.id;
-        if (!workoutId) workoutId = await this.workoutService.createWorkoutForDate(date, filterCategory);
+        if (!workoutId) workoutId = await this.workoutService.createWorkoutForDate(date, defaultCategory);
 
         await this.workoutService.addExerciseToWorkout(workoutId, {
           exerciseId: exercise.id, exerciseName: exercise.name, sets: [],
