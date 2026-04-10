@@ -310,7 +310,15 @@ export class WorkoutService {
 
     const { data, error } = await this.supabase.from('workouts').insert(row).select().single();
     if (error) throw error;
-    return data['id'];
+
+    // Update local cache immediately so the workout appears without reload
+    const newWorkout = toWorkout(data as Record<string, unknown>);
+    const monthKey   = newWorkout.date.substring(0, 7);
+    const existing   = this._monthCache.get(monthKey) ?? [];
+    this._monthCache.set(monthKey, [newWorkout, ...existing]);
+    this._rebuildHistorical();
+
+    return data['id'] as string;
   }
 
   async createTodayWorkout(category?: string): Promise<string> {

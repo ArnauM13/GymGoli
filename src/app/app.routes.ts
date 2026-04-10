@@ -10,14 +10,14 @@ export const routes: Routes = [
   },
   {
     path: '',
-    redirectTo: 'today',
+    redirectTo: 'train',
     pathMatch: 'full',
   },
   {
-    path: 'today',
+    path: 'train',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./features/today/today.component').then(m => m.TodayComponent),
+      import('./features/train/train.component').then(m => m.TrainComponent),
   },
   {
     path: 'history',
@@ -37,5 +37,5 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/charts/charts.component').then(m => m.ChartsComponent),
   },
-  { path: '**', redirectTo: 'today' },
+  { path: '**', redirectTo: 'train' },
 ];

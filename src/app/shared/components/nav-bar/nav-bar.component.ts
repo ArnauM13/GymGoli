@@ -91,7 +91,7 @@ interface NavItem {
 })
 export class NavBarComponent {
   readonly navItems: NavItem[] = [
-    { path: '/today', icon: 'today', label: 'Avui' },
+    { path: '/train', icon: 'exercise', label: 'Entrena' },
     { path: '/history', icon: 'calendar_month', label: 'Historial' },
     { path: '/library', icon: 'fitness_center', label: 'Exercicis' },
     { path: '/charts', icon: 'bar_chart', label: 'Progrés' },

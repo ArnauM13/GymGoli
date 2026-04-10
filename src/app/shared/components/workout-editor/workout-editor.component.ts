@@ -198,8 +198,8 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
                               [disabled]="setForm.invalid">×1</button>
                       <button type="button" class="we-quick-btn" (click)="submitSets(entry.exerciseId, 2)"
                               [disabled]="setForm.invalid">×2</button>
-                      <button type="button" class="we-quick-btn we-quick-btn-primary" (click)="submitSets(entry.exerciseId, 3)"
-                              [disabled]="setForm.invalid">×3</button>
+                      <button type="button" class="we-quick-btn we-quick-btn-primary" (click)="submitSets(entry.exerciseId, 4)"
+                              [disabled]="setForm.invalid">×4</button>
                     </div>
                   </div>
                 </form>
