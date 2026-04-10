@@ -1,5 +1,5 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
-import { SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 import { ExerciseService } from './exercise.service';
 import { AuthService } from './auth.service';
@@ -19,8 +19,6 @@ function toWorkout(row: Record<string, unknown>): Workout {
   };
 }
 
-const DRAFT_KEY = 'gym_workout_draft';
-
 @Injectable({ providedIn: 'root' })
 export class WorkoutService {
   private supabase        = inject(SupabaseService).client;
@@ -33,11 +31,6 @@ export class WorkoutService {
   private readonly _todayFirestore = signal<Workout[]>([]);
   private _realtimeChannel: RealtimeChannel | null = null;
 
-  // ── Local draft ──────────────────────────────────────────────────────────
-  private readonly _draft = signal<Workout | null>(null);
-  readonly pendingSync = signal(false);
-  private _pendingOldDraft: Workout | null = null;
-
   // ── History cache ────────────────────────────────────────────────────────
   private readonly _monthCache = new Map<string, Workout[]>();
   private readonly _historical = signal<Workout[]>([]);
@@ -47,11 +40,9 @@ export class WorkoutService {
 
   // ── Public signals ───────────────────────────────────────────────────────
 
-  readonly todayWorkout = computed((): Workout | null => {
-    const draft = this._draft();
-    if (draft && draft.date === this._todayStr) return draft;
-    return this._todayFirestore()[0] ?? null;
-  });
+  readonly todayWorkout = computed((): Workout | null =>
+    this._todayFirestore()[0] ?? null
+  );
 
   readonly workouts = computed((): Workout[] => {
     const today = this.todayWorkout();
@@ -73,62 +64,33 @@ export class WorkoutService {
 
   // ── Constructor ──────────────────────────────────────────────────────────
   constructor() {
-    this._loadDraftFromStorage();
-
     effect(() => {
       const uid = this.auth.uid();
 
-      // Tear down previous realtime subscription
       this._realtimeChannel?.unsubscribe();
       this._realtimeChannel = null;
       this._monthCache.clear();
       this._allLoaded = false;
       this._historical.set([]);
+      this._todayFirestore.set([]);
 
       if (uid) {
         this._subscribeToday(uid);
         this._preloadRecentMonths();
         this.exerciseService.seedIfEmpty(uid);
-
-        if (this._pendingOldDraft) {
-          const pending = this._pendingOldDraft;
-          this._pendingOldDraft = null;
-          this._finalizeOldDraft(pending);
-        }
       }
     });
-
-    // When realtime delivers today's workout and we have no active draft, sync it
-    effect(() => {
-      const firestoreToday = this._todayFirestore()[0];
-      const draft = this._draft();
-      if (firestoreToday && (!draft || draft.date !== this._todayStr)) {
-        this._draft.set(firestoreToday);
-        this.pendingSync.set(false);
-      }
-    });
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('online', () => this._autoSync());
-    }
   }
 
   // ── Realtime subscription for today ─────────────────────────────────────
   private _subscribeToday(uid: string): void {
-    // Initial fetch
     this._fetchToday(uid);
 
-    // Realtime updates
     this._realtimeChannel = this.supabase
       .channel(`workouts-today-${uid}`)
       .on(
         'postgres_changes',
-        {
-          event:  '*',
-          schema: 'public',
-          table:  'workouts',
-          filter: `user_id=eq.${uid}`,
-        },
+        { event: '*', schema: 'public', table: 'workouts', filter: `user_id=eq.${uid}` },
         () => this._fetchToday(uid)
       )
       .subscribe();
@@ -140,79 +102,7 @@ export class WorkoutService {
       .select('*')
       .eq('user_id', uid)
       .eq('date', this._todayStr);
-
     this._todayFirestore.set((data ?? []).map(r => toWorkout(r as Record<string, unknown>)));
-  }
-
-  // ── Draft persistence ────────────────────────────────────────────────────
-  private _loadDraftFromStorage(): void {
-    try {
-      const stored = localStorage.getItem(DRAFT_KEY);
-      if (!stored) return;
-      const draft = JSON.parse(stored) as Workout;
-      if (draft.date === this._todayStr) {
-        this._draft.set(draft);
-        this.pendingSync.set(true);
-      } else if (draft.id.startsWith('draft_')) {
-        this._pendingOldDraft = draft;
-        localStorage.removeItem(DRAFT_KEY);
-      } else {
-        localStorage.removeItem(DRAFT_KEY);
-      }
-    } catch { localStorage.removeItem(DRAFT_KEY); }
-  }
-
-  private _saveDraftToStorage(workout: Workout): void {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(workout));
-  }
-
-  private _clearDraft(): void {
-    this._draft.set(null);
-    this.pendingSync.set(false);
-    localStorage.removeItem(DRAFT_KEY);
-  }
-
-  private async _finalizeOldDraft(draft: Workout): Promise<void> {
-    try {
-      await this._writeDraftToSupabase(draft);
-      localStorage.removeItem(DRAFT_KEY);
-    } catch { /* silent — past-day drafts are best-effort */ }
-  }
-
-  private async _autoSync(): Promise<void> {
-    if (!this.pendingSync() || !this._draft()) return;
-    try { await this.finalizeToday(); } catch { /* retry on next online */ }
-  }
-
-  // ── Supabase write helpers ───────────────────────────────────────────────
-  private _uid(): string {
-    const uid = this.auth.uid();
-    if (!uid) throw new Error('Not authenticated');
-    return uid;
-  }
-
-  private async _writeDraftToSupabase(draft: Workout): Promise<void> {
-    const uid = this._uid();
-    const row: Record<string, unknown> = {
-      user_id:    uid,
-      date:       draft.date,
-      entries:    draft.entries,
-      categories: draft.categories ?? [],
-    };
-    if (draft.category) row['category'] = draft.category;
-    if (draft.notes)    row['notes']    = draft.notes;
-
-    if (draft.id.startsWith('draft_')) {
-      const { error } = await this.supabase.from('workouts').insert(row);
-      if (error) throw error;
-    } else {
-      const { error } = await this.supabase
-        .from('workouts')
-        .update({ entries: draft.entries, categories: draft.categories ?? [], category: draft.category ?? null, notes: draft.notes ?? null })
-        .eq('id', draft.id)
-        .eq('user_id', uid);
-      if (error) throw error;
-    }
   }
 
   // ── Load API ─────────────────────────────────────────────────────────────
@@ -273,9 +163,7 @@ export class WorkoutService {
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
-  todayDateString(): string {
-    return this._todayStr;
-  }
+  todayDateString(): string { return this._todayStr; }
 
   getWorkoutForDate(date: string): Workout | null {
     return this.workouts().find(w => w.date === date) ?? null;
@@ -302,52 +190,31 @@ export class WorkoutService {
 
   // ── Create ───────────────────────────────────────────────────────────────
   async createWorkoutForDate(date: string, category?: string): Promise<string> {
-    if (date === this._todayStr) return this._createLocalDraft(category);
-
     const uid = this._uid();
-    const row: Record<string, unknown> = { user_id: uid, date, entries: [], categories: category ? [category] : [] };
+    const row: Record<string, unknown> = {
+      user_id: uid, date, entries: [], categories: category ? [category] : [],
+    };
     if (category) row['category'] = category;
 
     const { data, error } = await this.supabase.from('workouts').insert(row).select().single();
     if (error) throw error;
 
-    // Update local cache immediately so the workout appears without reload
     const newWorkout = toWorkout(data as Record<string, unknown>);
-    const monthKey   = newWorkout.date.substring(0, 7);
-    const existing   = this._monthCache.get(monthKey) ?? [];
-    this._monthCache.set(monthKey, [newWorkout, ...existing]);
-    this._rebuildHistorical();
+
+    if (date === this._todayStr) {
+      this._todayFirestore.set([newWorkout, ...this._todayFirestore()]);
+    } else {
+      const monthKey = newWorkout.date.substring(0, 7);
+      const existing = this._monthCache.get(monthKey) ?? [];
+      this._monthCache.set(monthKey, [newWorkout, ...existing]);
+      this._rebuildHistorical();
+    }
 
     return data['id'] as string;
   }
 
   async createTodayWorkout(category?: string): Promise<string> {
-    return this._createLocalDraft(category);
-  }
-
-  private _createLocalDraft(category?: string): string {
-    const tempId = `draft_${Date.now()}`;
-    const draft: Workout = {
-      id: tempId, date: this._todayStr, entries: [],
-      category, categories: category ? [category] : [], createdAt: new Date(),
-    };
-    this._draft.set(draft);
-    this._saveDraftToStorage(draft);
-    this.pendingSync.set(true);
-    return tempId;
-  }
-
-  resetDraftFromCloud(): void {
-    this._clearDraft();
-  }
-
-  // ── Finalize ─────────────────────────────────────────────────────────────
-  async finalizeToday(): Promise<void> {
-    const draft = this._draft();
-    if (!draft) return;
-    if (draft.date !== this._todayStr) { this._clearDraft(); return; }
-    await this._writeDraftToSupabase(draft);
-    this._clearDraft();
+    return this.createWorkoutForDate(this._todayStr, category);
   }
 
   // ── Mutations ─────────────────────────────────────────────────────────────
@@ -357,11 +224,7 @@ export class WorkoutService {
     const entries     = [...workout.entries, entry];
     const exerciseCat = this.exerciseService.getById(entry.exerciseId)?.category;
     const categories  = this._mergeCategories(workout.categories ?? (workout.category ? [workout.category] : []), exerciseCat);
-    if (this._isTodayWorkout(workoutId)) {
-      this._updateDraft({ entries, categories });
-    } else {
-      await this._updateWorkout(workoutId, { entries, categories });
-    }
+    await this._updateWorkout(workoutId, { entries, categories });
   }
 
   async addSetsToEntry(workoutId: string, exerciseId: string, sets: WorkoutSet[]): Promise<void> {
@@ -370,11 +233,7 @@ export class WorkoutService {
     const entries = workout.entries.map(e =>
       e.exerciseId === exerciseId ? { ...e, sets: [...e.sets, ...sets] } : e
     );
-    if (this._isTodayWorkout(workoutId)) {
-      this._updateDraft({ entries });
-    } else {
-      await this._updateWorkout(workoutId, { entries });
-    }
+    await this._updateWorkout(workoutId, { entries });
   }
 
   async updateSetInEntry(workoutId: string, exerciseId: string, setIndex: number, updated: WorkoutSet): Promise<void> {
@@ -384,11 +243,7 @@ export class WorkoutService {
       if (e.exerciseId !== exerciseId) return e;
       const sets = [...e.sets]; sets[setIndex] = updated; return { ...e, sets };
     });
-    if (this._isTodayWorkout(workoutId)) {
-      this._updateDraft({ entries });
-    } else {
-      await this._updateWorkout(workoutId, { entries });
-    }
+    await this._updateWorkout(workoutId, { entries });
   }
 
   async removeSetFromEntry(workoutId: string, exerciseId: string, setIndex: number): Promise<void> {
@@ -397,11 +252,7 @@ export class WorkoutService {
     const entries = workout.entries.map(e =>
       e.exerciseId !== exerciseId ? e : { ...e, sets: e.sets.filter((_, i) => i !== setIndex) }
     );
-    if (this._isTodayWorkout(workoutId)) {
-      this._updateDraft({ entries });
-    } else {
-      await this._updateWorkout(workoutId, { entries });
-    }
+    await this._updateWorkout(workoutId, { entries });
   }
 
   async removeEntryFromWorkout(workoutId: string, exerciseId: string): Promise<void> {
@@ -409,11 +260,7 @@ export class WorkoutService {
     if (!workout) return;
     const entries    = workout.entries.filter(e => e.exerciseId !== exerciseId);
     const categories = this._computeCategories(entries, workout.category);
-    if (this._isTodayWorkout(workoutId)) {
-      this._updateDraft({ entries, categories });
-    } else {
-      await this._updateWorkout(workoutId, { entries, categories });
-    }
+    await this._updateWorkout(workoutId, { entries, categories });
   }
 
   async updateEntryFeeling(workoutId: string, exerciseId: string, feeling: FeelingLevel | undefined): Promise<void> {
@@ -427,44 +274,28 @@ export class WorkoutService {
       }
       return { ...e, feeling };
     });
-    if (this._isTodayWorkout(workoutId)) {
-      this._updateDraft({ entries });
-    } else {
-      await this._updateWorkout(workoutId, { entries });
-    }
+    await this._updateWorkout(workoutId, { entries });
   }
 
   async reorderEntries(workoutId: string, entries: WorkoutEntry[]): Promise<void> {
-    if (this._isTodayWorkout(workoutId)) {
-      this._updateDraft({ entries });
-    } else {
-      await this._updateWorkout(workoutId, { entries });
-    }
+    await this._updateWorkout(workoutId, { entries });
   }
 
   async deleteWorkout(id: string): Promise<void> {
-    if (this._isTodayWorkout(id)) this._clearDraft();
-    if (!id.startsWith('draft_')) {
-      const { error } = await this.supabase
-        .from('workouts')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', this._uid());
-      if (error) throw error;
-    }
+    const { error } = await this.supabase
+      .from('workouts')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', this._uid());
+    if (error) throw error;
     this._removeFromCache(id);
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────
-  private _isTodayWorkout(id: string): boolean { return this._draft()?.id === id; }
-
-  private _updateDraft(changes: Partial<Workout>): void {
-    const current = this._draft();
-    if (!current) return;
-    const updated = { ...current, ...changes };
-    this._draft.set(updated);
-    this._saveDraftToStorage(updated);
-    this.pendingSync.set(true);
+  private _uid(): string {
+    const uid = this.auth.uid();
+    if (!uid) throw new Error('Not authenticated');
+    return uid;
   }
 
   private async _updateWorkout(id: string, changes: Partial<Workout>): Promise<void> {
@@ -508,12 +339,12 @@ export class WorkoutService {
   }
 
   private _find(id: string): Workout | undefined {
-    const draft = this._draft();
-    if (draft?.id === id) return draft;
-    return this._historical().find(w => w.id === id);
+    return this._todayFirestore().find(w => w.id === id)
+      ?? this._historical().find(w => w.id === id);
   }
 
   private _patch(workoutId: string, changes: Partial<Workout>): void {
+    // Try historical cache
     for (const [key, workouts] of this._monthCache) {
       const idx = workouts.findIndex(w => w.id === workoutId);
       if (idx !== -1) {
@@ -523,6 +354,14 @@ export class WorkoutService {
         this._rebuildHistorical();
         return;
       }
+    }
+    // Try today's signal
+    const todayList = this._todayFirestore();
+    const todayIdx  = todayList.findIndex(w => w.id === workoutId);
+    if (todayIdx !== -1) {
+      const updated = [...todayList];
+      updated[todayIdx] = { ...updated[todayIdx], ...changes };
+      this._todayFirestore.set(updated);
     }
   }
 
@@ -534,6 +373,11 @@ export class WorkoutService {
         this._rebuildHistorical();
         return;
       }
+    }
+    const todayList = this._todayFirestore();
+    const filtered  = todayList.filter(w => w.id !== workoutId);
+    if (filtered.length !== todayList.length) {
+      this._todayFirestore.set(filtered);
     }
   }
 }

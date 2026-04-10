@@ -71,34 +71,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           (requestAddExercise)="openPicker()"
         />
 
-        <!-- ── Finalize bar (only for today's draft) ── -->
-        @if (isToday()) {
-          <div class="finalize-bar">
-            @if (pendingSync()) {
-              <button class="btn-finalize" (click)="finalize()" [disabled]="finalizing()">
-                @if (finalizing()) {
-                  <span class="material-symbols-outlined spin">sync</span>
-                  Sincronitzant...
-                } @else {
-                  <span class="material-symbols-outlined">cloud_done</span>
-                  Guardar entrenament
-                }
-              </button>
-              <div class="finalize-footer">
-                <p class="finalize-hint">Les dades es guardaran al núvol quan finalitzis</p>
-                <button class="btn-recover" (click)="recoverFromCloud()" [disabled]="finalizing()">
-                  <span class="material-symbols-outlined">cloud_download</span>
-                  Recuperar
-                </button>
-              </div>
-            } @else {
-              <div class="synced-badge">
-                <span class="material-symbols-outlined">cloud_done</span>
-                Entrenament sincronitzat
-              </div>
-            }
-          </div>
-        }
       }
 
     </div>
@@ -224,44 +196,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .type-label { font-size: 13px; font-weight: 600; }
     }
 
-    /* ── Finalize bar ── */
-    .finalize-bar {
-      margin: 16px 16px 0;
-      display: flex; flex-direction: column; align-items: center; gap: 6px;
-    }
-    .btn-finalize {
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      width: 100%; padding: 14px; border: none; border-radius: 14px;
-      background: #006874; color: white;
-      font-size: 15px; font-weight: 700; cursor: pointer;
-      transition: background 0.2s, opacity 0.2s; touch-action: manipulation;
-      .material-symbols-outlined { font-size: 20px; }
-      &:hover:not(:disabled) { background: #005a63; }
-      &:disabled { opacity: 0.6; cursor: default; }
-    }
-    .finalize-footer {
-      display: flex; align-items: center; justify-content: space-between;
-      width: 100%; gap: 8px;
-    }
-    .finalize-hint { margin: 0; font-size: 12px; color: #aaa; flex: 1; }
-    .btn-recover {
-      display: flex; align-items: center; gap: 4px;
-      padding: 5px 10px; border-radius: 20px; cursor: pointer;
-      border: 1px solid rgba(0,0,0,0.1); background: transparent;
-      color: #888; font-size: 11px; font-weight: 600; white-space: nowrap;
-      touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 14px; }
-      &:hover:not(:disabled) { border-color: #006874; color: #006874; background: rgba(0,104,116,0.05); }
-      &:disabled { opacity: 0.4; cursor: default; }
-    }
-    .synced-badge {
-      display: flex; align-items: center; gap: 6px;
-      padding: 10px 16px; border-radius: 12px;
-      background: rgba(76,175,80,0.08); color: #4caf50;
-      font-size: 13px; font-weight: 600;
-      .material-symbols-outlined { font-size: 18px; }
-    }
-
     /* ── FABs ── */
     .fab {
       position: fixed;
@@ -309,7 +243,6 @@ export class TrainComponent {
 
   readonly selectedDate = signal<string>(TODAY());
   readonly editMode     = signal(false);
-  readonly finalizing   = signal(false);
   readonly workoutTypes = WORKOUT_TYPES;
 
   readonly isToday = computed(() => this.selectedDate() === TODAY());
@@ -324,10 +257,6 @@ export class TrainComponent {
     if (this.isToday()) return this.workoutService.todayWorkout();
     return this.workoutService.getWorkoutForDate(this.selectedDate());
   });
-
-  readonly pendingSync = computed(() =>
-    this.isToday() && this.workoutService.pendingSync()
-  );
 
   readonly emptyTitle = computed(() =>
     this.isToday() ? 'Cap entrenament avui' : 'Cap entrenament aquest dia'
@@ -379,30 +308,6 @@ export class TrainComponent {
     const next = !this.editMode();
     this.editMode.set(next);
     if (!next) this.editor?.reset();
-  }
-
-  async finalize(): Promise<void> {
-    this.finalizing.set(true);
-    try {
-      await this.workoutService.finalizeToday();
-      this.snackBar.open('Entrenament guardat!', '', { duration: 2500 });
-    } catch {
-      this.snackBar.open(
-        navigator.onLine ? 'Error en guardar' : 'Sense connexió — es guardarà automàticament',
-        '', { duration: 4000 }
-      );
-    } finally {
-      this.finalizing.set(false);
-    }
-  }
-
-  recoverFromCloud(): void {
-    if (!this.isToday()) return;
-    if (!confirm('Sobreescriure els canvis locals amb les dades del núvol?\n\nEls canvis no finalitzats es perdran.')) return;
-    this.workoutService.resetDraftFromCloud();
-    this.editMode.set(false);
-    this.editor?.reset();
-    this.snackBar.open('Dades restaurades del núvol', '', { duration: 2500 });
   }
 
   async deleteWorkout(): Promise<void> {
