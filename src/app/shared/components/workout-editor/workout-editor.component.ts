@@ -1,4 +1,4 @@
-import { Component, ViewEncapsulation, inject, input, output, signal } from '@angular/core';
+import { Component, ViewEncapsulation, computed, inject, input, output, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { MatButtonModule } from '@angular/material/button';
@@ -44,10 +44,18 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
                 </div>
                 <div class="we-entry-name-row">
                   <span class="we-entry-name">{{ entry.exerciseName }}</span>
-                  @if (entry.feeling && addingFor() !== entry.exerciseId) {
-                    <span class="we-entry-feeling-inline" [title]="getFeelingLabel(entry.feeling)">
-                      {{ getFeelingEmoji(entry.feeling) }}
-                    </span>
+                  @if (entry.feeling || isEntryEditable(entry.exerciseId)) {
+                    <button type="button" class="we-fatiga-chip"
+                      [class.we-fatiga-chip--set]="!!entry.feeling"
+                      [class.we-fatiga-chip--editable]="isEntryEditable(entry.exerciseId)"
+                      [title]="entry.feeling ? getFeelingLabel(entry.feeling) : 'Afegir fatiga'"
+                      (click)="isEntryEditable(entry.exerciseId) && openFatigaPicker(entry.exerciseId)">
+                      @if (entry.feeling) {
+                        {{ getFeelingEmoji(entry.feeling) }}
+                      } @else {
+                        <span class="material-symbols-outlined we-fatiga-chip-icon">sentiment_neutral</span>
+                      }
+                    </button>
                   }
                 </div>
               </div>
@@ -75,19 +83,6 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
               }
             </div>
 
-            <!-- ── Feeling picker (visible while adding sets for this entry, or in edit mode) ── -->
-            @if ((editMode() && !alwaysEditable()) || editingEntry() === entry.exerciseId || addingFor() === entry.exerciseId) {
-              <div class="we-entry-feeling-row edit">
-                <span class="we-feeling-label">Sensació</span>
-                @for (level of feelingLevels; track level) {
-                  <button type="button" class="we-feeling-btn sm"
-                    [class.selected]="entry.feeling === level"
-                    [title]="getFeelingLabel(level)"
-                    (click)="setEntryFeeling(entry, level)"
-                  >{{ getFeelingEmoji(level) }}</button>
-                }
-              </div>
-            }
 
             <!-- ── Last session info banner ── -->
             @if (lastSessionData()?.exerciseId === entry.exerciseId && entry.sets.length === 0 && addingFor() === entry.exerciseId) {
@@ -232,6 +227,32 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
         }
 
       </div>
+
+      <!-- ── Fatiga popup ── -->
+      @if (feelingPickerFor()) {
+        <div class="we-fatiga-backdrop" (click)="closeFatigaPicker()"></div>
+        <div class="we-fatiga-popup">
+          <div class="we-fatiga-popup-header">
+            <span class="we-fatiga-popup-title">Fatiga</span>
+            @if (fatigaEntry()?.feeling) {
+              <button class="we-fatiga-clear-btn" (click)="pickFeeling(fatigaEntry()!.feeling!)">
+                <span class="material-symbols-outlined">close</span>
+              </button>
+            }
+          </div>
+          <div class="we-fatiga-options">
+            @for (level of feelingLevels; track level) {
+              <button type="button" class="we-fatiga-option"
+                [class.selected]="fatigaEntry()?.feeling === level"
+                (click)="pickFeeling(level)">
+                <span class="we-fatiga-option-emoji">{{ getFeelingEmoji(level) }}</span>
+                <span class="we-fatiga-option-label">{{ getFeelingLabel(level) }}</span>
+              </button>
+            }
+          </div>
+        </div>
+      }
+
     }
   `,
   styles: [`
@@ -285,7 +306,22 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
     .we-entry-title { display: flex; flex-direction: column; gap: 4px; flex: 1; }
     .we-entry-name  { font-size: 16px; font-weight: 600; color: #1a1a1a; }
     .we-entry-name-row { display: flex; align-items: center; gap: 4px; }
-    .we-entry-feeling-inline { font-size: 18px; line-height: 1; }
+    /* ── Fatiga chip (inline next to name) ── */
+    .we-fatiga-chip {
+      display: flex; align-items: center; justify-content: center;
+      width: 28px; height: 28px; border-radius: 50%;
+      border: none; background: transparent;
+      font-size: 18px; line-height: 1; cursor: default;
+      padding: 0; flex-shrink: 0;
+      transition: background 0.15s, transform 0.15s;
+      .we-fatiga-chip-icon { font-size: 18px; color: #ccc; }
+    }
+    .we-fatiga-chip--editable {
+      cursor: pointer;
+      &:hover { background: rgba(0,0,0,0.06); transform: scale(1.1); }
+      &:active { transform: scale(0.92); }
+    }
+    .we-fatiga-chip--set .we-fatiga-chip-icon { color: #888; }
     .we-entry-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
     .we-category-badge {
@@ -305,25 +341,50 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
       color: #006874 !important;
     }
 
-    /* ── Feeling row ── */
-    .we-entry-feeling-row {
-      display: flex; align-items: center; gap: 4px;
-      padding: 4px 14px 6px; min-height: 36px;
-      border-bottom: 1px solid #f0f0f0;
+    /* ── Fatiga popup ── */
+    .we-fatiga-backdrop {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.35);
     }
-    .we-feeling-label {
-      font-size: 11px; font-weight: 600; color: #aaa; margin-right: 4px; white-space: nowrap;
+    .we-fatiga-popup {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 201;
+      background: white; border-radius: 20px 20px 0 0;
+      padding: 20px 20px 32px;
+      box-shadow: 0 -4px 24px rgba(0,0,0,0.15);
     }
-    .we-feeling-btn {
-      font-size: 22px; width: 44px; height: 44px;
-      border: 2px solid transparent; border-radius: 50%;
-      background: #f0f0f0; cursor: pointer; transition: all 0.15s;
-      display: flex; align-items: center; justify-content: center; line-height: 1;
-      touch-action: manipulation;
-      &:hover   { transform: scale(1.1); }
-      &.selected { border-color: #006874; background: rgba(0,104,116,0.1); transform: scale(1.15); }
-      &.sm { font-size: 20px; width: 36px; height: 36px; }
+    .we-fatiga-popup-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px;
     }
+    .we-fatiga-popup-title {
+      font-size: 17px; font-weight: 700; color: #1a1a1a;
+    }
+    .we-fatiga-clear-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 1.5px solid rgba(239,83,80,0.3); background: rgba(239,83,80,0.07);
+      color: #ef5350; cursor: pointer;
+      touch-action: manipulation; transition: background 0.15s;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { background: rgba(239,83,80,0.16); }
+    }
+    .we-fatiga-options {
+      display: flex; gap: 8px; justify-content: space-between;
+    }
+    .we-fatiga-option {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px;
+      padding: 12px 4px; border-radius: 14px;
+      border: 2px solid transparent; background: #f5f5f5;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      &:hover { background: #ebebeb; transform: translateY(-2px); }
+      &:active { transform: scale(0.94); }
+      &.selected {
+        border-color: #006874; background: rgba(0,104,116,0.1);
+        transform: translateY(-2px);
+      }
+    }
+    .we-fatiga-option-emoji { font-size: 28px; line-height: 1; }
+    .we-fatiga-option-label { font-size: 10px; font-weight: 600; color: #888; text-align: center; }
 
     /* ── Last session banner ── */
     .we-last-session-banner {
@@ -441,10 +502,13 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
       display: flex; align-items: center; gap: 8px;
     }
     .we-cancel-btn {
-      padding: 8px 12px; border: none; background: transparent;
-      color: #888; font-size: 13px; font-weight: 500; cursor: pointer;
-      border-radius: 8px; touch-action: manipulation;
-      &:hover { background: #f0f0f0; }
+      padding: 11px 16px; border-radius: 10px;
+      border: 1.5px solid rgba(239,83,80,0.3); background: rgba(239,83,80,0.08);
+      color: #ef5350; font-size: 15px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation;
+      transition: all 0.15s;
+      &:hover { background: rgba(239,83,80,0.16); border-color: rgba(239,83,80,0.5); }
+      &:active { transform: scale(0.95); }
     }
     .we-quick-add {
       flex: 1; display: flex; gap: 6px; justify-content: flex-end;
@@ -520,12 +584,20 @@ export class WorkoutEditorComponent {
 
   readonly requestAddExercise = output<void>();
 
-  readonly addingFor    = signal<string | null>(null);
-  readonly editingSet   = signal<{ exerciseId: string; index: number } | null>(null);
-  readonly editingEntry = signal<string | null>(null);
+  readonly addingFor       = signal<string | null>(null);
+  readonly editingSet      = signal<{ exerciseId: string; index: number } | null>(null);
+  readonly editingEntry    = signal<string | null>(null);
   readonly lastSessionData = signal<{ exerciseId: string; date: string; maxWeight: number; feeling?: FeelingLevel } | null>(null);
+  readonly feelingPickerFor = signal<string | null>(null);
 
   readonly feelingLevels: FeelingLevel[] = [1, 2, 3, 4, 5];
+
+  readonly fatigaEntry = computed(() => {
+    const id = this.feelingPickerFor();
+    const w  = this.workout();
+    if (!id || !w) return null;
+    return w.entries.find(e => e.exerciseId === id) ?? null;
+  });
 
   readonly setForm = this.fb.group({
     weight: [0, [Validators.required, Validators.min(0)]],
@@ -622,6 +694,16 @@ export class WorkoutEditorComponent {
     this.editSetForm.patchValue({ reps: Math.max(1, v) });
   }
 
+  openFatigaPicker(exerciseId: string): void { this.feelingPickerFor.set(exerciseId); }
+  closeFatigaPicker(): void { this.feelingPickerFor.set(null); }
+
+  async pickFeeling(level: FeelingLevel): Promise<void> {
+    const entry = this.fatigaEntry();
+    if (!entry) return;
+    await this.setEntryFeeling(entry, level);
+    this.closeFatigaPicker();
+  }
+
   async setEntryFeeling(entry: WorkoutEntry, level: FeelingLevel): Promise<void> {
     const w = this.workout();
     if (!w) return;
@@ -629,7 +711,7 @@ export class WorkoutEditorComponent {
     try {
       await this.workoutService.updateEntryFeeling(w.id, entry.exerciseId, newFeeling);
     } catch {
-      this.snackBar.open('Error en actualitzar la sensació', '', { duration: 2000 });
+      this.snackBar.open('Error en actualitzar la fatiga', '', { duration: 2000 });
     }
   }
 
