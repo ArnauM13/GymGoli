@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -12,6 +12,7 @@ import {
   ExerciseCategory,
   SUBCATEGORY_LABELS,
 } from '../../core/models/exercise.model';
+import { AuthService } from '../../core/services/auth.service';
 import { ExerciseService } from '../../core/services/exercise.service';
 import {
   ExerciseFormDialogComponent,
@@ -191,10 +192,11 @@ import {
     }
   `],
 })
-export class LibraryComponent implements OnInit {
+export class LibraryComponent {
   private exerciseService = inject(ExerciseService);
-  private dialog = inject(MatDialog);
-  private snackBar = inject(MatSnackBar);
+  private authService     = inject(AuthService);
+  private dialog          = inject(MatDialog);
+  private snackBar        = inject(MatSnackBar);
 
   readonly activeFilter = signal<ExerciseCategory | null>(null);
   readonly exercises = this.exerciseService.exercises;
@@ -210,11 +212,6 @@ export class LibraryComponent implements OnInit {
     if (filter) return this.categoryList.filter(c => c.value === filter);
     return this.categoryList.filter(c => this.exercisesByCategory(c.value).length > 0);
   });
-
-  ngOnInit(): void {
-    // Seed after a brief delay to let Firestore load
-    setTimeout(() => this.exerciseService.seedIfEmpty(), 1000);
-  }
 
   exercisesByCategory(cat: ExerciseCategory): Exercise[] {
     return this.exercises().filter(e => e.category === cat);
@@ -241,8 +238,9 @@ export class LibraryComponent implements OnInit {
           await this.exerciseService.create(result);
           this.snackBar.open('Exercici creat', '', { duration: 2000 });
         }
-      } catch {
-        this.snackBar.open('Error en desar', '', { duration: 3000 });
+      } catch (err) {
+        const msg = (err as { message?: string }).message ?? 'Error desconegut';
+        this.snackBar.open(`Error en desar: ${msg}`, 'OK', { duration: 5000 });
       }
     });
   }
@@ -258,7 +256,8 @@ export class LibraryComponent implements OnInit {
   }
 
   async seed(): Promise<void> {
-    await this.exerciseService.seedIfEmpty();
+    const uid = this.authService.uid();
+    if (uid) await this.exerciseService.seedIfEmpty(uid);
     this.snackBar.open('Exercicis carregats', '', { duration: 2000 });
   }
 }

@@ -23,6 +23,11 @@ html {
 // Reset + base
 *, *::before, *::after { box-sizing: border-box; }
 
+// Prevent double-tap zoom on interactive elements
+button, a, input, select, textarea {
+  touch-action: manipulation;
+}
+
 html, body {
   height: 100%;
   margin: 0;
