@@ -66,6 +66,13 @@ html, body {
   border-radius: 20px !important;
 }
 
+// Calendar dialog — no inner padding, clean card look
+.cal-dialog .mat-mdc-dialog-surface {
+  padding: 0 !important;
+  overflow: hidden;
+  border-radius: 16px !important;
+}
+
 .mat-mdc-snack-bar-container {
   --mdc-snackbar-container-color: #323232;
   --mdc-snackbar-supporting-text-color: #fff;
