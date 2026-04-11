@@ -27,29 +27,23 @@ export class WorkoutService {
 
   private readonly _todayStr = new Date().toISOString().split('T')[0];
 
-  // ── Today: realtime ──────────────────────────────────────────────────────
-  private readonly _todayFirestore = signal<Workout[]>([]);
-  private _realtimeChannel: RealtimeChannel | null = null;
-
-  // ── History cache ────────────────────────────────────────────────────────
+  // ── Single unified cache (all dates including today) ─────────────────────
   private readonly _monthCache = new Map<string, Workout[]>();
   private readonly _historical = signal<Workout[]>([]);
   private _allLoaded = false;
+  private _realtimeChannel: RealtimeChannel | null = null;
 
   readonly isLoading = signal(false);
 
   // ── Public signals ───────────────────────────────────────────────────────
 
   readonly todayWorkout = computed((): Workout | null =>
-    this._todayFirestore()[0] ?? null
+    this._historical().find(w => w.date === this._todayStr) ?? null
   );
 
-  readonly workouts = computed((): Workout[] => {
-    const today = this.todayWorkout();
-    const hist  = this._historical().filter(w => w.date !== this._todayStr);
-    const arr   = today ? [today, ...hist] : hist;
-    return arr.sort((a, b) => b.date.localeCompare(a.date));
-  });
+  readonly workouts = computed((): Workout[] =>
+    [...this._historical()].sort((a, b) => b.date.localeCompare(a.date))
+  );
 
   readonly pastWorkouts = computed(() =>
     this.workouts().filter(w => w.date !== this._todayStr)
@@ -72,7 +66,6 @@ export class WorkoutService {
       this._monthCache.clear();
       this._allLoaded = false;
       this._historical.set([]);
-      this._todayFirestore.set([]);
 
       if (uid) {
         this._subscribeToday(uid);
@@ -102,7 +95,12 @@ export class WorkoutService {
       .select('*')
       .eq('user_id', uid)
       .eq('date', this._todayStr);
-    this._todayFirestore.set((data ?? []).map(r => toWorkout(r as Record<string, unknown>)));
+
+    const fresh = (data ?? []).map(r => toWorkout(r as Record<string, unknown>));
+    const key   = this._todayStr.substring(0, 7);
+    const existing = (this._monthCache.get(key) ?? []).filter(w => w.date !== this._todayStr);
+    this._monthCache.set(key, [...fresh, ...existing]);
+    this._rebuildHistorical();
   }
 
   // ── Load API ─────────────────────────────────────────────────────────────
@@ -207,15 +205,10 @@ export class WorkoutService {
     if (error) throw error;
 
     const newWorkout = toWorkout(data as Record<string, unknown>);
-
-    if (date === this._todayStr) {
-      this._todayFirestore.set([newWorkout, ...this._todayFirestore()]);
-    } else {
-      const monthKey = newWorkout.date.substring(0, 7);
-      const existing = this._monthCache.get(monthKey) ?? [];
-      this._monthCache.set(monthKey, [newWorkout, ...existing]);
-      this._rebuildHistorical();
-    }
+    const monthKey   = newWorkout.date.substring(0, 7);
+    const existing   = this._monthCache.get(monthKey) ?? [];
+    this._monthCache.set(monthKey, [newWorkout, ...existing]);
+    this._rebuildHistorical();
 
     return data['id'] as string;
   }
@@ -359,12 +352,10 @@ export class WorkoutService {
   }
 
   private _find(id: string): Workout | undefined {
-    return this._todayFirestore().find(w => w.id === id)
-      ?? this._historical().find(w => w.id === id);
+    return this._historical().find(w => w.id === id);
   }
 
   private _patch(workoutId: string, changes: Partial<Workout>): void {
-    // Try historical cache
     for (const [key, workouts] of this._monthCache) {
       const idx = workouts.findIndex(w => w.id === workoutId);
       if (idx !== -1) {
@@ -374,14 +365,6 @@ export class WorkoutService {
         this._rebuildHistorical();
         return;
       }
-    }
-    // Try today's signal
-    const todayList = this._todayFirestore();
-    const todayIdx  = todayList.findIndex(w => w.id === workoutId);
-    if (todayIdx !== -1) {
-      const updated = [...todayList];
-      updated[todayIdx] = { ...updated[todayIdx], ...changes };
-      this._todayFirestore.set(updated);
     }
   }
 
@@ -393,11 +376,6 @@ export class WorkoutService {
         this._rebuildHistorical();
         return;
       }
-    }
-    const todayList = this._todayFirestore();
-    const filtered  = todayList.filter(w => w.id !== workoutId);
-    if (filtered.length !== todayList.length) {
-      this._todayFirestore.set(filtered);
     }
   }
 }
