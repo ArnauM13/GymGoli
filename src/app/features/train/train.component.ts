@@ -324,6 +324,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       &:hover { background: #004f5a; }
     }
 
+
     /* ── Secció Esports ── */
     .sports-section {
       margin: 24px 16px 0;
@@ -412,7 +413,6 @@ export class TrainComponent {
 
   readonly selectedDate   = signal<string>(TODAY());
   readonly editMode       = signal(false);
-  readonly finalizing     = signal(false);
   readonly sportToggling  = signal(false);
   readonly workoutTypes   = WORKOUT_TYPES;
 
