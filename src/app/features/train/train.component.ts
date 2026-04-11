@@ -103,60 +103,73 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     </div>
 
-    <!-- ── Date nav (always visible, fixed above nav bar) ── -->
-    <div class="date-nav">
-      <button class="arrow-btn" (click)="navigateDate(-1)">
-        <span class="material-symbols-outlined">chevron_left</span>
-      </button>
+    <!-- ── Bottom bar: data + accions en un sol contenidor ── -->
+    <div class="bottom-bar">
 
-      <button class="date-btn" (click)="openCalendar()">
-        <span class="date-text">{{ dateLabel() }}</span>
-        <span class="material-symbols-outlined date-edit-icon">edit_calendar</span>
-      </button>
+      <!-- Navegació de data -->
+      <div class="bar-date">
+        <button class="arrow-btn" (click)="navigateDate(-1)">
+          <span class="material-symbols-outlined">chevron_left</span>
+        </button>
+        <button class="date-btn" (click)="openCalendar()">
+          <span class="date-text">{{ dateLabel() }}</span>
+          <span class="material-symbols-outlined date-edit-icon">edit_calendar</span>
+        </button>
+        <button class="arrow-btn" [class.invisible]="isToday()" (click)="navigateDate(1)">
+          <span class="material-symbols-outlined">chevron_right</span>
+        </button>
+      </div>
 
-      <button class="arrow-btn" [class.invisible]="isToday()" (click)="navigateDate(1)">
-        <span class="material-symbols-outlined">chevron_right</span>
-      </button>
-    </div>
-
-    <!-- ── FABs ── -->
-    @if (selectedWorkout()) {
-      @if (editMode()) {
-        <button class="fab-secondary fab-danger" (click)="deleteWorkout()" title="Eliminar entrenament">
-          <span class="material-symbols-outlined">delete</span>
-        </button>
-        <button class="fab" (click)="toggleEditMode()" title="Fet">
-          <span class="material-symbols-outlined">check</span>
-        </button>
-      } @else {
-        <button class="fab-secondary" (click)="toggleEditMode()" title="Reordenar / eliminar exercicis">
-          <span class="material-symbols-outlined">tune</span>
-        </button>
-        <button class="fab" (click)="openPicker()" title="Afegir exercici">
-          <span class="material-symbols-outlined">add</span>
-        </button>
+      <!-- Botons d'acció -->
+      @if (selectedWorkout()) {
+        @if (editMode()) {
+          <div class="bar-actions">
+            <button class="bar-icon-btn bar-danger" (click)="deleteWorkout()" title="Eliminar entrenament">
+              <span class="material-symbols-outlined">delete</span>
+            </button>
+            <button class="bar-primary-btn" (click)="toggleEditMode()">
+              <span class="material-symbols-outlined">check</span>
+              Fet
+            </button>
+          </div>
+        } @else {
+          <div class="bar-actions">
+            <button class="bar-icon-btn" (click)="toggleEditMode()" title="Reordenar / eliminar exercicis">
+              <span class="material-symbols-outlined">tune</span>
+            </button>
+            <button class="bar-primary-btn" (click)="openPicker()">
+              <span class="material-symbols-outlined">add</span>
+              Exercici
+            </button>
+          </div>
+        }
       }
-    }
+
+    </div>
   `,
   styles: [`
     .page { padding: 0 0 160px; min-height: 100dvh; }
 
-    /* ── Date nav (floating pill, centered, above nav bar) ── */
-    .date-nav {
+    /* ── Bottom bar: contenidor únic per data + accions ── */
+    .bottom-bar {
       position: fixed;
-      bottom: calc(64px + env(safe-area-inset-bottom) + 16px);
-      left: 50%; transform: translateX(-50%);
+      bottom: calc(64px + env(safe-area-inset-bottom) + 12px);
+      left: 12px; right: 12px;
       z-index: 90;
-      display: flex; align-items: center; gap: 0;
+      display: flex; align-items: center; gap: 4px;
       background: white;
-      border-radius: 50px;
+      border-radius: 20px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.08);
-      padding: 4px 4px;
-      white-space: nowrap;
+      padding: 4px;
+    }
+
+    .bar-date {
+      flex: 1; min-width: 0;
+      display: flex; align-items: center;
     }
 
     .arrow-btn {
-      width: 40px; height: 40px; border-radius: 50%; border: none; background: transparent;
+      width: 38px; height: 38px; border-radius: 50%; border: none; background: transparent;
       display: flex; align-items: center; justify-content: center;
       cursor: pointer; color: #999; transition: color 0.15s, background 0.15s;
       touch-action: manipulation; flex-shrink: 0;
@@ -166,15 +179,43 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
 
     .date-btn {
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      padding: 8px 14px; border-radius: 40px; border: none; background: transparent;
+      flex: 1; min-width: 0;
+      display: flex; align-items: center; gap: 5px;
+      padding: 8px 6px; border-radius: 14px; border: none; background: transparent;
       cursor: pointer; touch-action: manipulation; transition: background 0.15s;
       &:hover { background: rgba(0,0,0,0.05); }
     }
     .date-text {
-      font-size: 14px; font-weight: 600; color: #333; text-transform: capitalize;
+      flex: 1; min-width: 0;
+      font-size: 13px; font-weight: 600; color: #333; text-transform: capitalize;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .date-edit-icon { font-size: 15px; color: #bbb; }
+    .date-edit-icon { font-size: 14px; color: #bbb; flex-shrink: 0; }
+
+    .bar-actions {
+      display: flex; align-items: center; gap: 4px;
+      flex-shrink: 0; padding-right: 2px;
+    }
+
+    .bar-icon-btn {
+      width: 38px; height: 38px; border-radius: 50%; border: none;
+      background: transparent; color: #777;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 20px; }
+      &:hover { background: rgba(0,0,0,0.06); color: #333; }
+      &.bar-danger:hover { color: #ef5350; background: rgba(239,83,80,0.08); }
+    }
+
+    .bar-primary-btn {
+      display: flex; align-items: center; gap: 5px;
+      height: 38px; padding: 0 16px; border-radius: 19px; border: none;
+      background: #006874; color: white;
+      font-size: 13px; font-weight: 700; cursor: pointer;
+      touch-action: manipulation; transition: background 0.15s; white-space: nowrap;
+      .material-symbols-outlined { font-size: 17px; }
+      &:hover { background: #005a63; }
+    }
 
 
     /* ── Type badges ── */
@@ -260,37 +301,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       background: rgba(76,175,80,0.08); color: #4caf50;
       font-size: 13px; font-weight: 600;
       .material-symbols-outlined { font-size: 18px; }
-    }
-
-    /* ── FABs ── */
-    .fab {
-      position: fixed;
-      bottom: calc(64px + env(safe-area-inset-bottom) + 16px);
-      right: 16px; z-index: 100;
-      width: 56px; height: 56px; border-radius: 50%; border: none;
-      background: #006874; color: white;
-      box-shadow: 0 4px 16px rgba(0,104,116,0.4);
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; touch-action: manipulation;
-      transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
-      .material-symbols-outlined { font-size: 28px; }
-      &:hover { transform: scale(1.06); box-shadow: 0 6px 24px rgba(0,104,116,0.5); }
-      &:active { transform: scale(0.94); }
-    }
-
-    .fab-secondary {
-      position: fixed;
-      bottom: calc(64px + env(safe-area-inset-bottom) + 16px + 56px + 10px);
-      right: 24px; z-index: 100;
-      width: 40px; height: 40px; border-radius: 50%; border: none;
-      background: white; color: #666;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; touch-action: manipulation; transition: all 0.2s;
-      .material-symbols-outlined { font-size: 20px; }
-      &:hover { transform: scale(1.08); box-shadow: 0 4px 12px rgba(0,0,0,0.2); color: #006874; }
-      &:active { transform: scale(0.94); }
-      &.fab-danger:hover { color: #ef5350; }
     }
 
     @keyframes spin {

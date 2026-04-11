@@ -74,20 +74,20 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
 
     </div>
 
-    <!-- ── Date nav (floating pill, like train page) ── -->
-    <div class="date-nav">
-      <button class="arrow-btn" (click)="navigateDate(-1)">
-        <span class="material-symbols-outlined">chevron_left</span>
-      </button>
-
-      <button class="date-btn" (click)="openCalendar()">
-        <span class="date-text">{{ dateLabel() }}</span>
-        <span class="material-symbols-outlined date-edit-icon">edit_calendar</span>
-      </button>
-
-      <button class="arrow-btn" [class.invisible]="isToday()" (click)="navigateDate(1)">
-        <span class="material-symbols-outlined">chevron_right</span>
-      </button>
+    <!-- ── Bottom bar: data (mateix contenidor que train) ── -->
+    <div class="bottom-bar">
+      <div class="bar-date">
+        <button class="arrow-btn" (click)="navigateDate(-1)">
+          <span class="material-symbols-outlined">chevron_left</span>
+        </button>
+        <button class="date-btn" (click)="openCalendar()">
+          <span class="date-text">{{ dateLabel() }}</span>
+          <span class="material-symbols-outlined date-edit-icon">edit_calendar</span>
+        </button>
+        <button class="arrow-btn" [class.invisible]="isToday()" (click)="navigateDate(1)">
+          <span class="material-symbols-outlined">chevron_right</span>
+        </button>
+      </div>
     </div>
   `,
   styles: [`
@@ -200,38 +200,47 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     }
     .pill-icon { font-size: 14px; font-variation-settings: 'FILL' 1; }
 
-    /* ── Date nav ── */
-    .date-nav {
+    /* ── Bottom bar ── */
+    .bottom-bar {
       position: fixed;
-      bottom: calc(64px + env(safe-area-inset-bottom) + 16px);
-      left: 50%; transform: translateX(-50%);
+      bottom: calc(64px + env(safe-area-inset-bottom) + 12px);
+      left: 12px; right: 12px;
       z-index: 90;
-      display: flex; align-items: center;
+      display: flex; align-items: center; gap: 4px;
       background: white;
-      border-radius: 50px;
+      border-radius: 20px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.08);
       padding: 4px;
-      white-space: nowrap;
+    }
+
+    .bar-date {
+      flex: 1; min-width: 0;
+      display: flex; align-items: center;
     }
 
     .arrow-btn {
-      width: 40px; height: 40px; border-radius: 50%; border: none; background: transparent;
+      width: 38px; height: 38px; border-radius: 50%; border: none; background: transparent;
       display: flex; align-items: center; justify-content: center;
       cursor: pointer; color: #999; transition: color 0.15s, background 0.15s;
-      touch-action: manipulation;
+      touch-action: manipulation; flex-shrink: 0;
       .material-symbols-outlined { font-size: 22px; }
       &:hover { color: #333; background: rgba(0,0,0,0.06); }
       &.invisible { visibility: hidden; pointer-events: none; }
     }
 
     .date-btn {
-      display: flex; align-items: center; gap: 6px;
-      padding: 8px 14px; border-radius: 40px; border: none; background: transparent;
+      flex: 1; min-width: 0;
+      display: flex; align-items: center; gap: 5px;
+      padding: 8px 6px; border-radius: 14px; border: none; background: transparent;
       cursor: pointer; touch-action: manipulation; transition: background 0.15s;
       &:hover { background: rgba(0,0,0,0.05); }
     }
-    .date-text { font-size: 14px; font-weight: 600; color: #333; text-transform: capitalize; }
-    .date-edit-icon { font-size: 15px; color: #bbb; }
+    .date-text {
+      flex: 1; min-width: 0;
+      font-size: 13px; font-weight: 600; color: #333; text-transform: capitalize;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .date-edit-icon { font-size: 14px; color: #bbb; flex-shrink: 0; }
   `],
 })
 export class SportsComponent {
