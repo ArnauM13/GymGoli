@@ -6,7 +6,9 @@ import { CalendarComponent } from '../../shared/components/calendar/calendar.com
 import {
   CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, Exercise, ExerciseCategory,
 } from '../../core/models/exercise.model';
+import { SPORT_CONFIG, SPORT_TYPES, SportType } from '../../core/models/sport.model';
 import { WorkoutService } from '../../core/services/workout.service';
+import { SportService } from '../../core/services/sport.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
 
@@ -17,6 +19,8 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
   { value: 'pull', label: CATEGORY_LABELS.pull, icon: CATEGORY_ICONS.pull, color: CATEGORY_COLORS.pull },
   { value: 'legs', label: CATEGORY_LABELS.legs, icon: CATEGORY_ICONS.legs, color: CATEGORY_COLORS.legs },
 ];
+
+const SPORT_LIST = SPORT_TYPES.map(type => ({ type, ...SPORT_CONFIG[type] }));
 
 @Component({
   selector: 'app-train',
@@ -100,6 +104,31 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           </div>
         }
       }
+
+      <!-- ══ Secció Esports (sempre visible) ══ -->
+      <div class="sports-section">
+        <div class="sports-header">
+          <span class="material-symbols-outlined sports-header-icon">sports_soccer</span>
+          <h2 class="sports-title">Esports</h2>
+        </div>
+        <div class="sports-grid">
+          @for (sport of sportList; track sport.type) {
+            <button
+              class="sport-btn"
+              [class.active]="isSportDone(sport.type)"
+              [style.--sport-color]="sport.color"
+              (click)="toggleSport(sport.type)"
+              [disabled]="sportToggling()"
+            >
+              @if (isSportDone(sport.type)) {
+                <span class="sport-check material-symbols-outlined">check_circle</span>
+              }
+              <span class="material-symbols-outlined sport-icon">{{ sport.icon }}</span>
+              <span class="sport-name">{{ sport.label }}</span>
+            </button>
+          }
+        </div>
+      </div>
 
     </div>
 
@@ -303,6 +332,77 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .material-symbols-outlined { font-size: 18px; }
     }
 
+    /* ── Secció Esports ── */
+    .sports-section {
+      margin: 24px 16px 0;
+      padding: 14px 14px 16px;
+      background: white;
+      border-radius: 18px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+    }
+
+    .sports-header {
+      display: flex; align-items: center; gap: 7px;
+      margin-bottom: 14px;
+    }
+    .sports-header-icon {
+      font-size: 18px; color: #888;
+      font-variation-settings: 'FILL' 0, 'wght' 300;
+    }
+    .sports-title {
+      margin: 0; font-size: 14px; font-weight: 700;
+      color: #555; letter-spacing: 0.2px;
+    }
+
+    .sports-grid {
+      display: flex; gap: 10px;
+    }
+
+    .sport-btn {
+      position: relative;
+      flex: 1;
+      display: flex; flex-direction: column; align-items: center; gap: 7px;
+      padding: 16px 4px 14px;
+      border: 1.5px solid color-mix(in srgb, var(--sport-color) 30%, #e8e8e8);
+      border-radius: 16px;
+      background: white;
+      color: color-mix(in srgb, var(--sport-color) 65%, #444);
+      cursor: pointer; touch-action: manipulation;
+      transition: all 0.18s ease;
+
+      &:hover:not(:disabled) {
+        border-color: var(--sport-color);
+        background: color-mix(in srgb, var(--sport-color) 6%, white);
+        transform: translateY(-1px);
+      }
+      &:active:not(:disabled) { transform: scale(0.97); }
+
+      &.active {
+        border-color: var(--sport-color);
+        background: color-mix(in srgb, var(--sport-color) 10%, white);
+      }
+      &:disabled { opacity: 0.65; cursor: default; }
+    }
+
+    .sport-icon {
+      font-size: 28px;
+      font-variation-settings: 'FILL' 0, 'wght' 300;
+      transition: font-variation-settings 0.15s;
+      .active & { font-variation-settings: 'FILL' 1, 'wght' 400; }
+    }
+
+    .sport-name {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.2px;
+      text-align: center; line-height: 1.1;
+    }
+
+    .sport-check {
+      position: absolute; top: 6px; right: 6px;
+      font-size: 15px;
+      color: var(--sport-color);
+      font-variation-settings: 'FILL' 1, 'wght' 500;
+    }
+
     @keyframes spin {
       from { transform: rotate(0deg); }
       to   { transform: rotate(360deg); }
@@ -312,15 +412,18 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 })
 export class TrainComponent {
   readonly workoutService = inject(WorkoutService);
-  private dialog   = inject(MatDialog);
-  private snackBar = inject(MatSnackBar);
+  private sportService    = inject(SportService);
+  private dialog          = inject(MatDialog);
+  private snackBar        = inject(MatSnackBar);
 
   @ViewChild('editor') editor?: WorkoutEditorComponent;
 
-  readonly selectedDate = signal<string>(TODAY());
-  readonly editMode     = signal(false);
-  readonly finalizing   = signal(false);
-  readonly workoutTypes = WORKOUT_TYPES;
+  readonly selectedDate   = signal<string>(TODAY());
+  readonly editMode       = signal(false);
+  readonly finalizing     = signal(false);
+  readonly sportToggling  = signal(false);
+  readonly workoutTypes   = WORKOUT_TYPES;
+  readonly sportList      = SPORT_LIST;
 
   readonly isToday = computed(() => this.selectedDate() === TODAY());
 
@@ -359,8 +462,28 @@ export class TrainComponent {
     effect(() => {
       const date = this.selectedDate();
       const [yearStr, monthStr] = date.split('-');
-      this.workoutService.ensureMonthLoaded(parseInt(yearStr), parseInt(monthStr) - 1);
+      const year  = parseInt(yearStr);
+      const month = parseInt(monthStr) - 1;
+      this.workoutService.ensureMonthLoaded(year, month);
+      this.sportService.ensureMonthLoaded(year, month);
     });
+  }
+
+  // ── Sport helpers ──────────────────────────────────────────────────────────
+
+  isSportDone(sport: SportType): boolean {
+    return this.sportService.hasSportOnDate(this.selectedDate(), sport);
+  }
+
+  async toggleSport(sport: SportType): Promise<void> {
+    this.sportToggling.set(true);
+    try {
+      await this.sportService.toggleSport(this.selectedDate(), sport);
+    } catch {
+      this.snackBar.open('Error en guardar l\'esport', '', { duration: 2500 });
+    } finally {
+      this.sportToggling.set(false);
+    }
   }
 
   navigateDate(days: number): void {

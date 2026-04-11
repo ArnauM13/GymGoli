@@ -1,7 +1,7 @@
 import { ActivatedRouteSnapshot, DetachedRouteHandle, RouteReuseStrategy } from '@angular/router';
 
 /** Routes to keep alive across navigations (all authenticated pages). */
-const REUSE_ROUTES = new Set(['train', 'history', 'library', 'charts', 'sports']);
+const REUSE_ROUTES = new Set(['train', 'history', 'library', 'charts']);
 
 export class AppReuseStrategy implements RouteReuseStrategy {
   private readonly cache = new Map<string, DetachedRouteHandle>();
