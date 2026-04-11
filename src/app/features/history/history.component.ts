@@ -2,8 +2,10 @@ import { Component, computed, inject, signal } from '@angular/core';
 
 import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
 import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry } from '../../core/models/workout.model';
+import { SPORT_CONFIG, SportType } from '../../core/models/sport.model';
 import { WorkoutService } from '../../core/services/workout.service';
 import { ExerciseService } from '../../core/services/exercise.service';
+import { SportService } from '../../core/services/sport.service';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
 import { ExerciseStatsDialogComponent } from '../../shared/components/exercise-stats-dialog.component';
 
@@ -37,10 +39,27 @@ import { ExerciseStatsDialogComponent } from '../../shared/components/exercise-s
             <h2 class="detail-title">{{ selectedDateLabel() }}</h2>
           </div>
 
+          <!-- Sports done that day -->
+          @if (selectedDateSports().length > 0) {
+            <div class="sports-row">
+              @for (sport of selectedDateSports(); track sport) {
+                <span class="sport-tag" [style.--sport-color]="getSportColor(sport)">
+                  <span class="material-symbols-outlined sport-tag-icon">{{ getSportIcon(sport) }}</span>
+                  {{ getSportLabel(sport) }}
+                </span>
+              }
+            </div>
+          }
+
           @if (!selectedWorkout()) {
             <div class="detail-empty">
-              <span class="material-symbols-outlined empty-icon">fitness_center</span>
-              <p>Cap entrenament registrat</p>
+              @if (selectedDateSports().length === 0) {
+                <span class="material-symbols-outlined empty-icon">fitness_center</span>
+                <p>Cap activitat registrada</p>
+              } @else {
+                <span class="material-symbols-outlined empty-icon">sports_soccer</span>
+                <p>Sense entrenament al gimnàs</p>
+              }
             </div>
           } @else {
 
@@ -217,6 +236,22 @@ import { ExerciseStatsDialogComponent } from '../../shared/components/exercise-s
       text-transform: capitalize;
     }
 
+    /* ── Sports row ── */
+    .sports-row {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      padding: 10px 16px 8px;
+      border-bottom: 1px solid #f5f5f5;
+    }
+    .sport-tag {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 10px; border-radius: 20px;
+      background: color-mix(in srgb, var(--sport-color) 12%, white);
+      color: var(--sport-color);
+      font-size: 12px; font-weight: 600;
+      border: 1px solid color-mix(in srgb, var(--sport-color) 25%, transparent);
+    }
+    .sport-tag-icon { font-size: 14px; font-variation-settings: 'FILL' 1; }
+
     .detail-empty {
       display: flex; flex-direction: column; align-items: center;
       gap: 8px; padding: 24px; text-align: center;
@@ -374,6 +409,7 @@ import { ExerciseStatsDialogComponent } from '../../shared/components/exercise-s
 export class HistoryComponent {
   private workoutService  = inject(WorkoutService);
   private exerciseService = inject(ExerciseService);
+  private sportService    = inject(SportService);
 
   readonly selectedDate = signal<string | null>(null);
   readonly expandedId   = signal<string | null>(null);
@@ -385,6 +421,11 @@ export class HistoryComponent {
   readonly selectedWorkout = computed(() => {
     const d = this.selectedDate();
     return d ? this.workoutService.getWorkoutForDate(d) : null;
+  });
+
+  readonly selectedDateSports = computed((): SportType[] => {
+    const d = this.selectedDate();
+    return d ? this.sportService.getSportsForDate(d) : [];
   });
 
   readonly selectedEntry = computed((): WorkoutEntry | null => {
@@ -411,6 +452,10 @@ export class HistoryComponent {
   });
 
   getFeelingEmoji(level: FeelingLevel): string { return FEELING_EMOJI[level]; }
+
+  getSportLabel(sport: SportType): string { return SPORT_CONFIG[sport].label; }
+  getSportIcon(sport: SportType): string  { return SPORT_CONFIG[sport].icon; }
+  getSportColor(sport: SportType): string { return SPORT_CONFIG[sport].color; }
 
   getCatColor(cat: string): string { return CATEGORY_COLORS[cat as ExerciseCategory] ?? '#bbb'; }
   getCatLabel(cat: string): string { return CATEGORY_LABELS[cat as ExerciseCategory] ?? cat; }
