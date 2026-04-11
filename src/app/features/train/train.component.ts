@@ -6,7 +6,9 @@ import { CalendarComponent } from '../../shared/components/calendar/calendar.com
 import {
   CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, Exercise, ExerciseCategory,
 } from '../../core/models/exercise.model';
+import { Sport } from '../../core/models/sport.model';
 import { WorkoutService } from '../../core/services/workout.service';
+import { SportService } from '../../core/services/sport.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
 
@@ -17,6 +19,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
   { value: 'pull', label: CATEGORY_LABELS.pull, icon: CATEGORY_ICONS.pull, color: CATEGORY_COLORS.pull },
   { value: 'legs', label: CATEGORY_LABELS.legs, icon: CATEGORY_ICONS.legs, color: CATEGORY_COLORS.legs },
 ];
+
 
 @Component({
   selector: 'app-train',
@@ -73,62 +76,100 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
       }
 
+      <!-- ══ Secció Esports (sempre visible) ══ -->
+      <div class="sports-section">
+        <div class="sports-header">
+          <span class="material-symbols-outlined sports-header-icon">sports_soccer</span>
+          <h2 class="sports-title">Esports</h2>
+        </div>
+        <div class="sports-grid">
+          @for (sport of sportService.sports(); track sport.id) {
+            <button
+              class="sport-btn"
+              [class.active]="isSportDone(sport.id)"
+              [style.--sport-color]="sport.color"
+              (click)="toggleSport(sport.id)"
+              [disabled]="sportToggling()"
+            >
+              @if (isSportDone(sport.id)) {
+                <span class="sport-check material-symbols-outlined">check_circle</span>
+              }
+              <span class="material-symbols-outlined sport-icon">{{ sport.icon }}</span>
+              <span class="sport-name">{{ sport.name }}</span>
+            </button>
+          }
+        </div>
+      </div>
+
     </div>
 
-    <!-- ── Date nav (always visible, fixed above nav bar) ── -->
-    <div class="date-nav">
-      <button class="arrow-btn" (click)="navigateDate(-1)">
-        <span class="material-symbols-outlined">chevron_left</span>
-      </button>
+    <!-- ── Bottom bar: data + accions en un sol contenidor ── -->
+    <div class="bottom-bar">
 
-      <button class="date-btn" (click)="openCalendar()">
-        <span class="date-text">{{ dateLabel() }}</span>
-        <span class="material-symbols-outlined date-edit-icon">edit_calendar</span>
-      </button>
+      <!-- Navegació de data -->
+      <div class="bar-date">
+        <button class="arrow-btn" (click)="navigateDate(-1)">
+          <span class="material-symbols-outlined">chevron_left</span>
+        </button>
+        <button class="date-btn" (click)="openCalendar()">
+          <span class="date-text">{{ dateLabel() }}</span>
+          <span class="material-symbols-outlined date-edit-icon">edit_calendar</span>
+        </button>
+        <button class="arrow-btn" [class.invisible]="isToday()" (click)="navigateDate(1)">
+          <span class="material-symbols-outlined">chevron_right</span>
+        </button>
+      </div>
 
-      <button class="arrow-btn" [class.invisible]="isToday()" (click)="navigateDate(1)">
-        <span class="material-symbols-outlined">chevron_right</span>
-      </button>
-    </div>
-
-    <!-- ── FABs ── -->
-    @if (selectedWorkout()) {
-      @if (editMode()) {
-        <button class="fab-secondary fab-danger" (click)="deleteWorkout()" title="Eliminar entrenament">
-          <span class="material-symbols-outlined">delete</span>
-        </button>
-        <button class="fab" (click)="toggleEditMode()" title="Fet">
-          <span class="material-symbols-outlined">check</span>
-        </button>
-      } @else {
-        <button class="fab-secondary" (click)="toggleEditMode()" title="Reordenar / eliminar exercicis">
-          <span class="material-symbols-outlined">tune</span>
-        </button>
-        <button class="fab" (click)="openPicker()" title="Afegir exercici">
-          <span class="material-symbols-outlined">add</span>
-        </button>
+      <!-- Botons d'acció -->
+      @if (selectedWorkout()) {
+        @if (editMode()) {
+          <div class="bar-actions">
+            <button class="bar-icon-btn bar-danger" (click)="deleteWorkout()" title="Eliminar entrenament">
+              <span class="material-symbols-outlined">delete</span>
+            </button>
+            <button class="bar-primary-btn" (click)="toggleEditMode()">
+              <span class="material-symbols-outlined">check</span>
+              Fet
+            </button>
+          </div>
+        } @else {
+          <div class="bar-actions">
+            <button class="bar-icon-btn" (click)="toggleEditMode()" title="Reordenar / eliminar exercicis">
+              <span class="material-symbols-outlined">tune</span>
+            </button>
+            <button class="bar-primary-btn" (click)="openPicker()">
+              <span class="material-symbols-outlined">add</span>
+              Exercici
+            </button>
+          </div>
+        }
       }
-    }
+
+    </div>
   `,
   styles: [`
     .page { padding: 0 0 160px; min-height: 100dvh; }
 
-    /* ── Date nav (floating pill, centered, above nav bar) ── */
-    .date-nav {
+    /* ── Bottom bar: contenidor únic per data + accions ── */
+    .bottom-bar {
       position: fixed;
-      bottom: calc(64px + env(safe-area-inset-bottom) + 16px);
-      left: 50%; transform: translateX(-50%);
+      bottom: calc(64px + env(safe-area-inset-bottom) + 12px);
+      left: 12px; right: 12px;
       z-index: 90;
-      display: flex; align-items: center; gap: 0;
+      display: flex; align-items: center; gap: 4px;
       background: white;
-      border-radius: 50px;
+      border-radius: 20px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.08);
-      padding: 4px 4px;
-      white-space: nowrap;
+      padding: 4px;
+    }
+
+    .bar-date {
+      flex: 1; min-width: 0;
+      display: flex; align-items: center;
     }
 
     .arrow-btn {
-      width: 40px; height: 40px; border-radius: 50%; border: none; background: transparent;
+      width: 38px; height: 38px; border-radius: 50%; border: none; background: transparent;
       display: flex; align-items: center; justify-content: center;
       cursor: pointer; color: #999; transition: color 0.15s, background 0.15s;
       touch-action: manipulation; flex-shrink: 0;
@@ -138,15 +179,43 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
 
     .date-btn {
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      padding: 8px 14px; border-radius: 40px; border: none; background: transparent;
+      flex: 1; min-width: 0;
+      display: flex; align-items: center; gap: 5px;
+      padding: 8px 6px; border-radius: 14px; border: none; background: transparent;
       cursor: pointer; touch-action: manipulation; transition: background 0.15s;
       &:hover { background: rgba(0,0,0,0.05); }
     }
     .date-text {
-      font-size: 14px; font-weight: 600; color: #333; text-transform: capitalize;
+      flex: 1; min-width: 0;
+      font-size: 13px; font-weight: 600; color: #333; text-transform: capitalize;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .date-edit-icon { font-size: 15px; color: #bbb; }
+    .date-edit-icon { font-size: 14px; color: #bbb; flex-shrink: 0; }
+
+    .bar-actions {
+      display: flex; align-items: center; gap: 4px;
+      flex-shrink: 0; padding-right: 2px;
+    }
+
+    .bar-icon-btn {
+      width: 38px; height: 38px; border-radius: 50%; border: none;
+      background: transparent; color: #777;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 20px; }
+      &:hover { background: rgba(0,0,0,0.06); color: #333; }
+      &.bar-danger:hover { color: #ef5350; background: rgba(239,83,80,0.08); }
+    }
+
+    .bar-primary-btn {
+      display: flex; align-items: center; gap: 5px;
+      height: 38px; padding: 0 16px; border-radius: 19px; border: none;
+      background: #006874; color: white;
+      font-size: 13px; font-weight: 700; cursor: pointer;
+      touch-action: manipulation; transition: background 0.15s; white-space: nowrap;
+      .material-symbols-outlined { font-size: 17px; }
+      &:hover { background: #005a63; }
+    }
 
 
     /* ── Type badges ── */
@@ -196,35 +265,75 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .type-label { font-size: 13px; font-weight: 600; }
     }
 
-    /* ── FABs ── */
-    .fab {
-      position: fixed;
-      bottom: calc(64px + env(safe-area-inset-bottom) + 16px);
-      right: 16px; z-index: 100;
-      width: 56px; height: 56px; border-radius: 50%; border: none;
-      background: #006874; color: white;
-      box-shadow: 0 4px 16px rgba(0,104,116,0.4);
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; touch-action: manipulation;
-      transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
-      .material-symbols-outlined { font-size: 28px; }
-      &:hover { transform: scale(1.06); box-shadow: 0 6px 24px rgba(0,104,116,0.5); }
-      &:active { transform: scale(0.94); }
+    /* ── Secció Esports ── */
+    .sports-section {
+      margin: 24px 16px 0;
+      padding: 14px 14px 16px;
+      background: white;
+      border-radius: 18px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
     }
 
-    .fab-secondary {
-      position: fixed;
-      bottom: calc(64px + env(safe-area-inset-bottom) + 16px + 56px + 10px);
-      right: 24px; z-index: 100;
-      width: 40px; height: 40px; border-radius: 50%; border: none;
-      background: white; color: #666;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; touch-action: manipulation; transition: all 0.2s;
-      .material-symbols-outlined { font-size: 20px; }
-      &:hover { transform: scale(1.08); box-shadow: 0 4px 12px rgba(0,0,0,0.2); color: #006874; }
-      &:active { transform: scale(0.94); }
-      &.fab-danger:hover { color: #ef5350; }
+    .sports-header {
+      display: flex; align-items: center; gap: 7px;
+      margin-bottom: 14px;
+    }
+    .sports-header-icon {
+      font-size: 18px; color: #888;
+      font-variation-settings: 'FILL' 0, 'wght' 300;
+    }
+    .sports-title {
+      margin: 0; font-size: 14px; font-weight: 700;
+      color: #555; letter-spacing: 0.2px;
+    }
+
+    .sports-grid {
+      display: flex; gap: 10px;
+    }
+
+    .sport-btn {
+      position: relative;
+      flex: 1;
+      display: flex; flex-direction: column; align-items: center; gap: 7px;
+      padding: 16px 4px 14px;
+      border: 1.5px solid color-mix(in srgb, var(--sport-color) 30%, #e8e8e8);
+      border-radius: 16px;
+      background: white;
+      color: color-mix(in srgb, var(--sport-color) 65%, #444);
+      cursor: pointer; touch-action: manipulation;
+      transition: all 0.18s ease;
+
+      &:hover:not(:disabled) {
+        border-color: var(--sport-color);
+        background: color-mix(in srgb, var(--sport-color) 6%, white);
+        transform: translateY(-1px);
+      }
+      &:active:not(:disabled) { transform: scale(0.97); }
+
+      &.active {
+        border-color: var(--sport-color);
+        background: color-mix(in srgb, var(--sport-color) 10%, white);
+      }
+      &:disabled { opacity: 0.65; cursor: default; }
+    }
+
+    .sport-icon {
+      font-size: 28px;
+      font-variation-settings: 'FILL' 0, 'wght' 300;
+      transition: font-variation-settings 0.15s;
+      .active & { font-variation-settings: 'FILL' 1, 'wght' 400; }
+    }
+
+    .sport-name {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.2px;
+      text-align: center; line-height: 1.1;
+    }
+
+    .sport-check {
+      position: absolute; top: 6px; right: 6px;
+      font-size: 15px;
+      color: var(--sport-color);
+      font-variation-settings: 'FILL' 1, 'wght' 500;
     }
 
     @keyframes spin {
@@ -236,14 +345,17 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 })
 export class TrainComponent {
   readonly workoutService = inject(WorkoutService);
-  private dialog   = inject(MatDialog);
-  private snackBar = inject(MatSnackBar);
+  readonly sportService   = inject(SportService);
+  private dialog          = inject(MatDialog);
+  private snackBar        = inject(MatSnackBar);
 
   @ViewChild('editor') editor?: WorkoutEditorComponent;
 
-  readonly selectedDate = signal<string>(TODAY());
-  readonly editMode     = signal(false);
-  readonly workoutTypes = WORKOUT_TYPES;
+  readonly selectedDate   = signal<string>(TODAY());
+  readonly editMode       = signal(false);
+  readonly finalizing     = signal(false);
+  readonly sportToggling  = signal(false);
+  readonly workoutTypes   = WORKOUT_TYPES;
 
   readonly isToday = computed(() => this.selectedDate() === TODAY());
 
@@ -278,8 +390,28 @@ export class TrainComponent {
     effect(() => {
       const date = this.selectedDate();
       const [yearStr, monthStr] = date.split('-');
-      this.workoutService.ensureMonthLoaded(parseInt(yearStr), parseInt(monthStr) - 1);
+      const year  = parseInt(yearStr);
+      const month = parseInt(monthStr) - 1;
+      this.workoutService.ensureMonthLoaded(year, month);
+      this.sportService.ensureMonthLoaded(year, month);
     });
+  }
+
+  // ── Sport helpers ──────────────────────────────────────────────────────────
+
+  isSportDone(sportId: string): boolean {
+    return this.sportService.hasSportOnDate(this.selectedDate(), sportId);
+  }
+
+  async toggleSport(sportId: string): Promise<void> {
+    this.sportToggling.set(true);
+    try {
+      await this.sportService.toggleSport(this.selectedDate(), sportId);
+    } catch {
+      this.snackBar.open('Error en guardar l\'esport', '', { duration: 2500 });
+    } finally {
+      this.sportToggling.set(false);
+    }
   }
 
   navigateDate(days: number): void {
