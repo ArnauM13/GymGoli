@@ -6,7 +6,7 @@ import { CalendarComponent } from '../../shared/components/calendar/calendar.com
 import {
   CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, Exercise, ExerciseCategory,
 } from '../../core/models/exercise.model';
-import { SPORT_CONFIG, SPORT_TYPES, SportType } from '../../core/models/sport.model';
+import { Sport } from '../../core/models/sport.model';
 import { WorkoutService } from '../../core/services/workout.service';
 import { SportService } from '../../core/services/sport.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
@@ -20,7 +20,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
   { value: 'legs', label: CATEGORY_LABELS.legs, icon: CATEGORY_ICONS.legs, color: CATEGORY_COLORS.legs },
 ];
 
-const SPORT_LIST = SPORT_TYPES.map(type => ({ type, ...SPORT_CONFIG[type] }));
 
 @Component({
   selector: 'app-train',
@@ -112,19 +111,19 @@ const SPORT_LIST = SPORT_TYPES.map(type => ({ type, ...SPORT_CONFIG[type] }));
           <h2 class="sports-title">Esports</h2>
         </div>
         <div class="sports-grid">
-          @for (sport of sportList; track sport.type) {
+          @for (sport of sportService.sports(); track sport.id) {
             <button
               class="sport-btn"
-              [class.active]="isSportDone(sport.type)"
+              [class.active]="isSportDone(sport.id)"
               [style.--sport-color]="sport.color"
-              (click)="toggleSport(sport.type)"
+              (click)="toggleSport(sport.id)"
               [disabled]="sportToggling()"
             >
-              @if (isSportDone(sport.type)) {
+              @if (isSportDone(sport.id)) {
                 <span class="sport-check material-symbols-outlined">check_circle</span>
               }
               <span class="material-symbols-outlined sport-icon">{{ sport.icon }}</span>
-              <span class="sport-name">{{ sport.label }}</span>
+              <span class="sport-name">{{ sport.name }}</span>
             </button>
           }
         </div>
@@ -412,7 +411,7 @@ const SPORT_LIST = SPORT_TYPES.map(type => ({ type, ...SPORT_CONFIG[type] }));
 })
 export class TrainComponent {
   readonly workoutService = inject(WorkoutService);
-  private sportService    = inject(SportService);
+  readonly sportService   = inject(SportService);
   private dialog          = inject(MatDialog);
   private snackBar        = inject(MatSnackBar);
 
@@ -423,7 +422,6 @@ export class TrainComponent {
   readonly finalizing     = signal(false);
   readonly sportToggling  = signal(false);
   readonly workoutTypes   = WORKOUT_TYPES;
-  readonly sportList      = SPORT_LIST;
 
   readonly isToday = computed(() => this.selectedDate() === TODAY());
 
@@ -471,14 +469,14 @@ export class TrainComponent {
 
   // ── Sport helpers ──────────────────────────────────────────────────────────
 
-  isSportDone(sport: SportType): boolean {
-    return this.sportService.hasSportOnDate(this.selectedDate(), sport);
+  isSportDone(sportId: string): boolean {
+    return this.sportService.hasSportOnDate(this.selectedDate(), sportId);
   }
 
-  async toggleSport(sport: SportType): Promise<void> {
+  async toggleSport(sportId: string): Promise<void> {
     this.sportToggling.set(true);
     try {
-      await this.sportService.toggleSport(this.selectedDate(), sport);
+      await this.sportService.toggleSport(this.selectedDate(), sportId);
     } catch {
       this.snackBar.open('Error en guardar l\'esport', '', { duration: 2500 });
     } finally {

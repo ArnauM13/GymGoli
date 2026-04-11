@@ -12,11 +12,12 @@ import {
   ExerciseCategory,
   SUBCATEGORY_LABELS,
 } from '../../core/models/exercise.model';
+import { Sport } from '../../core/models/sport.model';
 import { AuthService } from '../../core/services/auth.service';
 import { ExerciseService } from '../../core/services/exercise.service';
-import {
-  ExerciseFormDialogComponent,
-} from './components/exercise-form-dialog.component';
+import { SportService } from '../../core/services/sport.service';
+import { ExerciseFormDialogComponent } from './components/exercise-form-dialog.component';
+import { SportFormDialogComponent } from './components/sport-form-dialog.component';
 
 @Component({
   selector: 'app-library',
@@ -92,6 +93,46 @@ import {
                 </div>
               </div>
             }
+          </div>
+        }
+      </div>
+
+      <!-- ══ Secció Esports ══ -->
+      <div class="section-divider"></div>
+
+      <header class="page-header">
+        <h1>Esports</h1>
+        <button mat-icon-button (click)="openSportForm()" aria-label="Nou esport">
+          <span class="material-symbols-outlined">add</span>
+        </button>
+      </header>
+
+      <div class="exercise-list">
+        @if (sports().length === 0) {
+          <div class="empty-state">
+            <span class="material-symbols-outlined empty-icon">sports_soccer</span>
+            <p>Cap esport configurat</p>
+            <button mat-flat-button (click)="openSportForm()">Afegeix el primer</button>
+          </div>
+        }
+
+        @for (sport of sports(); track sport.id) {
+          <div class="exercise-card">
+            <div class="exercise-info sport-info">
+              <span
+                class="material-symbols-outlined sport-icon"
+                [style.color]="sport.color"
+              >{{ sport.icon }}</span>
+              <span class="exercise-name">{{ sport.name }}</span>
+            </div>
+            <div class="exercise-actions">
+              <button mat-icon-button (click)="openSportForm(sport)" aria-label="Editar">
+                <span class="material-symbols-outlined">edit</span>
+              </button>
+              <button mat-icon-button (click)="deleteSport(sport)" aria-label="Eliminar">
+                <span class="material-symbols-outlined">delete</span>
+              </button>
+            </div>
           </div>
         }
       </div>
@@ -190,13 +231,33 @@ import {
       .empty-icon { font-size: 56px; color: #ccc; }
       p { margin: 0; font-size: 16px; }
     }
+
+    .section-divider {
+      height: 1px;
+      background: #eeeeee;
+      margin: 8px 16px 4px;
+    }
+
+    .sport-info {
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+    }
+    .sport-icon {
+      font-size: 22px;
+      font-variation-settings: 'FILL' 1, 'wght' 400;
+      flex-shrink: 0;
+    }
   `],
 })
 export class LibraryComponent {
   private exerciseService = inject(ExerciseService);
+  private sportService    = inject(SportService);
   private authService     = inject(AuthService);
   private dialog          = inject(MatDialog);
   private snackBar        = inject(MatSnackBar);
+
+  readonly sports = this.sportService.sports;
 
   readonly activeFilter = signal<ExerciseCategory | null>(null);
   readonly exercises = this.exerciseService.exercises;
@@ -259,5 +320,38 @@ export class LibraryComponent {
     const uid = this.authService.uid();
     if (uid) await this.exerciseService.seedIfEmpty(uid);
     this.snackBar.open('Exercicis carregats', '', { duration: 2000 });
+  }
+
+  openSportForm(sport?: Sport): void {
+    const ref = this.dialog.open(SportFormDialogComponent, {
+      data: { sport },
+      width: '360px',
+    });
+
+    ref.afterClosed().subscribe(async result => {
+      if (!result) return;
+      try {
+        if (sport) {
+          await this.sportService.updateSport(sport.id, result);
+          this.snackBar.open('Esport actualitzat', '', { duration: 2000 });
+        } else {
+          await this.sportService.createSport(result);
+          this.snackBar.open('Esport creat', '', { duration: 2000 });
+        }
+      } catch (err) {
+        const msg = (err as { message?: string }).message ?? 'Error desconegut';
+        this.snackBar.open(`Error en desar: ${msg}`, 'OK', { duration: 5000 });
+      }
+    });
+  }
+
+  async deleteSport(sport: Sport): Promise<void> {
+    if (!confirm(`Eliminar "${sport.name}"?`)) return;
+    try {
+      await this.sportService.deleteSport(sport.id);
+      this.snackBar.open('Esport eliminat', '', { duration: 2000 });
+    } catch {
+      this.snackBar.open('Error en eliminar', '', { duration: 3000 });
+    }
   }
 }
