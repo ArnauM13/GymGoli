@@ -37,5 +37,11 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/charts/charts.component').then(m => m.ChartsComponent),
   },
+  {
+    path: 'sports',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/sports/sports.component').then(m => m.SportsComponent),
+  },
   { path: '**', redirectTo: 'train' },
 ];

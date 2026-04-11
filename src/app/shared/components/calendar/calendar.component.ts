@@ -2,7 +2,9 @@ import { Component, computed, effect, inject, input, output, signal } from '@ang
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 import { CATEGORY_COLORS, ExerciseCategory } from '../../../core/models/exercise.model';
+import { SPORT_CONFIG, SportType } from '../../../core/models/sport.model';
 import { WorkoutService } from '../../../core/services/workout.service';
+import { SportService } from '../../../core/services/sport.service';
 
 const MONTHS_CA = [
   'Gener','Febrer','Març','Abril','Maig','Juny',
@@ -13,6 +15,8 @@ interface CalDay {
   date: string; day: number;
   hasWorkout: boolean;
   workoutCategories: string[];
+  hasSport: boolean;
+  sportTypes: SportType[];
   isToday: boolean; isFuture: boolean; isSelected: boolean;
 }
 
@@ -58,8 +62,15 @@ interface CalDay {
               [attr.aria-label]="cell.day"
             >
               <span class="day-num">{{ cell.day }}</span>
-              @if (cell.hasWorkout) {
-                <span class="workout-dot" [style.background]="getCatDotBackground(cell.workoutCategories)"></span>
+              @if (cell.hasWorkout || cell.hasSport) {
+                <div class="dots-row">
+                  @if (cell.hasWorkout) {
+                    <span class="workout-dot" [style.background]="getCatDotBackground(cell.workoutCategories)"></span>
+                  }
+                  @if (cell.hasSport) {
+                    <span class="sport-dot" [style.background]="getSportDotBackground(cell.sportTypes)"></span>
+                  }
+                </div>
               }
             </button>
           }
@@ -158,10 +169,20 @@ interface CalDay {
 
     .day-num { line-height: 1; }
 
+    .dots-row {
+      display: flex; align-items: center; justify-content: center; gap: 3px;
+    }
+
     .workout-dot {
       width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
     }
-    .is-selected .workout-dot { background: rgba(255,255,255,0.85) !important; }
+
+    .sport-dot {
+      width: 5px; height: 5px; border-radius: 2px; flex-shrink: 0;
+    }
+
+    .is-selected .workout-dot,
+    .is-selected .sport-dot { background: rgba(255,255,255,0.85) !important; }
 
     .cal-footer {
       display: flex; align-items: center; justify-content: flex-end; gap: 8px;
@@ -189,6 +210,7 @@ interface CalDay {
 })
 export class CalendarComponent {
   private workoutService = inject(WorkoutService);
+  private sportService   = inject(SportService);
   private dialogRef      = inject(MatDialogRef<CalendarComponent>, { optional: true });
   private dialogData     = inject<{ selectedDate?: string }>(MAT_DIALOG_DATA, { optional: true });
 
@@ -216,9 +238,10 @@ export class CalendarComponent {
       }
     }, { allowSignalWrites: true });
 
-    // Ensure workout data is loaded for the displayed month
+    // Ensure workout & sport data is loaded for the displayed month
     effect(() => {
       this.workoutService.ensureMonthLoaded(this.calYear(), this.calMonth());
+      this.sportService.ensureMonthLoaded(this.calYear(), this.calMonth());
     });
   }
 
@@ -244,6 +267,9 @@ export class CalendarComponent {
     const sel   = this.selectedDate() ?? this.dialogData?.selectedDate ?? null;
     const workoutByDate = new Map(this.workoutService.workouts().map(w => [w.date, w]));
 
+    // Trigger reactivity on sport sessions
+    const _sessions = this.sportService.sessions();
+
     const firstDay    = new Date(y, m, 1);
     const daysInMonth = new Date(y, m + 1, 0).getDate();
     const startPad    = (firstDay.getDay() + 6) % 7; // Monday-first
@@ -251,12 +277,15 @@ export class CalendarComponent {
     const cells: (CalDay | null)[] = [];
     for (let i = 0; i < startPad; i++) cells.push(null);
     for (let d = 1; d <= daysInMonth; d++) {
-      const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const w = workoutByDate.get(dateStr);
+      const dateStr    = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const w          = workoutByDate.get(dateStr);
+      const sportTypes = this.sportService.getSportsForDate(dateStr);
       cells.push({
         date: dateStr, day: d,
         hasWorkout:        !!w,
         workoutCategories: w?.categories ?? (w?.category ? [w.category] : []),
+        hasSport:    sportTypes.length > 0,
+        sportTypes,
         isToday:    dateStr === today,
         isFuture:   dateStr > today,
         isSelected: dateStr === sel,
@@ -289,6 +318,15 @@ export class CalendarComponent {
     if (!cats || cats.length === 0) return '#006874';
     if (cats.length === 1) return CATEGORY_COLORS[cats[0] as ExerciseCategory] ?? '#006874';
     const colors = cats.map(c => CATEGORY_COLORS[c as ExerciseCategory] ?? '#bbb');
+    const step   = 100 / colors.length;
+    const stops  = colors.map((c, i) => `${c} ${Math.round(i * step)}% ${Math.round((i + 1) * step)}%`).join(', ');
+    return `conic-gradient(${stops})`;
+  }
+
+  getSportDotBackground(sports: SportType[]): string {
+    if (!sports || sports.length === 0) return '#FB8C00';
+    if (sports.length === 1) return SPORT_CONFIG[sports[0]].color;
+    const colors = sports.map(s => SPORT_CONFIG[s].color);
     const step   = 100 / colors.length;
     const stops  = colors.map((c, i) => `${c} ${Math.round(i * step)}% ${Math.round((i + 1) * step)}%`).join(', ');
     return `conic-gradient(${stops})`;

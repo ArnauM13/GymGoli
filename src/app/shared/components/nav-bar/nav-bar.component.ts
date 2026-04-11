@@ -93,6 +93,7 @@ export class NavBarComponent {
   readonly navItems: NavItem[] = [
     { path: '/train', icon: 'exercise', label: 'Entrena' },
     { path: '/history', icon: 'calendar_month', label: 'Historial' },
+    { path: '/sports', icon: 'sports_soccer', label: 'Esports' },
     { path: '/library', icon: 'fitness_center', label: 'Exercicis' },
     { path: '/charts', icon: 'bar_chart', label: 'Progrés' },
   ];
