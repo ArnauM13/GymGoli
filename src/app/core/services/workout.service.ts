@@ -188,6 +188,13 @@ export class WorkoutService {
     return { date: past[0].date, maxWeight, feeling: entry.feeling };
   }
 
+  // ── Query helpers ────────────────────────────────────────────────────────
+  getLastWorkoutByCategory(category: string): Workout | null {
+    return this.workouts().find(w =>
+      w.categories?.includes(category) || w.category === category
+    ) ?? null;
+  }
+
   // ── Create ───────────────────────────────────────────────────────────────
   async createWorkoutForDate(date: string, category?: string): Promise<string> {
     const uid = this._uid();
@@ -215,6 +222,19 @@ export class WorkoutService {
 
   async createTodayWorkout(category?: string): Promise<string> {
     return this.createWorkoutForDate(this._todayStr, category);
+  }
+
+  async createWorkoutFromTemplate(date: string, category: string, templateEntries: WorkoutEntry[]): Promise<string> {
+    const entries: WorkoutEntry[] = templateEntries.map(e => ({
+      exerciseId: e.exerciseId,
+      exerciseName: e.exerciseName,
+      sets: [],
+    }));
+    const id = await this.createWorkoutForDate(date, category);
+    if (entries.length > 0) {
+      await this._updateWorkout(id, { entries });
+    }
+    return id;
   }
 
   // ── Mutations ─────────────────────────────────────────────────────────────
