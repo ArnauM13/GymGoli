@@ -35,6 +35,10 @@ import { ExerciseStatsDialogComponent } from '../../shared/components/exercise-s
       @if (selectedDate()) {
         <div class="detail-section">
 
+          @if (selectedWorkout()) {
+            <div class="detail-color-bar" [style.background]="workoutBarStyle()"></div>
+          }
+
           <div class="detail-header">
             <h2 class="detail-title">{{ selectedDateLabel() }}</h2>
           </div>
@@ -260,6 +264,10 @@ import { ExerciseStatsDialogComponent } from '../../shared/components/exercise-s
       padding: 10px 14px;
     }
 
+    .detail-color-bar {
+      height: 5px; width: 100%;
+    }
+
     .ex-card {
       position: relative;
       display: flex; flex-direction: column; align-items: flex-start;
@@ -272,11 +280,6 @@ import { ExerciseStatsDialogComponent } from '../../shared/components/exercise-s
       min-height: 96px; overflow: hidden;
       touch-action: manipulation;
 
-      &::before {
-        content: '';
-        position: absolute; top: 0; left: 0; right: 0; height: 3px;
-        background: var(--cat);
-      }
       &:hover { background: #f0f0f0; }
       &:active { transform: scale(0.97); }
       &.active {
@@ -464,6 +467,20 @@ export class HistoryComponent {
     const d = new Date(sel + 'T00:00:00');
     const label = d.toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'long' });
     return label.charAt(0).toUpperCase() + label.slice(1);
+  });
+
+  readonly workoutBarStyle = computed((): string => {
+    const w = this.selectedWorkout();
+    if (!w) return '';
+    const cats = w.categories?.length ? w.categories : (w.category ? [w.category] : []);
+    if (cats.length === 0) return 'background: #e0e0e0';
+    if (cats.length === 1) return `background: ${this.getCatColor(cats[0])}`;
+    const stops = cats.map((c, i) => {
+      const p1 = Math.round((i / cats.length) * 100);
+      const p2 = Math.round(((i + 1) / cats.length) * 100);
+      return `${this.getCatColor(c)} ${p1}% ${p2}%`;
+    }).join(', ');
+    return `background: linear-gradient(90deg, ${stops})`;
   });
 
   getFeelingEmoji(level: FeelingLevel): string { return FEELING_EMOJI[level]; }
