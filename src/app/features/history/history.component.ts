@@ -8,11 +8,12 @@ import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
 import { ExerciseStatsDialogComponent } from '../../shared/components/exercise-stats-dialog.component';
+import { ExerciseProgressInlineComponent } from '../../shared/components/exercise-progress-inline.component';
 
 @Component({
   selector: 'app-history',
   standalone: true,
-  imports: [CalendarComponent, ExerciseStatsDialogComponent],
+  imports: [CalendarComponent, ExerciseStatsDialogComponent, ExerciseProgressInlineComponent],
   template: `
     <div class="page">
 
@@ -103,9 +104,9 @@ import { ExerciseStatsDialogComponent } from '../../shared/components/exercise-s
                   </div>
                 }
                 <div class="ex-card-analysis">
-                  <app-exercise-stats
-                    [inlineExerciseId]="selectedExerciseId()"
-                    [inlineExerciseName]="selectedEntry()?.exerciseName ?? null" />
+                  <app-exercise-progress-inline
+                    [exerciseId]="selectedExerciseId()"
+                    [exerciseName]="selectedEntry()?.exerciseName ?? null" />
                 </div>
               </div>
             }
