@@ -33,7 +33,7 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
               @if (editMode()) {
                 <span class="we-drag-handle material-symbols-outlined" cdkDragHandle>drag_indicator</span>
               }
-              <div class="we-entry-title">
+              <div class="we-entry-title" (click)="toggleCollapse(entry.exerciseId)">
                 <div class="we-entry-badges">
                   <span class="we-category-badge" [style.background]="getCatColor(entry)">
                     {{ getCatLabel(entry) }}
@@ -44,6 +44,10 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
                 </div>
                 <div class="we-entry-name-row">
                   <span class="we-entry-name">{{ entry.exerciseName }}</span>
+                  <span class="we-collapse-chevron material-symbols-outlined"
+                        [class.rotated]="isCollapsed(entry.exerciseId)">
+                    expand_more
+                  </span>
                 </div>
               </div>
 
@@ -85,6 +89,10 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
               }
             </div>
 
+
+            <!-- ── Col·lapsable body ── -->
+            <div class="we-entry-body" [class.collapsed]="isCollapsed(entry.exerciseId)">
+            <div class="we-entry-body-inner">
 
             <!-- ── Last session info banner ── -->
             @if (lastSessionData()?.exerciseId === entry.exerciseId && entry.sets.length === 0 && addingFor() === entry.exerciseId) {
@@ -218,6 +226,9 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
               }
             }
 
+            </div><!-- /we-entry-body-inner -->
+            </div><!-- /we-entry-body -->
+
           </div>
         }
 
@@ -307,7 +318,30 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
 
     .we-entry-title { display: flex; flex-direction: column; gap: 4px; flex: 1; }
     .we-entry-name  { font-size: 16px; font-weight: 600; color: #1a1a1a; }
-    .we-entry-name-row { display: flex; align-items: center; gap: 4px; }
+    .we-entry-name-row { display: flex; align-items: center; gap: 2px; }
+
+    .we-collapse-chevron {
+      font-size: 18px; color: #bbb; flex-shrink: 0;
+      transition: transform 0.22s ease;
+      &.rotated { transform: rotate(-90deg); }
+    }
+
+    .we-entry-title {
+      cursor: pointer;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── Col·lapsable body ── */
+    .we-entry-body {
+      display: grid;
+      grid-template-rows: 1fr;
+      transition: grid-template-rows 0.22s ease;
+    }
+    .we-entry-body.collapsed {
+      grid-template-rows: 0fr;
+    }
+    .we-entry-body-inner { overflow: hidden; }
 
     /* ── Grup accions (sentiment + estadístiques) ── */
     .we-entry-actions-group {
@@ -596,11 +630,12 @@ export class WorkoutEditorComponent {
 
   readonly requestAddExercise = output<void>();
 
-  readonly addingFor       = signal<string | null>(null);
-  readonly editingSet      = signal<{ exerciseId: string; index: number } | null>(null);
-  readonly editingEntry    = signal<string | null>(null);
-  readonly lastSessionData = signal<{ exerciseId: string; date: string; maxWeight: number; feeling?: FeelingLevel } | null>(null);
+  readonly addingFor        = signal<string | null>(null);
+  readonly editingSet       = signal<{ exerciseId: string; index: number } | null>(null);
+  readonly editingEntry     = signal<string | null>(null);
+  readonly lastSessionData  = signal<{ exerciseId: string; date: string; maxWeight: number; feeling?: FeelingLevel } | null>(null);
   readonly feelingPickerFor = signal<string | null>(null);
+  readonly collapsedEntries = signal<Set<string>>(new Set());
 
   readonly feelingLevels: FeelingLevel[] = [1, 2, 3, 4, 5];
 
@@ -623,6 +658,21 @@ export class WorkoutEditorComponent {
 
   isEntryEditable(exerciseId: string): boolean {
     return this.editMode() || this.alwaysEditable() || this.editingEntry() === exerciseId;
+  }
+
+  isCollapsed(id: string): boolean { return this.collapsedEntries().has(id); }
+
+  toggleCollapse(id: string): void {
+    const s = new Set(this.collapsedEntries());
+    s.has(id) ? s.delete(id) : s.add(id);
+    this.collapsedEntries.set(s);
+  }
+
+  private _expandEntry(id: string): void {
+    if (!this.collapsedEntries().has(id)) return;
+    const s = new Set(this.collapsedEntries());
+    s.delete(id);
+    this.collapsedEntries.set(s);
   }
 
   reset(): void {
@@ -663,6 +713,7 @@ export class WorkoutEditorComponent {
   }
 
   startEntryEdit(exerciseId: string): void {
+    this._expandEntry(exerciseId);
     this.editingEntry.set(exerciseId);
     this.addingFor.set(null);
     this.editingSet.set(null);
@@ -728,6 +779,7 @@ export class WorkoutEditorComponent {
   }
 
   startAddSet(entry: WorkoutEntry): void {
+    this._expandEntry(entry.exerciseId);
     this.editingSet.set(null);
     this.addingFor.set(entry.exerciseId);
     const w = this.workout();
