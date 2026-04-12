@@ -257,7 +257,7 @@ import { ExerciseStatsDialogComponent } from '../../shared/components/exercise-s
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 8px;
-      padding: 10px 14px 0;
+      padding: 10px 14px;
     }
 
     .ex-card {
