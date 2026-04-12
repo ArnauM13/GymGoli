@@ -63,53 +63,46 @@ import { ExerciseStatsDialogComponent } from '../../shared/components/exercise-s
             </div>
           } @else {
 
-            <!-- Two-column: exercise list + sets panel -->
-            <div class="ex-layout">
-
-              <!-- Left column: exercise chips -->
-              <div class="ex-list">
-                @for (entry of selectedWorkout()!.entries; track entry.exerciseId) {
-                  <button class="ex-chip"
-                    [class.active]="selectedExerciseId() === entry.exerciseId"
-                    [style.--cat]="getEntryCatColor(entry)"
-                    (click)="selectExercise(entry.exerciseId)">
-                    <span class="ex-chip-dot"></span>
-                    <span class="ex-chip-name">{{ entry.exerciseName }}</span>
-                    <div class="ex-chip-meta">
-                      @if (entry.feeling) {
-                        <span>{{ getFeelingEmoji(entry.feeling) }}</span>
-                      }
-                      <span>{{ entry.sets.length }}s · {{ getMaxWeight(entry) }}kg</span>
-                    </div>
-                  </button>
-                }
-              </div>
-
-              <!-- Right column: sets for selected exercise -->
-              <div class="ex-sets-panel">
-                @if (!selectedEntry()) {
-                  <div class="ex-sets-hint">← Selecciona un exercici</div>
-                } @else if (selectedEntry()!.sets.length === 0) {
-                  <p class="ex-sets-empty">Sense sèries</p>
-                } @else {
-                  @for (set of selectedEntry()!.sets; track $index) {
-                    <div class="ex-set-row">
-                      <span class="ex-set-num">{{ $index + 1 }}</span>
-                      <span class="ex-set-weight">{{ set.weight }}<small>kg</small></span>
-                      <span class="ex-set-reps">× {{ set.reps }}</span>
-                    </div>
+            <!-- Grid de targetes d'exercicis -->
+            <div class="ex-grid">
+              @for (entry of selectedWorkout()!.entries; track entry.exerciseId) {
+                <button class="ex-card"
+                  [class.active]="selectedExerciseId() === entry.exerciseId"
+                  [style.--cat]="getEntryCatColor(entry)"
+                  (click)="selectExercise(entry.exerciseId)">
+                  @if (entry.feeling) {
+                    <span class="ex-card-feeling">{{ getFeelingEmoji(entry.feeling) }}</span>
                   }
-                }
-              </div>
-
+                  <span class="ex-card-name">{{ entry.exerciseName }}</span>
+                  <div class="ex-card-meta">
+                    <span class="ex-card-sets">{{ entry.sets.length }}<small> sèr</small></span>
+                    @if (entry.sets.length > 0) {
+                      <span class="ex-card-weight">{{ getMaxWeight(entry) }}<small>kg</small></span>
+                    }
+                  </div>
+                </button>
+              }
             </div>
 
-            <!-- Analysis panel (shown when an exercise is selected) -->
+            <!-- Detall de l'exercici seleccionat -->
             @if (selectedExerciseId()) {
-              <div class="ex-analysis">
-                <app-exercise-stats
-                  [inlineExerciseId]="selectedExerciseId()"
-                  [inlineExerciseName]="selectedEntry()?.exerciseName ?? null" />
+              <div class="ex-detail-panel">
+                @if ((selectedEntry()?.sets ?? []).length > 0) {
+                  <div class="ex-sets-row">
+                    @for (set of selectedEntry()!.sets; track $index) {
+                      <div class="ex-set-pill">
+                        <span class="ex-set-num">{{ $index + 1 }}</span>
+                        <span class="ex-set-weight">{{ set.weight }}<small>kg</small></span>
+                        <span class="ex-set-reps">×{{ set.reps }}</span>
+                      </div>
+                    }
+                  </div>
+                }
+                <div class="ex-card-analysis">
+                  <app-exercise-stats
+                    [inlineExerciseId]="selectedExerciseId()"
+                    [inlineExerciseName]="selectedEntry()?.exerciseName ?? null" />
+                </div>
               </div>
             }
 
@@ -259,68 +252,90 @@ import { ExerciseStatsDialogComponent } from '../../shared/components/exercise-s
       p { margin: 0; font-size: 14px; color: #aaa; }
     }
 
-    /* Two-column exercise layout */
-    .ex-layout {
+    /* ── Grid de targetes d'exercicis ── */
+    .ex-grid {
       display: grid;
-      grid-template-columns: 45% 55%;
-      min-height: 120px;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      padding: 10px 14px 14px;
     }
 
-    .ex-list {
-      padding: 10px 8px 10px 12px;
-      display: flex; flex-direction: column; gap: 4px;
-      border-right: 1px solid #f0f0f0;
-    }
+    .ex-card {
+      position: relative;
+      display: flex; flex-direction: column; align-items: flex-start;
+      padding: 14px 12px 12px;
+      border-radius: 14px;
+      border: 2px solid transparent;
+      background: #f7f7f7;
+      cursor: pointer; text-align: left;
+      transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+      min-height: 96px; overflow: hidden;
+      touch-action: manipulation;
 
-    .ex-chip {
-      display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
-      padding: 8px 8px 8px 10px;
-      border-radius: 10px; border: none; background: transparent;
-      cursor: pointer; text-align: left; width: 100%;
-      border-left: 3px solid transparent;
-      transition: background 0.15s, border-color 0.15s;
-      &:hover { background: #f5f5f5; }
+      &::before {
+        content: '';
+        position: absolute; top: 0; left: 0; right: 0; height: 3px;
+        background: var(--cat);
+      }
+      &:hover { background: #f0f0f0; }
+      &:active { transform: scale(0.97); }
       &.active {
-        background: color-mix(in srgb, var(--cat) 8%, white);
-        border-left-color: var(--cat);
+        background: color-mix(in srgb, var(--cat) 10%, white);
+        border-color: var(--cat);
+        box-shadow: 0 2px 10px color-mix(in srgb, var(--cat) 20%, transparent);
       }
     }
-    .ex-chip-dot {
-      display: inline-block; width: 6px; height: 6px; border-radius: 50%;
-      background: var(--cat); margin-bottom: 2px;
-    }
-    .ex-chip-name {
-      font-size: 12px; font-weight: 700; color: #1a1a1a;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      max-width: 100%;
-    }
-    .ex-chip-meta {
-      font-size: 11px; color: #888; display: flex; align-items: center; gap: 3px;
+
+    .ex-card-feeling {
+      position: absolute; top: 10px; right: 10px;
+      font-size: 17px; line-height: 1;
     }
 
-    /* Sets panel (right column) */
-    .ex-sets-panel {
-      padding: 10px 12px 10px 10px;
-      display: flex; flex-direction: column; gap: 6px;
-      justify-content: flex-start;
+    .ex-card-name {
+      font-size: 13px; font-weight: 700; color: #1a1a1a;
+      line-height: 1.3; margin-top: 4px; flex: 1;
+      word-break: break-word;
     }
-    .ex-sets-hint {
-      color: #ccc; font-size: 12px; font-style: italic;
-      display: flex; align-items: center; justify-content: center;
-      height: 100%; text-align: center; padding: 16px 8px;
+
+    .ex-card-meta {
+      display: flex; align-items: baseline; gap: 6px;
+      margin-top: 10px; padding-top: 6px;
+      border-top: 1px solid rgba(0,0,0,0.05);
+      width: 100%;
     }
-    .ex-set-row {
-      display: flex; align-items: center; gap: 8px;
+    .ex-card-sets {
+      font-size: 20px; font-weight: 800; color: var(--cat); line-height: 1;
+      small { font-size: 11px; font-weight: 500; color: #888; margin-left: 1px; }
     }
-    .ex-set-num { font-size: 11px; font-weight: 700; color: #ccc; min-width: 14px; }
-    .ex-set-weight { font-size: 14px; font-weight: 700; color: #1a1a1a; }
-    .ex-set-weight small { font-size: 10px; font-weight: 500; color: #888; }
+    .ex-card-weight {
+      font-size: 13px; font-weight: 600; color: #666;
+      small { font-size: 10px; font-weight: 400; }
+    }
+
+    /* ── Panell de detall (sèries + gràfica) ── */
+    .ex-detail-panel {
+      margin: 0 14px 14px;
+      background: #f7f7f7; border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .ex-sets-row {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      padding: 12px 14px 10px;
+    }
+    .ex-set-pill {
+      display: flex; align-items: center; gap: 4px;
+      padding: 5px 10px; background: white; border-radius: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .ex-set-num { font-size: 10px; font-weight: 600; color: #bbb; min-width: 12px; }
+    .ex-set-weight { font-size: 13px; font-weight: 700; color: #1a1a1a; }
+    .ex-set-weight small { font-size: 9px; font-weight: 400; color: #888; }
     .ex-set-reps { font-size: 12px; color: #666; }
-    .ex-sets-empty { font-size: 12px; color: #bbb; font-style: italic; margin: 0; }
 
-    /* Analysis panel */
-    .ex-analysis {
-      border-top: 1px solid #f0f0f0;
+    /* Gràfica inline dins el panell */
+    .ex-card-analysis {
+      border-top: 1px solid rgba(0,0,0,0.06);
     }
 
     /* ════════════════════════════════
