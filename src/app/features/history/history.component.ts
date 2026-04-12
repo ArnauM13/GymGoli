@@ -257,7 +257,7 @@ import { ExerciseStatsDialogComponent } from '../../shared/components/exercise-s
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 8px;
-      padding: 10px 14px 14px;
+      padding: 10px 14px 0;
     }
 
     .ex-card {
@@ -314,7 +314,7 @@ import { ExerciseStatsDialogComponent } from '../../shared/components/exercise-s
 
     /* ── Panell de detall (sèries + gràfica) ── */
     .ex-detail-panel {
-      margin: 0 14px 14px;
+      margin: 14px;
       background: #f7f7f7; border-radius: 12px;
       overflow: hidden;
     }
