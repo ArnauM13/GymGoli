@@ -44,26 +44,28 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
                 </div>
                 <div class="we-entry-name-row">
                   <span class="we-entry-name">{{ entry.exerciseName }}</span>
-                  @if (entry.feeling || isEntryEditable(entry.exerciseId)) {
-                    <button type="button" class="we-fatiga-chip"
-                      [class.we-fatiga-chip--set]="!!entry.feeling"
-                      [class.we-fatiga-chip--editable]="isEntryEditable(entry.exerciseId)"
-                      [title]="entry.feeling ? getFeelingLabel(entry.feeling) : 'Afegir fatiga'"
-                      (click)="isEntryEditable(entry.exerciseId) && openFatigaPicker(entry.exerciseId)">
-                      @if (entry.feeling) {
-                        {{ getFeelingEmoji(entry.feeling) }}
-                      } @else {
-                        <span class="material-symbols-outlined we-fatiga-chip-icon">sentiment_neutral</span>
-                      }
-                    </button>
-                  }
                 </div>
               </div>
 
-              <!-- Stats button (always visible) -->
-              <button class="we-icon-btn-sm" (click)="openStats(entry)" title="Estadístiques">
-                <span class="material-symbols-outlined">bar_chart</span>
-              </button>
+              <!-- Grup: sentiment + estadístiques -->
+              <div class="we-entry-actions-group">
+                @if (entry.feeling || isEntryEditable(entry.exerciseId)) {
+                  <button type="button" class="we-icon-btn-sm we-fatiga-btn"
+                    [class.we-fatiga-btn--set]="!!entry.feeling"
+                    [class.we-fatiga-btn--editable]="isEntryEditable(entry.exerciseId)"
+                    [title]="entry.feeling ? getFeelingLabel(entry.feeling) : 'Afegir fatiga'"
+                    (click)="isEntryEditable(entry.exerciseId) && openFatigaPicker(entry.exerciseId)">
+                    @if (entry.feeling) {
+                      <span class="we-fatiga-btn-emoji">{{ getFeelingEmoji(entry.feeling) }}</span>
+                    } @else {
+                      <span class="material-symbols-outlined">sentiment_neutral</span>
+                    }
+                  </button>
+                }
+                <button class="we-icon-btn-sm" (click)="openStats(entry)" title="Estadístiques">
+                  <span class="material-symbols-outlined">bar_chart</span>
+                </button>
+              </div>
 
               @if (editMode()) {
                 <button mat-icon-button class="we-remove-btn" (click)="removeEntry(entry.exerciseId)" title="Eliminar exercici">
@@ -306,22 +308,32 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
     .we-entry-title { display: flex; flex-direction: column; gap: 4px; flex: 1; }
     .we-entry-name  { font-size: 16px; font-weight: 600; color: #1a1a1a; }
     .we-entry-name-row { display: flex; align-items: center; gap: 4px; }
-    /* ── Fatiga chip (inline next to name) ── */
-    .we-fatiga-chip {
-      display: flex; align-items: center; justify-content: center;
-      width: 28px; height: 28px; border-radius: 50%;
-      border: none; background: transparent;
-      font-size: 18px; line-height: 1; cursor: default;
-      padding: 0; flex-shrink: 0;
-      transition: background 0.15s, transform 0.15s;
-      .we-fatiga-chip-icon { font-size: 18px; color: #ccc; }
+
+    /* ── Grup accions (sentiment + estadístiques) ── */
+    .we-entry-actions-group {
+      display: flex; align-items: center; gap: 0;
+      background: #f5f5f5; border: 1px solid #e8e8e8; border-radius: 8px;
+      overflow: hidden; flex-shrink: 0;
+      .we-icon-btn-sm {
+        border: none; border-radius: 0; background: transparent;
+        &:hover { background: #eee; }
+        & + .we-icon-btn-sm { border-left: 1px solid #e8e8e8; }
+      }
     }
-    .we-fatiga-chip--editable {
+
+    /* ── Botó fatiga (dins del grup) ── */
+    .we-fatiga-btn {
+      cursor: default;
+      .material-symbols-outlined { color: #ccc; }
+    }
+    .we-fatiga-btn--editable {
       cursor: pointer;
-      &:hover { background: rgba(0,0,0,0.06); transform: scale(1.1); }
-      &:active { transform: scale(0.92); }
+      &:hover { background: rgba(0,0,0,0.06) !important; }
+      &:active { transform: scale(0.94); }
     }
-    .we-fatiga-chip--set .we-fatiga-chip-icon { color: #888; }
+    .we-fatiga-btn--set .material-symbols-outlined { color: #888; }
+    .we-fatiga-btn-emoji { font-size: 18px; line-height: 1; }
+
     .we-entry-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
     .we-category-badge {
