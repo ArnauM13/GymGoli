@@ -605,13 +605,14 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
     /* ── Add-exercise button (history edit mode) ── */
     .we-add-exercise-btn {
       display: flex; align-items: center; justify-content: center; gap: 8px;
-      width: 100%; padding: 14px;
-      border: 1.5px dashed rgba(0,104,116,0.28); border-radius: 14px;
-      background: rgba(0,104,116,0.02); color: rgba(0,104,116,0.55);
-      font-size: 14px; font-weight: 600;
-      cursor: pointer; margin-top: 6px; transition: all 0.18s; touch-action: manipulation;
-      .material-symbols-outlined { font-size: 18px; line-height: 1; vertical-align: middle; }
-      &:hover { border-color: #006874; color: #006874; background: rgba(0,104,116,0.06); }
+      width: 100%; padding: 15px;
+      border: 2px dashed rgba(0,104,116,0.5); border-radius: 14px;
+      background: rgba(0,104,116,0.05); color: #006874;
+      font-size: 14px; font-weight: 700;
+      cursor: pointer; margin-top: 8px; transition: all 0.18s; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 20px; line-height: 1; vertical-align: middle; }
+      &:hover { border-color: #006874; border-style: solid; background: rgba(0,104,116,0.1); }
+      &:active { transform: scale(0.98); }
     }
 
     .we-set-actions { display: flex; gap: 2px; align-items: center; }
