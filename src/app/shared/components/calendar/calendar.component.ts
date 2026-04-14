@@ -28,7 +28,7 @@ interface CalDay {
   template: `
     <div class="calendar-card">
 
-      <!-- ── Header ── -->
+      <!-- ── Header: navigation only ── -->
       <div class="cal-header">
         <button class="cal-nav-btn" (click)="navigateBack()" aria-label="Anterior">
           <span class="material-symbols-outlined">chevron_left</span>
@@ -40,14 +40,14 @@ interface CalDay {
                 [disabled]="!canNavForward()" aria-label="Següent">
           <span class="material-symbols-outlined">chevron_right</span>
         </button>
+      </div>
 
-        <!-- View toggle -->
-        <div class="cal-view-seg">
-          <button class="cal-seg-btn" [class.active]="view() === 'week'"
-                  (click)="view.set('week')">Setm.</button>
-          <button class="cal-seg-btn" [class.active]="view() === 'month'"
-                  (click)="view.set('month')">Mes</button>
-        </div>
+      <!-- ── View toggle: small pills ── -->
+      <div class="cal-view-row">
+        <button class="cal-view-pill" [class.active]="view() === 'week'"
+                (click)="view.set('week')">Setmana</button>
+        <button class="cal-view-pill" [class.active]="view() === 'month'"
+                (click)="view.set('month')">Mes</button>
       </div>
 
       @if (isLoading()) {
@@ -125,16 +125,13 @@ interface CalDay {
       <!-- ── Footer ── -->
       <div class="cal-footer">
         @if (!isShowingCurrent()) {
-          <button class="goto-today-btn" (click)="goToToday()">
+          <button class="cal-today-nav" (click)="goToToday()">
             <span class="material-symbols-outlined">arrow_forward</span>
             Avui
           </button>
         }
         @if (isDialog) {
-          <button class="today-shortcut-btn" (click)="selectDay(todayStr)">
-            <span class="material-symbols-outlined">today</span>
-            Seleccionar avui
-          </button>
+          <button class="cal-select-today" (click)="selectDay(todayStr)">Avui</button>
         }
       </div>
 
@@ -169,17 +166,18 @@ interface CalDay {
       .material-symbols-outlined { font-size: 22px; }
     }
 
-    /* View segmented control */
-    .cal-view-seg {
-      display: flex; margin-left: 4px; flex-shrink: 0;
-      border: 1.5px solid #e8e8e8; border-radius: 8px; overflow: hidden;
+    /* ── View toggle pills ── */
+    .cal-view-row {
+      display: flex; align-items: center; justify-content: center; gap: 4px;
+      padding: 0 8px 8px;
     }
-    .cal-seg-btn {
-      padding: 5px 8px; border: none; background: transparent;
-      font-size: 11px; font-weight: 600; color: #888;
+    .cal-view-pill {
+      padding: 4px 12px; border-radius: 14px;
+      border: 1.5px solid #e8e8e8; background: transparent;
+      font-size: 11px; font-weight: 600; color: #999;
       cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      &.active { background: #006874; color: white; }
-      &:not(.active):hover { background: rgba(0,104,116,0.08); color: #006874; }
+      &.active { background: #006874; color: white; border-color: #006874; }
+      &:not(.active):hover { background: rgba(0,104,116,0.06); color: #006874; border-color: rgba(0,104,116,0.2); }
     }
 
     /* ── Loading bar ── */
@@ -284,23 +282,24 @@ interface CalDay {
 
     /* ── Footer ── */
     .cal-footer {
-      display: flex; align-items: center; justify-content: flex-end; gap: 8px;
-      padding: 4px 12px 14px;
+      display: flex; align-items: center; justify-content: flex-end; gap: 6px;
+      padding: 2px 12px 12px;
     }
 
-    .goto-today-btn, .today-shortcut-btn {
-      display: flex; align-items: center; gap: 6px;
-      padding: 10px 18px; border-radius: 12px; border: none;
-      font-size: 14px; font-weight: 600; cursor: pointer;
-      transition: background 0.15s; touch-action: manipulation;
-      .material-symbols-outlined { font-size: 18px; }
+    .cal-today-nav {
+      display: flex; align-items: center; gap: 4px;
+      padding: 5px 10px; border-radius: 14px;
+      border: 1.5px solid #e0e0e0; background: #f7f7f7;
+      font-size: 12px; font-weight: 600; color: #666;
+      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 14px; }
+      &:hover { background: #efefef; }
     }
-    .goto-today-btn {
-      background: rgba(0,104,116,0.08); color: #006874;
-      &:hover { background: rgba(0,104,116,0.16); }
-    }
-    .today-shortcut-btn {
-      background: #006874; color: white;
+    .cal-select-today {
+      padding: 5px 14px; border-radius: 14px;
+      border: none; background: #006874; color: white;
+      font-size: 12px; font-weight: 600;
+      cursor: pointer; touch-action: manipulation;
       &:hover { background: #005a63; }
     }
   `],
