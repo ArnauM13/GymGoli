@@ -26,74 +26,68 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
   standalone: true,
   imports: [WorkoutEditorComponent, LowerCasePipe],
   template: `
-    <!-- ── Fixed: date header (dashboard mode) ── -->
-    @if (!activeWorkout()) {
-      <div class="train-header">
-        <button class="arrow-btn" (click)="navigateDate(-1)" aria-label="Dia anterior">
-          <span class="material-symbols-outlined">chevron_left</span>
-        </button>
-        <button class="date-btn" (click)="openCalendar()">
-          <span class="material-symbols-outlined date-cal-icon">calendar_month</span>
-          <span class="date-text">{{ dateLabel() }}</span>
-        </button>
-        <button class="arrow-btn" [class.invisible]="isToday()" (click)="navigateDate(1)" aria-label="Dia següent">
-          <span class="material-symbols-outlined">chevron_right</span>
-        </button>
-      </div>
-    }
-
-    <!-- ── Fixed: workout topbar (active workout mode) ── -->
-    @if (activeWorkout(); as w) {
-      <div class="workout-topbar">
-        <button class="topbar-back" (click)="closeWorkout()" title="Tornar">
-          <span class="material-symbols-outlined">arrow_back_ios</span>
-        </button>
-        <div class="topbar-center">
-          <div class="topbar-badges">
-            @for (cat of activeWorkoutCategoryItems(); track cat.value) {
-              <span class="type-badge" [style.background]="cat.color">{{ cat.label }}</span>
-            }
-            @if (activeWorkoutCategoryItems().length > 1) {
-              <span class="hybrid-badge">Híbrid</span>
-            }
-          </div>
-          <span class="topbar-meta">
-            {{ topbarDateLabel(w) }}
-            @if (w.entries.length > 0) { · {{ w.entries.length }} exerc }
-          </span>
-        </div>
-        <button class="topbar-delete" (click)="deleteActiveWorkout()">
-          <span class="material-symbols-outlined">delete</span>
-          Eliminar
-        </button>
-      </div>
-    }
-
     <div class="page">
 
-      <!-- ── Loading ── -->
-      @if ((workoutService.isLoading() && dateWorkouts().length === 0) || creating()) {
-        <div class="loading-state">
-          <span class="material-symbols-outlined spin">sync</span>
+      @if (activeWorkout(); as w) {
+
+        <!-- ══ ACTIVE WORKOUT MODE ══ -->
+        <div class="workout-topbar">
+          <button class="topbar-back" (click)="closeWorkout()" title="Tornar">
+            <span class="material-symbols-outlined">arrow_back_ios</span>
+          </button>
+          <div class="topbar-center">
+            <div class="topbar-badges">
+              @for (cat of activeWorkoutCategoryItems(); track cat.value) {
+                <span class="type-badge" [style.background]="cat.color">{{ cat.label }}</span>
+              }
+              @if (activeWorkoutCategoryItems().length > 1) {
+                <span class="hybrid-badge">Híbrid</span>
+              }
+            </div>
+            <span class="topbar-meta">
+              {{ topbarDateLabel(w) }}
+              @if (w.entries.length > 0) { · {{ w.entries.length }} exerc }
+            </span>
+          </div>
+          <button class="topbar-delete" (click)="deleteActiveWorkout()">
+            <span class="material-symbols-outlined">delete</span>
+            Eliminar
+          </button>
         </div>
-      }
 
-      @if ((!workoutService.isLoading() || dateWorkouts().length > 0) && !creating()) {
+        <app-workout-editor
+          #editor
+          [workout]="w"
+          [editMode]="false"
+          [alwaysEditable]="true"
+          (requestAddExercise)="openPicker()"
+        />
 
-        @if (activeWorkout(); as w) {
+      } @else {
 
-          <!-- ══ ACTIVE WORKOUT ══ -->
-          <app-workout-editor
-            #editor
-            [workout]="w"
-            [editMode]="false"
-            [alwaysEditable]="true"
-            (requestAddExercise)="openPicker()"
-          />
+        <!-- ══ DASHBOARD MODE ══ -->
+        <div class="train-header">
+          <button class="arrow-btn" (click)="navigateDate(-1)" aria-label="Dia anterior">
+            <span class="material-symbols-outlined">chevron_left</span>
+          </button>
+          <button class="date-btn" (click)="openCalendar()">
+            <span class="material-symbols-outlined date-cal-icon">calendar_month</span>
+            <span class="date-text">{{ dateLabel() }}</span>
+          </button>
+          <button class="arrow-btn" [class.invisible]="isToday()" (click)="navigateDate(1)" aria-label="Dia següent">
+            <span class="material-symbols-outlined">chevron_right</span>
+          </button>
+        </div>
 
-        } @else {
+        <!-- ── Loading ── -->
+        @if ((workoutService.isLoading() && dateWorkouts().length === 0) || creating()) {
+          <div class="loading-state">
+            <span class="material-symbols-outlined spin">sync</span>
+          </div>
+        }
 
-          <!-- ══ DASHBOARD ══ -->
+        @if ((!workoutService.isLoading() || dateWorkouts().length > 0) && !creating()) {
+
 
           <!-- Entrenaments section -->
           <div class="workout-section">
@@ -218,25 +212,20 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
   `,
   styles: [`
-    .page { padding: 64px 0 148px; min-height: 100dvh; }
+    .page { padding: 0 0 148px; min-height: 100dvh; }
 
-    /* ── Fixed top: date header (dashboard mode) ── */
+    /* ── Date header (dashboard mode, part of page flow) ── */
     .train-header {
-      position: fixed;
-      top: 8px; left: 12px; right: 12px;
-      z-index: 90;
       display: flex; align-items: center;
+      padding: 4px 8px;
       background: white;
-      border-radius: 20px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.06);
-      padding: 4px;
     }
 
-    /* ── Fixed top: workout topbar (active mode) ── */
+    /* ── Workout topbar (active mode, sticky) ── */
     .workout-topbar {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      z-index: 90;
+      position: sticky;
+      top: 0;
+      z-index: 10;
       display: flex; align-items: center; gap: 8px;
       padding: 10px 12px 8px;
       background: white;
