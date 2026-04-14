@@ -45,15 +45,24 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               <span class="material-symbols-outlined">arrow_back_ios</span>
             </button>
             <div class="topbar-center">
-              @for (cat of activeWorkoutCategoryItems(); track cat.value) {
-                <span class="type-badge" [style.background]="cat.color">{{ cat.label }}</span>
-              }
-              @if (activeWorkoutCategoryItems().length > 1) {
-                <span class="hybrid-badge">Híbrid</span>
+              <div class="topbar-badges">
+                @for (cat of activeWorkoutCategoryItems(); track cat.value) {
+                  <span class="type-badge" [style.background]="cat.color">{{ cat.label }}</span>
+                }
+                @if (activeWorkoutCategoryItems().length > 1) {
+                  <span class="hybrid-badge">Híbrid</span>
+                }
+              </div>
+              @if (activeWorkout(); as w) {
+                <span class="topbar-meta">
+                  {{ topbarDateLabel(w) }}
+                  @if (w.entries.length > 0) { · {{ w.entries.length }} exerc }
+                </span>
               }
             </div>
-            <button class="topbar-delete" (click)="deleteActiveWorkout()" title="Eliminar entrenament">
+            <button class="topbar-delete" (click)="deleteActiveWorkout()">
               <span class="material-symbols-outlined">delete</span>
+              Eliminar
             </button>
           </div>
 
@@ -285,15 +294,25 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       &:hover { background: rgba(0,0,0,0.06); }
     }
     .topbar-center {
-      flex: 1; display: flex; align-items: center; flex-wrap: wrap; gap: 5px;
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .topbar-badges {
+      display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
+    }
+    .topbar-meta {
+      font-size: 11px; color: #aaa; font-weight: 500;
     }
     .topbar-delete {
-      width: 36px; height: 36px; border-radius: 50%; border: none;
-      background: transparent; cursor: pointer; color: #bbb;
-      display: flex; align-items: center; justify-content: center;
+      height: 34px; padding: 0 12px; border-radius: 10px;
+      border: 1.5px solid rgba(239,83,80,0.35);
+      background: rgba(239,83,80,0.06); cursor: pointer;
+      color: #ef5350;
+      display: flex; align-items: center; gap: 5px;
       transition: all 0.15s; flex-shrink: 0; touch-action: manipulation;
-      .material-symbols-outlined { font-size: 20px; }
-      &:hover { background: rgba(239,83,80,0.08); color: #ef5350; }
+      font-size: 12px; font-weight: 700;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover { background: rgba(239,83,80,0.12); border-color: #ef5350; }
     }
 
     /* ── Type badges ── */
@@ -624,6 +643,12 @@ export class TrainComponent {
   closeWorkout(): void {
     this.activeWorkoutId.set(null);
     this.editor?.reset();
+  }
+
+  topbarDateLabel(w: Workout): string {
+    const d = new Date(w.date + 'T12:00:00');
+    if (w.date === this.selectedDate() && this.isToday()) return 'Avui';
+    return d.toLocaleDateString('ca-ES', { weekday: 'short', day: 'numeric', month: 'short' });
   }
 
   workoutLabel(w: Workout): string {
