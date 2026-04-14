@@ -73,6 +73,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           <button class="date-btn" (click)="openCalendar()">
             <span class="material-symbols-outlined date-cal-icon">calendar_month</span>
             <span class="date-text">{{ dateLabel() }}</span>
+            <span class="material-symbols-outlined date-expand-icon">expand_more</span>
           </button>
           <button class="arrow-btn" [class.invisible]="isToday()" (click)="navigateDate(1)" aria-label="Dia següent">
             <span class="material-symbols-outlined">chevron_right</span>
@@ -288,15 +289,18 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .date-btn {
       flex: 1; min-width: 0;
       display: flex; align-items: center; justify-content: center; gap: 6px;
-      padding: 8px 6px; border-radius: 14px; border: none; background: transparent;
-      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
-      &:hover { background: rgba(0,0,0,0.05); }
+      padding: 7px 12px; border-radius: 20px;
+      border: 1.5px solid #e0e0e0; background: #f7f7f7;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      &:hover { background: #efefef; border-color: #bbb; }
     }
     .date-text {
+      flex: 1; min-width: 0;
       font-size: 13px; font-weight: 600; color: #333; text-transform: capitalize;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .date-cal-icon { font-size: 15px; color: #888; flex-shrink: 0; }
+    .date-cal-icon { font-size: 16px; color: #006874; flex-shrink: 0; }
+    .date-expand-icon { font-size: 16px; color: #aaa; flex-shrink: 0; margin-left: -2px; }
 
     /* ── Type badges (topbar) ── */
     .type-badge {
