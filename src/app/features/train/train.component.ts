@@ -26,6 +26,49 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
   standalone: true,
   imports: [WorkoutEditorComponent, LowerCasePipe],
   template: `
+    <!-- ── Fixed: date header (dashboard mode) ── -->
+    @if (!activeWorkout()) {
+      <div class="train-header">
+        <button class="arrow-btn" (click)="navigateDate(-1)" aria-label="Dia anterior">
+          <span class="material-symbols-outlined">chevron_left</span>
+        </button>
+        <button class="date-btn" (click)="openCalendar()">
+          <span class="material-symbols-outlined date-cal-icon">calendar_month</span>
+          <span class="date-text">{{ dateLabel() }}</span>
+        </button>
+        <button class="arrow-btn" [class.invisible]="isToday()" (click)="navigateDate(1)" aria-label="Dia següent">
+          <span class="material-symbols-outlined">chevron_right</span>
+        </button>
+      </div>
+    }
+
+    <!-- ── Fixed: workout topbar (active workout mode) ── -->
+    @if (activeWorkout(); as w) {
+      <div class="workout-topbar">
+        <button class="topbar-back" (click)="closeWorkout()" title="Tornar">
+          <span class="material-symbols-outlined">arrow_back_ios</span>
+        </button>
+        <div class="topbar-center">
+          <div class="topbar-badges">
+            @for (cat of activeWorkoutCategoryItems(); track cat.value) {
+              <span class="type-badge" [style.background]="cat.color">{{ cat.label }}</span>
+            }
+            @if (activeWorkoutCategoryItems().length > 1) {
+              <span class="hybrid-badge">Híbrid</span>
+            }
+          </div>
+          <span class="topbar-meta">
+            {{ topbarDateLabel(w) }}
+            @if (w.entries.length > 0) { · {{ w.entries.length }} exerc }
+          </span>
+        </div>
+        <button class="topbar-delete" (click)="deleteActiveWorkout()">
+          <span class="material-symbols-outlined">delete</span>
+          Eliminar
+        </button>
+      </div>
+    }
+
     <div class="page">
 
       <!-- ── Loading ── -->
@@ -40,32 +83,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         @if (activeWorkout(); as w) {
 
           <!-- ══ ACTIVE WORKOUT ══ -->
-          <div class="workout-topbar">
-            <button class="topbar-back" (click)="closeWorkout()" title="Tornar">
-              <span class="material-symbols-outlined">arrow_back_ios</span>
-            </button>
-            <div class="topbar-center">
-              <div class="topbar-badges">
-                @for (cat of activeWorkoutCategoryItems(); track cat.value) {
-                  <span class="type-badge" [style.background]="cat.color">{{ cat.label }}</span>
-                }
-                @if (activeWorkoutCategoryItems().length > 1) {
-                  <span class="hybrid-badge">Híbrid</span>
-                }
-              </div>
-              @if (activeWorkout(); as w) {
-                <span class="topbar-meta">
-                  {{ topbarDateLabel(w) }}
-                  @if (w.entries.length > 0) { · {{ w.entries.length }} exerc }
-                </span>
-              }
-            </div>
-            <button class="topbar-delete" (click)="deleteActiveWorkout()">
-              <span class="material-symbols-outlined">delete</span>
-              Eliminar
-            </button>
-          </div>
-
           <app-workout-editor
             #editor
             [workout]="w"
@@ -126,17 +143,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               </div>
             }
 
-            <!-- Type grid (hidden while suggestion showing) -->
-            @if (!suggestionType()) {
-              <div class="type-grid" [class.type-grid--mt]="dateWorkouts().length > 0">
-                @for (cat of workoutTypes; track cat.value) {
-                  <button class="type-btn" [style.--cat-color]="cat.color" (click)="selectType(cat.value)">
-                    <span class="material-symbols-outlined type-icon">{{ cat.icon }}</span>
-                    <span class="type-label">{{ cat.label }}</span>
-                  </button>
-                }
-              </div>
-            }
           </div>
 
           <!-- Sports section -->
@@ -190,100 +196,51 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     </div>
 
-    <!-- ── Bottom bar: date nav (dashboard) or "+" FAB (active workout) ── -->
+    <!-- ── Fixed bottom: type bar (dashboard) or FAB (active workout) ── -->
     @if (activeWorkout()) {
       <button class="add-exercise-fab" (click)="openPicker()" title="Afegir exercici">
         <span class="material-symbols-outlined">add</span>
       </button>
     } @else {
       <div class="bottom-bar">
-        <div class="bar-date">
-          <button class="arrow-btn" (click)="navigateDate(-1)">
-            <span class="material-symbols-outlined">chevron_left</span>
+        @for (cat of workoutTypes; track cat.value) {
+          <button
+            class="type-btn-bar"
+            [class.active]="suggestionType() === cat.value"
+            [style.--cat-color]="cat.color"
+            (click)="selectType(cat.value)"
+          >
+            <span class="material-symbols-outlined type-icon">{{ cat.icon }}</span>
+            <span class="type-label">{{ cat.label }}</span>
           </button>
-          <button class="date-btn" (click)="openCalendar()">
-            <span class="date-text">{{ dateLabel() }}</span>
-            <span class="material-symbols-outlined date-edit-icon">edit_calendar</span>
-          </button>
-          <button class="arrow-btn" [class.invisible]="isToday()" (click)="navigateDate(1)">
-            <span class="material-symbols-outlined">chevron_right</span>
-          </button>
-        </div>
+        }
       </div>
     }
   `,
   styles: [`
-    .page { padding: 0 0 160px; min-height: 100dvh; }
+    .page { padding: 64px 0 148px; min-height: 100dvh; }
 
-    /* ── Bottom bar ── */
-    .bottom-bar {
+    /* ── Fixed top: date header (dashboard mode) ── */
+    .train-header {
       position: fixed;
-      bottom: calc(64px + env(safe-area-inset-bottom) + 12px);
-      left: 12px; right: 12px;
+      top: 8px; left: 12px; right: 12px;
       z-index: 90;
-      display: flex; align-items: center; gap: 4px;
+      display: flex; align-items: center;
       background: white;
       border-radius: 20px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.08);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.06);
       padding: 4px;
     }
 
-    .bar-date {
-      flex: 1; min-width: 0;
-      display: flex; align-items: center;
-    }
-
-    .arrow-btn {
-      width: 38px; height: 38px; border-radius: 50%; border: none; background: transparent;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; color: #999; transition: color 0.15s, background 0.15s;
-      touch-action: manipulation; flex-shrink: 0;
-      .material-symbols-outlined { font-size: 22px; }
-      &:hover { color: #333; background: rgba(0,0,0,0.06); }
-      &.invisible { visibility: hidden; pointer-events: none; }
-    }
-
-    .date-btn {
-      flex: 1; min-width: 0;
-      display: flex; align-items: center; gap: 5px;
-      padding: 8px 6px; border-radius: 14px; border: none; background: transparent;
-      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
-      &:hover { background: rgba(0,0,0,0.05); }
-    }
-    .date-text {
-      flex: 1; min-width: 0;
-      font-size: 13px; font-weight: 600; color: #333; text-transform: capitalize;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .date-edit-icon { font-size: 14px; color: #bbb; flex-shrink: 0; }
-
-    /* ── Add-exercise FAB (active workout mode) ── */
-    .add-exercise-fab {
-      position: fixed;
-      bottom: calc(64px + env(safe-area-inset-bottom) + 16px);
-      right: 20px;
-      z-index: 90;
-      width: 52px; height: 52px; border-radius: 50%; border: none;
-      background: #006874; color: white;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; touch-action: manipulation;
-      box-shadow: 0 4px 16px rgba(0,104,116,0.4), 0 1px 4px rgba(0,0,0,0.1);
-      transition: background 0.15s, transform 0.15s;
-      .material-symbols-outlined { font-size: 26px; }
-      &:hover { background: #005a63; transform: scale(1.06); }
-      &:active { transform: scale(0.96); }
-    }
-
-    /* ── Loading ── */
-    .loading-state {
-      display: flex; justify-content: center; padding: 48px;
-      .material-symbols-outlined { font-size: 32px; color: #ccc; }
-    }
-
-    /* ── Active workout topbar ── */
+    /* ── Fixed top: workout topbar (active mode) ── */
     .workout-topbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 90;
       display: flex; align-items: center; gap: 8px;
-      padding: 10px 12px 6px;
+      padding: 10px 12px 8px;
+      background: white;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
     .topbar-back {
       width: 36px; height: 36px; border-radius: 50%; border: none;
@@ -315,7 +272,30 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       &:hover { background: rgba(239,83,80,0.12); border-color: #ef5350; }
     }
 
-    /* ── Type badges ── */
+    /* ── Date header controls ── */
+    .arrow-btn {
+      width: 38px; height: 38px; border-radius: 50%; border: none; background: transparent;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: #999; transition: color 0.15s, background 0.15s;
+      touch-action: manipulation; flex-shrink: 0;
+      .material-symbols-outlined { font-size: 22px; }
+      &:hover { color: #333; background: rgba(0,0,0,0.06); }
+      &.invisible { visibility: hidden; pointer-events: none; }
+    }
+    .date-btn {
+      flex: 1; min-width: 0;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 8px 6px; border-radius: 14px; border: none; background: transparent;
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
+      &:hover { background: rgba(0,0,0,0.05); }
+    }
+    .date-text {
+      font-size: 13px; font-weight: 600; color: #333; text-transform: capitalize;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .date-cal-icon { font-size: 15px; color: #888; flex-shrink: 0; }
+
+    /* ── Type badges (topbar) ── */
     .type-badge {
       padding: 3px 10px; border-radius: 10px;
       font-size: 12px; font-weight: 600; color: white;
@@ -325,6 +305,62 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       font-size: 11px; font-weight: 700;
       background: linear-gradient(90deg, #ef5350 0%, #9c27b0 50%, #2196f3 100%);
       color: white; letter-spacing: 0.3px;
+    }
+
+    /* ── Fixed bottom: type bar (dashboard) ── */
+    .bottom-bar {
+      position: fixed;
+      bottom: calc(64px + env(safe-area-inset-bottom) + 12px);
+      left: 12px; right: 12px;
+      z-index: 90;
+      display: flex; align-items: center; gap: 8px;
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.08);
+      padding: 8px;
+    }
+    .type-btn-bar {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px;
+      padding: 10px 4px 9px;
+      border: 1.5px solid color-mix(in srgb, var(--cat-color) 35%, #e8e8e8);
+      border-radius: 14px;
+      background: white; cursor: pointer;
+      color: color-mix(in srgb, var(--cat-color) 70%, #444);
+      transition: all 0.18s; touch-action: manipulation;
+      &:hover {
+        border-color: var(--cat-color);
+        background: color-mix(in srgb, var(--cat-color) 6%, white);
+      }
+      &:active { transform: scale(0.97); }
+      &.active {
+        border-color: var(--cat-color);
+        background: color-mix(in srgb, var(--cat-color) 10%, white);
+      }
+      .type-icon { font-size: 22px; }
+      .type-label { font-size: 11px; font-weight: 700; letter-spacing: 0.2px; }
+    }
+
+    /* ── Add-exercise FAB (active workout mode) ── */
+    .add-exercise-fab {
+      position: fixed;
+      bottom: calc(64px + env(safe-area-inset-bottom) + 16px);
+      right: 20px;
+      z-index: 90;
+      width: 52px; height: 52px; border-radius: 50%; border: none;
+      background: #006874; color: white;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation;
+      box-shadow: 0 4px 16px rgba(0,104,116,0.4), 0 1px 4px rgba(0,0,0,0.1);
+      transition: background 0.15s, transform 0.15s;
+      .material-symbols-outlined { font-size: 26px; }
+      &:hover { background: #005a63; transform: scale(1.06); }
+      &:active { transform: scale(0.96); }
+    }
+
+    /* ── Loading ── */
+    .loading-state {
+      display: flex; justify-content: center; padding: 48px;
+      .material-symbols-outlined { font-size: 32px; color: #ccc; }
     }
 
     /* ── Workout section (dashboard) ── */
@@ -368,29 +404,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       margin-right: 4px;
       .material-symbols-outlined { font-size: 18px; }
       &:hover { color: #ef5350; }
-    }
-
-    /* ── Type grid ── */
-    .type-grid {
-      display: flex; gap: 10px;
-      &.type-grid--mt { margin-top: 10px; }
-    }
-    .type-btn {
-      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 7px;
-      padding: 16px 4px 14px;
-      border: 1.5px solid color-mix(in srgb, var(--cat-color) 40%, #e8e8e8);
-      border-radius: 16px;
-      background: white; cursor: pointer;
-      color: color-mix(in srgb, var(--cat-color) 70%, #444);
-      transition: all 0.18s; touch-action: manipulation;
-      &:hover {
-        border-color: var(--cat-color);
-        background: color-mix(in srgb, var(--cat-color) 6%, white);
-        transform: translateY(-1px);
-      }
-      &:active { transform: scale(0.97); }
-      .type-icon { font-size: 28px; }
-      .type-label { font-size: 11px; font-weight: 700; letter-spacing: 0.2px; text-align: center; }
     }
 
     /* ── Suggestion (inline, inside workout-section) ── */
@@ -777,7 +790,7 @@ export class TrainComponent {
 
   openCalendar(): void {
     const ref = this.dialog.open(CalendarComponent, {
-      data: { selectedDate: this.selectedDate() },
+      data: { selectedDate: this.selectedDate(), initialView: 'month' as const },
       panelClass: 'cal-dialog',
       width: '360px',
       maxWidth: '95vw',

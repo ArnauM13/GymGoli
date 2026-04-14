@@ -309,7 +309,7 @@ export class CalendarComponent {
   private workoutService = inject(WorkoutService);
   private sportService   = inject(SportService);
   private dialogRef      = inject(MatDialogRef<CalendarComponent>, { optional: true });
-  private dialogData     = inject<{ selectedDate?: string }>(MAT_DIALOG_DATA, { optional: true });
+  private dialogData     = inject<{ selectedDate?: string; initialView?: 'week' | 'month' }>(MAT_DIALOG_DATA, { optional: true });
 
   readonly selectedDate = input<string | null>(null);
   readonly dateSelected = output<string>();
@@ -330,6 +330,9 @@ export class CalendarComponent {
   readonly todayStr  = new Date().toISOString().split('T')[0];
 
   constructor() {
+    const initialView = this.dialogData?.initialView;
+    if (initialView) this.view.set(initialView);
+
     // Navigate to the relevant period when selectedDate input changes
     effect(() => {
       const date = this.selectedDate() ?? this.dialogData?.selectedDate ?? null;
