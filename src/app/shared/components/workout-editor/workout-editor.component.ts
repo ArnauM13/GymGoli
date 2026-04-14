@@ -1,4 +1,4 @@
-import { Component, ViewEncapsulation, computed, inject, input, output, signal } from '@angular/core';
+import { Component, ViewEncapsulation, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { MatButtonModule } from '@angular/material/button';
@@ -10,6 +10,9 @@ import { FEELING_EMOJI, FEELING_LABEL, FeelingLevel, Workout, WorkoutEntry, Work
 import { ExerciseService } from '../../../core/services/exercise.service';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component';
+
+// Module-level: persists collapsed state per workout for the entire browser session
+const _collapsedByWorkout = new Map<string, Set<string>>();
 
 @Component({
   selector: 'app-workout-editor',
@@ -273,7 +276,7 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
   `,
   styles: [`
     .we-entries {
-      padding: 8px 16px 0;
+      padding: 10px 16px 0;
       display: flex;
       flex-direction: column;
       gap: 12px;
@@ -661,6 +664,18 @@ export class WorkoutEditorComponent {
     reps:   [8, [Validators.required, Validators.min(1)]],
   });
 
+  constructor() {
+    // Restore persisted collapsed state when the workout changes
+    effect(() => {
+      const id = this.workout()?.id;
+      if (id) {
+        untracked(() => this.collapsedEntries.set(
+          new Set(_collapsedByWorkout.get(id) ?? [])
+        ));
+      }
+    }, { allowSignalWrites: true });
+  }
+
   isEntryEditable(exerciseId: string): boolean {
     return this.editMode() || this.alwaysEditable() || this.editingEntry() === exerciseId;
   }
@@ -671,6 +686,8 @@ export class WorkoutEditorComponent {
     const s = new Set(this.collapsedEntries());
     s.has(id) ? s.delete(id) : s.add(id);
     this.collapsedEntries.set(s);
+    const wid = this.workout()?.id;
+    if (wid) _collapsedByWorkout.set(wid, new Set(s));
   }
 
   private _expandEntry(id: string): void {
@@ -678,6 +695,8 @@ export class WorkoutEditorComponent {
     const s = new Set(this.collapsedEntries());
     s.delete(id);
     this.collapsedEntries.set(s);
+    const wid = this.workout()?.id;
+    if (wid) _collapsedByWorkout.set(wid, new Set(s));
   }
 
   reset(): void {
