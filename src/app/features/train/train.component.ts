@@ -226,7 +226,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
   `,
   styles: [`
-    .page { padding: 0 0 84px; min-height: 100dvh; }
+    .page { padding: 0 0 84px; }
 
     /* ── Date header (dashboard mode, part of page flow) ── */
     .train-header {
