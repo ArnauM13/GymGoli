@@ -120,7 +120,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               }
               <span class="material-symbols-outlined sport-icon">{{ sport.icon }}</span>
               <span class="sport-name">{{ sport.name }}</span>
-              @if (isSportDone(sport.id) && getActiveSubtypeName(sport) as subName) {
+              @if (isSportDone(sport.id) && getActiveSubtypeName(sport); as subName) {
                 <span class="sport-subtype-label">{{ subName }}</span>
               }
             </button>

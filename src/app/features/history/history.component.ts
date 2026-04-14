@@ -51,7 +51,7 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
                 <span class="sport-tag" [style.--sport-color]="item.sport.color">
                   <span class="material-symbols-outlined sport-tag-icon">{{ item.sport.icon }}</span>
                   {{ item.sport.name }}
-                  @if (item.subtypeId && getSubtypeName(item.sport, item.subtypeId); as subName) {
+                  @if (item.subtypeId && getSubtypeName(item.sport, item.subtypeId ?? ''); as subName) {
                     <span class="sport-tag-subtype">· {{ subName }}</span>
                   }
                 </span>
