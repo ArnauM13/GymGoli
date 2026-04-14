@@ -29,13 +29,13 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     <div class="page">
 
       <!-- ── Loading ── -->
-      @if (workoutService.isLoading() && dateWorkouts().length === 0) {
+      @if ((workoutService.isLoading() && dateWorkouts().length === 0) || creating()) {
         <div class="loading-state">
           <span class="material-symbols-outlined spin">sync</span>
         </div>
       }
 
-      @if (!workoutService.isLoading() || dateWorkouts().length > 0) {
+      @if ((!workoutService.isLoading() || dateWorkouts().length > 0) && !creating()) {
 
         @if (activeWorkout(); as w) {
 
@@ -181,30 +181,27 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     </div>
 
-    <!-- ── Bottom bar ── -->
-    <div class="bottom-bar">
-      <div class="bar-date">
-        <button class="arrow-btn" (click)="navigateDate(-1)">
-          <span class="material-symbols-outlined">chevron_left</span>
-        </button>
-        <button class="date-btn" (click)="openCalendar()">
-          <span class="date-text">{{ dateLabel() }}</span>
-          <span class="material-symbols-outlined date-edit-icon">edit_calendar</span>
-        </button>
-        <button class="arrow-btn" [class.invisible]="isToday()" (click)="navigateDate(1)">
-          <span class="material-symbols-outlined">chevron_right</span>
-        </button>
-      </div>
-
-      @if (activeWorkout()) {
-        <div class="bar-actions">
-          <button class="bar-primary-btn" (click)="openPicker()">
-            <span class="material-symbols-outlined">add</span>
-            Exercici
+    <!-- ── Bottom bar: date nav (dashboard) or "+" FAB (active workout) ── -->
+    @if (activeWorkout()) {
+      <button class="add-exercise-fab" (click)="openPicker()" title="Afegir exercici">
+        <span class="material-symbols-outlined">add</span>
+      </button>
+    } @else {
+      <div class="bottom-bar">
+        <div class="bar-date">
+          <button class="arrow-btn" (click)="navigateDate(-1)">
+            <span class="material-symbols-outlined">chevron_left</span>
+          </button>
+          <button class="date-btn" (click)="openCalendar()">
+            <span class="date-text">{{ dateLabel() }}</span>
+            <span class="material-symbols-outlined date-edit-icon">edit_calendar</span>
+          </button>
+          <button class="arrow-btn" [class.invisible]="isToday()" (click)="navigateDate(1)">
+            <span class="material-symbols-outlined">chevron_right</span>
           </button>
         </div>
-      }
-    </div>
+      </div>
+    }
   `,
   styles: [`
     .page { padding: 0 0 160px; min-height: 100dvh; }
@@ -251,19 +248,21 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
     .date-edit-icon { font-size: 14px; color: #bbb; flex-shrink: 0; }
 
-    .bar-actions {
-      display: flex; align-items: center; gap: 4px;
-      flex-shrink: 0; padding-right: 2px;
-    }
-
-    .bar-primary-btn {
-      display: flex; align-items: center; gap: 5px;
-      height: 38px; padding: 0 16px; border-radius: 19px; border: none;
+    /* ── Add-exercise FAB (active workout mode) ── */
+    .add-exercise-fab {
+      position: fixed;
+      bottom: calc(64px + env(safe-area-inset-bottom) + 16px);
+      right: 20px;
+      z-index: 90;
+      width: 52px; height: 52px; border-radius: 50%; border: none;
       background: #006874; color: white;
-      font-size: 13px; font-weight: 700; cursor: pointer;
-      touch-action: manipulation; transition: background 0.15s; white-space: nowrap;
-      .material-symbols-outlined { font-size: 17px; }
-      &:hover { background: #005a63; }
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation;
+      box-shadow: 0 4px 16px rgba(0,104,116,0.4), 0 1px 4px rgba(0,0,0,0.1);
+      transition: background 0.15s, transform 0.15s;
+      .material-symbols-outlined { font-size: 26px; }
+      &:hover { background: #005a63; transform: scale(1.06); }
+      &:active { transform: scale(0.96); }
     }
 
     /* ── Loading ── */
@@ -526,6 +525,7 @@ export class TrainComponent {
   readonly workoutTypes    = WORKOUT_TYPES;
   readonly activeWorkoutId = signal<string | null>(null);
   readonly expandedSportId = signal<string | null>(null);
+  readonly creating        = signal(false);
 
   readonly isToday = computed(() => this.selectedDate() === TODAY());
 
@@ -673,11 +673,14 @@ export class TrainComponent {
     if (last) {
       this.suggestionType.set(category);
     } else {
+      this.creating.set(true);
       try {
         const id = await this.workoutService.createWorkoutForDate(this.selectedDate(), category);
         this.openWorkout(id);
       } catch {
         this.snackBar.open('Error en crear l\'entrenament', '', { duration: 3000 });
+      } finally {
+        this.creating.set(false);
       }
     }
   }
@@ -686,6 +689,7 @@ export class TrainComponent {
     const category = this.suggestionType();
     if (!category) return;
     this.suggestionType.set(null);
+    this.creating.set(true);
     try {
       const date = this.selectedDate();
       let id: string;
@@ -698,6 +702,8 @@ export class TrainComponent {
       this.openWorkout(id);
     } catch {
       this.snackBar.open('Error en crear l\'entrenament', '', { duration: 3000 });
+    } finally {
+      this.creating.set(false);
     }
   }
 

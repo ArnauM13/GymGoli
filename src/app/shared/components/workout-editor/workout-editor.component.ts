@@ -232,7 +232,7 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
           </div>
         }
 
-        @if (editMode() && !alwaysEditable()) {
+        @if (alwaysEditable() || editMode()) {
           <button class="we-add-exercise-btn" (click)="requestAddExercise.emit()">
             <span class="material-symbols-outlined">add</span>
             Afegir exercici
@@ -606,11 +606,12 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
     .we-add-exercise-btn {
       display: flex; align-items: center; justify-content: center; gap: 8px;
       width: 100%; padding: 14px;
-      border: 2px dashed #d0d0d0; border-radius: 14px;
-      background: transparent; color: #888; font-size: 15px; font-weight: 500;
-      cursor: pointer; margin-top: 4px; transition: all 0.2s; touch-action: manipulation;
-      .material-symbols-outlined { font-size: 20px; line-height: 1; vertical-align: middle; }
-      &:hover { border-color: #006874; color: #006874; background: rgba(0,104,116,0.04); }
+      border: 1.5px dashed rgba(0,104,116,0.28); border-radius: 14px;
+      background: rgba(0,104,116,0.02); color: rgba(0,104,116,0.55);
+      font-size: 14px; font-weight: 600;
+      cursor: pointer; margin-top: 6px; transition: all 0.18s; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 18px; line-height: 1; vertical-align: middle; }
+      &:hover { border-color: #006874; color: #006874; background: rgba(0,104,116,0.06); }
     }
 
     .we-set-actions { display: flex; gap: 2px; align-items: center; }
