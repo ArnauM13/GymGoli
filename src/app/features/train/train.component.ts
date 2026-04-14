@@ -7,7 +7,7 @@ import { CalendarComponent } from '../../shared/components/calendar/calendar.com
 import {
   CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, Exercise, ExerciseCategory,
 } from '../../core/models/exercise.model';
-import { WorkoutEntry } from '../../core/models/workout.model';
+import { Workout, WorkoutEntry } from '../../core/models/workout.model';
 import { WorkoutService } from '../../core/services/workout.service';
 import { SportService } from '../../core/services/sport.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
@@ -21,7 +21,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
   { value: 'legs', label: CATEGORY_LABELS.legs, icon: CATEGORY_ICONS.legs, color: CATEGORY_COLORS.legs },
 ];
 
-
 @Component({
   selector: 'app-train',
   standalone: true,
@@ -29,134 +28,161 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
   template: `
     <div class="page">
 
-      <!-- ── Workout type badges ── -->
-      @if (selectedWorkout() && workoutCategories().length > 0) {
-        <div class="type-badges">
-          @for (cat of workoutCategoryItems(); track cat.value) {
-            <span class="type-badge" [style.background]="cat.color">{{ cat.label }}</span>
-          }
-          @if (workoutCategories().length > 1) {
-            <span class="hybrid-badge">Híbrid</span>
-          }
-        </div>
-      }
-
       <!-- ── Loading ── -->
-      @if (workoutService.isLoading() && !selectedWorkout()) {
+      @if (workoutService.isLoading() && dateWorkouts().length === 0) {
         <div class="loading-state">
           <span class="material-symbols-outlined spin">sync</span>
         </div>
       }
 
-      <!-- ── Empty state / Suggestion ── -->
-      @if (!selectedWorkout() && !workoutService.isLoading()) {
-        @if (suggestionType() && suggestion()) {
-          <div class="suggestion-panel">
-            <div class="suggestion-header">
-              <span class="material-symbols-outlined sports-header-icon">fitness_center</span>
-              <span class="suggestion-title">Últim {{ suggestionTypeLabel() | lowercase }}</span>
-              <span class="suggestion-date">· {{ suggestionAgo() }}</span>
+      @if (!workoutService.isLoading() || dateWorkouts().length > 0) {
+
+        @if (activeWorkout(); as w) {
+
+          <!-- ══ ACTIVE WORKOUT ══ -->
+          <div class="workout-topbar">
+            <button class="topbar-back" (click)="closeWorkout()" title="Tornar">
+              <span class="material-symbols-outlined">arrow_back_ios</span>
+            </button>
+            <div class="topbar-center">
+              @for (cat of activeWorkoutCategoryItems(); track cat.value) {
+                <span class="type-badge" [style.background]="cat.color">{{ cat.label }}</span>
+              }
+              @if (activeWorkoutCategoryItems().length > 1) {
+                <span class="hybrid-badge">Híbrid</span>
+              }
             </div>
-            @if (suggestionEntries().length > 0) {
-              <div class="suggestion-exercises">
-                @for (entry of suggestionEntries(); track entry.exerciseId) {
-                  <div class="suggestion-exercise">
-                    <span class="suggestion-exercise-name">{{ entry.exerciseName }}</span>
-                    <span class="suggestion-exercise-stats">{{ entry.sets.length }} sèr · {{ maxWeight(entry) }}kg màx</span>
-                  </div>
-                }
-              </div>
-            }
-            <div class="suggestion-actions">
-              <button class="btn-suggestion-new" (click)="dismissSuggestion(false)">Nou</button>
-              <button class="btn-suggestion-template" (click)="dismissSuggestion(true)">Usar com a base</button>
-            </div>
+            <button class="topbar-delete" (click)="deleteActiveWorkout()" title="Eliminar entrenament">
+              <span class="material-symbols-outlined">delete</span>
+            </button>
           </div>
+
+          <app-workout-editor
+            #editor
+            [workout]="w"
+            [editMode]="false"
+            [alwaysEditable]="true"
+            (requestAddExercise)="openPicker()"
+          />
+
         } @else {
+
+          <!-- ══ DASHBOARD ══ -->
+
+          <!-- Entrenaments section -->
           <div class="workout-section">
             <div class="sports-header">
               <span class="material-symbols-outlined sports-header-icon">fitness_center</span>
-              <h2 class="sports-title">{{ emptyTitle() }}</h2>
+              <h2 class="sports-title">Entrenaments</h2>
             </div>
-            <div class="type-grid">
-              @for (cat of workoutTypes; track cat.value) {
-                <button class="type-btn" [style.--cat-color]="cat.color" (click)="selectType(cat.value)">
-                  <span class="material-symbols-outlined type-icon">{{ cat.icon }}</span>
-                  <span class="type-label">{{ cat.label }}</span>
+
+            <!-- Existing workout cards -->
+            @for (w of dateWorkouts(); track w.id) {
+              <div class="workout-card" (click)="openWorkout(w.id)">
+                <div class="wc-bar" [style.background]="workoutCardColor(w)"></div>
+                <div class="wc-info">
+                  <span class="wc-label">{{ workoutLabel(w) }}</span>
+                  <span class="wc-detail">
+                    {{ w.entries.length }} exerc
+                    @if (workoutSetsCount(w); as n) { · {{ n }} sèr }
+                  </span>
+                </div>
+                <button class="wc-delete" (click)="$event.stopPropagation(); confirmDeleteWorkout(w)" title="Eliminar">
+                  <span class="material-symbols-outlined">delete</span>
+                </button>
+              </div>
+            }
+
+            <!-- Inline suggestion panel -->
+            @if (suggestionType() && suggestion()) {
+              <div class="suggestion-body">
+                <div class="suggestion-header">
+                  <span class="suggestion-title">Últim {{ suggestionTypeLabel() | lowercase }}</span>
+                  <span class="suggestion-date">· {{ suggestionAgo() }}</span>
+                </div>
+                @if (suggestionEntries().length > 0) {
+                  <div class="suggestion-exercises">
+                    @for (entry of suggestionEntries(); track entry.exerciseId) {
+                      <div class="suggestion-exercise">
+                        <span class="suggestion-exercise-name">{{ entry.exerciseName }}</span>
+                        <span class="suggestion-exercise-stats">{{ entry.sets.length }} sèr · {{ maxWeight(entry) }}kg màx</span>
+                      </div>
+                    }
+                  </div>
+                }
+                <div class="suggestion-actions">
+                  <button class="btn-suggestion-new" (click)="dismissSuggestion(false)">Nou</button>
+                  <button class="btn-suggestion-template" (click)="dismissSuggestion(true)">Usar com a base</button>
+                </div>
+              </div>
+            }
+
+            <!-- Type grid (hidden while suggestion showing) -->
+            @if (!suggestionType()) {
+              <div class="type-grid" [class.type-grid--mt]="dateWorkouts().length > 0">
+                @for (cat of workoutTypes; track cat.value) {
+                  <button class="type-btn" [style.--cat-color]="cat.color" (click)="selectType(cat.value)">
+                    <span class="material-symbols-outlined type-icon">{{ cat.icon }}</span>
+                    <span class="type-label">{{ cat.label }}</span>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+
+          <!-- Sports section -->
+          <div class="sports-section">
+            <div class="sports-header">
+              <span class="material-symbols-outlined sports-header-icon">sports_soccer</span>
+              <h2 class="sports-title">Esports</h2>
+            </div>
+            <div class="sports-grid">
+              @for (sport of sportService.sports(); track sport.id) {
+                <button
+                  class="sport-btn"
+                  [class.active]="isSportDone(sport.id)"
+                  [style.--sport-color]="sport.color"
+                  (click)="toggleSport(sport.id)"
+                  [disabled]="sportToggling()"
+                >
+                  @if (isSportDone(sport.id)) {
+                    <span class="sport-check material-symbols-outlined">check_circle</span>
+                  }
+                  <span class="material-symbols-outlined sport-icon">{{ sport.icon }}</span>
+                  <span class="sport-name">{{ sport.name }}</span>
+                  @if (isSportDone(sport.id) && getActiveSubtypeName(sport); as subName) {
+                    <span class="sport-subtype-label">{{ subName }}</span>
+                  }
                 </button>
               }
             </div>
-          </div>
-        }
-      }
 
-      <!-- ── Workout editor ── -->
-      @if (selectedWorkout()) {
-        <app-workout-editor
-          #editor
-          [workout]="selectedWorkout()"
-          [editMode]="editMode()"
-          [alwaysEditable]="true"
-          (requestAddExercise)="openPicker()"
-        />
-
-      }
-
-      <!-- ══ Secció Esports ══ -->
-      @if (!workoutService.isLoading()) {
-      <div class="sports-section">
-        <div class="sports-header">
-          <span class="material-symbols-outlined sports-header-icon">sports_soccer</span>
-          <h2 class="sports-title">Esports</h2>
-        </div>
-        <div class="sports-grid">
-          @for (sport of sportService.sports(); track sport.id) {
-            <button
-              class="sport-btn"
-              [class.active]="isSportDone(sport.id)"
-              [style.--sport-color]="sport.color"
-              (click)="toggleSport(sport.id)"
-              [disabled]="sportToggling()"
-            >
-              @if (isSportDone(sport.id)) {
-                <span class="sport-check material-symbols-outlined">check_circle</span>
-              }
-              <span class="material-symbols-outlined sport-icon">{{ sport.icon }}</span>
-              <span class="sport-name">{{ sport.name }}</span>
-              @if (isSportDone(sport.id) && getActiveSubtypeName(sport); as subName) {
-                <span class="sport-subtype-label">{{ subName }}</span>
-              }
-            </button>
-          }
-        </div>
-
-        <!-- Subtype picker: shown when an active sport has subtypes -->
-        @if (expandedSport(); as sport) {
-          <div class="subtype-row">
-            <span class="subtype-row-label">{{ sport.name }}:</span>
-            <button
-              class="subtype-chip"
-              [class.active]="!activeSubtypeId()"
-              (click)="selectSubtype(null)"
-            >Cap</button>
-            @for (sub of sport.subtypes; track sub.id) {
-              <button
-                class="subtype-chip"
-                [class.active]="activeSubtypeId() === sub.id"
-                (click)="selectSubtype(sub.id)"
-              >{{ sub.name }}</button>
+            @if (expandedSport(); as sport) {
+              <div class="subtype-row">
+                <span class="subtype-row-label">{{ sport.name }}:</span>
+                <button
+                  class="subtype-chip"
+                  [class.active]="!activeSubtypeId()"
+                  (click)="selectSubtype(null)"
+                >Cap</button>
+                @for (sub of sport.subtypes; track sub.id) {
+                  <button
+                    class="subtype-chip"
+                    [class.active]="activeSubtypeId() === sub.id"
+                    (click)="selectSubtype(sub.id)"
+                  >{{ sub.name }}</button>
+                }
+              </div>
             }
           </div>
+
         }
-      </div>
-      } <!-- end @if !isLoading -->
+      }
 
     </div>
 
-    <!-- ── Bottom bar: data + accions en un sol contenidor ── -->
+    <!-- ── Bottom bar ── -->
     <div class="bottom-bar">
-
-      <!-- Navegació de data -->
       <div class="bar-date">
         <button class="arrow-btn" (click)="navigateDate(-1)">
           <span class="material-symbols-outlined">chevron_left</span>
@@ -170,37 +196,20 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         </button>
       </div>
 
-      <!-- Botons d'acció -->
-      @if (selectedWorkout()) {
-        @if (editMode()) {
-          <div class="bar-actions">
-            <button class="bar-icon-btn bar-danger" (click)="deleteWorkout()" title="Eliminar entrenament">
-              <span class="material-symbols-outlined">delete</span>
-            </button>
-            <button class="bar-primary-btn" (click)="toggleEditMode()">
-              <span class="material-symbols-outlined">check</span>
-              Fet
-            </button>
-          </div>
-        } @else {
-          <div class="bar-actions">
-            <button class="bar-icon-btn" (click)="toggleEditMode()" title="Reordenar / eliminar exercicis">
-              <span class="material-symbols-outlined">tune</span>
-            </button>
-            <button class="bar-primary-btn" (click)="openPicker()">
-              <span class="material-symbols-outlined">add</span>
-              Exercici
-            </button>
-          </div>
-        }
+      @if (activeWorkout()) {
+        <div class="bar-actions">
+          <button class="bar-primary-btn" (click)="openPicker()">
+            <span class="material-symbols-outlined">add</span>
+            Exercici
+          </button>
+        </div>
       }
-
     </div>
   `,
   styles: [`
     .page { padding: 0 0 160px; min-height: 100dvh; }
 
-    /* ── Bottom bar: contenidor únic per data + accions ── */
+    /* ── Bottom bar ── */
     .bottom-bar {
       position: fixed;
       bottom: calc(64px + env(safe-area-inset-bottom) + 12px);
@@ -247,16 +256,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       flex-shrink: 0; padding-right: 2px;
     }
 
-    .bar-icon-btn {
-      width: 38px; height: 38px; border-radius: 50%; border: none;
-      background: transparent; color: #777;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      .material-symbols-outlined { font-size: 20px; }
-      &:hover { background: rgba(0,0,0,0.06); color: #333; }
-      &.bar-danger:hover { color: #ef5350; background: rgba(239,83,80,0.08); }
-    }
-
     .bar-primary-btn {
       display: flex; align-items: center; gap: 5px;
       height: 38px; padding: 0 16px; border-radius: 19px; border: none;
@@ -267,12 +266,38 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       &:hover { background: #005a63; }
     }
 
+    /* ── Loading ── */
+    .loading-state {
+      display: flex; justify-content: center; padding: 48px;
+      .material-symbols-outlined { font-size: 32px; color: #ccc; }
+    }
+
+    /* ── Active workout topbar ── */
+    .workout-topbar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 12px 6px;
+    }
+    .topbar-back {
+      width: 36px; height: 36px; border-radius: 50%; border: none;
+      background: transparent; cursor: pointer; color: #555;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s; flex-shrink: 0; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 20px; }
+      &:hover { background: rgba(0,0,0,0.06); }
+    }
+    .topbar-center {
+      flex: 1; display: flex; align-items: center; flex-wrap: wrap; gap: 5px;
+    }
+    .topbar-delete {
+      width: 36px; height: 36px; border-radius: 50%; border: none;
+      background: transparent; cursor: pointer; color: #bbb;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s; flex-shrink: 0; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 20px; }
+      &:hover { background: rgba(239,83,80,0.08); color: #ef5350; }
+    }
 
     /* ── Type badges ── */
-    .type-badges {
-      display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
-      padding: 0 16px 10px;
-    }
     .type-badge {
       padding: 3px 10px; border-radius: 10px;
       font-size: 12px; font-weight: 600; color: white;
@@ -284,13 +309,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       color: white; letter-spacing: 0.3px;
     }
 
-    /* ── Loading ── */
-    .loading-state {
-      display: flex; justify-content: center; padding: 48px;
-      .material-symbols-outlined { font-size: 32px; color: #ccc; }
-    }
-
-    /* ── Workout type section (empty state) ── */
+    /* ── Workout section (dashboard) ── */
     .workout-section {
       margin: 12px 16px 0;
       padding: 14px 14px 16px;
@@ -298,8 +317,45 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       border-radius: 18px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.07);
     }
+
+    /* ── Workout summary cards ── */
+    .workout-card {
+      display: flex; align-items: center;
+      margin-bottom: 8px;
+      border: 1.5px solid #efefef; border-radius: 14px;
+      background: white; overflow: hidden;
+      cursor: pointer; transition: box-shadow 0.15s, border-color 0.15s;
+      touch-action: manipulation;
+      &:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-color: #ddd; }
+    }
+    .wc-bar {
+      width: 5px; align-self: stretch; flex-shrink: 0;
+    }
+    .wc-info {
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column; gap: 2px;
+      padding: 10px 10px;
+    }
+    .wc-label {
+      font-size: 13px; font-weight: 700; color: #1a1a1a;
+    }
+    .wc-detail {
+      font-size: 11px; color: #999;
+    }
+    .wc-delete {
+      width: 40px; height: 40px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      border: none; background: transparent; cursor: pointer;
+      color: #ccc; transition: color 0.15s; touch-action: manipulation;
+      margin-right: 4px;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { color: #ef5350; }
+    }
+
+    /* ── Type grid ── */
     .type-grid {
       display: flex; gap: 10px;
+      &.type-grid--mt { margin-top: 10px; }
     }
     .type-btn {
       flex: 1; display: flex; flex-direction: column; align-items: center; gap: 7px;
@@ -319,43 +375,41 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .type-label { font-size: 11px; font-weight: 700; letter-spacing: 0.2px; text-align: center; }
     }
 
-    /* ── Suggestion panel ── */
-    .suggestion-panel {
-      margin: 12px 16px 0;
-      background: white;
-      border-radius: 18px;
-      padding: 14px 14px 16px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+    /* ── Suggestion (inline, inside workout-section) ── */
+    .suggestion-body {
+      margin-top: 10px;
+      padding: 12px 10px 10px;
+      background: #fafafa; border-radius: 12px;
+      border: 1px solid #f0f0f0;
     }
     .suggestion-header {
-      display: flex; align-items: center; gap: 6px; margin-bottom: 14px;
+      display: flex; align-items: center; gap: 6px; margin-bottom: 10px;
     }
-    .suggestion-title { font-size: 14px; font-weight: 700; color: #555; letter-spacing: 0.2px; }
+    .suggestion-title { font-size: 13px; font-weight: 700; color: #444; }
     .suggestion-date  { font-size: 12px; color: #aaa; }
     .suggestion-exercises {
-      display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;
+      display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;
     }
     .suggestion-exercise {
       display: flex; justify-content: space-between; align-items: center;
     }
-    .suggestion-exercise-name  { font-size: 14px; color: #333; }
-    .suggestion-exercise-stats { font-size: 12px; color: #888; }
-    .suggestion-actions { display: flex; gap: 10px; }
+    .suggestion-exercise-name  { font-size: 13px; color: #333; }
+    .suggestion-exercise-stats { font-size: 11px; color: #888; }
+    .suggestion-actions { display: flex; gap: 8px; }
     .btn-suggestion-new {
-      flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 10px;
-      background: white; color: #666; font-size: 14px; font-weight: 600;
+      flex: 1; padding: 8px; border: 1.5px solid #e0e0e0; border-radius: 10px;
+      background: white; color: #666; font-size: 13px; font-weight: 600;
       cursor: pointer; touch-action: manipulation;
       &:hover { border-color: #bbb; color: #333; }
     }
     .btn-suggestion-template {
-      flex: 2; padding: 10px; border: none; border-radius: 10px;
-      background: #006874; color: white; font-size: 14px; font-weight: 600;
+      flex: 2; padding: 8px; border: none; border-radius: 10px;
+      background: #006874; color: white; font-size: 13px; font-weight: 600;
       cursor: pointer; touch-action: manipulation;
       &:hover { background: #004f5a; }
     }
 
-
-    /* ── Secció Esports ── */
+    /* ── Sports section ── */
     .sports-section {
       margin: 12px 16px 0;
       padding: 14px 14px 16px;
@@ -467,13 +521,35 @@ export class TrainComponent {
 
   @ViewChild('editor') editor?: WorkoutEditorComponent;
 
-  readonly selectedDate     = signal<string>(TODAY());
-  readonly editMode         = signal(false);
-  readonly sportToggling    = signal(false);
-  readonly workoutTypes     = WORKOUT_TYPES;
-  readonly expandedSportId  = signal<string | null>(null);
+  readonly selectedDate    = signal<string>(TODAY());
+  readonly sportToggling   = signal(false);
+  readonly workoutTypes    = WORKOUT_TYPES;
+  readonly activeWorkoutId = signal<string | null>(null);
+  readonly expandedSportId = signal<string | null>(null);
 
   readonly isToday = computed(() => this.selectedDate() === TODAY());
+
+  readonly dateWorkouts = computed(() =>
+    this.workoutService.getWorkoutsForDate(this.selectedDate())
+  );
+
+  readonly activeWorkout = computed((): Workout | null => {
+    const id = this.activeWorkoutId();
+    if (!id) return null;
+    return this.dateWorkouts().find(w => w.id === id) ?? null;
+  });
+
+  readonly activeWorkoutCategories = computed((): string[] => {
+    const w = this.activeWorkout();
+    if (!w) return [];
+    return w.categories?.length ? w.categories : (w.category ? [w.category] : []);
+  });
+
+  readonly activeWorkoutCategoryItems = computed(() =>
+    this.activeWorkoutCategories()
+      .map(c => WORKOUT_TYPES.find(t => t.value === c))
+      .filter((t): t is typeof WORKOUT_TYPES[0] => !!t)
+  );
 
   readonly expandedSport = computed(() => {
     const id = this.expandedSportId();
@@ -491,27 +567,6 @@ export class TrainComponent {
     const formatted = d.toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'short' });
     return this.isToday() ? `Avui · ${formatted}` : formatted;
   });
-
-  readonly selectedWorkout = computed(() => {
-    if (this.isToday()) return this.workoutService.todayWorkout();
-    return this.workoutService.getWorkoutForDate(this.selectedDate());
-  });
-
-  readonly emptyTitle = computed(() =>
-    this.isToday() ? 'Cap entrenament avui' : 'Cap entrenament aquest dia'
-  );
-
-  readonly workoutCategories = computed((): string[] => {
-    const w = this.selectedWorkout();
-    if (!w) return [];
-    return w.categories?.length ? w.categories : (w.category ? [w.category] : []);
-  });
-
-  readonly workoutCategoryItems = computed(() =>
-    this.workoutCategories()
-      .map(c => WORKOUT_TYPES.find(t => t.value === c))
-      .filter((t): t is typeof WORKOUT_TYPES[0] => !!t)
-  );
 
   readonly suggestionType = signal<ExerciseCategory | null>(null);
 
@@ -551,11 +606,157 @@ export class TrainComponent {
       const month = parseInt(monthStr) - 1;
       this.workoutService.ensureMonthLoaded(year, month);
       this.sportService.ensureMonthLoaded(year, month);
-      untracked(() => this.expandedSportId.set(null));
+      untracked(() => {
+        this.expandedSportId.set(null);
+        this.activeWorkoutId.set(null);
+        this.suggestionType.set(null);
+      });
     });
   }
 
-  // ── Sport helpers ──────────────────────────────────────────────────────────
+  // ── Workout navigation ────────────────────────────────────────────────────
+
+  openWorkout(id: string): void {
+    this.activeWorkoutId.set(id);
+    this.suggestionType.set(null);
+  }
+
+  closeWorkout(): void {
+    this.activeWorkoutId.set(null);
+    this.editor?.reset();
+  }
+
+  workoutLabel(w: Workout): string {
+    const cats = w.categories?.length ? w.categories : (w.category ? [w.category] : []);
+    if (!cats.length) return 'Entrenament';
+    return cats.map(c => CATEGORY_LABELS[c as ExerciseCategory] ?? c).join(' + ');
+  }
+
+  workoutCardColor(w: Workout): string {
+    const cats = w.categories?.length ? w.categories : (w.category ? [w.category] : []);
+    if (!cats.length) return '#006874';
+    if (cats.length === 1) return CATEGORY_COLORS[cats[0] as ExerciseCategory] ?? '#006874';
+    const colors = cats.map(c => CATEGORY_COLORS[c as ExerciseCategory] ?? '#006874');
+    const step = 100 / colors.length;
+    return `linear-gradient(180deg, ${colors.map((c, i) => `${c} ${i * step}%, ${c} ${(i + 1) * step}%`).join(', ')})`;
+  }
+
+  workoutSetsCount(w: Workout): number {
+    return w.entries.reduce((sum, e) => sum + e.sets.length, 0);
+  }
+
+  async deleteActiveWorkout(): Promise<void> {
+    if (!confirm('Eliminar l\'entrenament?')) return;
+    const w = this.activeWorkout();
+    if (!w) return;
+    try {
+      await this.workoutService.deleteWorkout(w.id);
+      this.activeWorkoutId.set(null);
+    } catch {
+      this.snackBar.open('Error en eliminar', '', { duration: 2000 });
+    }
+  }
+
+  async confirmDeleteWorkout(w: Workout): Promise<void> {
+    if (!confirm(`Eliminar "${this.workoutLabel(w)}"?`)) return;
+    try {
+      await this.workoutService.deleteWorkout(w.id);
+    } catch {
+      this.snackBar.open('Error en eliminar', '', { duration: 2000 });
+    }
+  }
+
+  // ── Workout creation ──────────────────────────────────────────────────────
+
+  async selectType(category: ExerciseCategory): Promise<void> {
+    const last = this.workoutService.getLastWorkoutByCategory(category);
+    if (last) {
+      this.suggestionType.set(category);
+    } else {
+      try {
+        const id = await this.workoutService.createWorkoutForDate(this.selectedDate(), category);
+        this.openWorkout(id);
+      } catch {
+        this.snackBar.open('Error en crear l\'entrenament', '', { duration: 3000 });
+      }
+    }
+  }
+
+  async dismissSuggestion(useTemplate: boolean): Promise<void> {
+    const category = this.suggestionType();
+    if (!category) return;
+    this.suggestionType.set(null);
+    try {
+      const date = this.selectedDate();
+      let id: string;
+      if (useTemplate) {
+        const template = this.workoutService.getLastWorkoutByCategory(category);
+        id = await this.workoutService.createWorkoutFromTemplate(date, category, template?.entries ?? []);
+      } else {
+        id = await this.workoutService.createWorkoutForDate(date, category);
+      }
+      this.openWorkout(id);
+    } catch {
+      this.snackBar.open('Error en crear l\'entrenament', '', { duration: 3000 });
+    }
+  }
+
+  maxWeight(entry: WorkoutEntry): number {
+    return entry.sets.length ? Math.max(...entry.sets.map(s => s.weight)) : 0;
+  }
+
+  openPicker(newCategory?: ExerciseCategory): void {
+    const w               = this.activeWorkout();
+    const excludeIds      = w?.entries.map(e => e.exerciseId) ?? [];
+    const defaultCategory = (newCategory ?? w?.category) as ExerciseCategory | undefined;
+
+    const ref = this.dialog.open(ExercisePickerDialogComponent, {
+      data: { excludeIds, defaultCategory }, width: '420px', maxHeight: '80vh',
+    });
+
+    ref.afterClosed().subscribe(async (exercise: Exercise | undefined) => {
+      if (!exercise) return;
+      try {
+        let workoutId = w?.id;
+        if (!workoutId) {
+          workoutId = await this.workoutService.createWorkoutForDate(this.selectedDate(), defaultCategory);
+          this.activeWorkoutId.set(workoutId);
+        }
+
+        await this.workoutService.addExerciseToWorkout(workoutId, {
+          exerciseId: exercise.id, exerciseName: exercise.name, sets: [],
+        });
+
+        setTimeout(() => {
+          this.editor?.startAddSet({ exerciseId: exercise.id, exerciseName: exercise.name, sets: [] });
+        }, 0);
+      } catch {
+        this.snackBar.open('Error en afegir l\'exercici', '', { duration: 3000 });
+      }
+    });
+  }
+
+  // ── Date navigation ───────────────────────────────────────────────────────
+
+  navigateDate(days: number): void {
+    const d = new Date(this.selectedDate() + 'T12:00:00');
+    d.setDate(d.getDate() + days);
+    this.selectedDate.set(d.toISOString().split('T')[0]);
+  }
+
+  openCalendar(): void {
+    const ref = this.dialog.open(CalendarComponent, {
+      data: { selectedDate: this.selectedDate() },
+      panelClass: 'cal-dialog',
+      width: '360px',
+      maxWidth: '95vw',
+    });
+    ref.afterClosed().subscribe((date: string | undefined) => {
+      if (date) this.selectedDate.set(date);
+    });
+  }
+
+  // ── Sport helpers ─────────────────────────────────────────────────────────
 
   isSportDone(sportId: string): boolean {
     return this.sportService.hasSportOnDate(this.selectedDate(), sportId);
@@ -574,9 +775,7 @@ export class TrainComponent {
       await this.sportService.toggleSport(this.selectedDate(), sportId);
       if (!wasActive) {
         const sport = this.sportService.sports().find(s => s.id === sportId);
-        if (sport?.subtypes?.length) {
-          this.expandedSportId.set(sportId);
-        }
+        if (sport?.subtypes?.length) this.expandedSportId.set(sportId);
       } else if (this.expandedSportId() === sportId) {
         this.expandedSportId.set(null);
       }
@@ -597,114 +796,5 @@ export class TrainComponent {
     } catch {
       this.snackBar.open('Error en guardar el subtipus', '', { duration: 2500 });
     }
-  }
-
-  navigateDate(days: number): void {
-    const d = new Date(this.selectedDate() + 'T12:00:00');
-    d.setDate(d.getDate() + days);
-    this.selectedDate.set(d.toISOString().split('T')[0]);
-    this.editMode.set(false);
-    this.suggestionType.set(null);
-  }
-
-  openCalendar(): void {
-    const ref = this.dialog.open(CalendarComponent, {
-      data: { selectedDate: this.selectedDate() },
-      panelClass: 'cal-dialog',
-      width: '360px',
-      maxWidth: '95vw',
-    });
-    ref.afterClosed().subscribe((date: string | undefined) => {
-      if (date) {
-        this.selectedDate.set(date);
-        this.editMode.set(false);
-        this.suggestionType.set(null);
-      }
-    });
-  }
-
-  toggleEditMode(): void {
-    const next = !this.editMode();
-    this.editMode.set(next);
-    if (!next) this.editor?.reset();
-  }
-
-  async deleteWorkout(): Promise<void> {
-    if (!confirm('Eliminar l\'entrenament?')) return;
-    const w = this.selectedWorkout();
-    if (!w) return;
-    try {
-      await this.workoutService.deleteWorkout(w.id);
-      this.editMode.set(false);
-    } catch {
-      this.snackBar.open('Error en eliminar', '', { duration: 2000 });
-    }
-  }
-
-  async selectType(category: ExerciseCategory): Promise<void> {
-    const last = this.workoutService.getLastWorkoutByCategory(category);
-    if (last) {
-      this.suggestionType.set(category);
-    } else {
-      try {
-        await this.workoutService.createWorkoutForDate(this.selectedDate(), category);
-      } catch {
-        this.snackBar.open('Error en crear l\'entrenament', '', { duration: 3000 });
-      }
-    }
-  }
-
-  async dismissSuggestion(useTemplate: boolean): Promise<void> {
-    const category = this.suggestionType();
-    if (!category) return;
-    this.suggestionType.set(null);
-    try {
-      const date = this.selectedDate();
-      if (useTemplate) {
-        const template = this.workoutService.getLastWorkoutByCategory(category);
-        await this.workoutService.createWorkoutFromTemplate(date, category, template?.entries ?? []);
-      } else {
-        await this.workoutService.createWorkoutForDate(date, category);
-      }
-    } catch {
-      this.snackBar.open('Error en crear l\'entrenament', '', { duration: 3000 });
-    }
-  }
-
-  maxWeight(entry: WorkoutEntry): number {
-    return entry.sets.length ? Math.max(...entry.sets.map(s => s.weight)) : 0;
-  }
-
-  openPicker(newCategory?: ExerciseCategory): void {
-    const w               = this.selectedWorkout();
-    const excludeIds      = w?.entries.map(e => e.exerciseId) ?? [];
-    const defaultCategory = (newCategory ?? w?.category) as ExerciseCategory | undefined;
-
-    const ref = this.dialog.open(ExercisePickerDialogComponent, {
-      data: { excludeIds, defaultCategory }, width: '420px', maxHeight: '80vh',
-    });
-
-    ref.afterClosed().subscribe(async (exercise: Exercise | undefined) => {
-      if (!exercise) return;
-      try {
-        let workoutId = w?.id;
-        if (!workoutId) {
-          const date = this.selectedDate();
-          workoutId = this.isToday()
-            ? await this.workoutService.createTodayWorkout(defaultCategory)
-            : await this.workoutService.createWorkoutForDate(date, defaultCategory);
-        }
-
-        await this.workoutService.addExerciseToWorkout(workoutId, {
-          exerciseId: exercise.id, exerciseName: exercise.name, sets: [],
-        });
-
-        setTimeout(() => {
-          this.editor?.startAddSet({ exerciseId: exercise.id, exerciseName: exercise.name, sets: [] });
-        }, 0);
-      } catch {
-        this.snackBar.open('Error en afegir l\'exercici', '', { duration: 3000 });
-      }
-    });
   }
 }

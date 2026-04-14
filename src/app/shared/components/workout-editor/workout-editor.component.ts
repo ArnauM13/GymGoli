@@ -22,7 +22,7 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
 
         @for (entry of w.entries; track entry.exerciseId) {
           <div class="we-entry-card"
-               cdkDrag [cdkDragDisabled]="!editMode()"
+               cdkDrag [cdkDragDisabled]="!editMode() && !alwaysEditable()"
                [style.--we-cat-color]="getCatColor(entry)"
                [class.we-entry-solo-edit]="!editMode() && !alwaysEditable() && editingEntry() === entry.exerciseId">
 
@@ -30,7 +30,7 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
 
             <!-- ── Entry header ── -->
             <div class="we-entry-header">
-              @if (editMode()) {
+              @if (editMode() && !alwaysEditable()) {
                 <span class="we-drag-handle material-symbols-outlined" cdkDragHandle>drag_indicator</span>
               }
               <div class="we-entry-title" (click)="toggleCollapse(entry.exerciseId)">
@@ -71,7 +71,7 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
                 </button>
               </div>
 
-              @if (editMode()) {
+              @if (editMode() || alwaysEditable()) {
                 <button mat-icon-button class="we-remove-btn" (click)="removeEntry(entry.exerciseId)" title="Eliminar exercici">
                   <span class="material-symbols-outlined">delete</span>
                 </button>

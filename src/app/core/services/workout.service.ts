@@ -167,6 +167,10 @@ export class WorkoutService {
     return this.workouts().find(w => w.date === date) ?? null;
   }
 
+  getWorkoutsForDate(date: string): Workout[] {
+    return this.workouts().filter(w => w.date === date);
+  }
+
   getWorkoutsForExercise(exerciseId: string): Workout[] {
     return this.workouts()
       .filter(w => w.entries.some(e => e.exerciseId === exerciseId))
