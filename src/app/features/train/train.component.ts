@@ -207,6 +207,23 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         <span class="material-symbols-outlined">add</span>
       </button>
     }
+
+    <!-- ── Bottom bar: quick-open last workout (dashboard, when workout exists) ── -->
+    @if (!activeWorkout() && dateWorkouts().length > 0) {
+      <div class="bottom-bar">
+        <button class="bar-shortcut" (click)="openWorkout(dateWorkouts()[0].id)">
+          <div class="bar-shortcut-color" [style.background]="workoutCardColor(dateWorkouts()[0])"></div>
+          <div class="bar-shortcut-info">
+            <span class="bar-shortcut-label">{{ workoutLabel(dateWorkouts()[0]) }}</span>
+            <span class="bar-shortcut-detail">
+              {{ dateWorkouts()[0].entries.length }} exerc
+              @if (workoutSetsCount(dateWorkouts()[0]); as n) { · {{ n }} sèr }
+            </span>
+          </div>
+          <span class="material-symbols-outlined bar-shortcut-arrow">arrow_forward_ios</span>
+        </button>
+      </div>
+    }
   `,
   styles: [`
     .page { padding: 0 0 84px; min-height: 100dvh; }
@@ -292,6 +309,40 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       background: linear-gradient(90deg, #ef5350 0%, #9c27b0 50%, #2196f3 100%);
       color: white; letter-spacing: 0.3px;
     }
+
+    /* ── Bottom bar: last workout shortcut ── */
+    .bottom-bar {
+      position: fixed;
+      bottom: calc(64px + env(safe-area-inset-bottom) + 12px);
+      left: 12px; right: 12px;
+      z-index: 90;
+      display: flex; align-items: center;
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.08);
+      padding: 4px;
+    }
+    .bar-shortcut {
+      flex: 1; display: flex; align-items: center; gap: 10px;
+      border: none; background: transparent; border-radius: 16px;
+      padding: 8px 10px 8px 0; cursor: pointer; touch-action: manipulation;
+      transition: background 0.15s;
+      &:hover { background: rgba(0,0,0,0.04); }
+    }
+    .bar-shortcut-color {
+      width: 5px; align-self: stretch; flex-shrink: 0;
+      border-radius: 4px; min-height: 36px;
+    }
+    .bar-shortcut-info {
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column; gap: 1px;
+    }
+    .bar-shortcut-label {
+      font-size: 13px; font-weight: 700; color: #1a1a1a;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .bar-shortcut-detail { font-size: 11px; color: #999; }
+    .bar-shortcut-arrow { font-size: 14px; color: #ccc; flex-shrink: 0; }
 
     /* ── Type grid (inside workout-section) ── */
     .type-grid {
