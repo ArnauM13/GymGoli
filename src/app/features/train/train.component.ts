@@ -227,7 +227,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       top: 0;
       z-index: 10;
       display: flex; align-items: center; gap: 8px;
-      padding: 10px 12px 8px;
+      padding: 10px 12px 0;
       background: white;
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }

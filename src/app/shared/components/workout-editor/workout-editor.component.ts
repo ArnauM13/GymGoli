@@ -270,7 +270,7 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
   `,
   styles: [`
     .we-entries {
-      padding: 0 16px;
+      padding: 12px 16px 0;
       display: flex;
       flex-direction: column;
       gap: 12px;
