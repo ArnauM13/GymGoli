@@ -53,6 +53,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         @if (suggestionType() && suggestion()) {
           <div class="suggestion-panel">
             <div class="suggestion-header">
+              <span class="material-symbols-outlined sports-header-icon">fitness_center</span>
               <span class="suggestion-title">Últim {{ suggestionTypeLabel() | lowercase }}</span>
               <span class="suggestion-date">· {{ suggestionAgo() }}</span>
             </div>
@@ -72,10 +73,11 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             </div>
           </div>
         } @else {
-          <div class="empty-state">
-            <span class="material-symbols-outlined empty-icon">fitness_center</span>
-            <h2>{{ emptyTitle() }}</h2>
-            <p>Quin tipus d'entrenament?</p>
+          <div class="workout-section">
+            <div class="sports-header">
+              <span class="material-symbols-outlined sports-header-icon">fitness_center</span>
+              <h2 class="sports-title">{{ emptyTitle() }}</h2>
+            </div>
             <div class="type-grid">
               @for (cat of workoutTypes; track cat.value) {
                 <button class="type-btn" [style.--cat-color]="cat.color" (click)="selectType(cat.value)">
@@ -288,44 +290,48 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .material-symbols-outlined { font-size: 32px; color: #ccc; }
     }
 
-    /* ── Empty state ── */
-    .empty-state {
-      display: flex; flex-direction: column; align-items: center;
-      gap: 12px; padding: 32px 24px 24px; text-align: center;
-      .empty-icon { font-size: 48px; color: #ddd; }
-      h2 { margin: 0; font-size: 18px; font-weight: 600; color: #444; }
-      p  { margin: 0; color: #888; font-size: 14px; }
+    /* ── Workout type section (empty state) ── */
+    .workout-section {
+      margin: 12px 16px 0;
+      padding: 14px 14px 16px;
+      background: white;
+      border-radius: 18px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
     }
     .type-grid {
-      display: flex; gap: 12px; margin-top: 8px; width: 100%; max-width: 340px;
+      display: flex; gap: 10px;
     }
     .type-btn {
-      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 8px;
-      border: 2px solid var(--cat-color); border-radius: 16px;
-      background: white; cursor: pointer; color: var(--cat-color);
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 7px;
+      padding: 16px 4px 14px;
+      border: 1.5px solid color-mix(in srgb, var(--cat-color) 40%, #e8e8e8);
+      border-radius: 16px;
+      background: white; cursor: pointer;
+      color: color-mix(in srgb, var(--cat-color) 70%, #444);
       transition: all 0.18s; touch-action: manipulation;
       &:hover {
-        background: color-mix(in srgb, var(--cat-color) 10%, white);
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        border-color: var(--cat-color);
+        background: color-mix(in srgb, var(--cat-color) 6%, white);
+        transform: translateY(-1px);
       }
+      &:active { transform: scale(0.97); }
       .type-icon { font-size: 28px; }
-      .type-label { font-size: 13px; font-weight: 600; }
+      .type-label { font-size: 11px; font-weight: 700; letter-spacing: 0.2px; text-align: center; }
     }
 
     /* ── Suggestion panel ── */
     .suggestion-panel {
-      margin: 24px 16px;
+      margin: 12px 16px 0;
       background: white;
-      border-radius: 16px;
-      padding: 20px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+      border-radius: 18px;
+      padding: 14px 14px 16px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
     }
     .suggestion-header {
-      display: flex; align-items: center; gap: 6px; margin-bottom: 16px;
+      display: flex; align-items: center; gap: 6px; margin-bottom: 14px;
     }
-    .suggestion-title { font-size: 15px; font-weight: 600; color: #333; }
-    .suggestion-date  { font-size: 14px; color: #888; }
+    .suggestion-title { font-size: 14px; font-weight: 700; color: #555; letter-spacing: 0.2px; }
+    .suggestion-date  { font-size: 12px; color: #aaa; }
     .suggestion-exercises {
       display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;
     }
@@ -351,7 +357,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     /* ── Secció Esports ── */
     .sports-section {
-      margin: 24px 16px 0;
+      margin: 12px 16px 0;
       padding: 14px 14px 16px;
       background: white;
       border-radius: 18px;
