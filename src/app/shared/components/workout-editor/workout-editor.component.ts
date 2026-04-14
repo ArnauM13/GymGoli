@@ -30,7 +30,8 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
 
             <!-- ── Entry header ── -->
             <div class="we-entry-header">
-              @if (editMode() && !alwaysEditable()) {
+              <!-- Drag handle: always on the left in train mode, restricts drag to handle only -->
+              @if (editMode() || alwaysEditable()) {
                 <span class="we-drag-handle material-symbols-outlined" cdkDragHandle>drag_indicator</span>
               }
               <div class="we-entry-title" (click)="toggleCollapse(entry.exerciseId)">
@@ -51,25 +52,27 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
                 </div>
               </div>
 
-              <!-- Grup: sentiment + estadístiques -->
-              <div class="we-entry-actions-group">
-                @if (entry.feeling || isEntryEditable(entry.exerciseId)) {
-                  <button type="button" class="we-icon-btn-sm we-fatiga-btn"
-                    [class.we-fatiga-btn--set]="!!entry.feeling"
-                    [class.we-fatiga-btn--editable]="isEntryEditable(entry.exerciseId)"
-                    [title]="entry.feeling ? getFeelingLabel(entry.feeling) : 'Afegir fatiga'"
-                    (click)="isEntryEditable(entry.exerciseId) && openFatigaPicker(entry.exerciseId)">
-                    @if (entry.feeling) {
-                      <span class="we-fatiga-btn-emoji">{{ getFeelingEmoji(entry.feeling) }}</span>
-                    } @else {
-                      <span class="material-symbols-outlined">sentiment_neutral</span>
-                    }
+              <!-- Grup: sentiment + estadístiques (only when expanded) -->
+              @if (!isCollapsed(entry.exerciseId)) {
+                <div class="we-entry-actions-group">
+                  @if (entry.feeling || isEntryEditable(entry.exerciseId)) {
+                    <button type="button" class="we-icon-btn-sm we-fatiga-btn"
+                      [class.we-fatiga-btn--set]="!!entry.feeling"
+                      [class.we-fatiga-btn--editable]="isEntryEditable(entry.exerciseId)"
+                      [title]="entry.feeling ? getFeelingLabel(entry.feeling) : 'Afegir fatiga'"
+                      (click)="isEntryEditable(entry.exerciseId) && openFatigaPicker(entry.exerciseId)">
+                      @if (entry.feeling) {
+                        <span class="we-fatiga-btn-emoji">{{ getFeelingEmoji(entry.feeling) }}</span>
+                      } @else {
+                        <span class="material-symbols-outlined">sentiment_neutral</span>
+                      }
+                    </button>
+                  }
+                  <button class="we-icon-btn-sm" (click)="openStats(entry)" title="Estadístiques">
+                    <span class="material-symbols-outlined">bar_chart</span>
                   </button>
-                }
-                <button class="we-icon-btn-sm" (click)="openStats(entry)" title="Estadístiques">
-                  <span class="material-symbols-outlined">bar_chart</span>
-                </button>
-              </div>
+                </div>
+              }
 
               @if (editMode() || alwaysEditable()) {
                 <button mat-icon-button class="we-remove-btn" (click)="removeEntry(entry.exerciseId)" title="Eliminar exercici">
@@ -295,15 +298,15 @@ import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 12px 8px 6px 14px;
-      gap: 4px;
+      padding: 14px 10px 14px 8px;
+      gap: 8px;
     }
 
     .we-drag-handle {
-      font-size: 20px; color: #ccc; cursor: grab;
-      padding: 4px 4px 4px 0; flex-shrink: 0;
+      font-size: 22px; color: #c8c8c8; cursor: grab;
+      padding: 6px 2px; flex-shrink: 0;
       user-select: none; touch-action: none;
-      &:active { cursor: grabbing; }
+      &:active { cursor: grabbing; color: #999; }
     }
 
     .we-entry-card.cdk-drag-preview {
