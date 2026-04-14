@@ -2,7 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 
 import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
 import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry } from '../../core/models/workout.model';
-import { Sport } from '../../core/models/sport.model';
+import { Sport, SportSubtype } from '../../core/models/sport.model';
 import { WorkoutService } from '../../core/services/workout.service';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
@@ -47,10 +47,13 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
           <!-- Sports done that day -->
           @if (selectedDateSports().length > 0) {
             <div class="sports-row">
-              @for (sport of selectedDateSports(); track sport.id) {
-                <span class="sport-tag" [style.--sport-color]="sport.color">
-                  <span class="material-symbols-outlined sport-tag-icon">{{ sport.icon }}</span>
-                  {{ sport.name }}
+              @for (item of selectedDateSports(); track item.sport.id) {
+                <span class="sport-tag" [style.--sport-color]="item.sport.color">
+                  <span class="material-symbols-outlined sport-tag-icon">{{ item.sport.icon }}</span>
+                  {{ item.sport.name }}
+                  @if (item.subtypeId && getSubtypeName(item.sport, item.subtypeId); as subName) {
+                    <span class="sport-tag-subtype">· {{ subName }}</span>
+                  }
                 </span>
               }
             </div>
@@ -249,6 +252,7 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
       border: 1px solid color-mix(in srgb, var(--sport-color) 25%, transparent);
     }
     .sport-tag-icon { font-size: 14px; font-variation-settings: 'FILL' 1; }
+    .sport-tag-subtype { font-weight: 400; opacity: 0.85; }
 
     .detail-empty {
       display: flex; flex-direction: column; align-items: center;
@@ -442,9 +446,9 @@ export class HistoryComponent {
     return d ? this.workoutService.getWorkoutForDate(d) : null;
   });
 
-  readonly selectedDateSports = computed((): Sport[] => {
+  readonly selectedDateSports = computed(() => {
     const d = this.selectedDate();
-    return d ? this.sportService.getSportsForDate(d) : [];
+    return d ? this.sportService.getSportSessionsForDate(d) : [];
   });
 
   readonly selectedEntry = computed((): WorkoutEntry | null => {
@@ -488,6 +492,10 @@ export class HistoryComponent {
 
 getCatColor(cat: string): string { return CATEGORY_COLORS[cat as ExerciseCategory] ?? '#bbb'; }
   getCatLabel(cat: string): string { return CATEGORY_LABELS[cat as ExerciseCategory] ?? cat; }
+
+  getSubtypeName(sport: Sport, subtypeId: string): string | null {
+    return sport.subtypes.find((s: SportSubtype) => s.id === subtypeId)?.name ?? null;
+  }
 
   getEntryCategory(entry: WorkoutEntry): ExerciseCategory {
     return this.exerciseService.getById(entry.exerciseId)?.category ?? 'push';

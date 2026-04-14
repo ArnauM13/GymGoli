@@ -2,7 +2,7 @@ import { Injectable, computed, effect, inject, signal } from '@angular/core';
 
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
-import { DEFAULT_SPORTS, Sport, SportSession } from '../models/sport.model';
+import { DEFAULT_SPORTS, Sport, SportSession, SportSubtype } from '../models/sport.model';
 
 // ── Row mappers ──────────────────────────────────────────────────────────────
 
@@ -12,18 +12,19 @@ function toSport(row: Record<string, unknown>): Sport {
     name:      row['name'] as string,
     icon:      row['icon'] as string,
     color:     row['color'] as string,
+    subtypes:  (row['subtypes'] as SportSubtype[] | null) ?? [],
     createdAt: new Date(row['created_at'] as string),
   };
 }
 
 function toSportSession(row: Record<string, unknown>): SportSession {
   return {
-    id:              row['id'] as string,
-    date:            row['date'] as string,
-    sportId:         row['sport_id'] as string,
-    durationMinutes: row['duration_minutes'] as number | undefined,
-    notes:           row['notes'] as string | undefined,
-    createdAt:       new Date(row['created_at'] as string),
+    id:        row['id'] as string,
+    date:      row['date'] as string,
+    sportId:   row['sport_id'] as string,
+    subtypeId: (row['subtype_id'] as string | null) ?? undefined,
+    notes:     row['notes'] as string | undefined,
+    createdAt: new Date(row['created_at'] as string),
   };
 }
 
@@ -80,27 +81,33 @@ export class SportService {
 
   private async _seedDefaults(uid: string): Promise<void> {
     for (const s of DEFAULT_SPORTS) {
-      await this.supabase.from('sports').insert({ user_id: uid, ...s });
+      await this.supabase.from('sports').insert({ user_id: uid, ...s, subtypes: [] });
     }
     const { data } = await this.supabase
       .from('sports').select('*').eq('user_id', uid).order('created_at');
     this._sports.set((data ?? []).map(r => toSport(r as Record<string, unknown>)));
   }
 
-  async createSport(payload: Pick<Sport, 'name' | 'icon' | 'color'>): Promise<void> {
+  async createSport(payload: Pick<Sport, 'name' | 'icon' | 'color' | 'subtypes'>): Promise<void> {
     const uid = this._uid();
     const { error } = await this.supabase
       .from('sports')
-      .insert({ user_id: uid, ...payload });
+      .insert({ user_id: uid, name: payload.name, icon: payload.icon, color: payload.color, subtypes: payload.subtypes });
     if (error) throw error;
     await this._loadSports(uid);
   }
 
-  async updateSport(id: string, payload: Partial<Pick<Sport, 'name' | 'icon' | 'color'>>): Promise<void> {
+  async updateSport(id: string, payload: Partial<Pick<Sport, 'name' | 'icon' | 'color' | 'subtypes'>>): Promise<void> {
     const uid = this._uid();
+    const dbPayload: Record<string, unknown> = {};
+    if (payload.name  !== undefined) dbPayload['name']     = payload.name;
+    if (payload.icon  !== undefined) dbPayload['icon']     = payload.icon;
+    if (payload.color !== undefined) dbPayload['color']    = payload.color;
+    if (payload.subtypes !== undefined) dbPayload['subtypes'] = payload.subtypes;
+
     const { error } = await this.supabase
       .from('sports')
-      .update(payload)
+      .update(dbPayload)
       .eq('id', id)
       .eq('user_id', uid);
     if (error) throw error;
@@ -116,7 +123,6 @@ export class SportService {
       .eq('user_id', uid);
     if (error) throw error;
     this._sports.set(this._sports().filter(s => s.id !== id));
-    // Remove cached sessions for this sport
     for (const [key, sessions] of this._monthCache) {
       this._monthCache.set(key, sessions.filter(s => s.sportId !== id));
     }
@@ -174,6 +180,23 @@ export class SportService {
       .filter((s): s is Sport => !!s);
   }
 
+  /** Returns sport + subtypeId pairs for a given date. */
+  getSportSessionsForDate(date: string): Array<{ sport: Sport; subtypeId?: string }> {
+    const sessions  = this._sessions().filter(s => s.date === date);
+    const sportsMap = new Map(this._sports().map(s => [s.id, s]));
+    const result: Array<{ sport: Sport; subtypeId?: string }> = [];
+    for (const s of sessions) {
+      const sport = sportsMap.get(s.sportId);
+      if (sport) result.push({ sport, subtypeId: s.subtypeId });
+    }
+    return result;
+  }
+
+  /** Returns the session for a specific sport on a specific date. */
+  getSessionForDate(date: string, sportId: string): SportSession | undefined {
+    return this._sessions().find(s => s.date === date && s.sportId === sportId);
+  }
+
   hasSportOnDate(date: string, sportId: string): boolean {
     return this._sessions().some(s => s.date === date && s.sportId === sportId);
   }
@@ -182,7 +205,7 @@ export class SportService {
     return this._sessions().some(s => s.date === date);
   }
 
-  // ── Toggle ────────────────────────────────────────────────────────────────
+  // ── Toggle & subtype ──────────────────────────────────────────────────────
 
   async toggleSport(date: string, sportId: string): Promise<void> {
     const existing = this._sessions().find(s => s.date === date && s.sportId === sportId);
@@ -191,6 +214,23 @@ export class SportService {
     } else {
       await this._createSession(date, sportId);
     }
+  }
+
+  async setSessionSubtype(sessionId: string, date: string, subtypeId: string | null): Promise<void> {
+    const uid = this._uid();
+    const { error } = await this.supabase
+      .from('sport_sessions')
+      .update({ subtype_id: subtypeId })
+      .eq('id', sessionId)
+      .eq('user_id', uid);
+    if (error) throw error;
+
+    const key    = date.substring(0, 7);
+    const bucket = this._monthCache.get(key) ?? [];
+    this._monthCache.set(key, bucket.map(s =>
+      s.id === sessionId ? { ...s, subtypeId: subtypeId ?? undefined } : s
+    ));
+    this._rebuild();
   }
 
   // ── Private mutations ─────────────────────────────────────────────────────

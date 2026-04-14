@@ -1,16 +1,22 @@
+export interface SportSubtype {
+  id: string;    // client-generated UUID
+  name: string;
+}
+
 export interface Sport {
   id: string;
   name: string;
-  icon: string;   // Material Symbol name
-  color: string;  // hex colour
+  icon: string;        // Material Symbol name
+  color: string;       // hex colour
+  subtypes: SportSubtype[];
   createdAt: Date;
 }
 
 export interface SportSession {
   id: string;
-  date: string;     // YYYY-MM-DD
-  sportId: string;  // FK → Sport.id
-  durationMinutes?: number;
+  date: string;        // YYYY-MM-DD
+  sportId: string;     // FK → Sport.id
+  subtypeId?: string;  // optional SportSubtype.id
   notes?: string;
   createdAt: Date;
 }

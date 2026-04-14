@@ -1,5 +1,5 @@
 import { LowerCasePipe } from '@angular/common';
-import { Component, ViewChild, computed, effect, inject, signal } from '@angular/core';
+import { Component, ViewChild, computed, effect, inject, signal, untracked } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
@@ -120,9 +120,31 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               }
               <span class="material-symbols-outlined sport-icon">{{ sport.icon }}</span>
               <span class="sport-name">{{ sport.name }}</span>
+              @if (isSportDone(sport.id) && getActiveSubtypeName(sport) as subName) {
+                <span class="sport-subtype-label">{{ subName }}</span>
+              }
             </button>
           }
         </div>
+
+        <!-- Subtype picker: shown when an active sport has subtypes -->
+        @if (expandedSport(); as sport) {
+          <div class="subtype-row">
+            <span class="subtype-row-label">{{ sport.name }}:</span>
+            <button
+              class="subtype-chip"
+              [class.active]="!activeSubtypeId()"
+              (click)="selectSubtype(null)"
+            >Cap</button>
+            @for (sub of sport.subtypes; track sub.id) {
+              <button
+                class="subtype-chip"
+                [class.active]="activeSubtypeId() === sub.id"
+                (click)="selectSubtype(sub.id)"
+              >{{ sub.name }}</button>
+            }
+          </div>
+        }
       </div>
 
     </div>
@@ -396,6 +418,32 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       font-variation-settings: 'FILL' 1, 'wght' 500;
     }
 
+    .sport-subtype-label {
+      font-size: 10px; font-weight: 600; color: var(--sport-color);
+      text-align: center; line-height: 1.1;
+      max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    /* ── Subtype picker row ── */
+    .subtype-row {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+      padding: 10px 2px 2px;
+    }
+    .subtype-row-label {
+      font-size: 11px; font-weight: 600; color: #888;
+      flex-shrink: 0;
+    }
+    .subtype-chip {
+      padding: 5px 12px;
+      border: 1.5px solid #e0e0e0; border-radius: 20px;
+      background: white; font-size: 12px; font-weight: 600; color: #666;
+      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+      &.active {
+        background: #006874; color: white; border-color: #006874;
+      }
+      &:hover:not(.active) { border-color: #006874; color: #006874; }
+    }
+
     @keyframes spin {
       from { transform: rotate(0deg); }
       to   { transform: rotate(360deg); }
@@ -411,12 +459,24 @@ export class TrainComponent {
 
   @ViewChild('editor') editor?: WorkoutEditorComponent;
 
-  readonly selectedDate   = signal<string>(TODAY());
-  readonly editMode       = signal(false);
-  readonly sportToggling  = signal(false);
-  readonly workoutTypes   = WORKOUT_TYPES;
+  readonly selectedDate     = signal<string>(TODAY());
+  readonly editMode         = signal(false);
+  readonly sportToggling    = signal(false);
+  readonly workoutTypes     = WORKOUT_TYPES;
+  readonly expandedSportId  = signal<string | null>(null);
 
   readonly isToday = computed(() => this.selectedDate() === TODAY());
+
+  readonly expandedSport = computed(() => {
+    const id = this.expandedSportId();
+    return id ? this.sportService.sports().find(s => s.id === id) ?? null : null;
+  });
+
+  readonly activeSubtypeId = computed(() => {
+    const sportId = this.expandedSportId();
+    if (!sportId) return null;
+    return this.sportService.getSessionForDate(this.selectedDate(), sportId)?.subtypeId ?? null;
+  });
 
   readonly dateLabel = computed(() => {
     const d = new Date(this.selectedDate() + 'T12:00:00');
@@ -483,6 +543,7 @@ export class TrainComponent {
       const month = parseInt(monthStr) - 1;
       this.workoutService.ensureMonthLoaded(year, month);
       this.sportService.ensureMonthLoaded(year, month);
+      untracked(() => this.expandedSportId.set(null));
     });
   }
 
@@ -492,14 +553,41 @@ export class TrainComponent {
     return this.sportService.hasSportOnDate(this.selectedDate(), sportId);
   }
 
+  getActiveSubtypeName(sport: { id: string; subtypes: { id: string; name: string }[] }): string | null {
+    const session = this.sportService.getSessionForDate(this.selectedDate(), sport.id);
+    if (!session?.subtypeId) return null;
+    return sport.subtypes.find(s => s.id === session.subtypeId)?.name ?? null;
+  }
+
   async toggleSport(sportId: string): Promise<void> {
     this.sportToggling.set(true);
     try {
+      const wasActive = this.sportService.hasSportOnDate(this.selectedDate(), sportId);
       await this.sportService.toggleSport(this.selectedDate(), sportId);
+      if (!wasActive) {
+        const sport = this.sportService.sports().find(s => s.id === sportId);
+        if (sport?.subtypes?.length) {
+          this.expandedSportId.set(sportId);
+        }
+      } else if (this.expandedSportId() === sportId) {
+        this.expandedSportId.set(null);
+      }
     } catch {
       this.snackBar.open('Error en guardar l\'esport', '', { duration: 2500 });
     } finally {
       this.sportToggling.set(false);
+    }
+  }
+
+  async selectSubtype(subtypeId: string | null): Promise<void> {
+    const sportId = this.expandedSportId();
+    if (!sportId) return;
+    const session = this.sportService.getSessionForDate(this.selectedDate(), sportId);
+    if (!session) return;
+    try {
+      await this.sportService.setSessionSubtype(session.id, this.selectedDate(), subtypeId);
+    } catch {
+      this.snackBar.open('Error en guardar el subtipus', '', { duration: 2500 });
     }
   }
 

@@ -5,7 +5,7 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 
-import { DEFAULT_SPORTS, SPORT_COLORS, SPORT_ICONS, Sport } from '../../../core/models/sport.model';
+import { DEFAULT_SPORTS, SPORT_COLORS, SPORT_ICONS, Sport, SportSubtype } from '../../../core/models/sport.model';
 
 export interface SportFormDialogData {
   sport?: Sport;
@@ -77,6 +77,39 @@ export interface SportFormDialogData {
           </div>
         </div>
 
+        <!-- Subtypes (optional) -->
+        <div class="picker-section">
+          <p class="field-label">Subtipus <span class="optional-hint">(opcional)</span></p>
+
+          @if (subtypes().length > 0) {
+            <div class="subtype-list">
+              @for (sub of subtypes(); track sub.id) {
+                <span class="subtype-chip">
+                  {{ sub.name }}
+                  <button type="button" class="subtype-remove" (click)="removeSubtype(sub.id)">
+                    <span class="material-symbols-outlined">close</span>
+                  </button>
+                </span>
+              }
+            </div>
+          }
+
+          <div class="subtype-add-row">
+            <input
+              class="subtype-input"
+              type="text"
+              placeholder="Nou subtipus..."
+              [value]="newSubtypeName()"
+              (input)="newSubtypeName.set($any($event.target).value)"
+              (keydown.enter)="$event.preventDefault(); addSubtype()"
+              autocomplete="off"
+            >
+            <button type="button" class="subtype-add-btn" (click)="addSubtype()" [disabled]="!newSubtypeName().trim()">
+              <span class="material-symbols-outlined">add</span>
+            </button>
+          </div>
+        </div>
+
       </form>
     </mat-dialog-content>
 
@@ -93,6 +126,7 @@ export interface SportFormDialogData {
 
     .picker-section { display: flex; flex-direction: column; gap: 8px; }
     .field-label { margin: 0; font-size: 13px; color: #616161; font-weight: 500; }
+    .optional-hint { font-weight: 400; color: #aaa; font-size: 11px; }
 
     /* Icon grid */
     .icon-grid {
@@ -159,6 +193,45 @@ export interface SportFormDialogData {
       font-size: 12px; font-weight: 700;
       color: color-mix(in srgb, var(--sport-color, #888) 70%, #333);
     }
+
+    /* Subtypes */
+    .subtype-list {
+      display: flex; flex-wrap: wrap; gap: 6px;
+    }
+    .subtype-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 8px 4px 10px;
+      background: #f0f0f0; border-radius: 20px;
+      font-size: 12px; font-weight: 500; color: #444;
+    }
+    .subtype-remove {
+      display: flex; align-items: center; justify-content: center;
+      width: 18px; height: 18px; border-radius: 50%; border: none;
+      background: transparent; cursor: pointer; color: #888; padding: 0;
+      transition: background 0.12s, color 0.12s;
+      .material-symbols-outlined { font-size: 13px; }
+      &:hover { background: #ddd; color: #333; }
+    }
+
+    .subtype-add-row {
+      display: flex; gap: 6px; align-items: center;
+    }
+    .subtype-input {
+      flex: 1; padding: 7px 10px;
+      border: 1.5px solid #e0e0e0; border-radius: 8px;
+      font-size: 13px; outline: none;
+      transition: border-color 0.15s;
+      &:focus { border-color: #006874; }
+    }
+    .subtype-add-btn {
+      width: 34px; height: 34px; border-radius: 8px; border: none;
+      background: #006874; color: white; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover:not(:disabled) { background: #005a63; }
+      &:disabled { background: #ccc; cursor: default; }
+    }
   `],
 })
 export class SportFormDialogComponent {
@@ -171,19 +244,33 @@ export class SportFormDialogComponent {
   readonly icons  = SPORT_ICONS;
   readonly colors = SPORT_COLORS;
 
-  readonly selectedIcon  = signal<string>(this.data.sport?.icon  ?? DEFAULT_SPORTS[0].icon);
-  readonly selectedColor = signal<string>(this.data.sport?.color ?? DEFAULT_SPORTS[0].color);
+  readonly selectedIcon     = signal<string>(this.data.sport?.icon  ?? DEFAULT_SPORTS[0].icon);
+  readonly selectedColor    = signal<string>(this.data.sport?.color ?? DEFAULT_SPORTS[0].color);
+  readonly subtypes         = signal<SportSubtype[]>([...(this.data.sport?.subtypes ?? [])]);
+  readonly newSubtypeName   = signal('');
 
   readonly form = this.fb.group({
     name: [this.data.sport?.name ?? '', Validators.required],
   });
 
+  addSubtype(): void {
+    const name = this.newSubtypeName().trim();
+    if (!name) return;
+    this.subtypes.update(list => [...list, { id: crypto.randomUUID(), name }]);
+    this.newSubtypeName.set('');
+  }
+
+  removeSubtype(id: string): void {
+    this.subtypes.update(list => list.filter(s => s.id !== id));
+  }
+
   save(): void {
     if (this.form.invalid) return;
     this.dialogRef.close({
-      name:  this.form.value.name!.trim(),
-      icon:  this.selectedIcon(),
-      color: this.selectedColor(),
+      name:     this.form.value.name!.trim(),
+      icon:     this.selectedIcon(),
+      color:    this.selectedColor(),
+      subtypes: this.subtypes(),
     });
   }
 
