@@ -172,7 +172,7 @@ interface CalDay {
       padding: 0 8px 8px;
     }
     .cal-view-pill {
-      padding: 4px 12px; border-radius: 14px;
+      padding: 6px 14px; border-radius: 14px;
       border: 1.5px solid #e8e8e8; background: transparent;
       font-size: 11px; font-weight: 600; color: #999;
       cursor: pointer; transition: all 0.15s; touch-action: manipulation;
@@ -287,18 +287,18 @@ interface CalDay {
     }
 
     .cal-today-nav {
-      display: flex; align-items: center; gap: 4px;
-      padding: 5px 10px; border-radius: 14px;
+      display: flex; align-items: center; gap: 5px;
+      padding: 8px 14px; border-radius: 16px;
       border: 1.5px solid #e0e0e0; background: #f7f7f7;
-      font-size: 12px; font-weight: 600; color: #666;
+      font-size: 13px; font-weight: 600; color: #666;
       cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      .material-symbols-outlined { font-size: 14px; }
+      .material-symbols-outlined { font-size: 16px; }
       &:hover { background: #efefef; }
     }
     .cal-select-today {
-      padding: 5px 14px; border-radius: 14px;
+      padding: 8px 18px; border-radius: 16px;
       border: none; background: #006874; color: white;
-      font-size: 12px; font-weight: 600;
+      font-size: 13px; font-weight: 600;
       cursor: pointer; touch-action: manipulation;
       &:hover { background: #005a63; }
     }
