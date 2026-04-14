@@ -36,8 +36,16 @@ export const SPORT_COLORS: string[] = [
 ];
 
 /** Default sports seeded on first login. */
-export const DEFAULT_SPORTS: Pick<Sport, 'name' | 'icon' | 'color'>[] = [
-  { name: 'Futbol',  icon: 'sports_soccer', color: '#43A047' },
-  { name: 'Pàdel',   icon: 'sports_tennis',  color: '#FB8C00' },
-  { name: 'Córrer',  icon: 'directions_run', color: '#8E24AA' },
+export const DEFAULT_SPORTS: Pick<Sport, 'name' | 'icon' | 'color' | 'subtypes'>[] = [
+  { name: 'Futbol', icon: 'sports_soccer', color: '#43A047', subtypes: [] },
+  { name: 'Pàdel',  icon: 'sports_tennis',  color: '#FB8C00', subtypes: [] },
+  {
+    name: 'Yoga', icon: 'sports_martial_arts', color: '#8E24AA',
+    subtypes: [
+      { id: 'yoga-hatha',       name: 'Hatha' },
+      { id: 'yoga-vinyasa',     name: 'Vinyasa' },
+      { id: 'yoga-yin',         name: 'Yin' },
+      { id: 'yoga-restorative', name: 'Restauratiu' },
+    ],
+  },
 ];
