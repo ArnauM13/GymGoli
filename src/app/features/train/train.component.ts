@@ -100,7 +100,8 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
       }
 
-      <!-- ══ Secció Esports (sempre visible) ══ -->
+      <!-- ══ Secció Esports ══ -->
+      @if (!workoutService.isLoading()) {
       <div class="sports-section">
         <div class="sports-header">
           <span class="material-symbols-outlined sports-header-icon">sports_soccer</span>
@@ -146,6 +147,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           </div>
         }
       </div>
+      } <!-- end @if !isLoading -->
 
     </div>
 
