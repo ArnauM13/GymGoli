@@ -137,6 +137,17 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               </div>
             }
 
+            <!-- Type buttons -->
+            @if (!suggestionType()) {
+              <div class="type-grid" [class.type-grid--mt]="dateWorkouts().length > 0">
+                @for (cat of workoutTypes; track cat.value) {
+                  <button class="type-btn" [style.--cat-color]="cat.color" (click)="selectType(cat.value)">
+                    <span class="material-symbols-outlined type-icon">{{ cat.icon }}</span>
+                    <span class="type-label">{{ cat.label }}</span>
+                  </button>
+                }
+              </div>
+            }
           </div>
 
           <!-- Sports section -->
@@ -190,29 +201,15 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     </div>
 
-    <!-- ── Fixed bottom: type bar (dashboard) or FAB (active workout) ── -->
+    <!-- ── FAB: add exercise (active workout mode only) ── -->
     @if (activeWorkout()) {
       <button class="add-exercise-fab" (click)="openPicker()" title="Afegir exercici">
         <span class="material-symbols-outlined">add</span>
       </button>
-    } @else {
-      <div class="bottom-bar">
-        @for (cat of workoutTypes; track cat.value) {
-          <button
-            class="type-btn-bar"
-            [class.active]="suggestionType() === cat.value"
-            [style.--cat-color]="cat.color"
-            (click)="selectType(cat.value)"
-          >
-            <span class="material-symbols-outlined type-icon">{{ cat.icon }}</span>
-            <span class="type-label">{{ cat.label }}</span>
-          </button>
-        }
-      </div>
     }
   `,
   styles: [`
-    .page { padding: 0 0 148px; min-height: 100dvh; }
+    .page { padding: 0 0 84px; min-height: 100dvh; }
 
     /* ── Date header (dashboard mode, part of page flow) ── */
     .train-header {
@@ -296,37 +293,28 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       color: white; letter-spacing: 0.3px;
     }
 
-    /* ── Fixed bottom: type bar (dashboard) ── */
-    .bottom-bar {
-      position: fixed;
-      bottom: calc(64px + env(safe-area-inset-bottom) + 12px);
-      left: 12px; right: 12px;
-      z-index: 90;
-      display: flex; align-items: center; gap: 8px;
-      background: white;
-      border-radius: 20px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.08);
-      padding: 8px;
+    /* ── Type grid (inside workout-section) ── */
+    .type-grid {
+      display: flex; gap: 10px;
+      &.type-grid--mt { margin-top: 10px; }
     }
-    .type-btn-bar {
-      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px;
-      padding: 10px 4px 9px;
-      border: 1.5px solid color-mix(in srgb, var(--cat-color) 35%, #e8e8e8);
-      border-radius: 14px;
-      background: white; cursor: pointer;
+    .type-btn {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 7px;
+      padding: 16px 4px 14px;
+      border: 2px solid color-mix(in srgb, var(--cat-color) 40%, #e8e8e8);
+      border-radius: 16px;
+      background: color-mix(in srgb, var(--cat-color) 4%, white);
+      cursor: pointer;
       color: color-mix(in srgb, var(--cat-color) 70%, #444);
       transition: all 0.18s; touch-action: manipulation;
       &:hover {
         border-color: var(--cat-color);
-        background: color-mix(in srgb, var(--cat-color) 6%, white);
+        background: color-mix(in srgb, var(--cat-color) 10%, white);
+        transform: translateY(-1px);
       }
       &:active { transform: scale(0.97); }
-      &.active {
-        border-color: var(--cat-color);
-        background: color-mix(in srgb, var(--cat-color) 10%, white);
-      }
-      .type-icon { font-size: 22px; }
-      .type-label { font-size: 11px; font-weight: 700; letter-spacing: 0.2px; }
+      .type-icon { font-size: 28px; }
+      .type-label { font-size: 11px; font-weight: 700; letter-spacing: 0.2px; text-align: center; }
     }
 
     /* ── Add-exercise FAB (active workout mode) ── */
