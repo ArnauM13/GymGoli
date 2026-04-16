@@ -160,6 +160,33 @@ export class WorkoutService {
     }
   }
 
+  // ── Paginated query ──────────────────────────────────────────────────────
+  async loadWorkoutPage(opts: {
+    page: number;
+    pageSize: number;
+    category?: string;
+    ascending?: boolean;
+  }): Promise<{ workouts: Workout[]; total: number }> {
+    const { page, pageSize, category, ascending = false } = opts;
+    const from = page * pageSize;
+    const to   = from + pageSize - 1;
+
+    const base = this.supabase
+      .from('workouts')
+      .select('*', { count: 'exact' })
+      .eq('user_id', this._uid())
+      .order('date', { ascending });
+
+    const q = category ? base.contains('categories', [category]) : base;
+    const { data, count, error } = await (q as typeof base).range(from, to);
+    if (error) throw error;
+
+    return {
+      workouts: (data ?? []).map(r => toWorkout(r as Record<string, unknown>)),
+      total: count ?? 0,
+    };
+  }
+
   // ── Helpers ──────────────────────────────────────────────────────────────
   todayDateString(): string { return this._todayStr; }
 
