@@ -152,9 +152,27 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
       ═════════════════════════════════════ -->
       @if (viewMode() === 'list') {
 
-        @if (allWorkouts().length > 0) {
+        <!-- ── Filtres i ordenació ── -->
+        <div class="filter-bar">
+          <button class="sort-btn" (click)="sortDesc.set(!sortDesc())" aria-label="Canviar ordre">
+            <span class="material-symbols-outlined">{{ sortDesc() ? 'arrow_downward' : 'arrow_upward' }}</span>
+            {{ sortDesc() ? 'Recents' : 'Antics' }}
+          </button>
+          <div class="filter-divider"></div>
+          <button class="filter-pill" [class.active]="filterCat() === null"
+                  (click)="filterCat.set(null)">Tots</button>
+          @for (cat of ['push','pull','legs']; track cat) {
+            <button class="filter-pill" [class.active]="filterCat() === cat"
+                    [style.--cat]="getCatColor(cat)"
+                    (click)="filterCat.set(filterCat() === cat ? null : cat)">
+              {{ getCatLabel(cat) }}
+            </button>
+          }
+        </div>
+
+        @if (filteredWorkouts().length > 0) {
           <div class="workout-list-wrap">
-            @for (workout of allWorkouts(); track workout.id) {
+            @for (workout of filteredWorkouts(); track workout.id) {
               <div class="workout-card" [class.expanded]="expandedId() === workout.id">
 
                 <!-- Color stripe lateral -->
@@ -216,6 +234,12 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
 
               </div>
             }
+          </div>
+        } @else if (allWorkouts().length > 0) {
+          <!-- Filtre actiu sense resultats -->
+          <div class="filter-empty">
+            <span class="material-symbols-outlined">filter_list_off</span>
+            <p>Cap entrenament amb aquest filtre</p>
           </div>
         } @else {
           <div class="empty-state">
@@ -373,6 +397,38 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
     /* ════════════════════════════════
        LIST MODE
     ════════════════════════════════ */
+    .filter-bar {
+      display: flex; align-items: center; gap: 6px;
+      padding: 0 16px 12px; overflow-x: auto;
+      scrollbar-width: none; &::-webkit-scrollbar { display: none; }
+    }
+    .sort-btn {
+      display: flex; align-items: center; gap: 3px; flex-shrink: 0;
+      padding: 7px 11px; border-radius: 10px;
+      border: 1.5px solid #e0e0e0; background: #f7f7f7;
+      font-size: 12px; font-weight: 600; color: #555;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 14px; }
+      &:hover { background: #efefef; }
+    }
+    .filter-divider {
+      width: 1px; height: 20px; background: #e8e8e8; flex-shrink: 0; margin: 0 2px;
+    }
+    .filter-pill {
+      flex-shrink: 0; padding: 7px 13px; border-radius: 20px;
+      border: 1.5px solid #e8e8e8; background: transparent;
+      font-size: 12px; font-weight: 600; color: #888;
+      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+      &.active { background: var(--cat, #006874); color: white; border-color: var(--cat, #006874); }
+      &:not(.active):hover { background: rgba(0,0,0,0.04); color: #555; }
+    }
+    .filter-empty {
+      display: flex; align-items: center; justify-content: center; flex-direction: column;
+      gap: 8px; padding: 32px 24px; color: #bbb;
+      .material-symbols-outlined { font-size: 36px; }
+      p { margin: 0; font-size: 14px; }
+    }
+
     .workout-list-wrap {
       display: flex; flex-direction: column; gap: 1px;
       margin: 4px 16px 0;
@@ -477,7 +533,22 @@ export class HistoryComponent {
   readonly expandedId   = signal<string | null>(null);
   readonly selectedExerciseId = signal<string | null>(null);
 
+  readonly sortDesc  = signal(true);
+  readonly filterCat = signal<string | null>(null);
+
   readonly allWorkouts = this.workoutService.workouts;
+
+  readonly filteredWorkouts = computed(() => {
+    const cat = this.filterCat();
+    let list = this.allWorkouts(); // already sorted desc by service
+    if (cat) {
+      list = list.filter(w => {
+        const cats = w.categories?.length ? w.categories : (w.category ? [w.category] : []);
+        return cats.includes(cat);
+      });
+    }
+    return this.sortDesc() ? list : [...list].reverse();
+  });
 
   readonly selectedWorkout = computed(() => {
     const d = this.selectedDate();
