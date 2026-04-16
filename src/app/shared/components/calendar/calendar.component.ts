@@ -42,12 +42,36 @@ interface CalDay {
         </button>
       </div>
 
-      <!-- ── View toggle: small pills ── -->
-      <div class="cal-view-row">
-        <button class="cal-view-pill" [class.active]="view() === 'week'"
-                (click)="view.set('week')">Setmana</button>
-        <button class="cal-view-pill" [class.active]="view() === 'month'"
-                (click)="view.set('month')">Mes</button>
+      <!-- ── Icon row: view toggle + today nav ── -->
+      <div class="cal-icon-row">
+        <!-- View toggle -->
+        <div class="cal-icon-wrap">
+          <button class="cal-icon-btn"
+                  (click)="handleViewClick()"
+                  (mousedown)="startLongPress('view')" (mouseup)="endLongPress()" (mouseleave)="endLongPress()"
+                  (touchstart)="startLongPress('view')" (touchend)="endLongPress()" (touchcancel)="endLongPress()" (touchmove)="cancelLongPress()">
+            {{ view() === 'week' ? '📅' : '🗓️' }}
+          </button>
+          @if (tooltip() === 'view') {
+            <div class="cal-tooltip">
+              {{ view() === 'week' ? 'Vista setmanal · toca per canviar a mensual' : 'Vista mensual · toca per canviar a setmanal' }}
+            </div>
+          }
+        </div>
+        <!-- Go to today -->
+        @if (!isShowingCurrent()) {
+          <div class="cal-icon-wrap">
+            <button class="cal-icon-btn"
+                    (click)="handleTodayClick()"
+                    (mousedown)="startLongPress('today')" (mouseup)="endLongPress()" (mouseleave)="endLongPress()"
+                    (touchstart)="startLongPress('today')" (touchend)="endLongPress()" (touchcancel)="endLongPress()" (touchmove)="cancelLongPress()">
+              🏠
+            </button>
+            @if (tooltip() === 'today') {
+              <div class="cal-tooltip">Torna al període actual</div>
+            }
+          </div>
+        }
       </div>
 
       @if (isLoading()) {
@@ -123,17 +147,11 @@ interface CalDay {
       }
 
       <!-- ── Footer ── -->
-      <div class="cal-footer">
-        @if (!isShowingCurrent()) {
-          <button class="cal-today-nav" (click)="goToToday()">
-            <span class="material-symbols-outlined">arrow_forward</span>
-            Avui
-          </button>
-        }
-        @if (isDialog) {
+      @if (isDialog) {
+        <div class="cal-footer">
           <button class="cal-select-today" (click)="selectDay(todayStr)">Avui</button>
-        }
-      </div>
+        </div>
+      }
 
     </div>
   `,
@@ -166,18 +184,32 @@ interface CalDay {
       .material-symbols-outlined { font-size: 22px; }
     }
 
-    /* ── View toggle pills ── */
-    .cal-view-row {
+    /* ── Icon row ── */
+    .cal-icon-row {
       display: flex; align-items: center; justify-content: center; gap: 4px;
       padding: 0 8px 8px;
     }
-    .cal-view-pill {
-      padding: 6px 14px; border-radius: 14px;
-      border: 1.5px solid #e8e8e8; background: transparent;
-      font-size: 11px; font-weight: 600; color: #999;
-      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      &.active { background: #006874; color: white; border-color: #006874; }
-      &:not(.active):hover { background: rgba(0,104,116,0.06); color: #006874; border-color: rgba(0,104,116,0.2); }
+    .cal-icon-wrap { position: relative; }
+    .cal-icon-btn {
+      width: 44px; height: 44px; border: none; background: transparent;
+      border-radius: 50%; cursor: pointer; font-size: 22px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s; touch-action: manipulation;
+      -webkit-user-select: none; user-select: none;
+      &:hover { background: rgba(0,0,0,0.06); }
+      &:active { background: rgba(0,0,0,0.1); }
+    }
+    .cal-tooltip {
+      position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+      background: rgba(30,30,30,0.88); color: white; backdrop-filter: blur(4px);
+      font-size: 12px; font-weight: 500; white-space: nowrap;
+      padding: 6px 12px; border-radius: 10px;
+      pointer-events: none; z-index: 20;
+      animation: tooltip-in 0.15s ease;
+    }
+    @keyframes tooltip-in {
+      from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
 
     /* ── Loading bar ── */
@@ -282,18 +314,8 @@ interface CalDay {
 
     /* ── Footer ── */
     .cal-footer {
-      display: flex; align-items: center; justify-content: flex-end; gap: 6px;
+      display: flex; align-items: center; justify-content: flex-end;
       padding: 2px 12px 12px;
-    }
-
-    .cal-today-nav {
-      display: flex; align-items: center; gap: 5px;
-      padding: 8px 14px; border-radius: 16px;
-      border: 1.5px solid #e0e0e0; background: #f7f7f7;
-      font-size: 13px; font-weight: 600; color: #666;
-      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      .material-symbols-outlined { font-size: 16px; }
-      &:hover { background: #efefef; }
     }
     .cal-select-today {
       padding: 8px 18px; border-radius: 16px;
@@ -314,7 +336,10 @@ export class CalendarComponent {
   readonly dateSelected = output<string>();
 
   // ── View ──────────────────────────────────────────────────────────────────
-  readonly view = signal<'week' | 'month'>('week');
+  readonly view    = signal<'week' | 'month'>('week');
+  readonly tooltip = signal<'view' | 'today' | null>(null);
+  private _lpTimer: ReturnType<typeof setTimeout> | null = null;
+  private _lpFired = false;
 
   // ── Month state ───────────────────────────────────────────────────────────
   readonly calYear  = signal(new Date().getFullYear());
@@ -426,6 +451,40 @@ export class CalendarComponent {
     this.calYear.set(now.getFullYear());
     this.calMonth.set(now.getMonth());
     this.weekStart.set(this._mondayOf(this.todayStr));
+  }
+
+  toggleView(): void {
+    this.view.set(this.view() === 'week' ? 'month' : 'week');
+  }
+
+  handleViewClick(): void {
+    if (this._lpFired) { this._lpFired = false; return; }
+    this.toggleView();
+  }
+
+  handleTodayClick(): void {
+    if (this._lpFired) { this._lpFired = false; return; }
+    this.goToToday();
+  }
+
+  startLongPress(which: 'view' | 'today'): void {
+    this._lpFired = false;
+    this._lpTimer = setTimeout(() => {
+      this._lpFired = true;
+      this.tooltip.set(which);
+    }, 600);
+  }
+
+  endLongPress(): void {
+    if (this._lpTimer) { clearTimeout(this._lpTimer); this._lpTimer = null; }
+    if (this.tooltip() !== null) {
+      setTimeout(() => this.tooltip.set(null), 1800);
+    }
+  }
+
+  cancelLongPress(): void {
+    if (this._lpTimer) { clearTimeout(this._lpTimer); this._lpTimer = null; }
+    this.tooltip.set(null);
   }
 
   // ── Week days ─────────────────────────────────────────────────────────────
