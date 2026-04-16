@@ -28,7 +28,7 @@ interface CalDay {
   template: `
     <div class="calendar-card">
 
-      <!-- ── Header: navigation only ── -->
+      <!-- ── Header: navigation + utility icons ── -->
       <div class="cal-header">
         <button class="cal-nav-btn" (click)="navigateBack()" aria-label="Anterior">
           <span class="material-symbols-outlined">chevron_left</span>
@@ -40,38 +40,40 @@ interface CalDay {
                 [disabled]="!canNavForward()" aria-label="Següent">
           <span class="material-symbols-outlined">chevron_right</span>
         </button>
-      </div>
 
-      <!-- ── Icon row: view toggle + today nav ── -->
-      <div class="cal-icon-row">
-        <!-- View toggle -->
-        <div class="cal-icon-wrap">
-          <button class="cal-icon-btn"
-                  (click)="handleViewClick()"
-                  (mousedown)="startLongPress('view')" (mouseup)="endLongPress()" (mouseleave)="endLongPress()"
-                  (touchstart)="startLongPress('view')" (touchend)="endLongPress()" (touchcancel)="endLongPress()" (touchmove)="cancelLongPress()">
-            {{ view() === 'week' ? '📅' : '🗓️' }}
-          </button>
-          @if (tooltip() === 'view') {
-            <div class="cal-tooltip">
-              {{ view() === 'week' ? 'Vista setmanal · toca per canviar a mensual' : 'Vista mensual · toca per canviar a setmanal' }}
+        <div class="cal-util-group">
+          <!-- View toggle -->
+          <div class="cal-icon-wrap">
+            <button class="cal-util-btn"
+                    [class.active]="false"
+                    (click)="handleViewClick()"
+                    (mousedown)="startLongPress('view')" (mouseup)="endLongPress()" (mouseleave)="endLongPress()"
+                    (touchstart)="startLongPress('view')" (touchend)="endLongPress()" (touchcancel)="endLongPress()" (touchmove)="cancelLongPress()">
+              <span class="material-symbols-outlined">
+                {{ view() === 'week' ? 'calendar_view_month' : 'calendar_view_week' }}
+              </span>
+            </button>
+            @if (tooltip() === 'view') {
+              <div class="cal-tooltip">
+                {{ view() === 'week' ? 'Vista setmanal · toca per canviar a mensual' : 'Vista mensual · toca per canviar a setmanal' }}
+              </div>
+            }
+          </div>
+          <!-- Go to today -->
+          @if (!isShowingCurrent()) {
+            <div class="cal-icon-wrap">
+              <button class="cal-util-btn"
+                      (click)="handleTodayClick()"
+                      (mousedown)="startLongPress('today')" (mouseup)="endLongPress()" (mouseleave)="endLongPress()"
+                      (touchstart)="startLongPress('today')" (touchend)="endLongPress()" (touchcancel)="endLongPress()" (touchmove)="cancelLongPress()">
+                <span class="material-symbols-outlined">today</span>
+              </button>
+              @if (tooltip() === 'today') {
+                <div class="cal-tooltip">Torna al període actual</div>
+              }
             </div>
           }
         </div>
-        <!-- Go to today -->
-        @if (!isShowingCurrent()) {
-          <div class="cal-icon-wrap">
-            <button class="cal-icon-btn"
-                    (click)="handleTodayClick()"
-                    (mousedown)="startLongPress('today')" (mouseup)="endLongPress()" (mouseleave)="endLongPress()"
-                    (touchstart)="startLongPress('today')" (touchend)="endLongPress()" (touchcancel)="endLongPress()" (touchmove)="cancelLongPress()">
-              🏠
-            </button>
-            @if (tooltip() === 'today') {
-              <div class="cal-tooltip">Torna al període actual</div>
-            }
-          </div>
-        }
       </div>
 
       @if (isLoading()) {
@@ -165,7 +167,7 @@ interface CalDay {
     /* ── Header ── */
     .cal-header {
       display: flex; align-items: center;
-      padding: 12px 8px 8px; gap: 2px;
+      padding: 10px 8px 8px; gap: 2px;
     }
 
     .cal-period-label {
@@ -184,23 +186,24 @@ interface CalDay {
       .material-symbols-outlined { font-size: 22px; }
     }
 
-    /* ── Icon row ── */
-    .cal-icon-row {
-      display: flex; align-items: center; justify-content: center; gap: 4px;
-      padding: 0 8px 8px;
+    /* ── Utility icon group (right side of header) ── */
+    .cal-util-group {
+      display: flex; align-items: center; gap: 0;
+      margin-left: 4px; flex-shrink: 0;
     }
     .cal-icon-wrap { position: relative; }
-    .cal-icon-btn {
-      width: 44px; height: 44px; border: none; background: transparent;
-      border-radius: 50%; cursor: pointer; font-size: 22px;
+    .cal-util-btn {
+      width: 34px; height: 34px; border: none; background: transparent;
+      border-radius: 50%; cursor: pointer; color: #888; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.15s; touch-action: manipulation;
       -webkit-user-select: none; user-select: none;
-      &:hover { background: rgba(0,0,0,0.06); }
+      .material-symbols-outlined { font-size: 20px; }
+      &:hover { background: rgba(0,0,0,0.06); color: #006874; }
       &:active { background: rgba(0,0,0,0.1); }
     }
     .cal-tooltip {
-      position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+      position: absolute; top: calc(100% + 6px); right: 0;
       background: rgba(30,30,30,0.88); color: white; backdrop-filter: blur(4px);
       font-size: 12px; font-weight: 500; white-space: nowrap;
       padding: 6px 12px; border-radius: 10px;
@@ -208,8 +211,8 @@ interface CalDay {
       animation: tooltip-in 0.15s ease;
     }
     @keyframes tooltip-in {
-      from { opacity: 0; transform: translateX(-50%) translateY(4px); }
-      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
 
     /* ── Loading bar ── */
