@@ -45,6 +45,13 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
           <app-calendar [selectedDate]="selectedDate()" (dateSelected)="selectDate($event)" />
         </div>
 
+        @if (!selectedDate()) {
+          <div class="select-day-hint">
+            <span class="material-symbols-outlined">touch_app</span>
+            Selecciona un dia per veure el detall
+          </div>
+        }
+
         @if (selectedDate()) {
           <div class="detail-section">
 
@@ -440,6 +447,15 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
       .set-reps { color: #666; }
     }
     .no-sets { font-size: 12px; color: #bbb; font-style: italic; padding-left: 15px; }
+
+    /* ── Select-day hint ── */
+    .select-day-hint {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      margin: 0 16px 12px; padding: 12px 16px;
+      background: rgba(0,104,116,0.06); border-radius: 12px;
+      font-size: 13px; font-weight: 500; color: #006874;
+      .material-symbols-outlined { font-size: 17px; }
+    }
 
     /* ── Empty state ── */
     .empty-state {
