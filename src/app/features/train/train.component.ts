@@ -611,9 +611,11 @@ export class TrainComponent {
   );
 
   readonly expandedSports = computed(() =>
-    this.expandedSportIds()
-      .map(id => this.sportService.sports().find(s => s.id === id))
-      .filter((s): s is NonNullable<typeof s> => !!s)
+    this.sportService.sports().filter(s => {
+      if (!s.subtypes?.length) return false;
+      if (this.expandedSportIds().includes(s.id)) return true;
+      return !!this.sportService.getSessionForDate(this.selectedDate(), s.id)?.subtypeId;
+    })
   );
 
   getSubtypeIdForSport(sportId: string): string | null {
