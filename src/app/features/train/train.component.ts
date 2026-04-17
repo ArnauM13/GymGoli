@@ -181,16 +181,11 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             @for (sport of expandedSports(); track sport.id) {
               <div class="subtype-row">
                 <span class="subtype-row-label">{{ sport.name }}:</span>
-                <button
-                  class="subtype-chip"
-                  [class.active]="!getSubtypeIdForSport(sport.id)"
-                  (click)="selectSubtype(null, sport.id)"
-                >Cap</button>
                 @for (sub of sport.subtypes; track sub.id) {
                   <button
                     class="subtype-chip"
                     [class.active]="getSubtypeIdForSport(sport.id) === sub.id"
-                    (click)="selectSubtype(sub.id, sport.id)"
+                    (click)="selectSubtype(getSubtypeIdForSport(sport.id) === sub.id ? null : sub.id, sport.id)"
                   >{{ sub.name }}</button>
                 }
               </div>
