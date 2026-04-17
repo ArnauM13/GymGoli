@@ -178,19 +178,19 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               }
             </div>
 
-            @if (expandedSport(); as sport) {
+            @for (sport of expandedSports(); track sport.id) {
               <div class="subtype-row">
                 <span class="subtype-row-label">{{ sport.name }}:</span>
                 <button
                   class="subtype-chip"
-                  [class.active]="!activeSubtypeId()"
-                  (click)="selectSubtype(null)"
+                  [class.active]="!getSubtypeIdForSport(sport.id)"
+                  (click)="selectSubtype(null, sport.id)"
                 >Cap</button>
                 @for (sub of sport.subtypes; track sub.id) {
                   <button
                     class="subtype-chip"
-                    [class.active]="activeSubtypeId() === sub.id"
-                    (click)="selectSubtype(sub.id)"
+                    [class.active]="getSubtypeIdForSport(sport.id) === sub.id"
+                    (click)="selectSubtype(sub.id, sport.id)"
                   >{{ sub.name }}</button>
                 }
               </div>
@@ -588,7 +588,7 @@ export class TrainComponent {
   readonly sportToggling   = signal(false);
   readonly workoutTypes    = WORKOUT_TYPES;
   readonly activeWorkoutId = signal<string | null>(null);
-  readonly expandedSportId = signal<string | null>(null);
+  readonly expandedSportIds = signal<string[]>([]);
   readonly creating        = signal(false);
 
   readonly isToday = computed(() => this.selectedDate() === TODAY());
@@ -615,16 +615,15 @@ export class TrainComponent {
       .filter((t): t is typeof WORKOUT_TYPES[0] => !!t)
   );
 
-  readonly expandedSport = computed(() => {
-    const id = this.expandedSportId();
-    return id ? this.sportService.sports().find(s => s.id === id) ?? null : null;
-  });
+  readonly expandedSports = computed(() =>
+    this.expandedSportIds()
+      .map(id => this.sportService.sports().find(s => s.id === id))
+      .filter((s): s is NonNullable<typeof s> => !!s)
+  );
 
-  readonly activeSubtypeId = computed(() => {
-    const sportId = this.expandedSportId();
-    if (!sportId) return null;
+  getSubtypeIdForSport(sportId: string): string | null {
     return this.sportService.getSessionForDate(this.selectedDate(), sportId)?.subtypeId ?? null;
-  });
+  }
 
   readonly dateLabel = computed(() => {
     const d = new Date(this.selectedDate() + 'T12:00:00');
@@ -671,7 +670,7 @@ export class TrainComponent {
       this.workoutService.ensureMonthLoaded(year, month);
       this.sportService.ensureMonthLoaded(year, month);
       untracked(() => {
-        this.expandedSportId.set(null);
+        this.expandedSportIds.set([]);
         this.activeWorkoutId.set(null);
         this.suggestionType.set(null);
       });
@@ -851,9 +850,11 @@ export class TrainComponent {
       await this.sportService.toggleSport(this.selectedDate(), sportId);
       if (!wasActive) {
         const sport = this.sportService.sports().find(s => s.id === sportId);
-        if (sport?.subtypes?.length) this.expandedSportId.set(sportId);
-      } else if (this.expandedSportId() === sportId) {
-        this.expandedSportId.set(null);
+        if (sport?.subtypes?.length) {
+          this.expandedSportIds.update(ids => [...ids, sportId]);
+        }
+      } else {
+        this.expandedSportIds.update(ids => ids.filter(id => id !== sportId));
       }
     } catch {
       this.snackBar.open('Error en guardar l\'esport', '', { duration: 2500 });
@@ -862,9 +863,7 @@ export class TrainComponent {
     }
   }
 
-  async selectSubtype(subtypeId: string | null): Promise<void> {
-    const sportId = this.expandedSportId();
-    if (!sportId) return;
+  async selectSubtype(subtypeId: string | null, sportId: string): Promise<void> {
     const session = this.sportService.getSessionForDate(this.selectedDate(), sportId);
     if (!session) return;
     try {
