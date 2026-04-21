@@ -164,7 +164,8 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
             <!-- Type buttons -->
             @if (!suggestionType()) {
-              <div class="type-grid" [class.type-grid--mt]="dateWorkouts().length > 0">
+              <div class="type-grid" [class.type-grid--mt]="dateWorkouts().length > 0"
+                   [style.grid-template-columns]="gridCols(workoutTypes.length)">
                 @for (cat of workoutTypes; track cat.value) {
                   <button class="type-btn" [style.--cat-color]="cat.color" (click)="selectType(cat.value)">
                     <span class="material-symbols-outlined type-icon">{{ cat.icon }}</span>
@@ -181,7 +182,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               <span class="material-symbols-outlined sports-header-icon">sports_soccer</span>
               <h2 class="sports-title">Esports</h2>
             </div>
-            <div class="sports-grid">
+            <div class="sports-grid" [style.grid-template-columns]="gridCols(sportService.sports().length)">
               @for (sport of sportService.sports(); track sport.id) {
                 <button
                   class="sport-btn"
@@ -356,11 +357,11 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     /* ── Type grid (inside workout-section) ── */
     .type-grid {
-      display: flex; gap: 10px;
+      display: grid; gap: 10px;
       &.type-grid--mt { margin-top: 10px; }
     }
     .type-btn {
-      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 7px;
+      display: flex; flex-direction: column; align-items: center; gap: 7px;
       padding: 16px 4px 14px;
       border: 2px solid color-mix(in srgb, var(--cat-color) 40%, #e8e8e8);
       border-radius: 16px;
@@ -501,12 +502,11 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
 
     .sports-grid {
-      display: flex; gap: 10px;
+      display: grid; gap: 10px;
     }
 
     .sport-btn {
       position: relative;
-      flex: 1;
       display: flex; flex-direction: column; align-items: center; gap: 7px;
       padding: 16px 4px 14px;
       border: 1.5px solid color-mix(in srgb, var(--sport-color) 30%, #e8e8e8);
@@ -750,6 +750,10 @@ export class TrainComponent {
     const colors = cats.map(c => CATEGORY_COLORS[c as ExerciseCategory] ?? '#006874');
     const step = 100 / colors.length;
     return `linear-gradient(180deg, ${colors.map((c, i) => `${c} ${i * step}%, ${c} ${(i + 1) * step}%`).join(', ')})`;
+  }
+
+  gridCols(count: number): string {
+    return `repeat(${count % 2 === 0 ? 2 : 3}, 1fr)`;
   }
 
   workoutPrimaryColor(w: Workout): string {
