@@ -71,8 +71,41 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           (dateSelected)="selectedDate.set($event)"
         />
 
-        <!-- ── Loading ── -->
-        @if ((workoutService.isLoading() && dateWorkouts().length === 0) || creating()) {
+        <!-- ── Skeleton (initial data load) ── -->
+        @if (workoutService.isLoading() && dateWorkouts().length === 0 && !creating()) {
+          <div class="sk-workout-section">
+            <div class="sk-section-header">
+              <div class="sk sk-icon-ph"></div>
+              <div class="sk sk-title-ph"></div>
+            </div>
+            <div class="sk-card-ph">
+              <div class="sk sk-card-bar"></div>
+              <div class="sk-card-body">
+                <div class="sk sk-line sk-line--55"></div>
+                <div class="sk sk-line sk-line--30"></div>
+              </div>
+            </div>
+            <div class="sk-btn-grid">
+              <div class="sk sk-btn-ph"></div>
+              <div class="sk sk-btn-ph"></div>
+              <div class="sk sk-btn-ph"></div>
+            </div>
+          </div>
+          <div class="sk-sports-section">
+            <div class="sk-section-header">
+              <div class="sk sk-icon-ph"></div>
+              <div class="sk sk-title-ph"></div>
+            </div>
+            <div class="sk-btn-grid">
+              <div class="sk sk-btn-ph"></div>
+              <div class="sk sk-btn-ph"></div>
+              <div class="sk sk-btn-ph"></div>
+            </div>
+          </div>
+        }
+
+        <!-- ── Creating spinner (brief, while new workout is being saved) ── -->
+        @if (creating()) {
           <div class="loading-state">
             <span class="material-symbols-outlined spin">sync</span>
           </div>
@@ -521,6 +554,46 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       }
       &:hover:not(.active) { border-color: #006874; color: #006874; }
     }
+
+    /* ── Skeleton screens ── */
+    @keyframes sk-shimmer {
+      from { background-position: -300px 0; }
+      to   { background-position: calc(300px + 100%) 0; }
+    }
+    .sk {
+      background: linear-gradient(90deg, #f0f0f0 0%, #e8e8e8 40%, #f0f0f0 80%);
+      background-size: 600px 100%;
+      animation: sk-shimmer 1.5s ease-in-out infinite;
+      border-radius: 8px;
+    }
+    .sk-workout-section, .sk-sports-section {
+      margin: 12px 16px 0;
+      padding: 14px 14px 16px;
+      background: white;
+      border-radius: 18px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+    }
+    .sk-section-header {
+      display: flex; align-items: center; gap: 7px;
+      margin-bottom: 14px;
+    }
+    .sk-icon-ph  { width: 18px; height: 18px; border-radius: 4px; flex-shrink: 0; }
+    .sk-title-ph { width: 90px; height: 13px; }
+    .sk-card-ph {
+      display: flex; align-items: stretch;
+      border: 1.5px solid #f0f0f0; border-radius: 14px;
+      overflow: hidden; margin-bottom: 12px;
+    }
+    .sk-card-bar { width: 5px; min-height: 52px; flex-shrink: 0; border-radius: 0; }
+    .sk-card-body {
+      flex: 1; padding: 10px;
+      display: flex; flex-direction: column; gap: 7px;
+    }
+    .sk-line      { height: 12px; }
+    .sk-line--55  { width: 55%; }
+    .sk-line--30  { width: 30%; height: 10px; }
+    .sk-btn-grid  { display: flex; gap: 10px; }
+    .sk-btn-ph    { flex: 1; height: 74px; border-radius: 16px; }
 
     @keyframes spin {
       from { transform: rotate(0deg); }
