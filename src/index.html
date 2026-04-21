@@ -20,31 +20,27 @@
   <app-root></app-root>
   <div id="app-loader">
     <img src="assets/bibis.png" class="al-logo" alt="GymGoli">
-    <div class="al-spinner"></div>
   </div>
   <style>
     #app-loader {
       position: fixed; inset: 0;
       background: #ffffff;
-      display: flex; flex-direction: column;
+      display: flex;
       align-items: center; justify-content: center;
-      gap: 28px; z-index: 9999;
-      transition: opacity 0.45s ease;
+      z-index: 9999;
+      transition: opacity 0.3s ease;
     }
     #app-loader.hiding { opacity: 0; pointer-events: none; }
     .al-logo {
       width: 76px; height: 76px;
       border-radius: 22px;
       box-shadow: 0 4px 20px rgba(0,104,116,0.18);
+      animation: al-pulse 1.8s ease-in-out infinite;
     }
-    .al-spinner {
-      width: 28px; height: 28px;
-      border: 3px solid #e8f4f5;
-      border-top-color: #006874;
-      border-radius: 50%;
-      animation: al-spin 0.75s linear infinite;
+    @keyframes al-pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.7; transform: scale(0.93); }
     }
-    @keyframes al-spin { to { transform: rotate(360deg); } }
   </style>
 </body>
 </html>

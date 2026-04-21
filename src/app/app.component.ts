@@ -163,14 +163,10 @@ export class AppComponent {
   constructor() {
     effect(() => {
       if (this.auth.user() === undefined) return;
-      const iconFont = document.fonts.load('24px "Material Symbols Outlined"');
-      const maxWait  = new Promise<void>(resolve => setTimeout(resolve, 3000));
-      Promise.race([iconFont, maxWait]).then(() => {
-        const loader = document.getElementById('app-loader');
-        if (!loader) return;
-        loader.classList.add('hiding');
-        setTimeout(() => loader.remove(), 450);
-      });
+      const loader = document.getElementById('app-loader');
+      if (!loader) return;
+      loader.classList.add('hiding');
+      setTimeout(() => loader.remove(), 300);
     });
   }
 
