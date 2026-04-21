@@ -163,10 +163,12 @@ export class AppComponent {
   constructor() {
     effect(() => {
       if (this.auth.user() === undefined) return;
-      const loader = document.getElementById('app-loader');
-      if (!loader) return;
-      loader.classList.add('hiding');
-      setTimeout(() => loader.remove(), 450);
+      document.fonts.ready.then(() => {
+        const loader = document.getElementById('app-loader');
+        if (!loader) return;
+        loader.classList.add('hiding');
+        setTimeout(() => loader.remove(), 450);
+      });
     });
   }
 
