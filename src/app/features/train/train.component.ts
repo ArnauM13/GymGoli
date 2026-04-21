@@ -231,8 +231,10 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     <!-- ── Bottom bar: quick-open last workout (dashboard, when workout exists) ── -->
     @if (!activeWorkout() && dateWorkouts().length > 0) {
       <div class="bottom-bar">
-        <button class="bar-shortcut" (click)="openWorkout(dateWorkouts()[0].id)">
-          <div class="bar-shortcut-color" [style.background]="workoutCardColor(dateWorkouts()[0])"></div>
+        <button class="bar-shortcut"
+                [style.--wc]="workoutPrimaryColor(dateWorkouts()[0])"
+                (click)="openWorkout(dateWorkouts()[0].id)">
+          <span class="material-symbols-outlined bar-shortcut-icon">fitness_center</span>
           <div class="bar-shortcut-info">
             <span class="bar-shortcut-label">{{ workoutLabel(dateWorkouts()[0]) }}</span>
             <span class="bar-shortcut-detail">
@@ -240,7 +242,10 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               @if (workoutSetsCount(dateWorkouts()[0]); as n) { · {{ n }} sèr }
             </span>
           </div>
-          <span class="material-symbols-outlined bar-shortcut-arrow">arrow_forward_ios</span>
+          <div class="bar-shortcut-open">
+            <span class="bar-shortcut-open-text">Obrir</span>
+            <span class="material-symbols-outlined bar-shortcut-arrow">arrow_forward_ios</span>
+          </div>
         </button>
       </div>
     }
@@ -303,36 +308,51 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     /* ── Bottom bar: last workout shortcut ── */
     .bottom-bar {
       position: fixed;
-      bottom: calc(64px + env(safe-area-inset-bottom) + 12px);
+      bottom: calc(64px + env(safe-area-inset-bottom) + 10px);
       left: 12px; right: 12px;
       z-index: 90;
-      display: flex; align-items: center;
-      background: white;
-      border-radius: 20px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.08);
-      padding: 4px;
+      border-radius: 22px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.1);
+      animation: bar-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes bar-in {
+      from { transform: translateY(14px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
     }
     .bar-shortcut {
-      flex: 1; display: flex; align-items: center; gap: 10px;
-      border: none; background: transparent; border-radius: 16px;
-      padding: 8px 10px 8px 0; cursor: pointer; touch-action: manipulation;
-      transition: background 0.15s;
-      &:hover { background: rgba(0,0,0,0.04); }
+      width: 100%; display: flex; align-items: center; gap: 12px;
+      border: 2px solid color-mix(in srgb, var(--wc) 22%, #e0e0e0);
+      background: color-mix(in srgb, var(--wc) 10%, white);
+      border-radius: 22px;
+      padding: 14px 16px;
+      cursor: pointer; touch-action: manipulation;
+      transition: background 0.15s, transform 0.1s;
+      &:hover  { background: color-mix(in srgb, var(--wc) 16%, white); }
+      &:active { transform: scale(0.98); }
     }
-    .bar-shortcut-color {
-      width: 5px; align-self: stretch; flex-shrink: 0;
-      border-radius: 4px; min-height: 36px;
+    .bar-shortcut-icon {
+      font-size: 26px; flex-shrink: 0;
+      color: var(--wc);
+      font-variation-settings: 'FILL' 1, 'wght' 400;
     }
     .bar-shortcut-info {
       flex: 1; min-width: 0;
-      display: flex; flex-direction: column; gap: 1px;
+      display: flex; flex-direction: column; gap: 2px;
     }
     .bar-shortcut-label {
-      font-size: 13px; font-weight: 700; color: #1a1a1a;
+      font-size: 15px; font-weight: 800; color: #1a1a1a;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .bar-shortcut-detail { font-size: 11px; color: #999; }
-    .bar-shortcut-arrow { font-size: 14px; color: #ccc; flex-shrink: 0; }
+    .bar-shortcut-detail { font-size: 12px; font-weight: 500; color: #777; }
+    .bar-shortcut-open {
+      display: flex; flex-direction: column; align-items: center; gap: 1px;
+      flex-shrink: 0; color: var(--wc);
+    }
+    .bar-shortcut-open-text {
+      font-size: 9px; font-weight: 800; letter-spacing: 0.6px;
+      text-transform: uppercase; line-height: 1;
+    }
+    .bar-shortcut-arrow { font-size: 15px; flex-shrink: 0; }
 
     /* ── Type grid (inside workout-section) ── */
     .type-grid {
@@ -730,6 +750,11 @@ export class TrainComponent {
     const colors = cats.map(c => CATEGORY_COLORS[c as ExerciseCategory] ?? '#006874');
     const step = 100 / colors.length;
     return `linear-gradient(180deg, ${colors.map((c, i) => `${c} ${i * step}%, ${c} ${(i + 1) * step}%`).join(', ')})`;
+  }
+
+  workoutPrimaryColor(w: Workout): string {
+    const cats = w.categories?.length ? w.categories : (w.category ? [w.category] : []);
+    return cats.length ? (CATEGORY_COLORS[cats[0] as ExerciseCategory] ?? '#006874') : '#006874';
   }
 
   workoutSetsCount(w: Workout): number {
