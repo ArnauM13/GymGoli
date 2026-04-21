@@ -163,7 +163,9 @@ export class AppComponent {
   constructor() {
     effect(() => {
       if (this.auth.user() === undefined) return;
-      document.fonts.ready.then(() => {
+      const iconFont = document.fonts.load('24px "Material Symbols Outlined"');
+      const maxWait  = new Promise<void>(resolve => setTimeout(resolve, 3000));
+      Promise.race([iconFont, maxWait]).then(() => {
         const loader = document.getElementById('app-loader');
         if (!loader) return;
         loader.classList.add('hiding');
