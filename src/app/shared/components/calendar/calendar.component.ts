@@ -1,26 +1,12 @@
 import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
-import { CATEGORY_COLORS, ExerciseCategory } from '../../../core/models/exercise.model';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { SportService } from '../../../core/services/sport.service';
-
-const MONTHS_CA = [
-  'Gener','Febrer','Març','Abril','Maig','Juny',
-  'Juliol','Agost','Setembre','Octubre','Novembre','Desembre',
-];
-const MONTHS_SHORT = [
-  'gen','feb','mar','abr','mai','jun','jul','ago','set','oct','nov','des',
-];
-
-interface CalDay {
-  date: string; day: number;
-  hasWorkout: boolean;
-  workoutCategories: string[];
-  hasSport: boolean;
-  sportColors: string[];
-  isToday: boolean; isFuture: boolean; isSelected: boolean;
-}
+import {
+  MONTHS_CA, MONTHS_SHORT, CalDay,
+  mondayOf, addDays, catDotBackground, sportDotBackground,
+} from '../../utils/calendar-utils';
 
 @Component({
   selector: 'app-calendar',
@@ -349,7 +335,7 @@ export class CalendarComponent {
   readonly calMonth = signal(new Date().getMonth());
 
   // ── Week state ────────────────────────────────────────────────────────────
-  readonly weekStart = signal<string>(this._mondayOf(new Date().toISOString().split('T')[0]));
+  readonly weekStart = signal<string>(mondayOf(new Date().toISOString().split('T')[0]));
 
   readonly dayNames = ['dl', 'dm', 'dc', 'dj', 'dv', 'ds', 'dg'];
   readonly isLoading = this.workoutService.isLoading;
@@ -367,7 +353,7 @@ export class CalendarComponent {
         const [y, m] = date.split('-').map(Number);
         this.calYear.set(y);
         this.calMonth.set(m - 1);
-        this.weekStart.set(this._mondayOf(date));
+        this.weekStart.set(mondayOf(date));
       }
     }, { allowSignalWrites: true });
 
@@ -378,7 +364,7 @@ export class CalendarComponent {
         this.sportService.ensureMonthLoaded(this.calYear(), this.calMonth());
       } else {
         const monday = this.weekStart();
-        const sunday = this._addDays(monday, 6);
+        const sunday = addDays(monday, 6);
         const [my, mm] = monday.split('-').map(Number);
         const [sy, sm] = sunday.split('-').map(Number);
         this.workoutService.ensureMonthLoaded(my, mm - 1);
@@ -397,7 +383,7 @@ export class CalendarComponent {
       return `${MONTHS_CA[this.calMonth()]} ${this.calYear()}`;
     }
     const monday = this.weekStart();
-    const sunday = this._addDays(monday, 6);
+    const sunday = addDays(monday, 6);
     const mDate  = new Date(monday + 'T12:00:00');
     const sDate  = new Date(sunday  + 'T12:00:00');
     const mDay   = mDate.getDate();
@@ -417,7 +403,7 @@ export class CalendarComponent {
       return this.calYear() < now.getFullYear() ||
         (this.calYear() === now.getFullYear() && this.calMonth() < now.getMonth());
     }
-    return this._addDays(this.weekStart(), 6) < this.todayStr;
+    return addDays(this.weekStart(), 6) < this.todayStr;
   });
 
   readonly isShowingCurrent = computed(() => {
@@ -425,7 +411,7 @@ export class CalendarComponent {
       const now = new Date();
       return this.calYear() === now.getFullYear() && this.calMonth() === now.getMonth();
     }
-    const sunday = this._addDays(this.weekStart(), 6);
+    const sunday = addDays(this.weekStart(), 6);
     return this.weekStart() <= this.todayStr && this.todayStr <= sunday;
   });
 
@@ -435,7 +421,7 @@ export class CalendarComponent {
       if (m < 0) { m = 11; y--; }
       this.calMonth.set(m); this.calYear.set(y);
     } else {
-      this.weekStart.set(this._addDays(this.weekStart(), -7));
+      this.weekStart.set(addDays(this.weekStart(), -7));
     }
   }
 
@@ -445,7 +431,7 @@ export class CalendarComponent {
       if (m > 11) { m = 0; y++; }
       this.calMonth.set(m); this.calYear.set(y);
     } else {
-      this.weekStart.set(this._addDays(this.weekStart(), 7));
+      this.weekStart.set(addDays(this.weekStart(), 7));
     }
   }
 
@@ -453,7 +439,7 @@ export class CalendarComponent {
     const now = new Date();
     this.calYear.set(now.getFullYear());
     this.calMonth.set(now.getMonth());
-    this.weekStart.set(this._mondayOf(this.todayStr));
+    this.weekStart.set(mondayOf(this.todayStr));
   }
 
   toggleView(): void {
@@ -501,7 +487,7 @@ export class CalendarComponent {
 
     const days: CalDay[] = [];
     for (let i = 0; i < 7; i++) {
-      const dateStr = this._addDays(monday, i);
+      const dateStr = addDays(monday, i);
       const d = new Date(dateStr + 'T12:00:00');
       const w = workoutByDate.get(dateStr);
       const sports = this.sportService.getSportsForDate(dateStr);
@@ -562,34 +548,6 @@ export class CalendarComponent {
     return this.dayNames[(new Date(dateStr + 'T12:00:00').getDay() + 6) % 7];
   }
 
-  getCatDotBackground(cats: string[]): string {
-    if (!cats || cats.length === 0) return '#006874';
-    if (cats.length === 1) return CATEGORY_COLORS[cats[0] as ExerciseCategory] ?? '#006874';
-    const colors = cats.map(c => CATEGORY_COLORS[c as ExerciseCategory] ?? '#bbb');
-    const step   = 100 / colors.length;
-    const stops  = colors.map((c, i) => `${c} ${Math.round(i * step)}% ${Math.round((i + 1) * step)}%`).join(', ');
-    return `conic-gradient(${stops})`;
-  }
-
-  getSportDotBackground(colors: string[]): string {
-    if (!colors || colors.length === 0) return '#FB8C00';
-    if (colors.length === 1) return colors[0];
-    const step  = 100 / colors.length;
-    const stops = colors.map((c, i) => `${c} ${Math.round(i * step)}% ${Math.round((i + 1) * step)}%`).join(', ');
-    return `conic-gradient(${stops})`;
-  }
-
-  // ── Private helpers ───────────────────────────────────────────────────────
-  private _mondayOf(dateStr: string): string {
-    const d = new Date(dateStr + 'T12:00:00');
-    const dow = d.getDay();
-    d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
-    return d.toISOString().split('T')[0];
-  }
-
-  private _addDays(dateStr: string, days: number): string {
-    const d = new Date(dateStr + 'T12:00:00');
-    d.setDate(d.getDate() + days);
-    return d.toISOString().split('T')[0];
-  }
+  readonly getCatDotBackground  = catDotBackground;
+  readonly getSportDotBackground = sportDotBackground;
 }

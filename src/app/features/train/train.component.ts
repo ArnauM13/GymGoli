@@ -3,6 +3,7 @@ import { Component, ViewChild, computed, effect, inject, signal, untracked } fro
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { InlineDatePickerComponent } from '../../shared/components/inline-date-picker/inline-date-picker.component';
+import { workoutCategories } from '../../shared/utils/calendar-utils';
 
 import {
   CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, Exercise, ExerciseCategory,
@@ -651,8 +652,7 @@ export class TrainComponent {
 
   readonly activeWorkoutCategories = computed((): string[] => {
     const w = this.activeWorkout();
-    if (!w) return [];
-    return w.categories?.length ? w.categories : (w.category ? [w.category] : []);
+    return w ? workoutCategories(w) : [];
   });
 
   readonly activeWorkoutCategoryItems = computed(() =>
@@ -738,13 +738,13 @@ export class TrainComponent {
   }
 
   workoutLabel(w: Workout): string {
-    const cats = w.categories?.length ? w.categories : (w.category ? [w.category] : []);
+    const cats = workoutCategories(w);
     if (!cats.length) return 'Entrenament';
     return cats.map(c => CATEGORY_LABELS[c as ExerciseCategory] ?? c).join(' + ');
   }
 
   workoutCardColor(w: Workout): string {
-    const cats = w.categories?.length ? w.categories : (w.category ? [w.category] : []);
+    const cats = workoutCategories(w);
     if (!cats.length) return '#006874';
     if (cats.length === 1) return CATEGORY_COLORS[cats[0] as ExerciseCategory] ?? '#006874';
     const colors = cats.map(c => CATEGORY_COLORS[c as ExerciseCategory] ?? '#006874');
@@ -757,7 +757,7 @@ export class TrainComponent {
   }
 
   workoutPrimaryColor(w: Workout): string {
-    const cats = w.categories?.length ? w.categories : (w.category ? [w.category] : []);
+    const cats = workoutCategories(w);
     return cats.length ? (CATEGORY_COLORS[cats[0] as ExerciseCategory] ?? '#006874') : '#006874';
   }
 

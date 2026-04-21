@@ -1,19 +1,10 @@
-import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
-import { CATEGORY_COLORS, ExerciseCategory } from '../../../core/models/exercise.model';
+import { Component, computed, effect, inject, input, linkedSignal, output } from '@angular/core';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { SportService } from '../../../core/services/sport.service';
-
-const MONTHS_CA = [
-  'Gener','Febrer','Març','Abril','Maig','Juny',
-  'Juliol','Agost','Setembre','Octubre','Novembre','Desembre',
-];
-
-interface CalDay {
-  date: string; day: number;
-  hasWorkout: boolean; workoutCategories: string[];
-  hasSport: boolean; sportColors: string[];
-  isToday: boolean; isFuture: boolean; isSelected: boolean;
-}
+import {
+  MONTHS_CA, CalDay,
+  mondayOf, addDays, catDotBackground, sportDotBackground,
+} from '../../utils/calendar-utils';
 
 @Component({
   selector: 'app-inline-date-picker',
@@ -22,7 +13,6 @@ interface CalDay {
   template: `
     <div class="idp">
 
-      <!-- ── Header: arrows + tappable period label + today icon ── -->
       <div class="idp-header">
         <button class="idp-nav" (click)="navBack()" aria-label="Període anterior">
           <span class="material-symbols-outlined">chevron_left</span>
@@ -44,14 +34,12 @@ interface CalDay {
         }
       </div>
 
-      <!-- ── Day-of-week labels ── -->
       <div class="idp-dow-row">
-        @for (name of dayNames; track name) {
+        @for (name of DAY_NAMES; track name) {
           <div class="idp-dow">{{ name }}</div>
         }
       </div>
 
-      <!-- ── Grid: week strip (default) or full month (expanded) ── -->
       <div class="idp-grid-wrap"
            (touchstart)="onSwipeStart($event)"
            (touchend)="onSwipeEnd($event)">
@@ -59,23 +47,22 @@ interface CalDay {
         @if (!expanded()) {
           <div class="idp-week-grid">
             @for (cell of weekDays(); track cell.date) {
-              <button
-                class="idp-day"
-                [class.is-today]="cell.isToday"
-                [class.is-selected]="cell.isSelected"
-                [class.is-future]="cell.isFuture"
-                [disabled]="cell.isFuture"
-                (click)="selectDay(cell.date)">
+              <button class="idp-day"
+                      [class.is-today]="cell.isToday"
+                      [class.is-selected]="cell.isSelected"
+                      [class.is-future]="cell.isFuture"
+                      [disabled]="cell.isFuture"
+                      (click)="selectDay(cell.date)">
                 <span class="idp-day-num">{{ cell.day }}</span>
                 @if (cell.hasWorkout || cell.hasSport) {
                   <div class="idp-dots">
                     @if (cell.hasWorkout) {
                       <span class="idp-dot idp-dot--workout"
-                            [style.background]="getCatDotBackground(cell.workoutCategories)"></span>
+                            [style.background]="catDotBg(cell.workoutCategories)"></span>
                     }
                     @if (cell.hasSport) {
                       <span class="idp-dot idp-dot--sport"
-                            [style.background]="getSportDotBackground(cell.sportColors)"></span>
+                            [style.background]="sportDotBg(cell.sportColors)"></span>
                     }
                   </div>
                 }
@@ -90,23 +77,22 @@ interface CalDay {
               @if (cell === null) {
                 <div></div>
               } @else {
-                <button
-                  class="idp-day"
-                  [class.is-today]="cell.isToday"
-                  [class.is-selected]="cell.isSelected"
-                  [class.is-future]="cell.isFuture"
-                  [disabled]="cell.isFuture"
-                  (click)="selectDay(cell.date)">
+                <button class="idp-day"
+                        [class.is-today]="cell.isToday"
+                        [class.is-selected]="cell.isSelected"
+                        [class.is-future]="cell.isFuture"
+                        [disabled]="cell.isFuture"
+                        (click)="selectDay(cell.date)">
                   <span class="idp-day-num">{{ cell.day }}</span>
                   @if (cell.hasWorkout || cell.hasSport) {
                     <div class="idp-dots">
                       @if (cell.hasWorkout) {
                         <span class="idp-dot idp-dot--workout"
-                              [style.background]="getCatDotBackground(cell.workoutCategories)"></span>
+                              [style.background]="catDotBg(cell.workoutCategories)"></span>
                       }
                       @if (cell.hasSport) {
                         <span class="idp-dot idp-dot--sport"
-                              [style.background]="getSportDotBackground(cell.sportColors)"></span>
+                              [style.background]="sportDotBg(cell.sportColors)"></span>
                       }
                     </div>
                   }
@@ -118,7 +104,6 @@ interface CalDay {
 
       </div>
 
-      <!-- ── Loading bar ── -->
       @if (workoutSvc.isLoading()) {
         <div class="idp-loading"><span class="idp-loading-bar"></span></div>
       }
@@ -137,7 +122,6 @@ interface CalDay {
 
     .idp { background: white; padding: 4px 0 0; }
 
-    /* ── Header ── */
     .idp-header {
       display: flex; align-items: center;
       padding: 6px 6px 2px; gap: 0;
@@ -179,7 +163,6 @@ interface CalDay {
       &:hover { background: rgba(0,104,116,0.08); color: #006874; }
     }
 
-    /* ── Day-of-week row ── */
     .idp-dow-row {
       display: grid; grid-template-columns: repeat(7, 1fr);
       padding: 0 8px;
@@ -190,18 +173,15 @@ interface CalDay {
       letter-spacing: 0.03em;
     }
 
-    /* ── Grid wrapper (swipe target) ── */
     .idp-grid-wrap {
       padding: 2px 8px 8px;
       touch-action: pan-y;
     }
 
-    /* ── Week grid ── */
     .idp-week-grid {
       display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px;
     }
 
-    /* ── Month grid ── */
     .idp-month-grid {
       display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;
       animation: idp-expand 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -211,7 +191,6 @@ interface CalDay {
       to   { opacity: 1; transform: translateY(0); }
     }
 
-    /* ── Day cell ── */
     .idp-day {
       display: flex; flex-direction: column; align-items: center;
       justify-content: center; gap: 3px;
@@ -225,12 +204,8 @@ interface CalDay {
       &:active:not(:disabled):not(.is-selected) { background: rgba(0,104,116,0.13); }
       &:disabled { cursor: default; }
 
-      &.is-today:not(.is-selected) {
-        outline: 2px solid #006874; outline-offset: -2px;
-      }
-      &.is-selected {
-        background: #006874 !important;
-      }
+      &.is-today:not(.is-selected) { outline: 2px solid #006874; outline-offset: -2px; }
+      &.is-selected { background: #006874 !important; }
       &.is-future { opacity: 0.28; }
     }
 
@@ -240,7 +215,6 @@ interface CalDay {
     .is-today:not(.is-selected) .idp-day-num { color: #006874; font-weight: 800; }
     .is-selected .idp-day-num { color: white; font-weight: 700; }
 
-    /* ── Activity dots ── */
     .idp-dots {
       display: flex; align-items: center; justify-content: center; gap: 2px;
     }
@@ -251,7 +225,6 @@ interface CalDay {
     }
     .is-selected .idp-dot { background: rgba(255,255,255,0.75) !important; }
 
-    /* ── Loading bar ── */
     .idp-loading {
       height: 2px; margin: 2px 8px 0; border-radius: 2px;
       background: rgba(0,104,116,0.1); overflow: hidden;
@@ -274,58 +247,54 @@ export class InlineDatePickerComponent {
   readonly selectedDate = input<string | null>(null);
   readonly dateSelected = output<string>();
 
+  readonly DAY_NAMES = ['dl', 'dm', 'dc', 'dj', 'dv', 'ds', 'dg'];
+  readonly todayStr  = new Date().toISOString().split('T')[0];
   readonly expanded  = signal(false);
-  readonly weekStart = signal<string>(this._mondayOf(new Date().toISOString().split('T')[0]));
-  readonly calYear   = signal(new Date().getFullYear());
-  readonly calMonth  = signal(new Date().getMonth());
 
-  readonly dayNames = ['dl', 'dm', 'dc', 'dj', 'dv', 'ds', 'dg'];
-  readonly todayStr = new Date().toISOString().split('T')[0];
+  // Writable signals that auto-reset when selectedDate changes (linkedSignal)
+  readonly weekStart = linkedSignal<string>(() => {
+    const d = this.selectedDate();
+    return d ? mondayOf(d) : mondayOf(this.todayStr);
+  });
+  readonly calYear = linkedSignal<number>(() => {
+    const d = this.selectedDate();
+    return d ? parseInt(d.split('-')[0]) : new Date().getFullYear();
+  });
+  readonly calMonth = linkedSignal<number>(() => {
+    const d = this.selectedDate();
+    return d ? parseInt(d.split('-')[1]) - 1 : new Date().getMonth();
+  });
 
   private _swipeStartX = 0;
   private _swipeStartY = 0;
 
   constructor() {
-    // Sync view to follow external selectedDate changes
+    // Single effect: preload data for visible week + expanded month (deduped)
     effect(() => {
-      const date = this.selectedDate();
-      if (date) {
-        const [y, m] = date.split('-').map(Number);
-        this.weekStart.set(this._mondayOf(date));
-        this.calYear.set(y);
-        this.calMonth.set(m - 1);
-      }
-    }, { allowSignalWrites: true });
+      const loaded = new Set<string>();
+      const load = (y: number, m: number) => {
+        const key = `${y}-${m}`;
+        if (loaded.has(key)) return;
+        loaded.add(key);
+        this.workoutSvc.ensureMonthLoaded(y, m);
+        this.sportSvc.ensureMonthLoaded(y, m);
+      };
 
-    // Preload data for visible week
-    effect(() => {
       const monday = this.weekStart();
-      const sunday = this._addDays(monday, 6);
+      const sunday = addDays(monday, 6);
       const [my, mm] = monday.split('-').map(Number);
       const [sy, sm] = sunday.split('-').map(Number);
-      this.workoutSvc.ensureMonthLoaded(my, mm - 1);
-      this.sportSvc.ensureMonthLoaded(my, mm - 1);
-      if (my !== sy || mm !== sm) {
-        this.workoutSvc.ensureMonthLoaded(sy, sm - 1);
-        this.sportSvc.ensureMonthLoaded(sy, sm - 1);
-      }
-    });
+      load(my, mm - 1);
+      if (my !== sy || mm !== sm) load(sy, sm - 1);
 
-    // Preload data for expanded month view
-    effect(() => {
-      if (this.expanded()) {
-        this.workoutSvc.ensureMonthLoaded(this.calYear(), this.calMonth());
-        this.sportSvc.ensureMonthLoaded(this.calYear(), this.calMonth());
-      }
+      if (this.expanded()) load(this.calYear(), this.calMonth());
     });
   }
 
   // ── Computed ──────────────────────────────────────────────────────────────
 
   readonly periodLabel = computed(() => {
-    if (this.expanded()) {
-      return `${MONTHS_CA[this.calMonth()]} ${this.calYear()}`;
-    }
+    if (this.expanded()) return `${MONTHS_CA[this.calMonth()]} ${this.calYear()}`;
     const d = new Date(this.weekStart() + 'T12:00:00');
     return `${MONTHS_CA[d.getMonth()]} ${d.getFullYear()}`;
   });
@@ -336,7 +305,7 @@ export class InlineDatePickerComponent {
       return this.calYear() < now.getFullYear() ||
         (this.calYear() === now.getFullYear() && this.calMonth() < now.getMonth());
     }
-    return this._addDays(this.weekStart(), 6) < this.todayStr;
+    return addDays(this.weekStart(), 6) < this.todayStr;
   });
 
   readonly isShowingCurrent = computed(() => {
@@ -344,75 +313,23 @@ export class InlineDatePickerComponent {
       const now = new Date();
       return this.calYear() === now.getFullYear() && this.calMonth() === now.getMonth();
     }
-    const sunday = this._addDays(this.weekStart(), 6);
+    const sunday = addDays(this.weekStart(), 6);
     return this.weekStart() <= this.todayStr && this.todayStr <= sunday;
   });
 
-  // ── Navigation ────────────────────────────────────────────────────────────
-
-  navBack(): void {
-    if (this.expanded()) {
-      let m = this.calMonth() - 1, y = this.calYear();
-      if (m < 0) { m = 11; y--; }
-      this.calMonth.set(m); this.calYear.set(y);
-    } else {
-      this.weekStart.set(this._addDays(this.weekStart(), -7));
-    }
-  }
-
-  navForward(): void {
-    if (this.expanded()) {
-      let m = this.calMonth() + 1, y = this.calYear();
-      if (m > 11) { m = 0; y++; }
-      this.calMonth.set(m); this.calYear.set(y);
-    } else {
-      this.weekStart.set(this._addDays(this.weekStart(), 7));
-    }
-  }
-
-  goToToday(): void {
-    const now = new Date();
-    this.weekStart.set(this._mondayOf(this.todayStr));
-    this.calYear.set(now.getFullYear());
-    this.calMonth.set(now.getMonth());
-  }
-
-  toggleExpanded(): void {
-    if (!this.expanded()) {
-      const d = new Date(this.weekStart() + 'T12:00:00');
-      this.calYear.set(d.getFullYear());
-      this.calMonth.set(d.getMonth());
-    }
-    this.expanded.set(!this.expanded());
-  }
-
-  // ── Swipe to navigate weeks ────────────────────────────────────────────────
-
-  onSwipeStart(e: TouchEvent): void {
-    this._swipeStartX = e.touches[0].clientX;
-    this._swipeStartY = e.touches[0].clientY;
-  }
-
-  onSwipeEnd(e: TouchEvent): void {
-    const dx = e.changedTouches[0].clientX - this._swipeStartX;
-    const dy = e.changedTouches[0].clientY - this._swipeStartY;
-    if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-      if (dx < 0 && this.canNavForward()) this.navForward();
-      else if (dx > 0) this.navBack();
-    }
-  }
-
-  // ── Week days ─────────────────────────────────────────────────────────────
+  // Shared map to avoid rebuilding it in both weekDays and calDays
+  private readonly workoutsByDate = computed(() =>
+    new Map(this.workoutSvc.workouts().map(w => [w.date, w]))
+  );
 
   readonly weekDays = computed((): CalDay[] => {
-    const monday = this.weekStart();
-    const today  = this.workoutSvc.todayDateString();
-    const sel    = this.selectedDate() ?? null;
-    const byDate = new Map(this.workoutSvc.workouts().map(w => [w.date, w]));
-    const _s = this.sportSvc.sessions();
+    const monday  = this.weekStart();
+    const today   = this.workoutSvc.todayDateString();
+    const sel     = this.selectedDate() ?? null;
+    const byDate  = this.workoutsByDate();
     const days: CalDay[] = [];
     for (let i = 0; i < 7; i++) {
-      const dateStr = this._addDays(monday, i);
+      const dateStr = addDays(monday, i);
       const d = new Date(dateStr + 'T12:00:00');
       const w = byDate.get(dateStr);
       const sports = this.sportSvc.getSportsForDate(dateStr);
@@ -430,14 +347,11 @@ export class InlineDatePickerComponent {
     return days;
   });
 
-  // ── Month days ────────────────────────────────────────────────────────────
-
   readonly calDays = computed((): (CalDay | null)[] => {
-    const y = this.calYear(), m = this.calMonth();
+    const y      = this.calYear(), m = this.calMonth();
     const today  = this.workoutSvc.todayDateString();
     const sel    = this.selectedDate() ?? null;
-    const byDate = new Map(this.workoutSvc.workouts().map(w => [w.date, w]));
-    const _s = this.sportSvc.sessions();
+    const byDate = this.workoutsByDate();
 
     const firstDay    = new Date(y, m, 1);
     const daysInMonth = new Date(y, m + 1, 0).getDate();
@@ -445,12 +359,12 @@ export class InlineDatePickerComponent {
 
     const cells: (CalDay | null)[] = [];
     for (let i = 0; i < startPad; i++) cells.push(null);
-    for (let d = 1; d <= daysInMonth; d++) {
-      const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const w = byDate.get(dateStr);
       const sports = this.sportSvc.getSportsForDate(dateStr);
       cells.push({
-        date: dateStr, day: d,
+        date: dateStr, day,
         hasWorkout: !!w,
         workoutCategories: w?.categories ?? (w?.category ? [w.category] : []),
         hasSport: sports.length > 0,
@@ -463,45 +377,70 @@ export class InlineDatePickerComponent {
     return cells;
   });
 
-  // ── Actions ───────────────────────────────────────────────────────────────
+  // ── Navigation ────────────────────────────────────────────────────────────
+
+  navBack(): void {
+    if (this.expanded()) {
+      let m = this.calMonth() - 1, y = this.calYear();
+      if (m < 0) { m = 11; y--; }
+      this.calMonth.set(m); this.calYear.set(y);
+    } else {
+      this.weekStart.set(addDays(this.weekStart(), -7));
+    }
+  }
+
+  navForward(): void {
+    if (this.expanded()) {
+      let m = this.calMonth() + 1, y = this.calYear();
+      if (m > 11) { m = 0; y++; }
+      this.calMonth.set(m); this.calYear.set(y);
+    } else {
+      this.weekStart.set(addDays(this.weekStart(), 7));
+    }
+  }
+
+  goToToday(): void {
+    const now = new Date();
+    this.weekStart.set(mondayOf(this.todayStr));
+    this.calYear.set(now.getFullYear());
+    this.calMonth.set(now.getMonth());
+  }
+
+  toggleExpanded(): void {
+    if (!this.expanded()) {
+      const d = new Date(this.weekStart() + 'T12:00:00');
+      this.calYear.set(d.getFullYear());
+      this.calMonth.set(d.getMonth());
+    }
+    this.expanded.set(!this.expanded());
+  }
 
   selectDay(date: string): void {
     this.dateSelected.emit(date);
     if (this.expanded()) {
-      this.weekStart.set(this._mondayOf(date));
+      this.weekStart.set(mondayOf(date));
       this.expanded.set(false);
     }
   }
 
-  // ── Dot helpers ───────────────────────────────────────────────────────────
+  // ── Swipe to navigate weeks ───────────────────────────────────────────────
 
-  getCatDotBackground(cats: string[]): string {
-    if (!cats?.length) return '#006874';
-    if (cats.length === 1) return CATEGORY_COLORS[cats[0] as ExerciseCategory] ?? '#006874';
-    const colors = cats.map(c => CATEGORY_COLORS[c as ExerciseCategory] ?? '#bbb');
-    const step   = 100 / colors.length;
-    return `conic-gradient(${colors.map((c, i) => `${c} ${Math.round(i * step)}% ${Math.round((i + 1) * step)}%`).join(', ')})`;
+  onSwipeStart(e: TouchEvent): void {
+    this._swipeStartX = e.touches[0].clientX;
+    this._swipeStartY = e.touches[0].clientY;
   }
 
-  getSportDotBackground(colors: string[]): string {
-    if (!colors?.length) return '#FB8C00';
-    if (colors.length === 1) return colors[0];
-    const step = 100 / colors.length;
-    return `conic-gradient(${colors.map((c, i) => `${c} ${Math.round(i * step)}% ${Math.round((i + 1) * step)}%`).join(', ')})`;
+  onSwipeEnd(e: TouchEvent): void {
+    const dx = e.changedTouches[0].clientX - this._swipeStartX;
+    const dy = e.changedTouches[0].clientY - this._swipeStartY;
+    if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx < 0 && this.canNavForward()) this.navForward();
+      else if (dx > 0) this.navBack();
+    }
   }
 
-  // ── Private helpers ───────────────────────────────────────────────────────
+  // ── Dot helpers (delegate to shared utils) ────────────────────────────────
 
-  private _mondayOf(dateStr: string): string {
-    const d = new Date(dateStr + 'T12:00:00');
-    const dow = d.getDay();
-    d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
-    return d.toISOString().split('T')[0];
-  }
-
-  private _addDays(dateStr: string, days: number): string {
-    const d = new Date(dateStr + 'T12:00:00');
-    d.setDate(d.getDate() + days);
-    return d.toISOString().split('T')[0];
-  }
+  readonly catDotBg   = catDotBackground;
+  readonly sportDotBg = sportDotBackground;
 }
