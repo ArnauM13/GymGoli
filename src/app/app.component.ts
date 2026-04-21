@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, effect, inject } from '@angular/core';
 import { Router, RouterOutlet } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
@@ -10,7 +10,8 @@ import { NavBarComponent } from './shared/components/nav-bar/nav-bar.component';
   standalone: true,
   imports: [RouterOutlet, NavBarComponent],
   template: `
-    <div class="app-shell">
+    @if (auth.user() !== undefined) {
+    <div class="app-shell app-ready">
 
       <!-- ── Top brand bar ── -->
       <header class="app-header">
@@ -51,6 +52,7 @@ import { NavBarComponent } from './shared/components/nav-bar/nav-bar.component';
         <app-nav-bar />
       }
     </div>
+    }
   `,
   styles: [`
     .app-shell {
@@ -138,6 +140,14 @@ import { NavBarComponent } from './shared/components/nav-bar/nav-bar.component';
       overflow-y: auto;
       overflow-x: hidden;
     }
+
+    .app-ready {
+      animation: app-enter 0.45s ease both;
+    }
+    @keyframes app-enter {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
   `],
 })
 export class AppComponent {
@@ -149,6 +159,16 @@ export class AppComponent {
 
   readonly userName      = computed(() => this.auth.user()?.user_metadata?.['full_name'] as string | undefined);
   readonly userAvatarUrl = computed(() => this.auth.user()?.user_metadata?.['avatar_url'] as string | undefined);
+
+  constructor() {
+    effect(() => {
+      if (this.auth.user() === undefined) return;
+      const loader = document.getElementById('app-loader');
+      if (!loader) return;
+      loader.classList.add('hiding');
+      setTimeout(() => loader.remove(), 450);
+    });
+  }
 
   toggleUserMenu(): void { this.menuOpen = !this.menuOpen; }
 
