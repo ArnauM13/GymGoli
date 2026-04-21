@@ -2,7 +2,7 @@ import { LowerCasePipe } from '@angular/common';
 import { Component, ViewChild, computed, effect, inject, signal, untracked } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
+import { InlineDatePickerComponent } from '../../shared/components/inline-date-picker/inline-date-picker.component';
 
 import {
   CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, Exercise, ExerciseCategory,
@@ -24,7 +24,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 @Component({
   selector: 'app-train',
   standalone: true,
-  imports: [WorkoutEditorComponent, LowerCasePipe],
+  imports: [WorkoutEditorComponent, LowerCasePipe, InlineDatePickerComponent],
   template: `
     <div class="page">
 
@@ -66,19 +66,10 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       } @else {
 
         <!-- ══ DASHBOARD MODE ══ -->
-        <div class="train-header">
-          <button class="arrow-btn" (click)="navigateDate(-1)" aria-label="Dia anterior">
-            <span class="material-symbols-outlined">chevron_left</span>
-          </button>
-          <button class="date-btn" (click)="openCalendar()">
-            <span class="material-symbols-outlined date-cal-icon">calendar_month</span>
-            <span class="date-text">{{ dateLabel() }}</span>
-            <span class="material-symbols-outlined date-expand-icon">expand_more</span>
-          </button>
-          <button class="arrow-btn" [class.invisible]="isToday()" (click)="navigateDate(1)" aria-label="Dia següent">
-            <span class="material-symbols-outlined">chevron_right</span>
-          </button>
-        </div>
+        <app-inline-date-picker
+          [selectedDate]="selectedDate()"
+          (dateSelected)="selectedDate.set($event)"
+        />
 
         <!-- ── Loading ── -->
         @if ((workoutService.isLoading() && dateWorkouts().length === 0) || creating()) {
@@ -224,13 +215,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
   styles: [`
     .page { padding: 0 0 84px; }
 
-    /* ── Date header (dashboard mode, part of page flow) ── */
-    .train-header {
-      display: flex; align-items: center;
-      padding: 4px 8px;
-      background: white;
-    }
-
     /* ── Workout topbar (active mode, sticky) ── */
     .workout-topbar {
       position: sticky;
@@ -270,32 +254,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .material-symbols-outlined { font-size: 16px; }
       &:hover { background: rgba(239,83,80,0.12); border-color: #ef5350; }
     }
-
-    /* ── Date header controls ── */
-    .arrow-btn {
-      width: 38px; height: 38px; border-radius: 50%; border: none; background: transparent;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; color: #999; transition: color 0.15s, background 0.15s;
-      touch-action: manipulation; flex-shrink: 0;
-      .material-symbols-outlined { font-size: 22px; }
-      &:hover { color: #333; background: rgba(0,0,0,0.06); }
-      &.invisible { visibility: hidden; pointer-events: none; }
-    }
-    .date-btn {
-      flex: 1; min-width: 0;
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      padding: 7px 12px; border-radius: 20px;
-      border: 1.5px solid #e0e0e0; background: #f7f7f7;
-      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      &:hover { background: #efefef; border-color: #bbb; }
-    }
-    .date-text {
-      flex: 1; min-width: 0;
-      font-size: 13px; font-weight: 600; color: #333; text-transform: capitalize;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .date-cal-icon { font-size: 16px; color: #006874; flex-shrink: 0; }
-    .date-expand-icon { font-size: 16px; color: #aaa; flex-shrink: 0; margin-left: -2px; }
 
     /* ── Type badges (topbar) ── */
     .type-badge {
@@ -622,12 +580,6 @@ export class TrainComponent {
     return this.sportService.getSessionForDate(this.selectedDate(), sportId)?.subtypeId ?? null;
   }
 
-  readonly dateLabel = computed(() => {
-    const d = new Date(this.selectedDate() + 'T12:00:00');
-    const formatted = d.toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'short' });
-    return this.isToday() ? `Avui · ${formatted}` : formatted;
-  });
-
   readonly suggestionType = signal<ExerciseCategory | null>(null);
 
   readonly suggestion = computed(() => {
@@ -805,26 +757,6 @@ export class TrainComponent {
       } catch {
         this.snackBar.open('Error en afegir l\'exercici', '', { duration: 3000 });
       }
-    });
-  }
-
-  // ── Date navigation ───────────────────────────────────────────────────────
-
-  navigateDate(days: number): void {
-    const d = new Date(this.selectedDate() + 'T12:00:00');
-    d.setDate(d.getDate() + days);
-    this.selectedDate.set(d.toISOString().split('T')[0]);
-  }
-
-  openCalendar(): void {
-    const ref = this.dialog.open(CalendarComponent, {
-      data: { selectedDate: this.selectedDate(), initialView: 'month' as const },
-      panelClass: 'cal-dialog',
-      width: '360px',
-      maxWidth: '95vw',
-    });
-    ref.afterClosed().subscribe((date: string | undefined) => {
-      if (date) this.selectedDate.set(date);
     });
   }
 
