@@ -1,4 +1,5 @@
 import { Component, inject } from '@angular/core';
+import { Location } from '@angular/common';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
 import { UserSettingsService } from '../../core/services/user-settings.service';
@@ -9,6 +10,13 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
   imports: [MatSlideToggleModule],
   template: `
     <div class="page">
+
+      <div class="page-header">
+        <button class="back-btn" (click)="back()" title="Tornar">
+          <span class="material-symbols-outlined">arrow_back_ios</span>
+        </button>
+        <h1 class="page-title">Configuració</h1>
+      </div>
 
       <div class="section">
         <h2 class="section-title">Estadístiques i mètriques</h2>
@@ -40,8 +48,28 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
   `,
   styles: [`
     .page {
-      padding: 16px 16px 84px;
+      padding: 0 16px 84px;
       max-width: 540px; margin: 0 auto;
+    }
+
+    /* ── Header ── */
+    .page-header {
+      display: flex; align-items: center; gap: 4px;
+      padding: 12px 0 16px;
+    }
+
+    .back-btn {
+      width: 36px; height: 36px; border-radius: 50%; border: none;
+      background: transparent; cursor: pointer; color: #555; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 20px; }
+      &:hover { background: rgba(0,0,0,0.06); }
+    }
+
+    .page-title {
+      margin: 0;
+      font-size: 20px; font-weight: 800; color: #1a1a1a; letter-spacing: -0.3px;
     }
 
     .section {
@@ -91,6 +119,9 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
 })
 export class SettingsComponent {
   readonly settingsService = inject(UserSettingsService);
+  private location         = inject(Location);
+
+  back(): void { this.location.back(); }
 
   toggleMetrics(): void {
     this.settingsService.update({ metricsEnabled: !this.settingsService.metricsEnabled() });
