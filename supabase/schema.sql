@@ -84,6 +84,24 @@ create policy "users own sport_sessions"
 
 create index sport_sessions_user_id_date_idx on sport_sessions (user_id, date desc);
 
+-- ── User settings ─────────────────────────────────────────────────────────────
+
+create table user_settings (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid references auth.users on delete cascade not null unique,
+  settings   jsonb not null default '{}',
+  updated_at timestamptz default now()
+);
+
+alter table user_settings enable row level security;
+
+create policy "users own settings"
+  on user_settings for all
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+create index user_settings_user_id_idx on user_settings (user_id);
+
 -- ── Realtime (enable for workouts table) ──────────────────────────────────────
 -- Run this or enable via Dashboard → Database → Replication → supabase_realtime publication
 
