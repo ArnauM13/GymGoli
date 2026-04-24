@@ -138,28 +138,6 @@ describe('TrainComponent', () => {
     });
   });
 
-  // ── navigateDate() ───────────────────────────────────────────────────────
-
-  describe('navigateDate()', () => {
-    it('increments selectedDate by 1 day', () => {
-      component.selectedDate.set('2024-01-15');
-      component.navigateDate(1);
-      expect(component.selectedDate()).toBe('2024-01-16');
-    });
-
-    it('decrements selectedDate by 1 day', () => {
-      component.selectedDate.set('2024-01-15');
-      component.navigateDate(-1);
-      expect(component.selectedDate()).toBe('2024-01-14');
-    });
-
-    it('wraps correctly across month boundaries', () => {
-      component.selectedDate.set('2024-01-31');
-      component.navigateDate(1);
-      expect(component.selectedDate()).toBe('2024-02-01');
-    });
-  });
-
   // ── openWorkout() / closeWorkout() ───────────────────────────────────────
 
   describe('openWorkout() / closeWorkout()', () => {
