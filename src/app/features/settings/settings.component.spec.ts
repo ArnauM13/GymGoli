@@ -11,7 +11,7 @@ describe('SettingsComponent', () => {
   let mockUpdate:  jasmine.Spy;
 
   beforeEach(async () => {
-    mockEnabled = signal(true);
+    mockEnabled = signal(false);
     mockUpdate  = jasmine.createSpy('update');
 
     await TestBed.configureTestingModule({

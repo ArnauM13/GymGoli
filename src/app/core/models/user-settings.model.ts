@@ -3,5 +3,5 @@ export interface UserSettings {
 }
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
-  metricsEnabled: true,
+  metricsEnabled: false,
 };
