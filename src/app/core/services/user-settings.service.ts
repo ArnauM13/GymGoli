@@ -41,9 +41,12 @@ export class UserSettingsService {
   }
 
   private async _load(uid: string): Promise<void> {
+    // Restore from localStorage synchronously so the UI never waits for the network
     const local = this._readLocalStorage(uid);
     if (local) this._settings.set({ ...DEFAULT_USER_SETTINGS, ...local });
+    this._loaded.set(true);
 
+    // Sync with Supabase in the background and update if it has fresher data
     try {
       const { data, error } = await this.supabase
         .from('user_settings')
@@ -57,8 +60,6 @@ export class UserSettingsService {
         this._writeLocalStorage(uid, merged);
       }
     } catch { /* table may not exist yet */ }
-
-    this._loaded.set(true);
   }
 
   async update(patch: Partial<UserSettings>): Promise<void> {
