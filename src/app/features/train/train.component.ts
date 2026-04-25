@@ -74,7 +74,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         />
 
         <!-- ── Fitness insights ── -->
-        <app-fitness-insights />
 
         <!-- ── Skeleton (initial data load) ── -->
         @if (workoutService.isLoading() && dateWorkouts().length === 0 && !creating()) {
@@ -118,6 +117,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
         @if ((!workoutService.isLoading() || dateWorkouts().length > 0) && !creating()) {
 
+          <app-fitness-insights />
 
           <!-- Entrenaments section -->
           <div class="workout-section">
