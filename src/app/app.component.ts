@@ -1,5 +1,5 @@
 import { Component, computed, effect, inject } from '@angular/core';
-import { Router, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { AuthService } from './core/services/auth.service';
@@ -8,7 +8,7 @@ import { NavBarComponent } from './shared/components/nav-bar/nav-bar.component';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, NavBarComponent],
+  imports: [RouterOutlet, RouterLink, NavBarComponent],
   template: `
     @if (auth.user() !== undefined) {
     <div class="app-shell app-ready">
@@ -35,6 +35,10 @@ import { NavBarComponent } from './shared/components/nav-bar/nav-bar.component';
                 <span class="user-menu-email">{{ auth.user()?.email }}</span>
               </div>
               <hr class="user-menu-divider">
+              <a class="user-menu-item" routerLink="/settings" (click)="menuOpen = false">
+                <span class="material-symbols-outlined">settings</span>
+                Configuració
+              </a>
               <button class="user-menu-item logout" (click)="logout()">
                 <span class="material-symbols-outlined">logout</span>
                 Tancar sessió
@@ -129,7 +133,7 @@ import { NavBarComponent } from './shared/components/nav-bar/nav-bar.component';
       width: 100%; padding: 10px 16px;
       border: none; background: transparent; cursor: pointer;
       font-size: 14px; font-weight: 500; color: #333;
-      transition: background 0.15s; text-align: left;
+      transition: background 0.15s; text-align: left; text-decoration: none;
       .material-symbols-outlined { font-size: 18px; color: #888; }
       &:hover { background: #f5f5f5; }
       &.logout { color: #ef5350; .material-symbols-outlined { color: #ef5350; } }

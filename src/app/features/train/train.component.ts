@@ -12,6 +12,7 @@ import { Workout, WorkoutEntry } from '../../core/models/workout.model';
 import { WorkoutService } from '../../core/services/workout.service';
 import { SportService } from '../../core/services/sport.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
+import { FitnessInsightsComponent } from '../../shared/components/fitness-insights/fitness-insights.component';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
@@ -25,7 +26,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 @Component({
   selector: 'app-train',
   standalone: true,
-  imports: [WorkoutEditorComponent, LowerCasePipe, InlineDatePickerComponent],
+  imports: [WorkoutEditorComponent, LowerCasePipe, InlineDatePickerComponent, FitnessInsightsComponent],
   template: `
     <div class="page">
 
@@ -71,6 +72,11 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           [selectedDate]="selectedDate()"
           (dateSelected)="selectedDate.set($event)"
         />
+
+        <!-- ── Fitness insights ── -->
+        @if (isToday()) {
+          <app-fitness-insights />
+        }
 
         <!-- ── Skeleton (initial data load) ── -->
         @if (workoutService.isLoading() && dateWorkouts().length === 0 && !creating()) {
