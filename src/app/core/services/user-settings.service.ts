@@ -25,32 +25,54 @@ export class UserSettingsService {
     });
   }
 
-  private async _load(uid: string): Promise<void> {
-    const { data } = await this.supabase
-      .from('user_settings')
-      .select('settings')
-      .eq('user_id', uid)
-      .maybeSingle();
+  private _lsKey(uid: string): string {
+    return `gymgoli_settings_${uid}`;
+  }
 
-    if (data?.settings) {
-      this._settings.set({ ...DEFAULT_USER_SETTINGS, ...(data.settings as Partial<UserSettings>) });
-    }
+  private _readLocalStorage(uid: string): Partial<UserSettings> | null {
+    try {
+      const raw = localStorage.getItem(this._lsKey(uid));
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  }
+
+  private _writeLocalStorage(uid: string, s: UserSettings): void {
+    try { localStorage.setItem(this._lsKey(uid), JSON.stringify(s)); } catch { }
+  }
+
+  private async _load(uid: string): Promise<void> {
+    const local = this._readLocalStorage(uid);
+    if (local) this._settings.set({ ...DEFAULT_USER_SETTINGS, ...local });
+
+    try {
+      const { data, error } = await this.supabase
+        .from('user_settings')
+        .select('settings')
+        .eq('user_id', uid)
+        .maybeSingle();
+
+      if (!error && data?.settings) {
+        const merged = { ...DEFAULT_USER_SETTINGS, ...(data.settings as Partial<UserSettings>) };
+        this._settings.set(merged);
+        this._writeLocalStorage(uid, merged);
+      }
+    } catch { /* table may not exist yet */ }
+
     this._loaded.set(true);
   }
 
   async update(patch: Partial<UserSettings>): Promise<void> {
-    const uid  = this.auth.uid();
+    const uid = this.auth.uid();
     if (!uid) return;
 
     const next = { ...this._settings(), ...patch };
     this._settings.set(next);
+    this._writeLocalStorage(uid, next);
 
-    const { error } = await this.supabase
-      .from('user_settings')
-      .upsert({ user_id: uid, settings: next, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
-
-    if (error) {
-      console.error('[UserSettingsService] update error:', error);
-    }
+    try {
+      await this.supabase
+        .from('user_settings')
+        .upsert({ user_id: uid, settings: next, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+    } catch { /* best-effort */ }
   }
 }

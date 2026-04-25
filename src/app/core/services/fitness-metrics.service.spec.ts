@@ -21,6 +21,10 @@ function makeWorkout(date: string): Workout {
   return { id: date, date, entries: [], createdAt: new Date() };
 }
 
+function makeWorkoutWithCats(date: string, cats: string[]): Workout {
+  return { id: date, date, entries: [], categories: cats, createdAt: new Date() };
+}
+
 function makeSport(id = 's1', color = '#43A047'): Sport {
   return { id, name: 'Futbol', icon: 'sports_soccer', color, subtypes: [], createdAt: new Date() };
 }
@@ -289,6 +293,114 @@ describe('FitnessMetricsService', () => {
 
       const insight = service.insights().find(i => i.type === 'recupera_esport');
       expect(insight?.color).toBe('#43A047');
+    });
+  });
+
+  // ── equilibra_gym ─────────────────────────────────────────────────────────
+
+  describe('equilibra_gym', () => {
+    it('triggers when there is a gap of 2+ between most and least done category', () => {
+      mockSessions.set([]);
+      mockSports.set([]);
+      mockWorkouts.set([
+        makeWorkoutWithCats(d(-1),  ['push']),
+        makeWorkoutWithCats(d(-3),  ['push']),
+        makeWorkoutWithCats(d(-5),  ['push']),
+        makeWorkoutWithCats(d(-7),  ['pull']),
+      ]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).toContain('equilibra_gym');
+    });
+
+    it('does NOT trigger when gap between categories is less than 2', () => {
+      mockSessions.set([]);
+      mockSports.set([]);
+      // push=2, pull=1, legs=1 → gap = max(2) - min(1) = 1 < 2
+      mockWorkouts.set([
+        makeWorkoutWithCats(d(-1), ['push']),
+        makeWorkoutWithCats(d(-2), ['pull']),
+        makeWorkoutWithCats(d(-3), ['push']),
+        makeWorkoutWithCats(d(-4), ['legs']),
+      ]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).not.toContain('equilibra_gym');
+    });
+
+    it('does NOT trigger with fewer than 3 workouts in last 28 days', () => {
+      mockSessions.set([]);
+      mockSports.set([]);
+      mockWorkouts.set([
+        makeWorkoutWithCats(d(-1), ['push']),
+        makeWorkoutWithCats(d(-2), ['pull']),
+      ]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).not.toContain('equilibra_gym');
+    });
+
+    it('does NOT trigger when only one category is used', () => {
+      mockSessions.set([]);
+      mockSports.set([]);
+      mockWorkouts.set([
+        makeWorkoutWithCats(d(-1), ['push']),
+        makeWorkoutWithCats(d(-2), ['push']),
+        makeWorkoutWithCats(d(-3), ['push']),
+        makeWorkoutWithCats(d(-4), ['push']),
+      ]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).not.toContain('equilibra_gym');
+    });
+
+    it('title matches the least done category (DAY_LABEL)', () => {
+      mockSessions.set([]);
+      mockSports.set([]);
+      mockWorkouts.set([
+        makeWorkoutWithCats(d(-1), ['push']),
+        makeWorkoutWithCats(d(-3), ['push']),
+        makeWorkoutWithCats(d(-5), ['push']),
+        makeWorkoutWithCats(d(-7), ['pull']),
+      ]);
+
+      const insight = service.insights().find(i => i.type === 'equilibra_gym');
+      // legs has 0 — least done; pull and push have counts but legs wins as min
+      // Actually: push=3, pull=1, legs=0 → legs is min with 0
+      expect(insight?.title).toMatch(/Leg day\?/i);
+    });
+
+    it('message includes counts for the non-neglected categories', () => {
+      mockSessions.set([]);
+      mockSports.set([]);
+      mockWorkouts.set([
+        makeWorkoutWithCats(d(-1),  ['push']),
+        makeWorkoutWithCats(d(-3),  ['push']),
+        makeWorkoutWithCats(d(-5),  ['push']),
+        makeWorkoutWithCats(d(-7),  ['pull']),
+        makeWorkoutWithCats(d(-9),  ['pull']),
+        makeWorkoutWithCats(d(-11), ['legs']),
+      ]);
+
+      const insight = service.insights().find(i => i.type === 'equilibra_gym');
+      // push=3 pull=2 legs=1 → legs is min, gap = 3-1 = 2 → triggers
+      expect(insight?.message).toContain('3');
+    });
+
+    it('ignores workouts older than 28 days', () => {
+      mockSessions.set([]);
+      mockSports.set([]);
+      mockWorkouts.set([
+        makeWorkoutWithCats(d(-1),  ['push']),
+        makeWorkoutWithCats(d(-3),  ['push']),
+        makeWorkoutWithCats(d(-5),  ['push']),
+        makeWorkoutWithCats(d(-29), ['legs']), // outside the 28-day window
+        makeWorkoutWithCats(d(-30), ['legs']),
+      ]);
+
+      const insight = service.insights().find(i => i.type === 'equilibra_gym');
+      // Only push(3) in window; legs outside — only 1 active cat → should NOT trigger
+      expect(insight).toBeUndefined();
     });
   });
 });
