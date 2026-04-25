@@ -7,6 +7,7 @@ import { WorkoutService } from './workout.service';
 export type InsightType =
   | 'setmana_fluixa'
   | 'prova_esport'
+  | 'prova_gym'
   | 'recupera_esport'
   | 'gran_setmana'
   | 'descansa'
@@ -104,21 +105,32 @@ export class FitnessMetricsService {
       });
     }
 
-    // ── 3. Setmana fluixa (<2 activitats i ja és dimecres o posterior) ────
+    // ── 3. Setmana fluixa (pocs gym workouts I poca activitat esportiva) ────
     else {
       const dow = new Date(today + 'T12:00:00').getDay();
-      if (weekTotal < 2 && (dow === 0 || dow >= 3)) {
+      if (weekWorkouts.length < 2 && weekSessions.length < 2 && (dow === 0 || dow >= 3)) {
         candidates.push({
           type: 'setmana_fluixa',
           emoji: '💤',
           title: 'Setmana tranquil·la...',
-          message: 'Aquesta setmana has anat poc. Avui seria un bon dia per moure\'t una mica, no creus?',
+          message: 'Poc moviment aquesta setmana. Avui seria un bon dia per moure\'t una mica, no creus?',
           color: '#0288d1',
         });
       }
     }
 
-    // ── 4. Prova esport (3+ gym però 0 esport en 7 dies) ─────────────────
+    // ── 4. Prova gym (2+ sessions esport però 0 gym en 7 dies) ───────────
+    if (last7Sessions.length >= 2 && last7Workouts.length === 0) {
+      candidates.push({
+        type: 'prova_gym',
+        emoji: '🏋️',
+        title: 'El gym et truca!',
+        message: `Portes ${last7Sessions.length} sessions d'esport però fa dies que no trepitges el gym. Avui, sí?`,
+        color: '#006874',
+      });
+    }
+
+    // ── 6. Prova esport (3+ gym però 0 esport en 7 dies) ─────────────────
     if (last7Workouts.length >= 3 && last7Sessions.length === 0 && sports.length > 0) {
       const favSport  = _favoriteSport(sessions, sports);
       const sportName = favSport ? favSport.name : 'algun esport';
@@ -197,8 +209,8 @@ export class FitnessMetricsService {
 
     // ── Retorna màxim 2 per prioritat ─────────────────────────────────────
     const priority: InsightType[] = [
-      'gran_setmana', 'descansa', 'setmana_fluixa',
-      'recupera_esport', 'equilibra_gym', 'prova_esport',
+      'gran_setmana', 'descansa', 'prova_gym', 'setmana_fluixa',
+      'prova_esport', 'recupera_esport', 'equilibra_gym',
     ];
     return candidates
       .sort((a, b) => priority.indexOf(a.type) - priority.indexOf(b.type))

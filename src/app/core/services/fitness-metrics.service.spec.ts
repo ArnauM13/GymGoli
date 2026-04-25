@@ -150,8 +150,7 @@ describe('FitnessMetricsService', () => {
   // ── setmana_fluixa ───────────────────────────────────────────────────────
 
   describe('setmana_fluixa', () => {
-    it('triggers on Wednesday with fewer than 2 weekly activities', () => {
-      // MOCK_DATE is Wednesday, 0 activities this week
+    it('triggers on Wednesday with 0 gym workouts and 0 sport sessions', () => {
       mockWorkouts.set([]);
       mockSessions.set([]);
       mockSports.set([]);
@@ -160,10 +159,19 @@ describe('FitnessMetricsService', () => {
       expect(types).toContain('setmana_fluixa');
     });
 
-    it('does NOT trigger when 2+ activities exist this week', () => {
+    it('does NOT trigger when 2+ gym workouts exist this week', () => {
       mockWorkouts.set([makeWorkout(d(-1)), makeWorkout(d(-2))]);
       mockSessions.set([]);
       mockSports.set([]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).not.toContain('setmana_fluixa');
+    });
+
+    it('does NOT trigger when 2+ sport sessions exist this week', () => {
+      mockWorkouts.set([]);
+      mockSessions.set([makeSession(d(-1)), makeSession(d(-2))]);
+      mockSports.set([makeSport()]);
 
       const types = service.insights().map(i => i.type);
       expect(types).not.toContain('setmana_fluixa');
@@ -175,6 +183,58 @@ describe('FitnessMetricsService', () => {
       mockSports.set([]);
 
       const types = service.insights().map(i => i.type);
+      expect(types).not.toContain('setmana_fluixa');
+    });
+  });
+
+  // ── prova_gym ────────────────────────────────────────────────────────────
+
+  describe('prova_gym', () => {
+    it('triggers when 2+ sport sessions and 0 gym workouts in last 7 days', () => {
+      mockWorkouts.set([]);
+      mockSessions.set([makeSession(d(-1)), makeSession(d(-3))]);
+      mockSports.set([makeSport()]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).toContain('prova_gym');
+    });
+
+    it('does NOT trigger when there are gym workouts in last 7 days', () => {
+      mockWorkouts.set([makeWorkout(d(-1))]);
+      mockSessions.set([makeSession(d(-1)), makeSession(d(-3))]);
+      mockSports.set([makeSport()]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).not.toContain('prova_gym');
+    });
+
+    it('does NOT trigger with only 1 sport session in last 7 days', () => {
+      mockWorkouts.set([]);
+      mockSessions.set([makeSession(d(-2))]);
+      mockSports.set([makeSport()]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).not.toContain('prova_gym');
+    });
+
+    it('message mentions the session count', () => {
+      mockWorkouts.set([]);
+      mockSessions.set([makeSession(d(-1)), makeSession(d(-3)), makeSession(d(-5))]);
+      mockSports.set([makeSport()]);
+
+      const insight = service.insights().find(i => i.type === 'prova_gym');
+      expect(insight?.message).toContain('3');
+    });
+
+    it('has higher priority than setmana_fluixa', () => {
+      // 0 gym workouts, 2 sport sessions → prova_gym should come before setmana_fluixa
+      // but setmana_fluixa won't fire because weekSessions >= 2
+      mockWorkouts.set([]);
+      mockSessions.set([makeSession(d(-1)), makeSession(d(-2))]);
+      mockSports.set([makeSport()]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).toContain('prova_gym');
       expect(types).not.toContain('setmana_fluixa');
     });
   });
