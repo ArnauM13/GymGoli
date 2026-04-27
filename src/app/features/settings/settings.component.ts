@@ -45,6 +45,41 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
         }
       </div>
 
+      @if (settingsService.metricsEnabled()) {
+        <div class="section">
+          <h2 class="section-title">Objectiu setmanal</h2>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">Activitats per setmana</span>
+              <span class="setting-desc">
+                Gym i esport compten igual. Els consells t'animaran quan ho aconsegueixis.
+              </span>
+            </div>
+
+            @if (settingsService.weeklyActivityGoal() === null) {
+              <button class="goal-set-btn" (click)="setGoal(3)">
+                <span class="material-symbols-outlined">add</span>
+                Definir
+              </button>
+            } @else {
+              <div class="goal-stepper">
+                <button class="step-btn" (click)="adjustGoal(-1)" [disabled]="settingsService.weeklyActivityGoal()! <= 1" aria-label="Menys">
+                  <span class="material-symbols-outlined">remove</span>
+                </button>
+                <span class="goal-value">{{ settingsService.weeklyActivityGoal() }}</span>
+                <button class="step-btn" (click)="adjustGoal(1)" [disabled]="settingsService.weeklyActivityGoal()! >= 7" aria-label="Més">
+                  <span class="material-symbols-outlined">add</span>
+                </button>
+                <button class="step-btn step-btn--danger" (click)="clearGoal()" aria-label="Eliminar objectiu">
+                  <span class="material-symbols-outlined">close</span>
+                </button>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
       <a class="legal-link" routerLink="/privacy">
         <span class="material-symbols-outlined">policy</span>
         Política de privacitat i Condicions d'ús
@@ -122,6 +157,37 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
       font-variation-settings: 'FILL' 1;
     }
 
+    /* ── Goal stepper ── */
+    .goal-set-btn {
+      display: flex; align-items: center; gap: 4px;
+      padding: 8px 14px; border-radius: 10px; border: 1.5px solid #e0e0e0;
+      background: white; color: #555; font-size: 13px; font-weight: 600;
+      cursor: pointer; white-space: nowrap; touch-action: manipulation;
+      transition: all 0.15s; flex-shrink: 0;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover { border-color: #006874; color: #006874; }
+    }
+
+    .goal-stepper {
+      display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+    }
+
+    .goal-value {
+      min-width: 28px; text-align: center;
+      font-size: 20px; font-weight: 800; color: #006874;
+    }
+
+    .step-btn {
+      width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid #e0e0e0;
+      background: white; cursor: pointer; color: #555;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover:not(:disabled) { border-color: #006874; color: #006874; background: rgba(0,104,116,0.04); }
+      &:disabled { opacity: 0.3; cursor: default; }
+      &.step-btn--danger:hover:not(:disabled) { border-color: #ef5350; color: #ef5350; background: rgba(239,83,80,0.06); }
+    }
+
     /* ── Legal link ── */
     .legal-link {
       display: flex; align-items: center; gap: 8px;
@@ -143,5 +209,20 @@ export class SettingsComponent {
 
   toggleMetrics(): void {
     this.settingsService.update({ metricsEnabled: !this.settingsService.metricsEnabled() });
+  }
+
+  setGoal(n: number): void {
+    this.settingsService.update({ weeklyActivityGoal: n });
+  }
+
+  adjustGoal(delta: number): void {
+    const current = this.settingsService.weeklyActivityGoal();
+    if (current === null) return;
+    const next = Math.max(1, Math.min(7, current + delta));
+    this.settingsService.update({ weeklyActivityGoal: next });
+  }
+
+  clearGoal(): void {
+    this.settingsService.update({ weeklyActivityGoal: null });
   }
 }

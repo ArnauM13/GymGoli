@@ -2,6 +2,7 @@ import { Injectable, computed, inject } from '@angular/core';
 
 import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../models/exercise.model';
 import { SportService } from './sport.service';
+import { UserSettingsService } from './user-settings.service';
 import { WorkoutService } from './workout.service';
 
 export type InsightType =
@@ -11,7 +12,10 @@ export type InsightType =
   | 'recupera_esport'
   | 'gran_setmana'
   | 'descansa'
-  | 'equilibra_gym';
+  | 'equilibra_gym'
+  | 'objectiu_assolit'
+  | 'camino_objectiu'
+  | 'anima_objectiu';
 
 export interface FitnessInsight {
   type: InsightType;
@@ -60,8 +64,9 @@ function daysAgoStr(n: number): string {
 
 @Injectable({ providedIn: 'root' })
 export class FitnessMetricsService {
-  private workoutService = inject(WorkoutService);
-  private sportService   = inject(SportService);
+  private workoutService  = inject(WorkoutService);
+  private sportService    = inject(SportService);
+  private settingsService = inject(UserSettingsService);
 
   readonly insights = computed((): FitnessInsight[] => {
     const today  = TODAY();
@@ -71,6 +76,7 @@ export class FitnessMetricsService {
     const workouts = this.workoutService.workouts();
     const sessions = this.sportService.sessions();
     const sports   = this.sportService.sports();
+    const goal     = this.settingsService.settings().weeklyActivityGoal;
 
     // ── Current week ──────────────────────────────────────────────────────
     const weekWorkouts = workouts.filter(w => w.date >= monday && w.date <= today);
@@ -207,9 +213,49 @@ export class FitnessMetricsService {
       }
     }
 
+    // ── Objectiu setmanal ─────────────────────────────────────────────────
+    if (goal !== null) {
+      const dow = new Date(today + 'T12:00:00').getDay();
+
+      if (weekTotal >= goal) {
+        candidates.push({
+          type: 'objectiu_assolit',
+          emoji: '🎯',
+          title: 'Objectiu de la setmana, fet!',
+          message: `Has fet ${weekTotal} activitats${weekTotal > goal ? `, ${weekTotal - goal} més del que et proposaves` : ''}. Quin crack!`,
+          color: '#006874',
+        });
+      } else if (dow === 0) {
+        // Sunday — last day of the week, give a final nudge
+        const missing = goal - weekTotal;
+        candidates.push({
+          type: 'anima_objectiu',
+          emoji: '🌟',
+          title: missing === 1 ? 'Última oportunitat!' : 'Últim dia de la setmana!',
+          message: missing === 1
+            ? `Et falta 1 activitat per assolir el teu objectiu de ${goal}. Avui pots!`
+            : `Portes ${weekTotal}/${goal} activitats. Encara hi ha temps avui!`,
+          color: '#f57c00',
+        });
+      } else if (weekTotal >= 1 && weekTotal < goal && dow >= 3) {
+        // Wed-Sat with some progress — encourage
+        const missing = goal - weekTotal;
+        candidates.push({
+          type: 'camino_objectiu',
+          emoji: '💪',
+          title: 'Vas per bon camí!',
+          message: missing === 1
+            ? `Portes ${weekTotal}/${goal}. Et falta 1 per assolir el teu objectiu setmanal!`
+            : `Portes ${weekTotal}/${goal} activitats. Continua així i ho aconseguiràs!`,
+          color: '#006874',
+        });
+      }
+    }
+
     // ── Retorna màxim 2 per prioritat ─────────────────────────────────────
     const priority: InsightType[] = [
-      'gran_setmana', 'descansa', 'prova_gym', 'setmana_fluixa',
+      'objectiu_assolit', 'gran_setmana', 'descansa', 'prova_gym',
+      'camino_objectiu', 'setmana_fluixa', 'anima_objectiu',
       'prova_esport', 'recupera_esport', 'equilibra_gym',
     ];
     return candidates

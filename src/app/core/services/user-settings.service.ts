@@ -12,9 +12,10 @@ export class UserSettingsService {
   private readonly _settings = signal<UserSettings>(DEFAULT_USER_SETTINGS);
   private readonly _loaded   = signal(false);
 
-  readonly settings       = this._settings.asReadonly();
-  readonly loaded         = this._loaded.asReadonly();
-  readonly metricsEnabled = computed(() => this._settings().metricsEnabled);
+  readonly settings            = this._settings.asReadonly();
+  readonly loaded              = this._loaded.asReadonly();
+  readonly metricsEnabled      = computed(() => this._settings().metricsEnabled);
+  readonly weeklyActivityGoal  = computed(() => this._settings().weeklyActivityGoal ?? null);
 
   constructor() {
     effect(() => {
