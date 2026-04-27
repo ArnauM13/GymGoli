@@ -6,7 +6,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { AuthService } from '../../core/services/auth.service';
 import { environment } from '../../../environments/environment';
 
-type AuthMode = 'login' | 'register';
+type AuthMode = 'login' | 'register' | 'forgot';
 
 // Supabase error messages use the message string directly (not error codes like Firebase)
 function friendlyError(err: unknown): string {
@@ -45,47 +45,84 @@ function friendlyError(err: unknown): string {
           </div>
         } @else {
 
-          <!-- ── Email / password form ── -->
-          <form class="email-form" (ngSubmit)="submitEmail()" #f="ngForm">
-            <div class="form-tabs">
-              <button type="button" class="tab-btn" [class.active]="mode() === 'login'"    (click)="mode.set('login')">Inicia sessió</button>
-              <button type="button" class="tab-btn" [class.active]="mode() === 'register'" (click)="mode.set('register')">Registra't</button>
-            </div>
+          @if (mode() === 'forgot') {
+            <!-- ── Forgot password form ── -->
+            <form class="email-form" (ngSubmit)="submitForgot()">
+              <p class="forgot-hint">T'enviarem un correu amb l'enllaç per restablir la contrasenya.</p>
+              <input
+                class="form-input"
+                type="email"
+                placeholder="Correu electrònic"
+                [(ngModel)]="email"
+                name="email"
+                required
+                autocomplete="email"
+              >
 
-            <input
-              class="form-input"
-              type="email"
-              placeholder="Correu electrònic"
-              [(ngModel)]="email"
-              name="email"
-              required
-              autocomplete="email"
-            >
-            <input
-              class="form-input"
-              type="password"
-              placeholder="Contrasenya"
-              [(ngModel)]="password"
-              name="password"
-              required
-              [attr.autocomplete]="mode() === 'register' ? 'new-password' : 'current-password'"
-            >
-
-            @if (emailError()) {
-              <p class="form-error">{{ emailError() }}</p>
-            }
-
-            @if (mode() === 'register' && registerSuccess()) {
-              <p class="form-success">Compte creat! Comprova el teu correu per confirmar el compte.</p>
-            }
-
-            <button class="btn-email" type="submit" [disabled]="loadingEmail()">
-              @if (loadingEmail()) {
-                <span class="material-symbols-outlined spin">sync</span>
+              @if (emailError()) {
+                <p class="form-error">{{ emailError() }}</p>
               }
-              {{ mode() === 'login' ? 'Entra' : 'Crear compte' }}
-            </button>
-          </form>
+              @if (forgotSuccess()) {
+                <p class="form-success">Correu enviat! Revisa la teva safata d'entrada.</p>
+              }
+
+              <button class="btn-email" type="submit" [disabled]="loadingEmail()">
+                @if (loadingEmail()) { <span class="material-symbols-outlined spin">sync</span> }
+                Envia l'enllaç
+              </button>
+              <button type="button" class="btn-back-link" (click)="mode.set('login')">
+                <span class="material-symbols-outlined">arrow_back</span> Tornar
+              </button>
+            </form>
+
+          } @else {
+            <!-- ── Email / password form ── -->
+            <form class="email-form" (ngSubmit)="submitEmail()" #f="ngForm">
+              <div class="form-tabs">
+                <button type="button" class="tab-btn" [class.active]="mode() === 'login'"    (click)="mode.set('login')">Inicia sessió</button>
+                <button type="button" class="tab-btn" [class.active]="mode() === 'register'" (click)="mode.set('register')">Registra't</button>
+              </div>
+
+              <input
+                class="form-input"
+                type="email"
+                placeholder="Correu electrònic"
+                [(ngModel)]="email"
+                name="email"
+                required
+                autocomplete="email"
+              >
+              <input
+                class="form-input"
+                type="password"
+                placeholder="Contrasenya"
+                [(ngModel)]="password"
+                name="password"
+                required
+                [attr.autocomplete]="mode() === 'register' ? 'new-password' : 'current-password'"
+              >
+
+              @if (emailError()) {
+                <p class="form-error">{{ emailError() }}</p>
+              }
+              @if (mode() === 'register' && registerSuccess()) {
+                <p class="form-success">Compte creat! Comprova el teu correu per confirmar el compte.</p>
+              }
+
+              <button class="btn-email" type="submit" [disabled]="loadingEmail()">
+                @if (loadingEmail()) {
+                  <span class="material-symbols-outlined spin">sync</span>
+                }
+                {{ mode() === 'login' ? 'Entra' : 'Crear compte' }}
+              </button>
+
+              @if (mode() === 'login') {
+                <button type="button" class="btn-forgot" (click)="openForgot()">
+                  Has oblidat la contrasenya?
+                </button>
+              }
+            </form>
+          }
 
           <!-- ── Divider ── -->
           <div class="divider"><span>o</span></div>
@@ -227,6 +264,24 @@ function friendlyError(err: unknown): string {
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     .spin { animation: spin 1s linear infinite; }
 
+    /* ── Forgot password ── */
+    .forgot-hint {
+      margin: 0; font-size: 13px; color: #777; line-height: 1.5; text-align: center;
+    }
+    .btn-forgot {
+      display: block; width: 100%; padding: 6px; border: none; background: transparent;
+      font-size: 12px; color: #006874; cursor: pointer; text-align: center;
+      text-decoration: underline; touch-action: manipulation;
+      &:hover { color: #00565f; }
+    }
+    .btn-back-link {
+      display: flex; align-items: center; justify-content: center; gap: 4px;
+      width: 100%; padding: 8px; border: none; background: transparent;
+      font-size: 13px; color: #888; cursor: pointer; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover { color: #333; }
+    }
+
     /* ── Access denied ── */
     .access-denied {
       display: flex; flex-direction: column; align-items: center;
@@ -266,6 +321,7 @@ export class LoginComponent {
   readonly blockedEmail    = signal('');
   readonly emailError      = signal('');
   readonly registerSuccess = signal(false);
+  readonly forgotSuccess   = signal(false);
   readonly hasRestriction: boolean = environment.allowedEmails.length > 0;
 
   email    = '';
@@ -286,6 +342,27 @@ export class LoginComponent {
       }
     } catch (err: unknown) {
       this.emailError.set(friendlyError(err));
+    } finally {
+      this.loadingEmail.set(false);
+    }
+  }
+
+  openForgot(): void {
+    this.emailError.set('');
+    this.forgotSuccess.set(false);
+    this.mode.set('forgot');
+  }
+
+  async submitForgot(): Promise<void> {
+    this.emailError.set('');
+    this.forgotSuccess.set(false);
+    if (!this.email) { this.emailError.set('Introdueix el teu correu electrònic.'); return; }
+    this.loadingEmail.set(true);
+    try {
+      await this.authService.resetPasswordForEmail(this.email);
+      this.forgotSuccess.set(true);
+    } catch (err: unknown) {
+      this.emailError.set('Error en enviar el correu. Torna-ho a provar.');
     } finally {
       this.loadingEmail.set(false);
     }

@@ -1,8 +1,10 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { Location } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
+import { AuthService } from '../../core/services/auth.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 
 @Component({
@@ -79,6 +81,35 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
           </div>
         </div>
       }
+
+      <!-- ── Compte ── -->
+      <div class="section section--danger">
+        <h2 class="section-title">Compte</h2>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Tancar sessió</span>
+            <span class="setting-desc">Sortiràs de l'aplicació en aquest dispositiu.</span>
+          </div>
+          <button class="danger-btn danger-btn--soft" (click)="logout()">Sortir</button>
+        </div>
+
+        <div class="setting-divider"></div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label danger-label">Eliminar compte</span>
+            <span class="setting-desc">S'eliminaran totes les teves dades de forma permanent.</span>
+          </div>
+          <button class="danger-btn" (click)="deleteAccount()" [disabled]="deletingAccount()">
+            @if (deletingAccount()) {
+              <span class="material-symbols-outlined spin">sync</span>
+            } @else {
+              Eliminar
+            }
+          </button>
+        </div>
+      </div>
 
       <a class="legal-link" routerLink="/privacy">
         <span class="material-symbols-outlined">policy</span>
@@ -188,6 +219,34 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
       &.step-btn--danger:hover:not(:disabled) { border-color: #ef5350; color: #ef5350; background: rgba(239,83,80,0.06); }
     }
 
+    /* ── Account / danger section ── */
+    .section--danger { margin-top: 8px; }
+
+    .setting-divider {
+      height: 1px; background: #f0f0f0; margin: 10px 0;
+    }
+
+    .danger-label { color: #c62828; }
+
+    .danger-btn {
+      display: flex; align-items: center; justify-content: center; gap: 4px;
+      padding: 8px 14px; border-radius: 10px;
+      border: 1.5px solid #e0e0e0; background: white;
+      font-size: 13px; font-weight: 600; color: #555;
+      cursor: pointer; white-space: nowrap; flex-shrink: 0;
+      transition: all 0.15s; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 15px; }
+      &:hover:not(:disabled) { border-color: #bbb; color: #333; }
+      &:disabled { opacity: 0.5; cursor: default; }
+      &:not(.danger-btn--soft) {
+        border-color: #ffcdd2; color: #c62828;
+        &:hover:not(:disabled) { background: #fef2f2; border-color: #ef9a9a; }
+      }
+    }
+
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .spin { animation: spin 1s linear infinite; font-size: 15px !important; }
+
     /* ── Legal link ── */
     .legal-link {
       display: flex; align-items: center; gap: 8px;
@@ -203,9 +262,19 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
 })
 export class SettingsComponent {
   readonly settingsService = inject(UserSettingsService);
+  private authService      = inject(AuthService);
   private location         = inject(Location);
+  private router           = inject(Router);
+  private snackBar         = inject(MatSnackBar);
+
+  readonly deletingAccount = signal(false);
 
   back(): void { this.location.back(); }
+
+  async logout(): Promise<void> {
+    await this.authService.logout();
+    this.router.navigate(['/login']);
+  }
 
   toggleMetrics(): void {
     this.settingsService.update({ metricsEnabled: !this.settingsService.metricsEnabled() });
@@ -224,5 +293,26 @@ export class SettingsComponent {
 
   clearGoal(): void {
     this.settingsService.update({ weeklyActivityGoal: null });
+  }
+
+  async deleteAccount(): Promise<void> {
+    const confirmed = confirm(
+      'Estàs segur/a que vols eliminar el compte?\n\nTotes les teves dades (entrenaments, esports, configuració) s\'eliminaran de forma permanent i no es podran recuperar.'
+    );
+    if (!confirmed) return;
+
+    this.deletingAccount.set(true);
+    try {
+      await this.authService.deleteAccount();
+      this.router.navigate(['/login']);
+    } catch {
+      this.snackBar.open(
+        'Error en eliminar el compte. Contacta amb el suport si el problema persisteix.',
+        'OK',
+        { duration: 6000 }
+      );
+    } finally {
+      this.deletingAccount.set(false);
+    }
   }
 }
