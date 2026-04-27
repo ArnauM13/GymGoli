@@ -1,7 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
-import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import {
@@ -22,12 +20,12 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
 @Component({
   selector: 'app-library',
   standalone: true,
-  imports: [MatButtonModule, MatIconModule],
+  imports: [],
   template: `
     <div class="page">
       <header class="page-header">
         <h1>Exercicis</h1>
-        <button mat-icon-button (click)="openForm()" aria-label="Nou exercici">
+        <button class="header-add" (click)="openForm()" aria-label="Nou exercici">
           <span class="material-symbols-outlined">add</span>
         </button>
       </header>
@@ -43,210 +41,258 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
           <button
             class="filter-chip"
             [class.active]="activeFilter() === cat.value"
+            [style.--cat-color]="getCategoryColor(cat.value)"
             (click)="activeFilter.set(cat.value)"
           >
-            <span class="material-symbols-outlined" style="font-size:16px">{{ cat.icon }}</span>
+            <span class="material-symbols-outlined">{{ cat.icon }}</span>
             {{ cat.label }}
           </button>
         }
       </div>
 
-      <!-- Exercise list -->
-      <div class="exercise-list">
-        @if (exercises().length === 0) {
+      <!-- Empty state -->
+      @if (exercises().length === 0) {
+        <div class="card-section">
           <div class="empty-state">
             <span class="material-symbols-outlined empty-icon">fitness_center</span>
             <p>Cap exercici encara</p>
-            <button mat-flat-button (click)="openForm()">Crea el primer</button>
-            <button mat-button (click)="seed()">Carrega exercicis per defecte</button>
-          </div>
-        }
-
-        @for (cat of visibleCategories(); track cat.value) {
-          <div class="category-section">
-            <div class="category-header" [style.border-left-color]="getCategoryColor(cat.value)">
-              <span class="material-symbols-outlined" [style.color]="getCategoryColor(cat.value)">
-                {{ getCategoryIcon(cat.value) }}
-              </span>
-              <h2>{{ getCategoryLabel(cat.value) }}</h2>
-              <span class="count">{{ exercisesByCategory(cat.value).length }}</span>
+            <div class="empty-actions">
+              <button class="btn-primary" (click)="openForm()">Crea el primer</button>
+              <button class="btn-secondary" (click)="seed()">Carrega per defecte</button>
             </div>
-
-            @for (exercise of exercisesByCategory(cat.value); track exercise.id) {
-              <div class="exercise-card">
-                <div class="exercise-info">
-                  <span class="exercise-name">{{ exercise.name }}</span>
-                  @if (exercise.subcategory) {
-                    <span class="exercise-sub">{{ getSubcategoryLabel(exercise.subcategory) }}</span>
-                  }
-                  @if (exercise.notes) {
-                    <span class="exercise-notes">{{ exercise.notes }}</span>
-                  }
-                </div>
-                <div class="exercise-actions">
-                  <button mat-icon-button (click)="openForm(exercise)" aria-label="Editar">
-                    <span class="material-symbols-outlined">edit</span>
-                  </button>
-                  <button mat-icon-button (click)="deleteExercise(exercise)" aria-label="Eliminar">
-                    <span class="material-symbols-outlined">delete</span>
-                  </button>
-                </div>
-              </div>
-            }
           </div>
-        }
-      </div>
+        </div>
+      }
+
+      @for (cat of visibleCategories(); track cat.value) {
+        <div class="card-section">
+          <div class="section-header">
+            <span class="material-symbols-outlined section-icon" [style.color]="getCategoryColor(cat.value)">
+              {{ getCategoryIcon(cat.value) }}
+            </span>
+            <h2 class="section-title">{{ getCategoryLabel(cat.value) }}</h2>
+            <span class="section-count">{{ exercisesByCategory(cat.value).length }}</span>
+          </div>
+
+          @for (exercise of exercisesByCategory(cat.value); track exercise.id) {
+            <div class="item-card">
+              <div class="ic-bar" [style.background]="getCategoryColor(cat.value)"></div>
+              <div class="ic-info">
+                <span class="ic-name">{{ exercise.name }}</span>
+                <span class="ic-detail">
+                  @if (exercise.subcategory) {
+                    {{ getSubcategoryLabel(exercise.subcategory) }}
+                  }
+                  @if (exercise.subcategory && exercise.notes) { · }
+                  @if (exercise.notes) { {{ exercise.notes }} }
+                </span>
+              </div>
+              <button class="ic-action" (click)="openForm(exercise)" aria-label="Editar">
+                <span class="material-symbols-outlined">edit</span>
+              </button>
+              <button class="ic-action ic-action--danger" (click)="deleteExercise(exercise)" aria-label="Eliminar">
+                <span class="material-symbols-outlined">delete</span>
+              </button>
+            </div>
+          }
+        </div>
+      }
 
       <!-- ══ Secció Esports ══ -->
-      <div class="section-divider"></div>
-
-      <header class="page-header">
+      <header class="page-header page-header--mt">
         <h1>Esports</h1>
-        <button mat-icon-button (click)="openSportForm()" aria-label="Nou esport">
+        <button class="header-add" (click)="openSportForm()" aria-label="Nou esport">
           <span class="material-symbols-outlined">add</span>
         </button>
       </header>
 
-      <div class="exercise-list">
-        @if (sports().length === 0) {
+      @if (sports().length === 0) {
+        <div class="card-section">
           <div class="empty-state">
             <span class="material-symbols-outlined empty-icon">sports_soccer</span>
             <p>Cap esport configurat</p>
-            <button mat-flat-button (click)="openSportForm()">Afegeix el primer</button>
-          </div>
-        }
-
-        @for (sport of sports(); track sport.id) {
-          <div class="exercise-card">
-            <div class="exercise-info sport-info">
-              <span
-                class="material-symbols-outlined sport-icon"
-                [style.color]="sport.color"
-              >{{ sport.icon }}</span>
-              <span class="exercise-name">{{ sport.name }}</span>
+            <div class="empty-actions">
+              <button class="btn-primary" (click)="openSportForm()">Afegeix el primer</button>
             </div>
-            <div class="exercise-actions">
-              <button mat-icon-button (click)="openSportForm(sport)" aria-label="Editar">
+          </div>
+        </div>
+      } @else {
+        <div class="card-section">
+          <div class="section-header">
+            <span class="material-symbols-outlined section-icon">sports_soccer</span>
+            <h2 class="section-title">Els teus esports</h2>
+            <span class="section-count">{{ sports().length }}</span>
+          </div>
+
+          @for (sport of sports(); track sport.id) {
+            <div class="item-card">
+              <div class="ic-bar" [style.background]="sport.color"></div>
+              <span class="material-symbols-outlined sport-icon" [style.color]="sport.color">
+                {{ sport.icon }}
+              </span>
+              <div class="ic-info">
+                <span class="ic-name">{{ sport.name }}</span>
+                @if (sport.subtypes?.length) {
+                  <span class="ic-detail">{{ sport.subtypes.length }} subtipus</span>
+                }
+              </div>
+              <button class="ic-action" (click)="openSportForm(sport)" aria-label="Editar">
                 <span class="material-symbols-outlined">edit</span>
               </button>
-              <button mat-icon-button (click)="deleteSport(sport)" aria-label="Eliminar">
+              <button class="ic-action ic-action--danger" (click)="deleteSport(sport)" aria-label="Eliminar">
                 <span class="material-symbols-outlined">delete</span>
               </button>
             </div>
-          </div>
-        }
-      </div>
+          }
+        </div>
+      }
     </div>
   `,
   styles: [`
-    .page { padding: 0 0 80px; }
+    .page { padding: 0 0 84px; }
 
+    /* ── Page header ── */
     .page-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      display: flex; align-items: center; justify-content: space-between;
       padding: 16px 16px 8px;
-
-      h1 { margin: 0; font-size: 22px; font-weight: 600; color: #1a1a1a; }
+      &.page-header--mt { padding-top: 24px; }
+      h1 { margin: 0; font-size: 20px; font-weight: 700; color: #1a1a1a; letter-spacing: -0.2px; }
+    }
+    .header-add {
+      width: 36px; height: 36px; border-radius: 50%; border: none;
+      background: #006874; color: white; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, transform 0.1s; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 20px; }
+      &:hover  { background: #005a63; }
+      &:active { transform: scale(0.94); }
     }
 
+    /* ── Filter chips ── */
     .filter-bar {
-      display: flex;
-      gap: 8px;
+      display: flex; gap: 6px;
       padding: 4px 16px 12px;
       overflow-x: auto;
       scrollbar-width: none;
       &::-webkit-scrollbar { display: none; }
     }
-
     .filter-chip {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      padding: 6px 14px;
-      border: 1.5px solid #e0e0e0;
-      border-radius: 20px;
+      display: flex; align-items: center; gap: 4px;
+      padding: 6px 12px;
+      border: 1.5px solid #e0e0e0; border-radius: 20px;
       background: white;
-      font-size: 13px;
-      font-weight: 500;
-      color: #616161;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: all 0.2s;
-
-      &:hover { border-color: #006874; color: #006874; }
-      &.active { background: #006874; color: white; border-color: #006874; }
+      font-size: 12px; font-weight: 600; color: #666;
+      cursor: pointer; white-space: nowrap; touch-action: manipulation;
+      transition: all 0.15s;
+      .material-symbols-outlined { font-size: 15px; }
+      &:hover:not(.active) {
+        border-color: var(--cat-color, #006874);
+        color: var(--cat-color, #006874);
+      }
+      &.active {
+        background: var(--cat-color, #006874);
+        border-color: var(--cat-color, #006874);
+        color: white;
+      }
     }
 
-    .exercise-list { padding: 0 16px; }
-
-    .category-section { margin-bottom: 20px; }
-
-    .category-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 12px;
-      border-left: 4px solid #ccc;
-      background: #f8f8f8;
-      border-radius: 0 8px 8px 0;
-      margin-bottom: 8px;
-
-      h2 { margin: 0; font-size: 15px; font-weight: 600; color: #333; flex: 1; }
-      .count { font-size: 12px; color: #888; background: #e0e0e0; border-radius: 10px; padding: 1px 7px; }
+    /* ── Section card (matches train page) ── */
+    .card-section {
+      margin: 12px 16px 0;
+      padding: 14px 14px 10px;
+      background: white;
+      border-radius: 18px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
     }
 
-    .exercise-card {
-      display: flex;
-      align-items: center;
-      padding: 10px 12px;
-      background: white;
-      border-radius: 10px;
+    .section-header {
+      display: flex; align-items: center; gap: 7px;
+      margin-bottom: 12px;
+    }
+    .section-icon {
+      font-size: 18px; color: #888;
+      font-variation-settings: 'FILL' 0, 'wght' 300;
+    }
+    .section-title {
+      margin: 0; flex: 1;
+      font-size: 14px; font-weight: 700; color: #555; letter-spacing: 0.2px;
+    }
+    .section-count {
+      font-size: 11px; font-weight: 700; color: #999;
+      background: #f0f0f0; border-radius: 10px; padding: 2px 8px;
+    }
+
+    /* ── Item card (exercise / sport) ── */
+    .item-card {
+      display: flex; align-items: center;
       margin-bottom: 6px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      border: 1.5px solid #efefef; border-radius: 14px;
+      background: white; overflow: hidden;
+      transition: box-shadow 0.15s, border-color 0.15s;
+      &:last-child  { margin-bottom: 4px; }
+      &:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-color: #ddd; }
     }
 
-    .exercise-info {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
+    .ic-bar { width: 5px; align-self: stretch; flex-shrink: 0; }
 
-    .exercise-name { font-size: 15px; font-weight: 500; color: #1a1a1a; }
-    .exercise-sub { font-size: 12px; color: #006874; font-weight: 500; }
-    .exercise-notes { font-size: 12px; color: #888; font-style: italic; }
-
-    .exercise-actions { display: flex; gap: 4px; color: #bbb; }
-
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 12px;
-      padding: 48px 16px;
-      text-align: center;
-      color: #888;
-
-      .empty-icon { font-size: 56px; color: #ccc; }
-      p { margin: 0; font-size: 16px; }
-    }
-
-    .section-divider {
-      height: 1px;
-      background: #eeeeee;
-      margin: 8px 16px 4px;
-    }
-
-    .sport-info {
-      flex-direction: row;
-      align-items: center;
-      gap: 10px;
-    }
     .sport-icon {
-      font-size: 22px;
+      font-size: 22px; flex-shrink: 0;
+      padding: 0 2px 0 10px;
       font-variation-settings: 'FILL' 1, 'wght' 400;
-      flex-shrink: 0;
+    }
+
+    .ic-info {
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column; gap: 2px;
+      padding: 10px 10px;
+    }
+    .ic-name {
+      font-size: 13px; font-weight: 700; color: #1a1a1a;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .ic-detail {
+      font-size: 11px; color: #999;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      &:empty { display: none; }
+    }
+
+    .ic-action {
+      width: 36px; height: 36px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      border: none; background: transparent; cursor: pointer;
+      color: #ccc; touch-action: manipulation;
+      transition: color 0.15s, background 0.15s;
+      .material-symbols-outlined { font-size: 17px; }
+      &:hover { color: #666; background: rgba(0,0,0,0.04); }
+      &.ic-action--danger:hover { color: #ef5350; background: rgba(239,83,80,0.08); }
+      &:last-child { margin-right: 4px; }
+    }
+
+    /* ── Empty state ── */
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+      padding: 28px 16px;
+      text-align: center; color: #888;
+      .empty-icon {
+        font-size: 48px; color: #d8d8d8;
+        font-variation-settings: 'FILL' 0, 'wght' 200;
+      }
+      p { margin: 0; font-size: 14px; font-weight: 500; }
+    }
+    .empty-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+    .btn-primary {
+      padding: 8px 16px; border: none; border-radius: 10px;
+      background: #006874; color: white;
+      font-size: 13px; font-weight: 700; cursor: pointer;
+      transition: background 0.15s; touch-action: manipulation;
+      &:hover { background: #005a63; }
+    }
+    .btn-secondary {
+      padding: 8px 16px; border-radius: 10px;
+      border: 1.5px solid #e0e0e0; background: white; color: #666;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: all 0.15s; touch-action: manipulation;
+      &:hover { border-color: #bbb; color: #333; }
     }
   `],
 })
