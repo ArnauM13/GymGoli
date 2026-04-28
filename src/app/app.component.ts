@@ -3,15 +3,21 @@ import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { AuthService } from './core/services/auth.service';
+import { UserSettingsService } from './core/services/user-settings.service';
 import { NavBarComponent } from './shared/components/nav-bar/nav-bar.component';
+import { OnboardingComponent } from './shared/components/onboarding/onboarding.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, NavBarComponent],
+  imports: [RouterOutlet, RouterLink, NavBarComponent, OnboardingComponent],
   template: `
     @if (auth.user() !== undefined) {
     <div class="app-shell app-ready">
+
+    @if (showOnboarding()) {
+      <app-onboarding (done)="onOnboardingDone()" />
+    }
 
       <!-- ── Top brand bar ── -->
       <header class="app-header">
@@ -155,14 +161,22 @@ import { NavBarComponent } from './shared/components/nav-bar/nav-bar.component';
   `],
 })
 export class AppComponent {
-  readonly auth   = inject(AuthService);
-  private router  = inject(Router);
-  private snackBar = inject(MatSnackBar);
+  readonly auth            = inject(AuthService);
+  private settingsService  = inject(UserSettingsService);
+  private router           = inject(Router);
+  private snackBar         = inject(MatSnackBar);
 
   menuOpen = false;
 
   readonly userName      = computed(() => this.auth.user()?.user_metadata?.['full_name'] as string | undefined);
   readonly userAvatarUrl = computed(() => this.auth.user()?.user_metadata?.['avatar_url'] as string | undefined);
+
+  readonly showOnboarding = computed(() => {
+    const user     = this.auth.user();
+    const settings = this.settingsService.settings();
+    const loaded   = this.settingsService.loaded();
+    return !!user && loaded && !settings.onboardingDone;
+  });
 
   constructor() {
     effect(() => {
@@ -172,9 +186,18 @@ export class AppComponent {
       loader.classList.add('hiding');
       setTimeout(() => loader.remove(), 300);
     });
+
+    // Redirect to /reset-password when Supabase fires PASSWORD_RECOVERY
+    effect(() => {
+      if (this.auth.isPasswordRecovery()) {
+        this.router.navigate(['/reset-password']);
+      }
+    });
   }
 
   toggleUserMenu(): void { this.menuOpen = !this.menuOpen; }
+
+  onOnboardingDone(): void { /* showOnboarding() reacts to settings change automatically */ }
 
   async logout(): Promise<void> {
     this.menuOpen = false;

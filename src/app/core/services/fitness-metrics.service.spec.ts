@@ -4,6 +4,8 @@ import { signal } from '@angular/core';
 import { FitnessMetricsService } from './fitness-metrics.service';
 import { WorkoutService } from './workout.service';
 import { SportService } from './sport.service';
+import { UserSettingsService } from './user-settings.service';
+import { DEFAULT_USER_SETTINGS, UserSettings } from '../models/user-settings.model';
 import { Workout } from '../models/workout.model';
 import { Sport, SportSession } from '../models/sport.model';
 
@@ -38,6 +40,7 @@ describe('FitnessMetricsService', () => {
   let mockWorkouts: ReturnType<typeof signal<Workout[]>>;
   let mockSessions: ReturnType<typeof signal<SportSession[]>>;
   let mockSports:   ReturnType<typeof signal<Sport[]>>;
+  let mockSettings: ReturnType<typeof signal<UserSettings>>;
 
   beforeEach(() => {
     jasmine.clock().install();
@@ -46,12 +49,14 @@ describe('FitnessMetricsService', () => {
     mockWorkouts = signal<Workout[]>([]);
     mockSessions = signal<SportSession[]>([]);
     mockSports   = signal<Sport[]>([]);
+    mockSettings = signal<UserSettings>({ ...DEFAULT_USER_SETTINGS });
 
     TestBed.configureTestingModule({
       providers: [
         FitnessMetricsService,
-        { provide: WorkoutService, useValue: { workouts: mockWorkouts } },
-        { provide: SportService,   useValue: { sessions: mockSessions, sports: mockSports } },
+        { provide: WorkoutService,     useValue: { workouts: mockWorkouts } },
+        { provide: SportService,       useValue: { sessions: mockSessions, sports: mockSports } },
+        { provide: UserSettingsService, useValue: { settings: mockSettings } },
       ],
     });
 
@@ -62,7 +67,9 @@ describe('FitnessMetricsService', () => {
 
   // ── Base case ────────────────────────────────────────────────────────────
 
-  it('returns no insights when there is no data', () => {
+  it('returns no insights on Monday with no data (start of week)', () => {
+    // Monday Apr 21 — before the mid-week threshold, so setmana_fluixa doesn't trigger
+    jasmine.clock().mockDate(new Date('2025-04-21T12:00:00'));
     expect(service.insights()).toEqual([]);
   });
 
@@ -461,6 +468,165 @@ describe('FitnessMetricsService', () => {
       const insight = service.insights().find(i => i.type === 'equilibra_gym');
       // Only push(3) in window; legs outside — only 1 active cat → should NOT trigger
       expect(insight).toBeUndefined();
+    });
+  });
+
+  // ── objectiu_assolit ─────────────────────────────────────────────────────
+
+  describe('objectiu_assolit', () => {
+    it('triggers when weekTotal equals the goal', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 3 });
+      mockWorkouts.set([d(-2), d(-1), d(0)].map(makeWorkout));
+      mockSessions.set([]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).toContain('objectiu_assolit');
+    });
+
+    it('triggers when weekTotal exceeds the goal', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 2 });
+      mockWorkouts.set([d(-2), d(-1), d(0)].map(makeWorkout));
+      mockSessions.set([]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).toContain('objectiu_assolit');
+    });
+
+    it('does NOT trigger when weekTotal is below the goal', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 5 });
+      mockWorkouts.set([d(-1), d(0)].map(makeWorkout));
+      mockSessions.set([]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).not.toContain('objectiu_assolit');
+    });
+
+    it('does NOT trigger when no goal is set', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: null });
+      mockWorkouts.set([d(-2), d(-1), d(0)].map(makeWorkout));
+      mockSessions.set([]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).not.toContain('objectiu_assolit');
+    });
+
+    it('message mentions the activity count', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 3 });
+      mockWorkouts.set([d(-2), d(-1), d(0)].map(makeWorkout));
+
+      const insight = service.insights().find(i => i.type === 'objectiu_assolit');
+      expect(insight?.message).toContain('3');
+    });
+
+    it('has higher priority than gran_setmana', () => {
+      // 5+ activities + goal met → objectiu_assolit must appear first
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 3 });
+      mockWorkouts.set([d(-2), d(-1), d(0)].map(makeWorkout));
+      mockSessions.set([makeSession(d(-2)), makeSession(d(-1))]);
+
+      const insights = service.insights();
+      expect(insights[0].type).toBe('objectiu_assolit');
+    });
+  });
+
+  // ── camino_objectiu ──────────────────────────────────────────────────────
+
+  describe('camino_objectiu', () => {
+    // MOCK_DATE is Wed Apr 23 (dow=3), so camino_objectiu conditions apply
+
+    it('triggers on Wednesday with some progress toward goal', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 4 });
+      mockWorkouts.set([makeWorkout(d(-1))]);  // 1 workout this week, goal is 4
+      mockSessions.set([]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).toContain('camino_objectiu');
+    });
+
+    it('does NOT trigger when goal is not set', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: null });
+      mockWorkouts.set([makeWorkout(d(-1))]);
+      mockSessions.set([]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).not.toContain('camino_objectiu');
+    });
+
+    it('does NOT trigger when weekTotal is 0 (no progress yet)', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 4 });
+      mockWorkouts.set([]);
+      mockSessions.set([]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).not.toContain('camino_objectiu');
+    });
+
+    it('does NOT trigger when goal is already met', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 2 });
+      mockWorkouts.set([d(-2), d(-1)].map(makeWorkout));
+      mockSessions.set([]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).not.toContain('camino_objectiu');
+    });
+
+    it('message includes current and goal counts', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 4 });
+      mockWorkouts.set([makeWorkout(d(-1))]);
+
+      const insight = service.insights().find(i => i.type === 'camino_objectiu');
+      expect(insight?.message).toContain('1');
+      expect(insight?.message).toContain('4');
+    });
+  });
+
+  // ── anima_objectiu ───────────────────────────────────────────────────────
+
+  describe('anima_objectiu', () => {
+    // anima_objectiu fires on Sunday (dow=0)
+
+    it('triggers on Sunday when goal not yet met', () => {
+      // Move to Sunday Apr 27
+      jasmine.clock().mockDate(new Date('2025-04-27T12:00:00'));
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 3 });
+      // Monday Apr 21 is the start of that week
+      mockWorkouts.set([makeWorkout('2025-04-22'), makeWorkout('2025-04-24')]);
+      mockSessions.set([]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).toContain('anima_objectiu');
+    });
+
+    it('does NOT trigger on Sunday when goal is already met', () => {
+      jasmine.clock().mockDate(new Date('2025-04-27T12:00:00'));
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 2 });
+      mockWorkouts.set([makeWorkout('2025-04-22'), makeWorkout('2025-04-24')]);
+      mockSessions.set([]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).not.toContain('anima_objectiu');
+    });
+
+    it('does NOT trigger when no goal is set', () => {
+      jasmine.clock().mockDate(new Date('2025-04-27T12:00:00'));
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: null });
+      mockWorkouts.set([makeWorkout('2025-04-22')]);
+      mockSessions.set([]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).not.toContain('anima_objectiu');
+    });
+
+    it('message mentions missing count', () => {
+      jasmine.clock().mockDate(new Date('2025-04-27T12:00:00'));
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 3 });
+      mockWorkouts.set([makeWorkout('2025-04-22')]);
+      mockSessions.set([]);
+
+      const insight = service.insights().find(i => i.type === 'anima_objectiu');
+      // 1 workout, goal 3 → missing 2
+      expect(insight?.message).toContain('1');
+      expect(insight?.message).toContain('3');
     });
   });
 });

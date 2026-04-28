@@ -29,6 +29,9 @@ export class AuthService {
     return list.includes(u.email ?? '');
   });
 
+  private readonly _passwordRecovery = signal(false);
+  readonly isPasswordRecovery = this._passwordRecovery.asReadonly();
+
   constructor() {
     // Restore session on init
     this.supabase.auth.getSession().then(({ data }) => {
@@ -40,6 +43,7 @@ export class AuthService {
     this.supabase.auth.onAuthStateChange((_event, session) => {
       this._session.set(session);
       this._user.set(session?.user ?? null);
+      if (_event === 'PASSWORD_RECOVERY') this._passwordRecovery.set(true);
     });
   }
 
@@ -77,6 +81,25 @@ export class AuthService {
   }
 
   async logout(): Promise<void> {
+    await this.supabase.auth.signOut();
+  }
+
+  async resetPasswordForEmail(email: string): Promise<void> {
+    const { error } = await this.supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) throw error;
+  }
+
+  async updatePassword(newPassword: string): Promise<void> {
+    const { error } = await this.supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+    this._passwordRecovery.set(false);
+  }
+
+  async deleteAccount(): Promise<void> {
+    const { error } = await this.supabase.rpc('delete_my_account');
+    if (error) throw error;
     await this.supabase.auth.signOut();
   }
 

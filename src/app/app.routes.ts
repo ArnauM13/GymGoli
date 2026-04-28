@@ -14,6 +14,11 @@ export const routes: Routes = [
       import('./features/privacy/privacy.component').then(m => m.PrivacyComponent),
   },
   {
+    path: 'reset-password',
+    loadComponent: () =>
+      import('./features/auth/reset-password.component').then(m => m.ResetPasswordComponent),
+  },
+  {
     path: '',
     redirectTo: 'train',
     pathMatch: 'full',
