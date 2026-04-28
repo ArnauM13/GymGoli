@@ -208,7 +208,7 @@ interface ChartPoint {
       flex-direction: column;
       align-items: center;
       gap: 8px;
-      color: #bbb;
+      color: #767676;
       text-align: center;
 
       .material-symbols-outlined { font-size: 48px; }
@@ -234,7 +234,7 @@ interface ChartPoint {
     }
 
     .stat-value { font-size: 18px; font-weight: 700; color: #1a1a1a; }
-    .stat-label { font-size: 11px; color: #888; }
+    .stat-label { font-size: 11px; color: #666; }
     .positive { color: #4caf50; }
     .negative { color: #ef5350; }
 
@@ -248,7 +248,7 @@ interface ChartPoint {
 
       .empty-icon { font-size: 64px; color: #ddd; }
       h2 { margin: 0; font-size: 20px; font-weight: 600; color: #444; }
-      p { margin: 0; color: #888; }
+      p { margin: 0; color: #666; }
     }
   `],
 })

@@ -124,11 +124,11 @@ export interface ExercisePickerData {
 
     .info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
     .name { font-size: 15px; font-weight: 500; color: #1a1a1a; }
-    .sub { font-size: 12px; color: #888; }
+    .sub { font-size: 12px; color: #666; }
 
-    .arrow { color: #bbb; font-size: 20px; }
+    .arrow { color: #767676; font-size: 20px; }
 
-    .empty { padding: 24px; text-align: center; color: #888; }
+    .empty { padding: 24px; text-align: center; color: #666; }
   `],
 })
 export class ExercisePickerDialogComponent {

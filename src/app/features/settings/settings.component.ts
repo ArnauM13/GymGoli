@@ -81,7 +81,7 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
 
     .section-title {
       margin: 0 0 14px;
-      font-size: 13px; font-weight: 700; color: #888;
+      font-size: 13px; font-weight: 700; color: #666;
       letter-spacing: 0.3px; text-transform: uppercase;
     }
 
@@ -99,7 +99,7 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
     }
 
     .setting-desc {
-      font-size: 12px; color: #888; line-height: 1.4;
+      font-size: 12px; color: #666; line-height: 1.4;
     }
 
     /* ── Hint ── */

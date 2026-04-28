@@ -285,7 +285,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
     }
     .topbar-meta {
-      font-size: 11px; color: #aaa; font-weight: 500;
+      font-size: 11px; color: #666; font-weight: 500;
     }
     .topbar-delete {
       height: 34px; padding: 0 12px; border-radius: 10px;
@@ -438,7 +438,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       font-size: 13px; font-weight: 700; color: #1a1a1a;
     }
     .wc-detail {
-      font-size: 11px; color: #999;
+      font-size: 11px; color: #666;
     }
     .wc-delete {
       width: 40px; height: 40px; flex-shrink: 0;
@@ -461,7 +461,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       display: flex; align-items: center; gap: 6px; margin-bottom: 10px;
     }
     .suggestion-title { font-size: 13px; font-weight: 700; color: #444; }
-    .suggestion-date  { font-size: 12px; color: #aaa; }
+    .suggestion-date  { font-size: 12px; color: #666; }
     .suggestion-exercises {
       display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;
     }
@@ -469,13 +469,13 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       display: flex; justify-content: space-between; align-items: center;
     }
     .suggestion-exercise-name  { font-size: 13px; color: #333; }
-    .suggestion-exercise-stats { font-size: 11px; color: #888; }
+    .suggestion-exercise-stats { font-size: 11px; color: #666; }
     .suggestion-actions { display: flex; gap: 8px; }
     .btn-suggestion-new {
       flex: 1; padding: 8px; border: 1.5px solid #e0e0e0; border-radius: 10px;
       background: white; color: #666; font-size: 13px; font-weight: 600;
       cursor: pointer; touch-action: manipulation;
-      &:hover { border-color: #bbb; color: #333; }
+      &:hover { border-color: #767676; color: #333; }
     }
     .btn-suggestion-template {
       flex: 2; padding: 8px; border: none; border-radius: 10px;
@@ -498,7 +498,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       margin-bottom: 14px;
     }
     .sports-header-icon {
-      font-size: 18px; color: #888;
+      font-size: 18px; color: #666;
       font-variation-settings: 'FILL' 0, 'wght' 300;
     }
     .sports-title {
@@ -566,7 +566,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       padding: 10px 2px 2px;
     }
     .subtype-row-label {
-      font-size: 11px; font-weight: 600; color: #888;
+      font-size: 11px; font-weight: 600; color: #666;
       flex-shrink: 0;
     }
     .subtype-chip {

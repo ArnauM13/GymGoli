@@ -126,7 +126,7 @@ export interface SportFormDialogData {
 
     .picker-section { display: flex; flex-direction: column; gap: 8px; }
     .field-label { margin: 0; font-size: 13px; color: #616161; font-weight: 500; }
-    .optional-hint { font-weight: 400; color: #aaa; font-size: 11px; }
+    .optional-hint { font-weight: 400; color: #666; font-size: 11px; }
 
     /* Icon grid */
     .icon-grid {
@@ -145,7 +145,7 @@ export interface SportFormDialogData {
         font-size: 20px; color: #555;
         font-variation-settings: 'FILL' 0, 'wght' 300;
       }
-      &:hover { border-color: #aaa; background: #f0f0f0; }
+      &:hover { border-color: #666; background: #f0f0f0; }
       &.selected {
         border-color: currentColor;
         background: color-mix(in srgb, currentColor 8%, white);
