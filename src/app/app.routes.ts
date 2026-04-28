@@ -9,6 +9,11 @@ export const routes: Routes = [
       import('./features/auth/login.component').then(m => m.LoginComponent),
   },
   {
+    path: 'privacy',
+    loadComponent: () =>
+      import('./features/privacy/privacy.component').then(m => m.PrivacyComponent),
+  },
+  {
     path: '',
     redirectTo: 'train',
     pathMatch: 'full',

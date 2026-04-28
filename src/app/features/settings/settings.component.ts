@@ -1,5 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { Location } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
 import { UserSettingsService } from '../../core/services/user-settings.service';
@@ -7,7 +8,7 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [MatSlideToggleModule],
+  imports: [MatSlideToggleModule, RouterLink],
   template: `
     <div class="page">
 
@@ -43,6 +44,11 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
           </div>
         }
       </div>
+
+      <a class="legal-link" routerLink="/privacy">
+        <span class="material-symbols-outlined">policy</span>
+        Política de privacitat i Condicions d'ús
+      </a>
 
     </div>
   `,
@@ -114,6 +120,18 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
     .hint-icon {
       font-size: 15px; color: #006874; flex-shrink: 0; margin-top: 1px;
       font-variation-settings: 'FILL' 1;
+    }
+
+    /* ── Legal link ── */
+    .legal-link {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 12px; padding: 12px 14px;
+      background: white; border-radius: 14px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+      font-size: 13px; font-weight: 500; color: #555;
+      text-decoration: none; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 18px; color: #888; }
+      &:hover { color: #006874; box-shadow: 0 2px 14px rgba(0,0,0,0.11); }
     }
   `],
 })
