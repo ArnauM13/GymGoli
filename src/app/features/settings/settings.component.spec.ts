@@ -12,7 +12,10 @@ import { FitnessMetricsService } from '../../core/services/fitness-metrics.servi
 describe('SettingsComponent', () => {
   let component: SettingsComponent;
   let mockEnabled:       ReturnType<typeof signal<boolean>>;
+  let mockGoalMode:      ReturnType<typeof signal<'combined' | 'separate'>>;
   let mockGoal:          ReturnType<typeof signal<number | null>>;
+  let mockGymGoal:       ReturnType<typeof signal<number | null>>;
+  let mockSportGoal:     ReturnType<typeof signal<number | null>>;
   let mockStreak:        ReturnType<typeof signal<number>>;
   let mockUpdate:        jasmine.Spy;
   let mockLogout:        jasmine.Spy;
@@ -21,14 +24,17 @@ describe('SettingsComponent', () => {
   let mockSnackBarOpen:  jasmine.Spy;
 
   beforeEach(async () => {
-    mockEnabled       = signal(false);
-    mockGoal          = signal<number | null>(null);
-    mockStreak        = signal(0);
-    mockUpdate        = jasmine.createSpy('update');
-    mockLogout        = jasmine.createSpy('logout').and.returnValue(Promise.resolve());
+    mockEnabled    = signal(false);
+    mockGoalMode   = signal<'combined' | 'separate'>('combined');
+    mockGoal       = signal<number | null>(null);
+    mockGymGoal    = signal<number | null>(null);
+    mockSportGoal  = signal<number | null>(null);
+    mockStreak     = signal(0);
+    mockUpdate     = jasmine.createSpy('update');
+    mockLogout     = jasmine.createSpy('logout').and.returnValue(Promise.resolve());
     mockDeleteAccount = jasmine.createSpy('deleteAccount').and.returnValue(Promise.resolve());
-    mockNavigate      = jasmine.createSpy('navigate').and.returnValue(Promise.resolve(true));
-    mockSnackBarOpen  = jasmine.createSpy('open');
+    mockNavigate   = jasmine.createSpy('navigate').and.returnValue(Promise.resolve(true));
+    mockSnackBarOpen = jasmine.createSpy('open');
 
     await TestBed.configureTestingModule({
       imports: [SettingsComponent],
@@ -37,10 +43,20 @@ describe('SettingsComponent', () => {
           provide: UserSettingsService,
           useValue: {
             metricsEnabled:     mockEnabled,
+            goalMode:           mockGoalMode,
             weeklyActivityGoal: mockGoal,
+            weeklyGymGoal:      mockGymGoal,
+            weeklySportGoal:    mockSportGoal,
             loaded:             signal(true),
-            settings:           signal({ metricsEnabled: false, weeklyActivityGoal: null, onboardingDone: false }),
-            update:             mockUpdate,
+            settings:           signal({
+              metricsEnabled: false,
+              weeklyActivityGoal: null,
+              weeklyGymGoal: null,
+              weeklySportGoal: null,
+              goalMode: 'combined',
+              onboardingDone: false,
+            }),
+            update: mockUpdate,
           },
         },
         {
@@ -124,7 +140,21 @@ describe('SettingsComponent', () => {
     });
   });
 
-  // ── setGoal() ────────────────────────────────────────────────────────────
+  // ── setGoalMode() ────────────────────────────────────────────────────────
+
+  describe('setGoalMode()', () => {
+    it('updates goalMode to combined', () => {
+      component.setGoalMode('combined');
+      expect(mockUpdate).toHaveBeenCalledWith({ goalMode: 'combined' });
+    });
+
+    it('updates goalMode to separate', () => {
+      component.setGoalMode('separate');
+      expect(mockUpdate).toHaveBeenCalledWith({ goalMode: 'separate' });
+    });
+  });
+
+  // ── Combined goal ────────────────────────────────────────────────────────
 
   describe('setGoal()', () => {
     it('calls update with the given goal value', () => {
@@ -132,8 +162,6 @@ describe('SettingsComponent', () => {
       expect(mockUpdate).toHaveBeenCalledWith({ weeklyActivityGoal: 3 });
     });
   });
-
-  // ── adjustGoal() ─────────────────────────────────────────────────────────
 
   describe('adjustGoal()', () => {
     it('increments the goal by delta', () => {
@@ -167,12 +195,106 @@ describe('SettingsComponent', () => {
     });
   });
 
-  // ── clearGoal() ──────────────────────────────────────────────────────────
-
   describe('clearGoal()', () => {
     it('sets weeklyActivityGoal to null', () => {
       component.clearGoal();
       expect(mockUpdate).toHaveBeenCalledWith({ weeklyActivityGoal: null });
+    });
+  });
+
+  // ── Gym goal ─────────────────────────────────────────────────────────────
+
+  describe('setGymGoal()', () => {
+    it('calls update with the given gym goal value', () => {
+      component.setGymGoal(2);
+      expect(mockUpdate).toHaveBeenCalledWith({ weeklyGymGoal: 2 });
+    });
+  });
+
+  describe('adjustGymGoal()', () => {
+    it('increments the gym goal by delta', () => {
+      mockGymGoal.set(2);
+      component.adjustGymGoal(1);
+      expect(mockUpdate).toHaveBeenCalledWith({ weeklyGymGoal: 3 });
+    });
+
+    it('decrements the gym goal by delta', () => {
+      mockGymGoal.set(3);
+      component.adjustGymGoal(-1);
+      expect(mockUpdate).toHaveBeenCalledWith({ weeklyGymGoal: 2 });
+    });
+
+    it('clamps at minimum 1', () => {
+      mockGymGoal.set(1);
+      component.adjustGymGoal(-1);
+      expect(mockUpdate).toHaveBeenCalledWith({ weeklyGymGoal: 1 });
+    });
+
+    it('clamps at maximum 7', () => {
+      mockGymGoal.set(7);
+      component.adjustGymGoal(1);
+      expect(mockUpdate).toHaveBeenCalledWith({ weeklyGymGoal: 7 });
+    });
+
+    it('does nothing when gym goal is null', () => {
+      mockGymGoal.set(null);
+      component.adjustGymGoal(1);
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('clearGymGoal()', () => {
+    it('sets weeklyGymGoal to null', () => {
+      component.clearGymGoal();
+      expect(mockUpdate).toHaveBeenCalledWith({ weeklyGymGoal: null });
+    });
+  });
+
+  // ── Sport goal ───────────────────────────────────────────────────────────
+
+  describe('setSportGoal()', () => {
+    it('calls update with the given sport goal value', () => {
+      component.setSportGoal(2);
+      expect(mockUpdate).toHaveBeenCalledWith({ weeklySportGoal: 2 });
+    });
+  });
+
+  describe('adjustSportGoal()', () => {
+    it('increments the sport goal by delta', () => {
+      mockSportGoal.set(2);
+      component.adjustSportGoal(1);
+      expect(mockUpdate).toHaveBeenCalledWith({ weeklySportGoal: 3 });
+    });
+
+    it('decrements the sport goal by delta', () => {
+      mockSportGoal.set(3);
+      component.adjustSportGoal(-1);
+      expect(mockUpdate).toHaveBeenCalledWith({ weeklySportGoal: 2 });
+    });
+
+    it('clamps at minimum 1', () => {
+      mockSportGoal.set(1);
+      component.adjustSportGoal(-1);
+      expect(mockUpdate).toHaveBeenCalledWith({ weeklySportGoal: 1 });
+    });
+
+    it('clamps at maximum 7', () => {
+      mockSportGoal.set(7);
+      component.adjustSportGoal(1);
+      expect(mockUpdate).toHaveBeenCalledWith({ weeklySportGoal: 7 });
+    });
+
+    it('does nothing when sport goal is null', () => {
+      mockSportGoal.set(null);
+      component.adjustSportGoal(1);
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('clearSportGoal()', () => {
+    it('sets weeklySportGoal to null', () => {
+      component.clearSportGoal();
+      expect(mockUpdate).toHaveBeenCalledWith({ weeklySportGoal: null });
     });
   });
 

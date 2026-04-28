@@ -7,6 +7,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { AuthService } from '../../core/services/auth.service';
 import { FitnessMetricsService } from '../../core/services/fitness-metrics.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
+import { GoalMode } from '../../core/models/user-settings.model';
 
 @Component({
   selector: 'app-settings',
@@ -52,36 +53,116 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
         <div class="section">
           <h2 class="section-title">Objectiu setmanal</h2>
 
-          <div class="setting-row">
-            <div class="setting-info">
-              <span class="setting-label">Activitats per setmana</span>
-              <span class="setting-desc">
-                Gym i esport compten igual. Els consells t'animaran quan ho aconsegueixis.
-              </span>
-            </div>
-
-            @if (settingsService.weeklyActivityGoal() === null) {
-              <button class="goal-set-btn" (click)="setGoal(3)">
-                <span class="material-symbols-outlined">add</span>
-                Definir
-              </button>
-            } @else {
-              <div class="goal-stepper">
-                <button class="step-btn" (click)="adjustGoal(-1)" [disabled]="settingsService.weeklyActivityGoal()! <= 1" aria-label="Menys">
-                  <span class="material-symbols-outlined">remove</span>
-                </button>
-                <span class="goal-value">{{ settingsService.weeklyActivityGoal() }}</span>
-                <button class="step-btn" (click)="adjustGoal(1)" [disabled]="settingsService.weeklyActivityGoal()! >= 7" aria-label="Més">
-                  <span class="material-symbols-outlined">add</span>
-                </button>
-                <button class="step-btn step-btn--danger" (click)="clearGoal()" aria-label="Eliminar objectiu">
-                  <span class="material-symbols-outlined">close</span>
-                </button>
-              </div>
-            }
+          <!-- Mode selector -->
+          <div class="mode-selector">
+            <button
+              class="mode-btn"
+              [class.mode-btn--active]="settingsService.goalMode() === 'combined'"
+              (click)="setGoalMode('combined')"
+            >Combinat</button>
+            <button
+              class="mode-btn"
+              [class.mode-btn--active]="settingsService.goalMode() === 'separate'"
+              (click)="setGoalMode('separate')"
+            >Separat</button>
           </div>
 
-          @if (settingsService.weeklyActivityGoal() !== null && metricsService.goalStreak() > 0) {
+          @if (settingsService.goalMode() === 'combined') {
+            <!-- Combined goal (gym + sport together) -->
+            <div class="setting-row">
+              <div class="setting-info">
+                <span class="setting-label">Activitats per setmana</span>
+                <span class="setting-desc">
+                  Gym i esport compten igual. Els consells t'animaran quan ho aconsegueixis.
+                </span>
+              </div>
+
+              @if (settingsService.weeklyActivityGoal() === null) {
+                <button class="goal-set-btn" (click)="setGoal(3)">
+                  <span class="material-symbols-outlined">add</span>
+                  Definir
+                </button>
+              } @else {
+                <div class="goal-stepper">
+                  <button class="step-btn" (click)="adjustGoal(-1)" [disabled]="settingsService.weeklyActivityGoal()! <= 1" aria-label="Menys">
+                    <span class="material-symbols-outlined">remove</span>
+                  </button>
+                  <span class="goal-value">{{ settingsService.weeklyActivityGoal() }}</span>
+                  <button class="step-btn" (click)="adjustGoal(1)" [disabled]="settingsService.weeklyActivityGoal()! >= 7" aria-label="Més">
+                    <span class="material-symbols-outlined">add</span>
+                  </button>
+                  <button class="step-btn step-btn--danger" (click)="clearGoal()" aria-label="Eliminar objectiu">
+                    <span class="material-symbols-outlined">close</span>
+                  </button>
+                </div>
+              }
+            </div>
+          } @else {
+            <!-- Separate goals (gym and sport independently) -->
+            <div class="separate-goals">
+
+              <div class="goal-row">
+                <div class="goal-row-info">
+                  <span class="material-symbols-outlined goal-icon">fitness_center</span>
+                  <div class="setting-info">
+                    <span class="setting-label">Entrenos de gym</span>
+                    <span class="setting-desc">Sessions de musculació per setmana.</span>
+                  </div>
+                </div>
+                @if (settingsService.weeklyGymGoal() === null) {
+                  <button class="goal-set-btn" (click)="setGymGoal(2)">
+                    <span class="material-symbols-outlined">add</span>
+                    Definir
+                  </button>
+                } @else {
+                  <div class="goal-stepper">
+                    <button class="step-btn" (click)="adjustGymGoal(-1)" [disabled]="settingsService.weeklyGymGoal()! <= 1" aria-label="Menys">
+                      <span class="material-symbols-outlined">remove</span>
+                    </button>
+                    <span class="goal-value">{{ settingsService.weeklyGymGoal() }}</span>
+                    <button class="step-btn" (click)="adjustGymGoal(1)" [disabled]="settingsService.weeklyGymGoal()! >= 7" aria-label="Més">
+                      <span class="material-symbols-outlined">add</span>
+                    </button>
+                    <button class="step-btn step-btn--danger" (click)="clearGymGoal()" aria-label="Eliminar objectiu gym">
+                      <span class="material-symbols-outlined">close</span>
+                    </button>
+                  </div>
+                }
+              </div>
+
+              <div class="goal-row">
+                <div class="goal-row-info">
+                  <span class="material-symbols-outlined goal-icon">directions_run</span>
+                  <div class="setting-info">
+                    <span class="setting-label">Sessions d'esport</span>
+                    <span class="setting-desc">Activitats esportives per setmana.</span>
+                  </div>
+                </div>
+                @if (settingsService.weeklySportGoal() === null) {
+                  <button class="goal-set-btn" (click)="setSportGoal(2)">
+                    <span class="material-symbols-outlined">add</span>
+                    Definir
+                  </button>
+                } @else {
+                  <div class="goal-stepper">
+                    <button class="step-btn" (click)="adjustSportGoal(-1)" [disabled]="settingsService.weeklySportGoal()! <= 1" aria-label="Menys">
+                      <span class="material-symbols-outlined">remove</span>
+                    </button>
+                    <span class="goal-value">{{ settingsService.weeklySportGoal() }}</span>
+                    <button class="step-btn" (click)="adjustSportGoal(1)" [disabled]="settingsService.weeklySportGoal()! >= 7" aria-label="Més">
+                      <span class="material-symbols-outlined">add</span>
+                    </button>
+                    <button class="step-btn step-btn--danger" (click)="clearSportGoal()" aria-label="Eliminar objectiu esport">
+                      <span class="material-symbols-outlined">close</span>
+                    </button>
+                  </div>
+                }
+              </div>
+
+            </div>
+          }
+
+          @if (metricsService.goalStreak() > 0) {
             <div class="streak-row">
               <span class="streak-fire">🔥</span>
               <span class="streak-text">
@@ -200,6 +281,42 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
       font-variation-settings: 'FILL' 1;
     }
 
+    /* ── Mode selector ── */
+    .mode-selector {
+      display: flex; gap: 6px;
+      margin-bottom: 16px;
+    }
+
+    .mode-btn {
+      flex: 1; padding: 8px 12px; border-radius: 10px;
+      border: 1.5px solid #e0e0e0; background: white;
+      font-size: 13px; font-weight: 600; color: #888;
+      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+      &:hover { border-color: #bbb; color: #555; }
+      &.mode-btn--active {
+        border-color: #006874; background: rgba(0,104,116,0.07);
+        color: #006874;
+      }
+    }
+
+    /* ── Separate goals ── */
+    .separate-goals {
+      display: flex; flex-direction: column; gap: 12px;
+    }
+
+    .goal-row {
+      display: flex; align-items: center; gap: 12px;
+    }
+
+    .goal-row-info {
+      display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0;
+    }
+
+    .goal-icon {
+      font-size: 20px; color: #888; flex-shrink: 0;
+      font-variation-settings: 'FILL' 0;
+    }
+
     /* ── Goal stepper ── */
     .goal-set-btn {
       display: flex; align-items: center; gap: 4px;
@@ -302,6 +419,12 @@ export class SettingsComponent {
     this.settingsService.update({ metricsEnabled: !this.settingsService.metricsEnabled() });
   }
 
+  setGoalMode(mode: GoalMode): void {
+    this.settingsService.update({ goalMode: mode });
+  }
+
+  // ── Combined goal ────────────────────────────────────────────────────────
+
   setGoal(n: number): void {
     this.settingsService.update({ weeklyActivityGoal: n });
   }
@@ -309,13 +432,46 @@ export class SettingsComponent {
   adjustGoal(delta: number): void {
     const current = this.settingsService.weeklyActivityGoal();
     if (current === null) return;
-    const next = Math.max(1, Math.min(7, current + delta));
-    this.settingsService.update({ weeklyActivityGoal: next });
+    this.settingsService.update({ weeklyActivityGoal: Math.max(1, Math.min(7, current + delta)) });
   }
 
   clearGoal(): void {
     this.settingsService.update({ weeklyActivityGoal: null });
   }
+
+  // ── Gym goal ─────────────────────────────────────────────────────────────
+
+  setGymGoal(n: number): void {
+    this.settingsService.update({ weeklyGymGoal: n });
+  }
+
+  adjustGymGoal(delta: number): void {
+    const current = this.settingsService.weeklyGymGoal();
+    if (current === null) return;
+    this.settingsService.update({ weeklyGymGoal: Math.max(1, Math.min(7, current + delta)) });
+  }
+
+  clearGymGoal(): void {
+    this.settingsService.update({ weeklyGymGoal: null });
+  }
+
+  // ── Sport goal ───────────────────────────────────────────────────────────
+
+  setSportGoal(n: number): void {
+    this.settingsService.update({ weeklySportGoal: n });
+  }
+
+  adjustSportGoal(delta: number): void {
+    const current = this.settingsService.weeklySportGoal();
+    if (current === null) return;
+    this.settingsService.update({ weeklySportGoal: Math.max(1, Math.min(7, current + delta)) });
+  }
+
+  clearSportGoal(): void {
+    this.settingsService.update({ weeklySportGoal: null });
+  }
+
+  // ── Account ──────────────────────────────────────────────────────────────
 
   async deleteAccount(): Promise<void> {
     const confirmed = confirm(

@@ -697,5 +697,98 @@ describe('FitnessMetricsService', () => {
       mockSessions.set([]);
       expect(service.goalStreak()).toBe(1);
     });
+
+    // ── Separate mode ─────────────────────────────────────────────────────
+
+    it('returns 0 in separate mode when no sub-goal is set', () => {
+      mockSettings.set({
+        ...DEFAULT_USER_SETTINGS, goalMode: 'separate',
+        weeklyGymGoal: null, weeklySportGoal: null,
+      });
+      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]);
+      mockSessions.set([makeSession(d(0))]);
+      expect(service.goalStreak()).toBe(0);
+    });
+
+    it('counts streak when only gym goal is set and met', () => {
+      mockSettings.set({
+        ...DEFAULT_USER_SETTINGS, goalMode: 'separate',
+        weeklyGymGoal: 2, weeklySportGoal: null,
+      });
+      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]);
+      mockSessions.set([]);
+      expect(service.goalStreak()).toBe(1);
+    });
+
+    it('counts streak when only sport goal is set and met', () => {
+      mockSettings.set({
+        ...DEFAULT_USER_SETTINGS, goalMode: 'separate',
+        weeklyGymGoal: null, weeklySportGoal: 1,
+      });
+      mockWorkouts.set([]);
+      mockSessions.set([makeSession(d(0))]);
+      expect(service.goalStreak()).toBe(1);
+    });
+
+    it('requires both sub-goals to be met when both are set', () => {
+      mockSettings.set({
+        ...DEFAULT_USER_SETTINGS, goalMode: 'separate',
+        weeklyGymGoal: 2, weeklySportGoal: 1,
+      });
+      // gym met (2) but sport not met (0)
+      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]);
+      mockSessions.set([]);
+      expect(service.goalStreak()).toBe(0);
+    });
+
+    it('returns 1 when both separate goals are met this week', () => {
+      mockSettings.set({
+        ...DEFAULT_USER_SETTINGS, goalMode: 'separate',
+        weeklyGymGoal: 2, weeklySportGoal: 1,
+      });
+      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]);
+      mockSessions.set([makeSession(d(0))]);
+      expect(service.goalStreak()).toBe(1);
+    });
+  });
+
+  // ── objectiu_assolit (separate mode) ─────────────────────────────────────
+
+  describe('objectiu_assolit (separate mode)', () => {
+    it('triggers when both separate goals are met', () => {
+      mockSettings.set({
+        ...DEFAULT_USER_SETTINGS, goalMode: 'separate',
+        weeklyGymGoal: 2, weeklySportGoal: 1,
+      });
+      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]);
+      mockSessions.set([makeSession(d(0))]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).toContain('objectiu_assolit');
+    });
+
+    it('does NOT trigger when gym goal is not met in separate mode', () => {
+      mockSettings.set({
+        ...DEFAULT_USER_SETTINGS, goalMode: 'separate',
+        weeklyGymGoal: 3, weeklySportGoal: 1,
+      });
+      mockWorkouts.set([makeWorkout(d(0))]); // only 1 workout, need 3
+      mockSessions.set([makeSession(d(0))]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).not.toContain('objectiu_assolit');
+    });
+
+    it('triggers when only gym goal is set and met in separate mode', () => {
+      mockSettings.set({
+        ...DEFAULT_USER_SETTINGS, goalMode: 'separate',
+        weeklyGymGoal: 2, weeklySportGoal: null,
+      });
+      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]);
+      mockSessions.set([]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).toContain('objectiu_assolit');
+    });
   });
 });
