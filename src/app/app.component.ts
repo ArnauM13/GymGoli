@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -18,6 +18,13 @@ import { OnboardingComponent } from './shared/components/onboarding/onboarding.c
 
     @if (showOnboarding()) {
       <app-onboarding (done)="onOnboardingDone()" />
+    }
+
+    @if (isOffline()) {
+      <div class="offline-banner" role="status" aria-live="polite">
+        <span class="material-symbols-outlined">wifi_off</span>
+        Sense connexió — les dades es guardaran quan torni internet
+      </div>
     }
 
       <!-- ── Top brand bar ── -->
@@ -71,6 +78,15 @@ import { OnboardingComponent } from './shared/components/onboarding/onboarding.c
       flex-direction: column;
       height: 100vh;
       height: 100dvh;
+    }
+
+    /* ── Offline banner ── */
+    .offline-banner {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 8px 16px; flex-shrink: 0;
+      background: #455a64; color: white;
+      font-size: 12px; font-weight: 500; line-height: 1.3; text-align: center;
+      .material-symbols-outlined { font-size: 16px; flex-shrink: 0; }
     }
 
     /* ── Top brand header ── */
@@ -170,6 +186,8 @@ export class AppComponent {
 
   menuOpen = false;
 
+  readonly isOffline = signal(false);
+
   readonly userName      = computed(() => this.auth.user()?.user_metadata?.['full_name'] as string | undefined);
   readonly userAvatarUrl = computed(() => this.auth.user()?.user_metadata?.['avatar_url'] as string | undefined);
 
@@ -200,6 +218,13 @@ export class AppComponent {
     effect(() => {
       this.doc.documentElement.classList.toggle('dark', this.settingsService.darkMode());
     });
+
+    const win = this.doc.defaultView;
+    if (win) {
+      this.isOffline.set(!win.navigator.onLine);
+      win.addEventListener('offline', () => this.isOffline.set(true));
+      win.addEventListener('online',  () => this.isOffline.set(false));
+    }
   }
 
   toggleUserMenu(): void { this.menuOpen = !this.menuOpen; }
