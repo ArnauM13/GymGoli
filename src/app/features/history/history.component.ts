@@ -35,7 +35,10 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
             </button>
           </div>
         </div>
-        <span class="count">{{ allWorkouts().length }} entrenaments</span>
+        <span class="count">
+          @if (isLoading() && allWorkouts().length === 0) { ··· }
+          @else { {{ allWorkouts().length }} entrenaments }
+        </span>
       </header>
 
       <!-- ══════════════════════════════════
@@ -145,7 +148,7 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
           </div>
         }
 
-        @if (allWorkouts().length === 0) {
+        @if (allWorkouts().length === 0 && !isLoading()) {
           <div class="empty-state">
             <span class="material-symbols-outlined empty-icon">calendar_month</span>
             <h2>Cap entrenament</h2>
@@ -159,6 +162,28 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
            MODE: LLISTA
       ═════════════════════════════════════ -->
       @if (viewMode() === 'list') {
+
+        @if (isLoading() && allWorkouts().length === 0) {
+          <!-- ── Skeleton (initial data load) ── -->
+          <div class="sk-list">
+            @for (_ of [1,2,3,4,5]; track $index) {
+              <div class="sk-workout-card">
+                <div class="sk sk-stripe"></div>
+                <div class="sk-card-row">
+                  <div class="sk-date">
+                    <div class="sk sk-day"></div>
+                    <div class="sk sk-month"></div>
+                  </div>
+                  <div class="sk-summary">
+                    <div class="sk sk-badge"></div>
+                    <div class="sk sk-text"></div>
+                  </div>
+                  <div class="sk sk-chevron-ph"></div>
+                </div>
+              </div>
+            }
+          </div>
+        } @else {
 
         <!-- ── Filtres i ordenació ── -->
         <div class="filter-bar">
@@ -256,6 +281,8 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
             <p>Encara no hi ha cap entrenament registrat</p>
           </div>
         }
+
+        } <!-- end @else (not loading) -->
 
       }
 
@@ -529,14 +556,45 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
       h2 { margin: 0; font-size: 18px; font-weight: 600; color: var(--c-text); }
       p { margin: 0; font-size: 14px; color: var(--c-text-2); }
     }
+
+    /* ── Skeleton ── */
+    @keyframes sk-shimmer {
+      from { background-position: -300px 0; }
+      to   { background-position: calc(300px + 100%) 0; }
+    }
+    .sk {
+      background: linear-gradient(90deg, #f0f0f0 0%, #e8e8e8 40%, #f0f0f0 80%);
+      background-size: 600px 100%;
+      animation: sk-shimmer 1.5s ease-in-out infinite;
+      border-radius: 8px;
+    }
+    .sk-list { margin: 0 16px; display: flex; flex-direction: column; gap: 8px; }
+    .sk-workout-card {
+      position: relative;
+      background: white; border-radius: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07); overflow: hidden;
+    }
+    .sk-stripe { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; border-radius: 0; }
+    .sk-card-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 13px 12px 13px 18px;
+    }
+    .sk-date { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 36px; flex-shrink: 0; }
+    .sk-day   { width: 24px; height: 22px; }
+    .sk-month { width: 32px; height: 9px; }
+    .sk-summary { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+    .sk-badge { width: 52px; height: 18px; border-radius: 8px; }
+    .sk-text  { width: 40%; height: 12px; }
+    .sk-chevron-ph { width: 20px; height: 20px; border-radius: 4px; flex-shrink: 0; }
   `],
 })
 export class HistoryComponent {
-  private workoutService   = inject(WorkoutService);
-  private exerciseService  = inject(ExerciseService);
-  private sportService     = inject(SportService);
-  private settingsService  = inject(UserSettingsService);
+  private workoutService  = inject(WorkoutService);
+  private exerciseService = inject(ExerciseService);
+  private sportService    = inject(SportService);
+  private settingsService = inject(UserSettingsService);
 
+  readonly isLoading = computed(() => this.workoutService.isLoading());
   readonly unit = this.settingsService.weightUnit;
   dispW(kg: number): number { return kgToDisplay(kg, this.unit()); }
 
