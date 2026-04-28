@@ -143,7 +143,7 @@ function friendlyError(err: unknown): string {
       box-shadow: 0 4px 16px rgba(0,104,116,0.2);
     }
     .login-title { margin: 0; font-size: 28px; font-weight: 800; color: #1a1a1a; letter-spacing: -0.5px; }
-    .login-sub   { margin: 0; font-size: 14px; color: #888; }
+    .login-sub   { margin: 0; font-size: 14px; color: #666; }
 
     /* ── Email form ── */
     .email-form {
@@ -158,7 +158,7 @@ function friendlyError(err: unknown): string {
     .tab-btn {
       flex: 1; padding: 9px 0;
       border: none; background: transparent; cursor: pointer;
-      font-size: 13px; font-weight: 600; color: #888;
+      font-size: 13px; font-weight: 600; color: #666;
       transition: all 0.18s;
       &.active { background: #006874; color: white; }
     }
@@ -196,7 +196,7 @@ function friendlyError(err: unknown): string {
     /* ── Divider ── */
     .divider {
       width: 100%; display: flex; align-items: center; gap: 10px;
-      span { font-size: 12px; color: #bbb; white-space: nowrap; }
+      span { font-size: 12px; color: #767676; white-space: nowrap; }
       &::before, &::after {
         content: ''; flex: 1; height: 1px; background: #e8e8e8;
       }
@@ -242,7 +242,7 @@ function friendlyError(err: unknown): string {
 
     .login-note {
       display: flex; align-items: center; gap: 5px;
-      margin: 0; font-size: 11px; color: #bbb;
+      margin: 0; font-size: 11px; color: #767676;
       .material-symbols-outlined { font-size: 13px; }
     }
   `],

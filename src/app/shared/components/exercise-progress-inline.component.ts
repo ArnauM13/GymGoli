@@ -132,7 +132,7 @@ interface ChartPoint { date: string; value: number; }
       display: flex; flex-direction: column; gap: 3px;
     }
     .epi-stat-val { font-size: 16px; font-weight: 700; color: #1a1a1a; }
-    .epi-stat-lbl { font-size: 10px; color: #888; }
+    .epi-stat-lbl { font-size: 10px; color: #666; }
     .positive { color: #4caf50; }
     .negative { color: #ef5350; }
   `],

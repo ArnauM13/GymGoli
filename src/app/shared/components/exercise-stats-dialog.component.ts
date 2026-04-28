@@ -112,7 +112,7 @@ interface SessionPoint {
     .esd-title-block { display: flex; align-items: center; gap: 8px; }
     .esd-title-icon { font-size: 22px; color: #006874; }
     .esd-title { margin: 0; font-size: 18px; font-weight: 700; color: #1a1a1a; }
-    .esd-close-btn { color: #888; }
+    .esd-close-btn { color: #666; }
 
     /* Loading bar */
     .esd-loading-bar-wrap {
@@ -131,7 +131,7 @@ interface SessionPoint {
     /* ── Empty state ── */
     .esd-empty {
       display: flex; flex-direction: column; align-items: center;
-      gap: 10px; padding: 40px 24px; color: #bbb; text-align: center;
+      gap: 10px; padding: 40px 24px; color: #767676; text-align: center;
       .material-symbols-outlined { font-size: 48px; }
       p { margin: 0; font-size: 14px; }
     }
@@ -149,7 +149,7 @@ interface SessionPoint {
       display: flex; flex-direction: column; align-items: center; gap: 3px;
     }
     .esd-stat-value { font-size: 16px; font-weight: 700; color: #1a1a1a; }
-    .esd-stat-label { font-size: 10px; color: #888; text-align: center; }
+    .esd-stat-label { font-size: 10px; color: #666; text-align: center; }
     .positive { color: #4caf50 !important; }
     .negative { color: #ef5350 !important; }
 
@@ -165,7 +165,7 @@ interface SessionPoint {
       display: flex; align-items: center; gap: 10px;
     }
     .esd-session-date {
-      font-size: 12px; color: #888; width: 52px; flex-shrink: 0; text-align: right;
+      font-size: 12px; color: #666; width: 52px; flex-shrink: 0; text-align: right;
     }
     .esd-bar-track {
       flex: 1; height: 10px; background: #f0f0f0; border-radius: 5px; overflow: hidden;

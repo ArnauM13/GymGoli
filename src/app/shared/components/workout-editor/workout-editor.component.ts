@@ -309,7 +309,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       font-size: 22px; color: #c8c8c8; cursor: grab;
       padding: 6px 2px; flex-shrink: 0;
       user-select: none; touch-action: none;
-      &:active { cursor: grabbing; color: #999; }
+      &:active { cursor: grabbing; color: #666; }
     }
 
     .we-entry-card.cdk-drag-preview {
@@ -327,7 +327,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     .we-entry-name-row { display: flex; align-items: center; gap: 2px; }
 
     .we-collapse-chevron {
-      font-size: 18px; color: #bbb; flex-shrink: 0;
+      font-size: 18px; color: #767676; flex-shrink: 0;
       transition: transform 0.22s ease;
       &.rotated { transform: rotate(-90deg); }
     }
@@ -371,7 +371,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       &:hover { background: rgba(0,0,0,0.06) !important; }
       &:active { transform: scale(0.94); }
     }
-    .we-fatiga-btn--set .material-symbols-outlined { color: #888; }
+    .we-fatiga-btn--set .material-symbols-outlined { color: #666; }
     .we-fatiga-btn-emoji { font-size: 18px; line-height: 1; }
 
     .we-entry-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -385,7 +385,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       font-size: 11px; font-weight: 500; color: #666; background: #f0f0f0; width: fit-content;
     }
 
-    .we-remove-btn { color: #bbb; flex-shrink: 0; }
+    .we-remove-btn { color: #767676; flex-shrink: 0; }
 
     .we-entry-done-btn {
       background: rgba(0,104,116,0.1) !important;
@@ -436,7 +436,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       }
     }
     .we-fatiga-option-emoji { font-size: 28px; line-height: 1; }
-    .we-fatiga-option-label { font-size: 10px; font-weight: 600; color: #888; text-align: center; }
+    .we-fatiga-option-label { font-size: 10px; font-weight: 600; color: #666; text-align: center; }
 
     /* ── Last session banner ── */
     .we-last-session-banner {
@@ -447,7 +447,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     }
     .we-lsb-icon { font-size: 20px; color: #006874; flex-shrink: 0; }
     .we-lsb-info { display: flex; flex-direction: column; gap: 1px; flex: 1; }
-    .we-lsb-label { font-size: 10px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.4px; }
+    .we-lsb-label { font-size: 10px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.4px; }
     .we-lsb-date  { font-size: 13px; font-weight: 600; color: #1a1a1a; }
     .we-lsb-stats { display: flex; align-items: center; gap: 6px; }
     .we-lsb-weight { font-size: 16px; font-weight: 700; color: #006874; }
@@ -455,7 +455,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
     .we-no-sets-hint {
       margin: 0; padding: 4px 14px 12px;
-      font-size: 13px; color: #bbb; font-style: italic;
+      font-size: 13px; color: #767676; font-style: italic;
     }
 
     /* ── Sets list ── */
@@ -476,7 +476,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     }
 
     .we-set-num {
-      color: #bbb; font-size: 12px; font-weight: 500;
+      color: #767676; font-size: 12px; font-weight: 500;
       width: 20px; text-align: center; flex-shrink: 0;
     }
 
@@ -493,7 +493,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     /* ── Icon buttons ── */
     .we-icon-btn-sm {
       background: #f5f5f5; border: 1px solid #e8e8e8; border-radius: 8px;
-      cursor: pointer; color: #999; padding: 7px 10px;
+      cursor: pointer; color: #666; padding: 7px 10px;
       display: flex; align-items: center; min-width: 40px; min-height: 36px;
       justify-content: center; touch-action: manipulation;
       .material-symbols-outlined { font-size: 18px; }

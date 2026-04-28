@@ -180,7 +180,7 @@ import {
     .cal-icon-wrap { position: relative; }
     .cal-util-btn {
       width: 34px; height: 34px; border: none; background: transparent;
-      border-radius: 50%; cursor: pointer; color: #888; flex-shrink: 0;
+      border-radius: 50%; cursor: pointer; color: #666; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.15s; touch-action: manipulation;
       -webkit-user-select: none; user-select: none;
@@ -243,7 +243,7 @@ import {
     }
 
     .week-dow {
-      font-size: 10px; font-weight: 600; color: #aaa;
+      font-size: 10px; font-weight: 600; color: #666;
       text-transform: uppercase; line-height: 1;
     }
     .is-today .week-dow  { color: #006874; }
@@ -265,7 +265,7 @@ import {
 
     .cal-dow {
       text-align: center; font-size: 11px; font-weight: 600;
-      color: #aaa; padding: 4px 0; text-transform: uppercase;
+      color: #666; padding: 4px 0; text-transform: uppercase;
     }
 
     .cal-day {

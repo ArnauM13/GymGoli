@@ -210,7 +210,7 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
       margin-bottom: 12px;
     }
     .section-icon {
-      font-size: 18px; color: #888;
+      font-size: 18px; color: #666;
       font-variation-settings: 'FILL' 0, 'wght' 300;
     }
     .section-title {
@@ -218,7 +218,7 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
       font-size: 14px; font-weight: 700; color: #555; letter-spacing: 0.2px;
     }
     .section-count {
-      font-size: 11px; font-weight: 700; color: #999;
+      font-size: 11px; font-weight: 700; color: #666;
       background: #f0f0f0; border-radius: 10px; padding: 2px 8px;
     }
 
@@ -251,7 +251,7 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .ic-detail {
-      font-size: 11px; color: #999;
+      font-size: 11px; color: #666;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       &:empty { display: none; }
     }
@@ -272,7 +272,7 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
     .empty-state {
       display: flex; flex-direction: column; align-items: center; gap: 12px;
       padding: 28px 16px;
-      text-align: center; color: #888;
+      text-align: center; color: #666;
       .empty-icon {
         font-size: 48px; color: #d8d8d8;
         font-variation-settings: 'FILL' 0, 'wght' 200;
@@ -292,7 +292,7 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
       border: 1.5px solid #e0e0e0; background: white; color: #666;
       font-size: 13px; font-weight: 600; cursor: pointer;
       transition: all 0.15s; touch-action: manipulation;
-      &:hover { border-color: #bbb; color: #333; }
+      &:hover { border-color: #767676; color: #333; }
     }
   `],
 })

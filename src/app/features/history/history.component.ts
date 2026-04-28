@@ -264,7 +264,7 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
       display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;
       h1 { margin: 0; font-size: 22px; font-weight: 700; }
     }
-    .count { font-size: 12px; color: #999; }
+    .count { font-size: 12px; color: #666; }
 
     /* ── View mode segmented control ── */
     .view-seg {
@@ -275,7 +275,7 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
     .view-seg-btn {
       width: 38px; height: 34px; border: none; background: transparent;
       display: flex; align-items: center; justify-content: center;
-      cursor: pointer; color: #aaa; transition: all 0.15s; touch-action: manipulation;
+      cursor: pointer; color: #666; transition: all 0.15s; touch-action: manipulation;
       .material-symbols-outlined { font-size: 18px; }
       &.active { background: #006874; color: white; }
       &:not(.active):hover { background: rgba(0,104,116,0.08); color: #006874; }
@@ -327,7 +327,7 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
       display: flex; flex-direction: column; align-items: center;
       gap: 8px; padding: 24px; text-align: center;
       .empty-icon { font-size: 36px; color: #ddd; }
-      p { margin: 0; font-size: 14px; color: #aaa; }
+      p { margin: 0; font-size: 14px; color: #666; }
     }
 
     /* Exercise grid */
@@ -367,7 +367,7 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
     }
     .ex-card-sets {
       font-size: 20px; font-weight: 800; color: var(--cat); line-height: 1;
-      small { font-size: 11px; font-weight: 500; color: #888; margin-left: 1px; }
+      small { font-size: 11px; font-weight: 500; color: #666; margin-left: 1px; }
     }
     .ex-card-weight {
       font-size: 13px; font-weight: 600; color: #666;
@@ -388,9 +388,9 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
       padding: 5px 10px; background: white; border-radius: 20px;
       box-shadow: 0 1px 4px rgba(0,0,0,0.08);
     }
-    .ex-set-num { font-size: 10px; font-weight: 600; color: #bbb; min-width: 12px; }
+    .ex-set-num { font-size: 10px; font-weight: 600; color: #767676; min-width: 12px; }
     .ex-set-weight { font-size: 13px; font-weight: 700; color: #1a1a1a; }
-    .ex-set-weight small { font-size: 9px; font-weight: 400; color: #888; }
+    .ex-set-weight small { font-size: 9px; font-weight: 400; color: #666; }
     .ex-set-reps { font-size: 12px; color: #666; }
     .ex-card-analysis { border-top: 1px solid rgba(0,0,0,0.06); }
 
@@ -417,14 +417,14 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
     .filter-pill {
       flex-shrink: 0; padding: 7px 13px; border-radius: 20px;
       border: 1.5px solid #e8e8e8; background: transparent;
-      font-size: 12px; font-weight: 600; color: #888;
+      font-size: 12px; font-weight: 600; color: #666;
       cursor: pointer; transition: all 0.15s; touch-action: manipulation;
       &.active { background: var(--cat, #006874); color: white; border-color: var(--cat, #006874); }
       &:not(.active):hover { background: rgba(0,0,0,0.04); color: #555; }
     }
     .filter-empty {
       display: flex; align-items: center; justify-content: center; flex-direction: column;
-      gap: 8px; padding: 32px 24px; color: #bbb;
+      gap: 8px; padding: 32px 24px; color: #767676;
       .material-symbols-outlined { font-size: 36px; }
       p { margin: 0; font-size: 14px; }
     }
@@ -457,7 +457,7 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
       display: flex; flex-direction: column; align-items: center;
       min-width: 36px; flex-shrink: 0;
       .day { font-size: 20px; font-weight: 700; color: #1a1a1a; line-height: 1; }
-      .month-year { font-size: 10px; color: #888; text-transform: uppercase; margin-top: 2px; }
+      .month-year { font-size: 10px; color: #666; text-transform: uppercase; margin-top: 2px; }
     }
 
     .workout-summary {
@@ -466,7 +466,7 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
     .exercise-count {
       font-size: 13px; font-weight: 600; color: #1a1a1a;
     }
-    .set-count-inline { font-size: 12px; font-weight: 400; color: #888; }
+    .set-count-inline { font-size: 12px; font-weight: 400; color: #666; }
 
     .workout-badges-row { display: flex; flex-wrap: wrap; gap: 4px; }
     .workout-type-badge {
@@ -477,7 +477,7 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
       background: linear-gradient(90deg, #ef5350 0%, #9c27b0 50%, #2196f3 100%) !important;
     }
 
-    .chevron { color: #bbb; font-size: 20px; flex-shrink: 0; }
+    .chevron { color: #767676; font-size: 20px; flex-shrink: 0; }
 
     .workout-detail {
       border-top: 1px solid #f0f0f0; padding: 12px 14px 12px 18px;
@@ -502,7 +502,7 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
       .set-weight { font-weight: 600; color: #333; }
       .set-reps { color: #666; }
     }
-    .no-sets { font-size: 12px; color: #bbb; font-style: italic; padding-left: 15px; }
+    .no-sets { font-size: 12px; color: #767676; font-style: italic; padding-left: 15px; }
 
     /* ── Select-day hint ── */
     .select-day-hint {
@@ -519,7 +519,7 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
       gap: 10px; padding: 40px 24px; text-align: center;
       .empty-icon { font-size: 56px; color: #ddd; }
       h2 { margin: 0; font-size: 18px; font-weight: 600; color: #444; }
-      p { margin: 0; font-size: 14px; color: #888; }
+      p { margin: 0; font-size: 14px; color: #666; }
     }
   `],
 })

@@ -101,7 +101,7 @@ import { NavBarComponent } from './shared/components/nav-bar/nav-bar.component';
     .user-avatar {
       width: 34px; height: 34px; border-radius: 50%; object-fit: cover;
     }
-    .user-icon { font-size: 28px; color: #bbb; }
+    .user-icon { font-size: 28px; color: #767676; }
 
     /* ── User dropdown menu ── */
     .user-menu-backdrop {
@@ -124,7 +124,7 @@ import { NavBarComponent } from './shared/components/nav-bar/nav-bar.component';
       display: flex; flex-direction: column; gap: 2px;
     }
     .user-menu-name  { font-size: 14px; font-weight: 700; color: #1a1a1a; }
-    .user-menu-email { font-size: 12px; color: #888; }
+    .user-menu-email { font-size: 12px; color: #666; }
 
     .user-menu-divider { margin: 0; border: none; border-top: 1px solid #f0f0f0; }
 
@@ -134,7 +134,7 @@ import { NavBarComponent } from './shared/components/nav-bar/nav-bar.component';
       border: none; background: transparent; cursor: pointer;
       font-size: 14px; font-weight: 500; color: #333;
       transition: background 0.15s; text-align: left; text-decoration: none;
-      .material-symbols-outlined { font-size: 18px; color: #888; }
+      .material-symbols-outlined { font-size: 18px; color: #666; }
       &:hover { background: #f5f5f5; }
       &.logout { color: #ef5350; .material-symbols-outlined { color: #ef5350; } }
     }

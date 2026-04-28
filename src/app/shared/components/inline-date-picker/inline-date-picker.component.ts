@@ -149,7 +149,7 @@ import {
       font-size: 14px; font-weight: 700; color: #1a1a1a; letter-spacing: 0.01em;
     }
     .idp-chevron {
-      font-size: 18px; color: #aaa;
+      font-size: 18px; color: #666;
       transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
       &.flipped { transform: rotate(180deg); }
     }
