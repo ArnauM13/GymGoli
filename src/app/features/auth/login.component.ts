@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { AuthService } from '../../core/services/auth.service';
@@ -25,7 +25,7 @@ function friendlyError(err: unknown): string {
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   template: `
     <div class="login-page">
       <div class="login-card">
@@ -114,6 +114,8 @@ function friendlyError(err: unknown): string {
           }
 
         }
+
+        <a class="privacy-link" routerLink="/privacy">Política de privacitat</a>
       </div>
     </div>
   `,
@@ -244,6 +246,11 @@ function friendlyError(err: unknown): string {
       display: flex; align-items: center; gap: 5px;
       margin: 0; font-size: 11px; color: #767676;
       .material-symbols-outlined { font-size: 13px; }
+    }
+
+    .privacy-link {
+      font-size: 11px; color: #aaa; text-decoration: none;
+      &:hover { color: #006874; text-decoration: underline; }
     }
   `],
 })
