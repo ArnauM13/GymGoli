@@ -6,6 +6,7 @@ export interface UserSettings {
   weeklyGymGoal: number | null;
   weeklySportGoal: number | null;
   goalMode: GoalMode;
+  darkMode: boolean;
   onboardingDone: boolean;
 }
 
@@ -15,5 +16,6 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   weeklyGymGoal: null,
   weeklySportGoal: null,
   goalMode: 'combined',
+  darkMode: false,
   onboardingDone: false,
 };

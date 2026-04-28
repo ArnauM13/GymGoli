@@ -130,7 +130,7 @@ interface ChartPoint {
 
     .section { padding: 8px 16px; }
 
-    .select-label { display: block; font-size: 12px; color: #666; font-weight: 500; margin-bottom: 6px; }
+    .select-label { display: block; font-size: 12px; color: var(--c-text-2); font-weight: 500; margin-bottom: 6px; }
 
     .select-wrap { position: relative; }
 
@@ -140,7 +140,7 @@ interface ChartPoint {
     }
     .loading-dot {
       display: block; width: 8px; height: 8px; border-radius: 50%;
-      background: #006874;
+      background: var(--c-brand);
       animation: pulse-dot 1s ease-in-out infinite;
     }
     @keyframes pulse-dot {
@@ -151,11 +151,11 @@ interface ChartPoint {
     .exercise-select {
       width: 100%;
       padding: 10px 12px;
-      border: 1.5px solid #e0e0e0;
+      border: 1.5px solid var(--c-border);
       border-radius: 10px;
       font-size: 15px;
-      background: white;
-      color: #1a1a1a;
+      background: var(--c-card);
+      color: var(--c-text);
       outline: none;
       appearance: none;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24'%3E%3Cpath fill='%23888' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
@@ -164,7 +164,7 @@ interface ChartPoint {
       padding-right: 36px;
       cursor: pointer;
 
-      &:focus { border-color: #006874; }
+      &:focus { border-color: var(--c-brand); }
     }
 
     .metric-tabs {
@@ -176,24 +176,24 @@ interface ChartPoint {
     .metric-tab {
       flex: 1;
       padding: 8px 4px;
-      border: 1.5px solid #e0e0e0;
+      border: 1.5px solid var(--c-border);
       border-radius: 8px;
-      background: white;
+      background: var(--c-card);
       font-size: 13px;
       font-weight: 500;
-      color: #666;
+      color: var(--c-text-2);
       cursor: pointer;
       transition: all 0.2s;
 
-      &.active { background: #006874; color: white; border-color: #006874; }
-      &:hover:not(.active) { border-color: #006874; color: #006874; }
+      &.active { background: var(--c-brand); color: white; border-color: var(--c-brand); }
+      &:hover:not(.active) { border-color: var(--c-brand); color: var(--c-brand); }
     }
 
     .chart-container {
       margin: 0 16px;
-      background: white;
+      background: var(--c-card);
       border-radius: 14px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      box-shadow: 0 2px 8px var(--c-shadow);
       padding: 16px;
       height: 240px;
       display: flex;
@@ -208,7 +208,7 @@ interface ChartPoint {
       flex-direction: column;
       align-items: center;
       gap: 8px;
-      color: #767676;
+      color: var(--c-text-3);
       text-align: center;
 
       .material-symbols-outlined { font-size: 48px; }
@@ -223,18 +223,18 @@ interface ChartPoint {
     }
 
     .stat-card {
-      background: white;
+      background: var(--c-card);
       border-radius: 10px;
       padding: 12px 8px;
       text-align: center;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      box-shadow: 0 1px 4px var(--c-shadow);
       display: flex;
       flex-direction: column;
       gap: 4px;
     }
 
-    .stat-value { font-size: 18px; font-weight: 700; color: #1a1a1a; }
-    .stat-label { font-size: 11px; color: #666; }
+    .stat-value { font-size: 18px; font-weight: 700; color: var(--c-text); }
+    .stat-label { font-size: 11px; color: var(--c-text-2); }
     .positive { color: #4caf50; }
     .negative { color: #ef5350; }
 
@@ -246,9 +246,9 @@ interface ChartPoint {
       padding: 60px 24px;
       text-align: center;
 
-      .empty-icon { font-size: 64px; color: #ddd; }
-      h2 { margin: 0; font-size: 20px; font-weight: 600; color: #444; }
-      p { margin: 0; color: #666; }
+      .empty-icon { font-size: 64px; color: var(--c-border); }
+      h2 { margin: 0; font-size: 20px; font-weight: 600; color: var(--c-text); }
+      p { margin: 0; color: var(--c-text-2); }
     }
   `],
 })

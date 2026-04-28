@@ -284,16 +284,16 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
     /* ── Entry card ── */
     .we-entry-card {
-      background: white;
+      background: var(--c-card);
       border-radius: 14px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      box-shadow: 0 2px 8px var(--c-shadow);
       overflow: hidden;
       border-left: 4px solid var(--we-cat-color, #ccc);
       transition: box-shadow 0.2s, border-left-width 0.2s;
     }
 
     .we-entry-solo-edit {
-      box-shadow: 0 3px 14px rgba(0,104,116,0.18);
+      box-shadow: 0 3px 14px rgba(var(--c-brand-rgb), 0.18);
       border-left-width: 5px;
     }
 
@@ -306,28 +306,28 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     }
 
     .we-drag-handle {
-      font-size: 22px; color: #c8c8c8; cursor: grab;
+      font-size: 22px; color: var(--c-border); cursor: grab;
       padding: 6px 2px; flex-shrink: 0;
       user-select: none; touch-action: none;
-      &:active { cursor: grabbing; color: #666; }
+      &:active { cursor: grabbing; color: var(--c-text-3); }
     }
 
     .we-entry-card.cdk-drag-preview {
-      box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+      box-shadow: 0 8px 24px var(--c-shadow-md);
       border-radius: 14px; opacity: 0.95;
     }
     .we-drag-placeholder {
-      height: 60px; border: 2px dashed #d0e8ea;
-      border-radius: 14px; background: rgba(0,104,116,0.04);
+      height: 60px; border: 2px dashed rgba(var(--c-brand-rgb), 0.2);
+      border-radius: 14px; background: rgba(var(--c-brand-rgb), 0.04);
     }
     .cdk-drag-animating .we-entry-card { transition: transform 200ms ease; }
 
     .we-entry-title { display: flex; flex-direction: column; gap: 4px; flex: 1; }
-    .we-entry-name  { font-size: 16px; font-weight: 600; color: #1a1a1a; }
+    .we-entry-name  { font-size: 16px; font-weight: 600; color: var(--c-text); }
     .we-entry-name-row { display: flex; align-items: center; gap: 2px; }
 
     .we-collapse-chevron {
-      font-size: 18px; color: #767676; flex-shrink: 0;
+      font-size: 18px; color: var(--c-text-3); flex-shrink: 0;
       transition: transform 0.22s ease;
       &.rotated { transform: rotate(-90deg); }
     }
@@ -352,26 +352,26 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     /* ── Grup accions (sentiment + estadístiques) ── */
     .we-entry-actions-group {
       display: flex; align-items: center; gap: 0;
-      background: #f5f5f5; border: 1px solid #e8e8e8; border-radius: 8px;
+      background: var(--c-subtle); border: 1px solid var(--c-border-2); border-radius: 8px;
       overflow: hidden; flex-shrink: 0;
       .we-icon-btn-sm {
         border: none; border-radius: 0; background: transparent;
-        &:hover { background: #eee; }
-        & + .we-icon-btn-sm { border-left: 1px solid #e8e8e8; }
+        &:hover { background: var(--c-hover); }
+        & + .we-icon-btn-sm { border-left: 1px solid var(--c-border-2); }
       }
     }
 
     /* ── Botó fatiga (dins del grup) ── */
     .we-fatiga-btn {
       cursor: default;
-      .material-symbols-outlined { color: #ccc; }
+      .material-symbols-outlined { color: var(--c-border); }
     }
     .we-fatiga-btn--editable {
       cursor: pointer;
-      &:hover { background: rgba(0,0,0,0.06) !important; }
+      &:hover { background: var(--c-hover) !important; }
       &:active { transform: scale(0.94); }
     }
-    .we-fatiga-btn--set .material-symbols-outlined { color: #666; }
+    .we-fatiga-btn--set .material-symbols-outlined { color: var(--c-text-3); }
     .we-fatiga-btn-emoji { font-size: 18px; line-height: 1; }
 
     .we-entry-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -382,15 +382,15 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     }
     .we-subcategory-badge {
       display: inline-block; padding: 2px 8px; border-radius: 10px;
-      font-size: 11px; font-weight: 500; color: #666; background: #f0f0f0; width: fit-content;
+      font-size: 11px; font-weight: 500; color: var(--c-text-2); background: var(--c-border-2); width: fit-content;
     }
 
-    .we-remove-btn { color: #767676; flex-shrink: 0; }
+    .we-remove-btn { color: var(--c-text-3); flex-shrink: 0; }
 
     .we-entry-done-btn {
-      background: rgba(0,104,116,0.1) !important;
-      border-color: rgba(0,104,116,0.3) !important;
-      color: #006874 !important;
+      background: rgba(var(--c-brand-rgb), 0.1) !important;
+      border-color: rgba(var(--c-brand-rgb), 0.3) !important;
+      color: var(--c-brand) !important;
     }
 
     /* ── Fatiga popup ── */
@@ -400,16 +400,16 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     }
     .we-fatiga-popup {
       position: fixed; bottom: 0; left: 0; right: 0; z-index: 201;
-      background: white; border-radius: 20px 20px 0 0;
+      background: var(--c-card); border-radius: 20px 20px 0 0;
       padding: 20px 20px 32px;
-      box-shadow: 0 -4px 24px rgba(0,0,0,0.15);
+      box-shadow: 0 -4px 24px var(--c-shadow-md);
     }
     .we-fatiga-popup-header {
       display: flex; align-items: center; justify-content: space-between;
       margin-bottom: 20px;
     }
     .we-fatiga-popup-title {
-      font-size: 17px; font-weight: 700; color: #1a1a1a;
+      font-size: 17px; font-weight: 700; color: var(--c-text);
     }
     .we-fatiga-clear-btn {
       display: flex; align-items: center; justify-content: center;
@@ -426,36 +426,36 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     .we-fatiga-option {
       flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px;
       padding: 12px 4px; border-radius: 14px;
-      border: 2px solid transparent; background: #f5f5f5;
+      border: 2px solid transparent; background: var(--c-subtle);
       cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      &:hover { background: #ebebeb; transform: translateY(-2px); }
+      &:hover { background: var(--c-hover); transform: translateY(-2px); }
       &:active { transform: scale(0.94); }
       &.selected {
-        border-color: #006874; background: rgba(0,104,116,0.1);
+        border-color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.1);
         transform: translateY(-2px);
       }
     }
     .we-fatiga-option-emoji { font-size: 28px; line-height: 1; }
-    .we-fatiga-option-label { font-size: 10px; font-weight: 600; color: #666; text-align: center; }
+    .we-fatiga-option-label { font-size: 10px; font-weight: 600; color: var(--c-text-2); text-align: center; }
 
     /* ── Last session banner ── */
     .we-last-session-banner {
       display: flex; align-items: center; gap: 10px;
       margin: 4px 14px 6px; padding: 10px 14px;
-      background: rgba(0,104,116,0.07); border: 1px solid rgba(0,104,116,0.15);
+      background: rgba(var(--c-brand-rgb), 0.07); border: 1px solid rgba(var(--c-brand-rgb), 0.15);
       border-radius: 10px;
     }
-    .we-lsb-icon { font-size: 20px; color: #006874; flex-shrink: 0; }
+    .we-lsb-icon { font-size: 20px; color: var(--c-brand); flex-shrink: 0; }
     .we-lsb-info { display: flex; flex-direction: column; gap: 1px; flex: 1; }
-    .we-lsb-label { font-size: 10px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.4px; }
-    .we-lsb-date  { font-size: 13px; font-weight: 600; color: #1a1a1a; }
+    .we-lsb-label { font-size: 10px; font-weight: 600; color: var(--c-text-2); text-transform: uppercase; letter-spacing: 0.4px; }
+    .we-lsb-date  { font-size: 13px; font-weight: 600; color: var(--c-text); }
     .we-lsb-stats { display: flex; align-items: center; gap: 6px; }
-    .we-lsb-weight { font-size: 16px; font-weight: 700; color: #006874; }
+    .we-lsb-weight { font-size: 16px; font-weight: 700; color: var(--c-brand); }
     .we-lsb-feeling { font-size: 20px; line-height: 1; }
 
     .we-no-sets-hint {
       margin: 0; padding: 4px 14px 12px;
-      font-size: 13px; color: #767676; font-style: italic;
+      font-size: 13px; color: var(--c-text-3); font-style: italic;
     }
 
     /* ── Sets list ── */
@@ -463,20 +463,20 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
     .we-set-row {
       display: flex; align-items: center; gap: 10px;
-      min-height: 48px; border-bottom: 1px solid #f5f5f5;
+      min-height: 48px; border-bottom: 1px solid var(--c-border-2);
       border-radius: 8px; padding: 0 4px;
       transition: background 0.12s;
       &:last-child { border-bottom: none; }
 
       &.we-set-row-tappable {
         cursor: pointer;
-        &:hover { background: rgba(0,104,116,0.05); }
-        &:active { background: rgba(0,104,116,0.1); }
+        &:hover { background: rgba(var(--c-brand-rgb), 0.05); }
+        &:active { background: rgba(var(--c-brand-rgb), 0.1); }
       }
     }
 
     .we-set-num {
-      color: #767676; font-size: 12px; font-weight: 500;
+      color: var(--c-text-3); font-size: 12px; font-weight: 500;
       width: 20px; text-align: center; flex-shrink: 0;
     }
 
@@ -486,18 +486,18 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       display: inline-flex; align-items: baseline; gap: 3px;
       padding: 6px 12px; border-radius: 20px; font-size: 15px; font-weight: 700;
       small { font-size: 11px; font-weight: 500; opacity: 0.7; }
-      &.weight { background: rgba(0,104,116,0.1); color: #006874; }
-      &.reps   { background: #f0f0f0; color: #555; }
+      &.weight { background: rgba(var(--c-brand-rgb), 0.1); color: var(--c-brand); }
+      &.reps   { background: var(--c-border-2); color: var(--c-text-2); }
     }
 
     /* ── Icon buttons ── */
     .we-icon-btn-sm {
-      background: #f5f5f5; border: 1px solid #e8e8e8; border-radius: 8px;
-      cursor: pointer; color: #666; padding: 7px 10px;
+      background: var(--c-subtle); border: 1px solid var(--c-border-2); border-radius: 8px;
+      cursor: pointer; color: var(--c-text-2); padding: 7px 10px;
       display: flex; align-items: center; min-width: 40px; min-height: 36px;
       justify-content: center; touch-action: manipulation;
       .material-symbols-outlined { font-size: 18px; }
-      &:hover        { background: #eee; color: #666; }
+      &:hover        { background: var(--c-hover); color: var(--c-text-2); }
       &.danger       { background: rgba(239,83,80,0.08); border-color: rgba(239,83,80,0.2); color: #ef5350; }
       &.danger:hover { background: rgba(239,83,80,0.16); }
     }
@@ -505,14 +505,14 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     /* ── Inline set-edit row ── */
     .we-edit-set-row {
       display: flex; align-items: flex-start; gap: 10px;
-      padding: 10px 0 8px; background: #f0f9fa; border-radius: 10px; margin: 4px 0;
+      padding: 10px 0 8px; background: rgba(var(--c-brand-rgb), 0.05); border-radius: 10px; margin: 4px 0;
       .we-set-num { padding-top: 14px; }
     }
     .we-inline-edit { flex: 1; display: flex; flex-direction: column; gap: 8px; }
     .we-inline-inputs { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
     .we-inline-group {
       display: flex; flex-direction: column; gap: 3px;
-      label { font-size: 11px; color: #555; font-weight: 600; }
+      label { font-size: 11px; color: var(--c-text-2); font-weight: 600; }
     }
     .we-number-input.compact {
       button { width: 26px; height: 30px; font-size: 15px; }
@@ -522,7 +522,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
     /* ── Add-sets form ── */
     .we-set-form {
-      padding: 12px 14px; background: #fafafa; border-top: 1px solid #f0f0f0;
+      padding: 12px 14px; background: var(--c-subtle); border-top: 1px solid var(--c-border-2);
       display: flex; flex-direction: column; gap: 12px;
     }
 
@@ -530,22 +530,22 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
     .we-input-group {
       flex: 1; display: flex; flex-direction: column; gap: 4px;
-      label { font-size: 12px; color: #666; font-weight: 500; }
+      label { font-size: 12px; color: var(--c-text-2); font-weight: 500; }
     }
 
     .we-number-input {
       display: flex; align-items: center;
-      border: 1.5px solid #e0e0e0; border-radius: 8px; overflow: hidden; background: white;
+      border: 1.5px solid var(--c-border); border-radius: 8px; overflow: hidden; background: var(--c-card);
       button {
-        width: 30px; height: 38px; border: none; background: #f5f5f5;
-        font-size: 18px; cursor: pointer; color: #333; touch-action: manipulation;
-        &:hover  { background: #e8e8e8; }
-        &:active { background: #ddd; }
+        width: 30px; height: 38px; border: none; background: var(--c-subtle);
+        font-size: 18px; cursor: pointer; color: var(--c-text); touch-action: manipulation;
+        &:hover  { background: var(--c-hover); }
+        &:active { background: var(--c-border-2); }
       }
       input {
         flex: 1; border: none; text-align: center;
         font-size: 16px; font-weight: 600; outline: none;
-        width: 0; min-width: 0; padding: 8px 0; background: white;
+        width: 0; min-width: 0; padding: 8px 0; background: var(--c-card); color: var(--c-text);
       }
     }
 
@@ -568,43 +568,43 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     .we-quick-btn {
       flex: 1; max-width: 72px;
       padding: 11px 0; border-radius: 10px;
-      border: 1.5px solid #006874; background: white;
-      color: #006874; font-size: 15px; font-weight: 700;
+      border: 1.5px solid var(--c-brand); background: var(--c-card);
+      color: var(--c-brand); font-size: 15px; font-weight: 700;
       cursor: pointer; touch-action: manipulation;
       transition: all 0.15s;
-      &:hover:not(:disabled)  { background: rgba(0,104,116,0.08); }
+      &:hover:not(:disabled)  { background: rgba(var(--c-brand-rgb), 0.08); }
       &:active:not(:disabled) { transform: scale(0.95); }
       &:disabled { opacity: 0.4; cursor: default; }
     }
     .we-quick-btn-primary {
-      background: #006874; color: white;
-      &:hover:not(:disabled) { background: #005a63; }
+      background: var(--c-brand); color: white;
+      &:hover:not(:disabled) { background: var(--c-brand-dk); }
     }
 
     /* ── Add / Repeat row ── */
     .we-add-set-row {
       display: flex; align-items: stretch;
-      border-top: 1px solid rgba(0,104,116,0.08);
+      border-top: 1px solid rgba(var(--c-brand-rgb), 0.08);
     }
 
     .we-add-set-btn {
       flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
-      padding: 14px; border: none; background: rgba(0,104,116,0.06);
-      color: #006874; font-size: 14px; font-weight: 600;
+      padding: 14px; border: none; background: rgba(var(--c-brand-rgb), 0.06);
+      color: var(--c-brand); font-size: 14px; font-weight: 600;
       cursor: pointer; touch-action: manipulation;
-      &:hover { background: rgba(0,104,116,0.12); }
+      &:hover { background: rgba(var(--c-brand-rgb), 0.12); }
     }
 
     .we-repeat-btn {
       display: flex; align-items: center; gap: 5px;
       padding: 14px 16px;
-      border: none; border-left: 1px solid rgba(0,104,116,0.12);
-      background: rgba(0,104,116,0.04);
-      color: #006874; font-size: 13px; font-weight: 600;
+      border: none; border-left: 1px solid rgba(var(--c-brand-rgb), 0.12);
+      background: rgba(var(--c-brand-rgb), 0.04);
+      color: var(--c-brand); font-size: 13px; font-weight: 600;
       cursor: pointer; touch-action: manipulation;
       transition: background 0.15s; white-space: nowrap;
       .material-symbols-outlined { font-size: 18px; }
-      &:hover { background: rgba(0,104,116,0.12); }
+      &:hover { background: rgba(var(--c-brand-rgb), 0.12); }
     }
     .we-repeat-label { font-size: 13px; font-weight: 600; }
 
@@ -612,12 +612,12 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     .we-add-exercise-btn {
       display: flex; align-items: center; justify-content: center; gap: 8px;
       width: 100%; padding: 15px;
-      border: 2px dashed rgba(0,104,116,0.5); border-radius: 14px;
-      background: rgba(0,104,116,0.05); color: #006874;
+      border: 2px dashed rgba(var(--c-brand-rgb), 0.5); border-radius: 14px;
+      background: rgba(var(--c-brand-rgb), 0.05); color: var(--c-brand);
       font-size: 14px; font-weight: 700;
       cursor: pointer; margin-top: 8px; transition: all 0.18s; touch-action: manipulation;
       .material-symbols-outlined { font-size: 20px; line-height: 1; vertical-align: middle; }
-      &:hover { border-color: #006874; border-style: solid; background: rgba(0,104,116,0.1); }
+      &:hover { border-color: var(--c-brand); border-style: solid; background: rgba(var(--c-brand-rgb), 0.1); }
       &:active { transform: scale(0.98); }
     }
 

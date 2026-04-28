@@ -145,7 +145,7 @@ import {
   `,
   styles: [`
     .calendar-card {
-      background: white;
+      background: var(--c-card);
       border-radius: 16px;
       overflow: hidden;
     }
@@ -158,17 +158,17 @@ import {
 
     .cal-period-label {
       flex: 1; text-align: center;
-      font-size: 15px; font-weight: 700; color: #1a1a1a;
+      font-size: 15px; font-weight: 700; color: var(--c-text);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
     .cal-nav-btn {
       width: 34px; height: 34px; border: none; background: transparent;
-      border-radius: 50%; cursor: pointer; color: #555; flex-shrink: 0;
+      border-radius: 50%; cursor: pointer; color: var(--c-text-2); flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.15s;
-      &:hover:not(:disabled) { background: rgba(0,0,0,0.06); }
-      &:disabled { color: #ccc; cursor: default; }
+      &:hover:not(:disabled) { background: var(--c-hover); }
+      &:disabled { color: var(--c-border); cursor: default; }
       .material-symbols-outlined { font-size: 22px; }
     }
 
@@ -180,13 +180,13 @@ import {
     .cal-icon-wrap { position: relative; }
     .cal-util-btn {
       width: 34px; height: 34px; border: none; background: transparent;
-      border-radius: 50%; cursor: pointer; color: #666; flex-shrink: 0;
+      border-radius: 50%; cursor: pointer; color: var(--c-text-2); flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.15s; touch-action: manipulation;
       -webkit-user-select: none; user-select: none;
       .material-symbols-outlined { font-size: 20px; }
-      &:hover { background: rgba(0,0,0,0.06); color: #006874; }
-      &:active { background: rgba(0,0,0,0.1); }
+      &:hover { background: var(--c-hover); color: var(--c-brand); }
+      &:active { background: var(--c-hover); }
     }
     .cal-tooltip {
       position: absolute; top: calc(100% + 6px); right: 0;
@@ -204,11 +204,11 @@ import {
     /* ── Loading bar ── */
     .cal-loading {
       height: 3px; margin: 0 8px 6px; border-radius: 2px;
-      background: rgba(0,104,116,0.1); overflow: hidden;
+      background: rgba(var(--c-brand-rgb), 0.1); overflow: hidden;
     }
     .cal-loading-bar {
       display: block; height: 100%; width: 40%;
-      background: #006874; border-radius: 2px;
+      background: var(--c-brand); border-radius: 2px;
       animation: cal-slide 1.2s ease-in-out infinite;
     }
     @keyframes cal-slide {
@@ -229,33 +229,33 @@ import {
       background: transparent; cursor: pointer;
       transition: background 0.15s; touch-action: manipulation;
 
-      &:hover:not(:disabled):not(.is-selected) { background: rgba(0,104,116,0.08); }
+      &:hover:not(:disabled):not(.is-selected) { background: rgba(var(--c-brand-rgb), 0.08); }
       &:disabled { cursor: default; }
 
       &.is-today:not(.is-selected) {
-        outline: 2px solid #006874; outline-offset: -2px;
-        color: #006874;
+        outline: 2px solid var(--c-brand); outline-offset: -2px;
+        color: var(--c-brand);
       }
       &.is-selected {
-        background: #006874 !important; color: white;
+        background: var(--c-brand) !important; color: white;
       }
-      &.is-future { color: #ccc; }
+      &.is-future { color: var(--c-border); }
     }
 
     .week-dow {
-      font-size: 10px; font-weight: 600; color: #666;
+      font-size: 10px; font-weight: 600; color: var(--c-text-3);
       text-transform: uppercase; line-height: 1;
     }
-    .is-today .week-dow  { color: #006874; }
+    .is-today .week-dow  { color: var(--c-brand); }
     .is-selected .week-dow { color: rgba(255,255,255,0.75); }
-    .is-future .week-dow { color: #ccc; }
+    .is-future .week-dow { color: var(--c-border); }
 
     .week-num {
-      font-size: 16px; font-weight: 700; color: #1a1a1a; line-height: 1;
+      font-size: 16px; font-weight: 700; color: var(--c-text); line-height: 1;
     }
-    .is-today .week-num    { color: #006874; }
+    .is-today .week-num    { color: var(--c-brand); }
     .is-selected .week-num { color: white; }
-    .is-future .week-num   { color: #ccc; }
+    .is-future .week-num   { color: var(--c-border); }
 
     /* ══ MENSUAL ══ */
     .cal-grid {
@@ -265,7 +265,7 @@ import {
 
     .cal-dow {
       text-align: center; font-size: 11px; font-weight: 600;
-      color: #666; padding: 4px 0; text-transform: uppercase;
+      color: var(--c-text-3); padding: 4px 0; text-transform: uppercase;
     }
 
     .cal-day {
@@ -273,21 +273,21 @@ import {
       justify-content: center; gap: 3px;
       min-height: 40px; width: 100%;
       border: none; border-radius: 10px; background: transparent;
-      font-size: 14px; font-weight: 500; color: #333;
+      font-size: 14px; font-weight: 500; color: var(--c-text);
       cursor: pointer; transition: background 0.15s; padding: 4px 0;
 
-      &:hover:not(:disabled):not(.is-selected) { background: rgba(0,104,116,0.08); }
+      &:hover:not(:disabled):not(.is-selected) { background: rgba(var(--c-brand-rgb), 0.08); }
       &:disabled { cursor: default; }
 
       &.is-today:not(.is-selected) {
-        outline: 2px solid #006874; outline-offset: -2px;
-        color: #006874; font-weight: 700;
+        outline: 2px solid var(--c-brand); outline-offset: -2px;
+        color: var(--c-brand); font-weight: 700;
       }
       &.is-selected {
-        background: #006874 !important; color: white; font-weight: 700;
+        background: var(--c-brand) !important; color: white; font-weight: 700;
       }
-      &.is-future { color: #ccc; }
-      &.has-workout.is-future { color: #ddd; }
+      &.is-future { color: var(--c-border); }
+      &.has-workout.is-future { color: var(--c-border-2); }
     }
 
     .day-num { line-height: 1; }
@@ -308,10 +308,10 @@ import {
     }
     .cal-select-today {
       padding: 8px 18px; border-radius: 16px;
-      border: none; background: #006874; color: white;
+      border: none; background: var(--c-brand); color: white;
       font-size: 13px; font-weight: 600;
       cursor: pointer; touch-action: manipulation;
-      &:hover { background: #005a63; }
+      &:hover { background: var(--c-brand-dk); }
     }
   `],
 })

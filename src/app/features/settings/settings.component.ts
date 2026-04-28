@@ -23,6 +23,22 @@ import { GoalMode } from '../../core/models/user-settings.model';
         <h1 class="page-title">Configuració</h1>
       </div>
 
+      <!-- ── Aparença ── -->
+      <div class="section">
+        <h2 class="section-title">Aparença</h2>
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Mode fosc</span>
+            <span class="setting-desc">Redueix la llum de la pantalla per a un ús nocturn còmode.</span>
+          </div>
+          <mat-slide-toggle
+            [checked]="settingsService.darkMode()"
+            (change)="toggleDarkMode()"
+            color="primary"
+          />
+        </div>
+      </div>
+
       <div class="section">
         <h2 class="section-title">Estadístiques i mètriques</h2>
 
@@ -225,28 +241,28 @@ import { GoalMode } from '../../core/models/user-settings.model';
 
     .back-btn {
       width: 36px; height: 36px; border-radius: 50%; border: none;
-      background: transparent; cursor: pointer; color: #555; flex-shrink: 0;
+      background: transparent; cursor: pointer; color: var(--c-text-2); flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.15s; touch-action: manipulation;
       .material-symbols-outlined { font-size: 20px; }
-      &:hover { background: rgba(0,0,0,0.06); }
+      &:hover { background: var(--c-hover); }
     }
 
     .page-title {
       margin: 0;
-      font-size: 20px; font-weight: 800; color: #1a1a1a; letter-spacing: -0.3px;
+      font-size: 20px; font-weight: 800; color: var(--c-text); letter-spacing: -0.3px;
     }
 
     .section {
-      background: white;
+      background: var(--c-card);
       border-radius: 18px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+      box-shadow: 0 2px 10px var(--c-shadow);
       padding: 16px; margin-bottom: 16px;
     }
 
     .section-title {
       margin: 0 0 14px;
-      font-size: 13px; font-weight: 700; color: #666;
+      font-size: 13px; font-weight: 700; color: var(--c-text-2);
       letter-spacing: 0.3px; text-transform: uppercase;
     }
 
@@ -260,24 +276,24 @@ import { GoalMode } from '../../core/models/user-settings.model';
     }
 
     .setting-label {
-      font-size: 15px; font-weight: 700; color: #1a1a1a;
+      font-size: 15px; font-weight: 700; color: var(--c-text);
     }
 
     .setting-desc {
-      font-size: 12px; color: #666; line-height: 1.4;
+      font-size: 12px; color: var(--c-text-2); line-height: 1.4;
     }
 
     /* ── Hint ── */
     .setting-hint {
       display: flex; align-items: flex-start; gap: 6px;
       margin-top: 12px; padding: 10px 12px;
-      background: rgba(0, 104, 116, 0.06); border-radius: 10px;
-      border: 1px solid rgba(0, 104, 116, 0.15);
-      font-size: 12px; color: #555; line-height: 1.4;
+      background: rgba(var(--c-brand-rgb), 0.06); border-radius: 10px;
+      border: 1px solid rgba(var(--c-brand-rgb), 0.15);
+      font-size: 12px; color: var(--c-text-2); line-height: 1.4;
     }
 
     .hint-icon {
-      font-size: 15px; color: #006874; flex-shrink: 0; margin-top: 1px;
+      font-size: 15px; color: var(--c-brand); flex-shrink: 0; margin-top: 1px;
       font-variation-settings: 'FILL' 1;
     }
 
@@ -289,13 +305,13 @@ import { GoalMode } from '../../core/models/user-settings.model';
 
     .mode-btn {
       flex: 1; padding: 8px 12px; border-radius: 10px;
-      border: 1.5px solid #e0e0e0; background: white;
-      font-size: 13px; font-weight: 600; color: #888;
+      border: 1.5px solid var(--c-border); background: var(--c-card);
+      font-size: 13px; font-weight: 600; color: var(--c-text-3);
       cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      &:hover { border-color: #bbb; color: #555; }
+      &:hover { border-color: var(--c-text-3); color: var(--c-text-2); }
       &.mode-btn--active {
-        border-color: #006874; background: rgba(0,104,116,0.07);
-        color: #006874;
+        border-color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.07);
+        color: var(--c-brand);
       }
     }
 
@@ -313,19 +329,19 @@ import { GoalMode } from '../../core/models/user-settings.model';
     }
 
     .goal-icon {
-      font-size: 20px; color: #888; flex-shrink: 0;
+      font-size: 20px; color: var(--c-text-3); flex-shrink: 0;
       font-variation-settings: 'FILL' 0;
     }
 
     /* ── Goal stepper ── */
     .goal-set-btn {
       display: flex; align-items: center; gap: 4px;
-      padding: 8px 14px; border-radius: 10px; border: 1.5px solid #e0e0e0;
-      background: white; color: #555; font-size: 13px; font-weight: 600;
+      padding: 8px 14px; border-radius: 10px; border: 1.5px solid var(--c-border);
+      background: var(--c-card); color: var(--c-text-2); font-size: 13px; font-weight: 600;
       cursor: pointer; white-space: nowrap; touch-action: manipulation;
       transition: all 0.15s; flex-shrink: 0;
       .material-symbols-outlined { font-size: 16px; }
-      &:hover { border-color: #006874; color: #006874; }
+      &:hover { border-color: var(--c-brand); color: var(--c-brand); }
     }
 
     .goal-stepper {
@@ -334,16 +350,16 @@ import { GoalMode } from '../../core/models/user-settings.model';
 
     .goal-value {
       min-width: 28px; text-align: center;
-      font-size: 20px; font-weight: 800; color: #006874;
+      font-size: 20px; font-weight: 800; color: var(--c-brand);
     }
 
     .step-btn {
-      width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid #e0e0e0;
-      background: white; cursor: pointer; color: #555;
+      width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid var(--c-border);
+      background: var(--c-card); cursor: pointer; color: var(--c-text-2);
       display: flex; align-items: center; justify-content: center;
       transition: all 0.15s; touch-action: manipulation;
       .material-symbols-outlined { font-size: 16px; }
-      &:hover:not(:disabled) { border-color: #006874; color: #006874; background: rgba(0,104,116,0.04); }
+      &:hover:not(:disabled) { border-color: var(--c-brand); color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.04); }
       &:disabled { opacity: 0.3; cursor: default; }
       &.step-btn--danger:hover:not(:disabled) { border-color: #ef5350; color: #ef5350; background: rgba(239,83,80,0.06); }
     }
@@ -361,7 +377,7 @@ import { GoalMode } from '../../core/models/user-settings.model';
     .section--danger { margin-top: 8px; }
 
     .setting-divider {
-      height: 1px; background: #f0f0f0; margin: 10px 0;
+      height: 1px; background: var(--c-border-2); margin: 10px 0;
     }
 
     .danger-label { color: #c62828; }
@@ -369,12 +385,12 @@ import { GoalMode } from '../../core/models/user-settings.model';
     .danger-btn {
       display: flex; align-items: center; justify-content: center; gap: 4px;
       padding: 8px 14px; border-radius: 10px;
-      border: 1.5px solid #e0e0e0; background: white;
-      font-size: 13px; font-weight: 600; color: #555;
+      border: 1.5px solid var(--c-border); background: var(--c-card);
+      font-size: 13px; font-weight: 600; color: var(--c-text-2);
       cursor: pointer; white-space: nowrap; flex-shrink: 0;
       transition: all 0.15s; touch-action: manipulation;
       .material-symbols-outlined { font-size: 15px; }
-      &:hover:not(:disabled) { border-color: #bbb; color: #333; }
+      &:hover:not(:disabled) { border-color: var(--c-text-3); color: var(--c-text); }
       &:disabled { opacity: 0.5; cursor: default; }
       &:not(.danger-btn--soft) {
         border-color: #ffcdd2; color: #c62828;
@@ -389,12 +405,12 @@ import { GoalMode } from '../../core/models/user-settings.model';
     .legal-link {
       display: flex; align-items: center; gap: 8px;
       margin-top: 12px; padding: 12px 14px;
-      background: white; border-radius: 14px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
-      font-size: 13px; font-weight: 500; color: #555;
+      background: var(--c-card); border-radius: 14px;
+      box-shadow: 0 2px 10px var(--c-shadow);
+      font-size: 13px; font-weight: 500; color: var(--c-text-2);
       text-decoration: none; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 18px; color: #888; }
-      &:hover { color: #006874; box-shadow: 0 2px 14px rgba(0,0,0,0.11); }
+      .material-symbols-outlined { font-size: 18px; color: var(--c-text-3); }
+      &:hover { color: var(--c-brand); box-shadow: 0 2px 14px var(--c-shadow-md); }
     }
   `],
 })
@@ -413,6 +429,10 @@ export class SettingsComponent {
   async logout(): Promise<void> {
     await this.authService.logout();
     this.router.navigate(['/login']);
+  }
+
+  toggleDarkMode(): void {
+    this.settingsService.update({ darkMode: !this.settingsService.darkMode() });
   }
 
   toggleMetrics(): void {

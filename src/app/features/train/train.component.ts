@@ -266,16 +266,16 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       z-index: 10;
       display: flex; align-items: center; gap: 8px;
       padding: 10px 12px 12px;
-      background: white;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      background: var(--c-card);
+      box-shadow: 0 2px 8px var(--c-shadow);
     }
     .topbar-back {
       width: 36px; height: 36px; border-radius: 50%; border: none;
-      background: transparent; cursor: pointer; color: #555;
+      background: transparent; cursor: pointer; color: var(--c-text-2);
       display: flex; align-items: center; justify-content: center;
       transition: background 0.15s; flex-shrink: 0; touch-action: manipulation;
       .material-symbols-outlined { font-size: 20px; }
-      &:hover { background: rgba(0,0,0,0.06); }
+      &:hover { background: var(--c-hover); }
     }
     .topbar-center {
       flex: 1; min-width: 0;
@@ -285,7 +285,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
     }
     .topbar-meta {
-      font-size: 11px; color: #666; font-weight: 500;
+      font-size: 11px; color: var(--c-text-2); font-weight: 500;
     }
     .topbar-delete {
       height: 34px; padding: 0 12px; border-radius: 10px;
@@ -327,13 +327,13 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
     .bar-shortcut {
       width: 100%; display: flex; align-items: center; gap: 12px;
-      border: 2px solid color-mix(in srgb, var(--wc) 22%, #e0e0e0);
-      background: color-mix(in srgb, var(--wc) 10%, white);
+      border: 2px solid color-mix(in srgb, var(--wc) 22%, var(--c-border));
+      background: color-mix(in srgb, var(--wc) 10%, var(--c-card));
       border-radius: 22px;
       padding: 14px 16px;
       cursor: pointer; touch-action: manipulation;
       transition: background 0.15s, transform 0.1s;
-      &:hover  { background: color-mix(in srgb, var(--wc) 16%, white); }
+      &:hover  { background: color-mix(in srgb, var(--wc) 16%, var(--c-card)); }
       &:active { transform: scale(0.98); }
     }
     .bar-shortcut-icon {
@@ -346,10 +346,10 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       display: flex; flex-direction: column; gap: 2px;
     }
     .bar-shortcut-label {
-      font-size: 15px; font-weight: 800; color: #1a1a1a;
+      font-size: 15px; font-weight: 800; color: var(--c-text);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .bar-shortcut-detail { font-size: 12px; font-weight: 500; color: #777; }
+    .bar-shortcut-detail { font-size: 12px; font-weight: 500; color: var(--c-text-2); }
     .bar-shortcut-open {
       display: flex; flex-direction: column; align-items: center; gap: 1px;
       flex-shrink: 0; color: var(--wc);
@@ -368,15 +368,15 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .type-btn {
       display: flex; flex-direction: column; align-items: center; gap: 7px;
       padding: 16px 4px 14px;
-      border: 2px solid color-mix(in srgb, var(--cat-color) 40%, #e8e8e8);
+      border: 2px solid color-mix(in srgb, var(--cat-color) 40%, var(--c-border));
       border-radius: 16px;
-      background: color-mix(in srgb, var(--cat-color) 4%, white);
+      background: color-mix(in srgb, var(--cat-color) 4%, var(--c-card));
       cursor: pointer;
-      color: color-mix(in srgb, var(--cat-color) 70%, #444);
+      color: color-mix(in srgb, var(--cat-color) 70%, var(--c-text));
       transition: all 0.18s; touch-action: manipulation;
       &:hover {
         border-color: var(--cat-color);
-        background: color-mix(in srgb, var(--cat-color) 10%, white);
+        background: color-mix(in srgb, var(--cat-color) 10%, var(--c-card));
         transform: translateY(-1px);
       }
       &:active { transform: scale(0.97); }
@@ -391,40 +391,40 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       right: 20px;
       z-index: 90;
       width: 52px; height: 52px; border-radius: 50%; border: none;
-      background: #006874; color: white;
+      background: var(--c-brand); color: white;
       display: flex; align-items: center; justify-content: center;
       cursor: pointer; touch-action: manipulation;
-      box-shadow: 0 4px 16px rgba(0,104,116,0.4), 0 1px 4px rgba(0,0,0,0.1);
+      box-shadow: 0 4px 16px rgba(var(--c-brand-rgb), 0.4), 0 1px 4px rgba(0,0,0,0.1);
       transition: background 0.15s, transform 0.15s;
       .material-symbols-outlined { font-size: 26px; }
-      &:hover { background: #005a63; transform: scale(1.06); }
+      &:hover { background: var(--c-brand-dk); transform: scale(1.06); }
       &:active { transform: scale(0.96); }
     }
 
     /* ── Loading ── */
     .loading-state {
       display: flex; justify-content: center; padding: 48px;
-      .material-symbols-outlined { font-size: 32px; color: #ccc; }
+      .material-symbols-outlined { font-size: 32px; color: var(--c-border); }
     }
 
     /* ── Workout section (dashboard) ── */
     .workout-section {
       margin: 12px 16px 0;
       padding: 14px 14px 16px;
-      background: white;
+      background: var(--c-card);
       border-radius: 18px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+      box-shadow: 0 2px 10px var(--c-shadow);
     }
 
     /* ── Workout summary cards ── */
     .workout-card {
       display: flex; align-items: center;
       margin-bottom: 8px;
-      border: 1.5px solid #efefef; border-radius: 14px;
-      background: white; overflow: hidden;
+      border: 1.5px solid var(--c-border-2); border-radius: 14px;
+      background: var(--c-card); overflow: hidden;
       cursor: pointer; transition: box-shadow 0.15s, border-color 0.15s;
       touch-action: manipulation;
-      &:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-color: #ddd; }
+      &:hover { box-shadow: 0 2px 8px var(--c-shadow); border-color: var(--c-border); }
     }
     .wc-bar {
       width: 5px; align-self: stretch; flex-shrink: 0;
@@ -435,16 +435,16 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       padding: 10px 10px;
     }
     .wc-label {
-      font-size: 13px; font-weight: 700; color: #1a1a1a;
+      font-size: 13px; font-weight: 700; color: var(--c-text);
     }
     .wc-detail {
-      font-size: 11px; color: #666;
+      font-size: 11px; color: var(--c-text-2);
     }
     .wc-delete {
       width: 40px; height: 40px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
       border: none; background: transparent; cursor: pointer;
-      color: #ccc; transition: color 0.15s; touch-action: manipulation;
+      color: var(--c-border); transition: color 0.15s; touch-action: manipulation;
       margin-right: 4px;
       .material-symbols-outlined { font-size: 18px; }
       &:hover { color: #ef5350; }
@@ -454,43 +454,43 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .suggestion-body {
       margin-top: 10px;
       padding: 12px 10px 10px;
-      background: #fafafa; border-radius: 12px;
-      border: 1px solid #f0f0f0;
+      background: var(--c-subtle); border-radius: 12px;
+      border: 1px solid var(--c-border-2);
     }
     .suggestion-header {
       display: flex; align-items: center; gap: 6px; margin-bottom: 10px;
     }
-    .suggestion-title { font-size: 13px; font-weight: 700; color: #444; }
-    .suggestion-date  { font-size: 12px; color: #666; }
+    .suggestion-title { font-size: 13px; font-weight: 700; color: var(--c-text); }
+    .suggestion-date  { font-size: 12px; color: var(--c-text-2); }
     .suggestion-exercises {
       display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;
     }
     .suggestion-exercise {
       display: flex; justify-content: space-between; align-items: center;
     }
-    .suggestion-exercise-name  { font-size: 13px; color: #333; }
-    .suggestion-exercise-stats { font-size: 11px; color: #666; }
+    .suggestion-exercise-name  { font-size: 13px; color: var(--c-text); }
+    .suggestion-exercise-stats { font-size: 11px; color: var(--c-text-2); }
     .suggestion-actions { display: flex; gap: 8px; }
     .btn-suggestion-new {
-      flex: 1; padding: 8px; border: 1.5px solid #e0e0e0; border-radius: 10px;
-      background: white; color: #666; font-size: 13px; font-weight: 600;
+      flex: 1; padding: 8px; border: 1.5px solid var(--c-border); border-radius: 10px;
+      background: var(--c-card); color: var(--c-text-2); font-size: 13px; font-weight: 600;
       cursor: pointer; touch-action: manipulation;
-      &:hover { border-color: #767676; color: #333; }
+      &:hover { border-color: var(--c-text-3); color: var(--c-text); }
     }
     .btn-suggestion-template {
       flex: 2; padding: 8px; border: none; border-radius: 10px;
-      background: #006874; color: white; font-size: 13px; font-weight: 600;
+      background: var(--c-brand); color: white; font-size: 13px; font-weight: 600;
       cursor: pointer; touch-action: manipulation;
-      &:hover { background: #004f5a; }
+      &:hover { background: var(--c-brand-dk); }
     }
 
     /* ── Sports section ── */
     .sports-section {
       margin: 12px 16px 0;
       padding: 14px 14px 16px;
-      background: white;
+      background: var(--c-card);
       border-radius: 18px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+      box-shadow: 0 2px 10px var(--c-shadow);
     }
 
     .sports-header {
@@ -498,12 +498,12 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       margin-bottom: 14px;
     }
     .sports-header-icon {
-      font-size: 18px; color: #666;
+      font-size: 18px; color: var(--c-text-2);
       font-variation-settings: 'FILL' 0, 'wght' 300;
     }
     .sports-title {
       margin: 0; font-size: 14px; font-weight: 700;
-      color: #555; letter-spacing: 0.2px;
+      color: var(--c-text-2); letter-spacing: 0.2px;
     }
 
     .sports-grid {
@@ -514,23 +514,23 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       position: relative;
       display: flex; flex-direction: column; align-items: center; gap: 7px;
       padding: 16px 4px 14px;
-      border: 1.5px solid color-mix(in srgb, var(--sport-color) 30%, #e8e8e8);
+      border: 1.5px solid color-mix(in srgb, var(--sport-color) 30%, var(--c-border));
       border-radius: 16px;
-      background: white;
-      color: color-mix(in srgb, var(--sport-color) 65%, #444);
+      background: var(--c-card);
+      color: color-mix(in srgb, var(--sport-color) 65%, var(--c-text));
       cursor: pointer; touch-action: manipulation;
       transition: all 0.18s ease;
 
       &:hover:not(:disabled) {
         border-color: var(--sport-color);
-        background: color-mix(in srgb, var(--sport-color) 6%, white);
+        background: color-mix(in srgb, var(--sport-color) 6%, var(--c-card));
         transform: translateY(-1px);
       }
       &:active:not(:disabled) { transform: scale(0.97); }
 
       &.active {
         border-color: var(--sport-color);
-        background: color-mix(in srgb, var(--sport-color) 10%, white);
+        background: color-mix(in srgb, var(--sport-color) 10%, var(--c-card));
       }
       &:disabled { opacity: 0.65; cursor: default; }
     }
@@ -566,18 +566,18 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       padding: 10px 2px 2px;
     }
     .subtype-row-label {
-      font-size: 11px; font-weight: 600; color: #666;
+      font-size: 11px; font-weight: 600; color: var(--c-text-2);
       flex-shrink: 0;
     }
     .subtype-chip {
       padding: 5px 12px;
-      border: 1.5px solid #e0e0e0; border-radius: 20px;
-      background: white; font-size: 12px; font-weight: 600; color: #666;
+      border: 1.5px solid var(--c-border); border-radius: 20px;
+      background: var(--c-card); font-size: 12px; font-weight: 600; color: var(--c-text-2);
       cursor: pointer; transition: all 0.15s; touch-action: manipulation;
       &.active {
-        background: #006874; color: white; border-color: #006874;
+        background: var(--c-brand); color: white; border-color: var(--c-brand);
       }
-      &:hover:not(.active) { border-color: #006874; color: #006874; }
+      &:hover:not(.active) { border-color: var(--c-brand); color: var(--c-brand); }
     }
 
     /* ── Skeleton screens ── */
@@ -586,7 +586,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       to   { background-position: calc(300px + 100%) 0; }
     }
     .sk {
-      background: linear-gradient(90deg, #f0f0f0 0%, #e8e8e8 40%, #f0f0f0 80%);
+      background: linear-gradient(90deg, var(--c-border-2) 0%, var(--c-border) 40%, var(--c-border-2) 80%);
       background-size: 600px 100%;
       animation: sk-shimmer 1.5s ease-in-out infinite;
       border-radius: 8px;
@@ -594,9 +594,9 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .sk-workout-section, .sk-sports-section {
       margin: 12px 16px 0;
       padding: 14px 14px 16px;
-      background: white;
+      background: var(--c-card);
       border-radius: 18px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+      box-shadow: 0 2px 10px var(--c-shadow);
     }
     .sk-section-header {
       display: flex; align-items: center; gap: 7px;
@@ -606,7 +606,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .sk-title-ph { width: 90px; height: 13px; }
     .sk-card-ph {
       display: flex; align-items: stretch;
-      border: 1.5px solid #f0f0f0; border-radius: 14px;
+      border: 1.5px solid var(--c-border-2); border-radius: 14px;
       overflow: hidden; margin-bottom: 12px;
     }
     .sk-card-bar { width: 5px; min-height: 52px; flex-shrink: 0; border-radius: 0; }

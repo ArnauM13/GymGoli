@@ -12,6 +12,7 @@ import { FitnessMetricsService } from '../../core/services/fitness-metrics.servi
 describe('SettingsComponent', () => {
   let component: SettingsComponent;
   let mockEnabled:       ReturnType<typeof signal<boolean>>;
+  let mockDarkMode:      ReturnType<typeof signal<boolean>>;
   let mockGoalMode:      ReturnType<typeof signal<'combined' | 'separate'>>;
   let mockGoal:          ReturnType<typeof signal<number | null>>;
   let mockGymGoal:       ReturnType<typeof signal<number | null>>;
@@ -25,6 +26,7 @@ describe('SettingsComponent', () => {
 
   beforeEach(async () => {
     mockEnabled    = signal(false);
+    mockDarkMode   = signal(false);
     mockGoalMode   = signal<'combined' | 'separate'>('combined');
     mockGoal       = signal<number | null>(null);
     mockGymGoal    = signal<number | null>(null);
@@ -43,6 +45,7 @@ describe('SettingsComponent', () => {
           provide: UserSettingsService,
           useValue: {
             metricsEnabled:     mockEnabled,
+            darkMode:           mockDarkMode,
             goalMode:           mockGoalMode,
             weeklyActivityGoal: mockGoal,
             weeklyGymGoal:      mockGymGoal,
@@ -50,6 +53,7 @@ describe('SettingsComponent', () => {
             loaded:             signal(true),
             settings:           signal({
               metricsEnabled: false,
+              darkMode: false,
               weeklyActivityGoal: null,
               weeklyGymGoal: null,
               weeklySportGoal: null,
@@ -109,6 +113,22 @@ describe('SettingsComponent', () => {
     it('calls update exactly once per toggle', () => {
       component.toggleMetrics();
       expect(mockUpdate).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ── toggleDarkMode() ─────────────────────────────────────────────────────
+
+  describe('toggleDarkMode()', () => {
+    it('enables dark mode when currently disabled', () => {
+      mockDarkMode.set(false);
+      component.toggleDarkMode();
+      expect(mockUpdate).toHaveBeenCalledWith({ darkMode: true });
+    });
+
+    it('disables dark mode when currently enabled', () => {
+      mockDarkMode.set(true);
+      component.toggleDarkMode();
+      expect(mockUpdate).toHaveBeenCalledWith({ darkMode: false });
     });
   });
 
