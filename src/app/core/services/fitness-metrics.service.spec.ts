@@ -629,4 +629,73 @@ describe('FitnessMetricsService', () => {
       expect(insight?.message).toContain('3');
     });
   });
+
+  // ── goalStreak ───────────────────────────────────────────────────────────
+  // MOCK_DATE is Wednesday 2025-04-23. Week starts Monday 2025-04-21.
+
+  describe('goalStreak', () => {
+    it('returns 0 when no goal is set', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: null });
+      expect(service.goalStreak()).toBe(0);
+    });
+
+    it('returns 0 when current week has no activity', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 3 });
+      mockWorkouts.set([]);
+      mockSessions.set([]);
+      expect(service.goalStreak()).toBe(0);
+    });
+
+    it('returns 0 when current week has activity but below goal', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 3 });
+      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]); // 2 < 3
+      mockSessions.set([]);
+      expect(service.goalStreak()).toBe(0);
+    });
+
+    it('returns 1 when current week meets the goal', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 3 });
+      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1)), makeWorkout(d(-2))]);
+      mockSessions.set([]);
+      expect(service.goalStreak()).toBe(1);
+    });
+
+    it('counts sport sessions toward the streak', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 2 });
+      mockWorkouts.set([makeWorkout(d(0))]);
+      mockSessions.set([makeSession(d(-1))]);
+      expect(service.goalStreak()).toBe(1);
+    });
+
+    it('returns 2 when current and previous week both met the goal', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 2 });
+      // Current week (Apr 21–23): 2 workouts
+      mockWorkouts.set([
+        makeWorkout(d(0)),   // Apr 23 (Wed)
+        makeWorkout(d(-1)),  // Apr 22 (Tue)
+        // Previous week (Apr 14–20): 3 workouts
+        makeWorkout(d(-7)),  // Apr 16
+        makeWorkout(d(-8)),  // Apr 15
+        makeWorkout(d(-9)),  // Apr 14
+      ]);
+      mockSessions.set([]);
+      expect(service.goalStreak()).toBe(2);
+    });
+
+    it('stops counting when a week did not meet the goal', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 2 });
+      // Current week: met (2 workouts)
+      // Previous week: not met (1 workout)
+      // 2 weeks ago: met (but streak already broken)
+      mockWorkouts.set([
+        makeWorkout(d(0)),    // current week
+        makeWorkout(d(-1)),   // current week
+        makeWorkout(d(-8)),   // previous week: only 1
+        makeWorkout(d(-14)),  // 2 weeks ago
+        makeWorkout(d(-15)),  // 2 weeks ago
+      ]);
+      mockSessions.set([]);
+      expect(service.goalStreak()).toBe(1);
+    });
+  });
 });

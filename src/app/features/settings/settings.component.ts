@@ -5,6 +5,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { AuthService } from '../../core/services/auth.service';
+import { FitnessMetricsService } from '../../core/services/fitness-metrics.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 
 @Component({
@@ -79,6 +80,17 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
               </div>
             }
           </div>
+
+          @if (settingsService.weeklyActivityGoal() !== null && metricsService.goalStreak() > 0) {
+            <div class="streak-row">
+              <span class="streak-fire">🔥</span>
+              <span class="streak-text">
+                {{ metricsService.goalStreak() }}
+                setmana{{ metricsService.goalStreak() !== 1 ? 'nes' : '' }}
+                consecutiva{{ metricsService.goalStreak() !== 1 ? 's' : '' }}
+              </span>
+            </div>
+          }
         </div>
       }
 
@@ -219,6 +231,15 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
       &.step-btn--danger:hover:not(:disabled) { border-color: #ef5350; color: #ef5350; background: rgba(239,83,80,0.06); }
     }
 
+    /* ── Goal streak ── */
+    .streak-row {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 10px; padding: 8px 12px;
+      background: rgba(230, 81, 0, 0.07); border-radius: 10px;
+    }
+    .streak-fire { font-size: 17px; line-height: 1; flex-shrink: 0; }
+    .streak-text { font-size: 13px; font-weight: 700; color: #e65100; }
+
     /* ── Account / danger section ── */
     .section--danger { margin-top: 8px; }
 
@@ -261,8 +282,9 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
   `],
 })
 export class SettingsComponent {
-  readonly settingsService = inject(UserSettingsService);
-  private authService      = inject(AuthService);
+  readonly settingsService  = inject(UserSettingsService);
+  readonly metricsService   = inject(FitnessMetricsService);
+  private authService       = inject(AuthService);
   private location         = inject(Location);
   private router           = inject(Router);
   private snackBar         = inject(MatSnackBar);

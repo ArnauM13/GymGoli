@@ -262,6 +262,27 @@ export class FitnessMetricsService {
       .sort((a, b) => priority.indexOf(a.type) - priority.indexOf(b.type))
       .slice(0, 2);
   });
+
+  readonly goalStreak = computed((): number => {
+    const goal = this.settingsService.settings().weeklyActivityGoal;
+    if (goal === null) return 0;
+
+    const today    = TODAY();
+    const workouts = this.workoutService.workouts();
+    const sessions = this.sportService.sessions();
+
+    let streak = 0;
+    for (let week = 0; week <= 52; week++) {
+      const monday = mondayOfWeek(offsetDate(today, -(week * 7)));
+      const end    = week === 0 ? today : offsetDate(monday, 6);
+      const total  =
+        workouts.filter(w => w.date >= monday && w.date <= end).length +
+        sessions.filter(s => s.date >= monday && s.date <= end).length;
+      if (total >= goal) streak++;
+      else break;
+    }
+    return streak;
+  });
 }
 
 function _favoriteSport(
