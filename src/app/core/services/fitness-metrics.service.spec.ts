@@ -791,4 +791,53 @@ describe('FitnessMetricsService', () => {
       expect(types).toContain('objectiu_assolit');
     });
   });
+
+  // ── augmenta_objectiu ─────────────────────────────────────────────────────
+
+  describe('augmenta_objectiu', () => {
+    beforeEach(() => jasmine.clock().mockDate(new Date(MOCK_DATE + 'T12:00:00')));
+
+    function weekWorkouts(weekOffset: number): Workout[] {
+      const monday = d(-(weekOffset * 7) - (new Date(MOCK_DATE + 'T12:00:00').getDay() === 0 ? 6 : new Date(MOCK_DATE + 'T12:00:00').getDay() - 1));
+      return [makeWorkout(monday), makeWorkout(d(-(weekOffset * 7)))];
+    }
+
+    it('does not appear when streak < 3', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, metricsEnabled: true, weeklyActivityGoal: 2 });
+      // Only 1 week met
+      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]);
+      mockSessions.set([]);
+      const types = service.insights().map(i => i.type);
+      expect(types).not.toContain('augmenta_objectiu');
+    });
+
+    it('does not appear when no goal is set', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, metricsEnabled: true, weeklyActivityGoal: null });
+      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]);
+      mockSessions.set([]);
+      const types = service.insights().map(i => i.type);
+      expect(types).not.toContain('augmenta_objectiu');
+    });
+
+    it('appears when streak >= 3 with a combined goal', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, metricsEnabled: true, weeklyActivityGoal: 1 });
+      // 3 weeks each with 1+ workout
+      mockWorkouts.set([
+        makeWorkout(d(0)),       // this week
+        makeWorkout(d(-7)),      // last week
+        makeWorkout(d(-14)),     // 2 weeks ago
+      ]);
+      mockSessions.set([]);
+      const types = service.insights().map(i => i.type);
+      expect(types).toContain('augmenta_objectiu');
+    });
+
+    it('insight message mentions the streak count', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, metricsEnabled: true, weeklyActivityGoal: 1 });
+      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-7)), makeWorkout(d(-14))]);
+      mockSessions.set([]);
+      const insight = service.insights().find(i => i.type === 'augmenta_objectiu');
+      expect(insight?.title).toContain('3');
+    });
+  });
 });

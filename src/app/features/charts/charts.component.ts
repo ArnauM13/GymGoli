@@ -25,7 +25,9 @@ import {
 import { Exercise } from '../../core/models/exercise.model';
 import { Workout } from '../../core/models/workout.model';
 import { ExerciseService } from '../../core/services/exercise.service';
+import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
+import { kgToDisplay } from '../../shared/utils/weight.utils';
 
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, Title, Tooltip, Legend);
 
@@ -256,7 +258,10 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
   @ViewChild('chartCanvas') canvasRef!: ElementRef<HTMLCanvasElement>;
 
   private exerciseService = inject(ExerciseService);
-  private workoutService = inject(WorkoutService);
+  private workoutService  = inject(WorkoutService);
+  private settingsService = inject(UserSettingsService);
+
+  readonly unit = this.settingsService.weightUnit;
 
   /** Only show exercises that have at least one set recorded in loaded workouts */
   readonly exercises = computed(() => {
@@ -283,8 +288,13 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
     if (!exId) return [];
     const workouts = this.workoutService.getWorkoutsForExercise(exId);
     const metric = this.selectedMetric();
+    const unit   = this.unit();
     return workouts
-      .map(w => ({ date: w.date, value: this.extractMetric(w, exId, metric) }))
+      .map(w => {
+        let value = this.extractMetric(w, exId, metric);
+        if (metric === 'weight' || metric === 'volume') value = kgToDisplay(value, unit);
+        return { date: w.date, value };
+      })
       .filter(p => metric !== 'feeling' || p.value > 0);
   });
 
@@ -339,7 +349,8 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
   }
 
   private getMetricLabel(metric: Metric): string {
-    return { weight: 'Pes màxim (kg)', volume: 'Volum total (kg)', feeling: 'Sensació (1-5)' }[metric];
+    const u = this.unit();
+    return { weight: `Pes màxim (${u})`, volume: `Volum total (${u})`, feeling: 'Sensació (1-5)' }[metric];
   }
 
   private updateChart(data: ChartPoint[], metric: Metric): void {

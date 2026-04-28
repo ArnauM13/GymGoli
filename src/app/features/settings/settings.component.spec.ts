@@ -13,6 +13,7 @@ describe('SettingsComponent', () => {
   let component: SettingsComponent;
   let mockEnabled:       ReturnType<typeof signal<boolean>>;
   let mockDarkMode:      ReturnType<typeof signal<boolean>>;
+  let mockWeightUnit:    ReturnType<typeof signal<'kg' | 'lb'>>;
   let mockGoalMode:      ReturnType<typeof signal<'combined' | 'separate'>>;
   let mockGoal:          ReturnType<typeof signal<number | null>>;
   let mockGymGoal:       ReturnType<typeof signal<number | null>>;
@@ -27,6 +28,7 @@ describe('SettingsComponent', () => {
   beforeEach(async () => {
     mockEnabled    = signal(false);
     mockDarkMode   = signal(false);
+    mockWeightUnit = signal<'kg' | 'lb'>('kg');
     mockGoalMode   = signal<'combined' | 'separate'>('combined');
     mockGoal       = signal<number | null>(null);
     mockGymGoal    = signal<number | null>(null);
@@ -46,6 +48,7 @@ describe('SettingsComponent', () => {
           useValue: {
             metricsEnabled:     mockEnabled,
             darkMode:           mockDarkMode,
+            weightUnit:         mockWeightUnit,
             goalMode:           mockGoalMode,
             weeklyActivityGoal: mockGoal,
             weeklyGymGoal:      mockGymGoal,
@@ -54,6 +57,7 @@ describe('SettingsComponent', () => {
             settings:           signal({
               metricsEnabled: false,
               darkMode: false,
+              weightUnit: 'kg',
               weeklyActivityGoal: null,
               weeklyGymGoal: null,
               weeklySportGoal: null,
@@ -129,6 +133,22 @@ describe('SettingsComponent', () => {
       mockDarkMode.set(true);
       component.toggleDarkMode();
       expect(mockUpdate).toHaveBeenCalledWith({ darkMode: false });
+    });
+  });
+
+  // ── setWeightUnit() ──────────────────────────────────────────────────────
+
+  describe('setWeightUnit()', () => {
+    it('sets unit to kg', () => {
+      mockWeightUnit.set('lb');
+      component.setWeightUnit('kg');
+      expect(mockUpdate).toHaveBeenCalledWith({ weightUnit: 'kg' });
+    });
+
+    it('sets unit to lb', () => {
+      mockWeightUnit.set('kg');
+      component.setWeightUnit('lb');
+      expect(mockUpdate).toHaveBeenCalledWith({ weightUnit: 'lb' });
     });
   });
 

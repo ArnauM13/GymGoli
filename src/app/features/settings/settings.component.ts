@@ -7,7 +7,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { AuthService } from '../../core/services/auth.service';
 import { FitnessMetricsService } from '../../core/services/fitness-metrics.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
-import { GoalMode } from '../../core/models/user-settings.model';
+import { GoalMode, WeightUnit } from '../../core/models/user-settings.model';
 
 @Component({
   selector: 'app-settings',
@@ -36,6 +36,16 @@ import { GoalMode } from '../../core/models/user-settings.model';
             (change)="toggleDarkMode()"
             color="primary"
           />
+        </div>
+        <div class="setting-row setting-row--top">
+          <div class="setting-info">
+            <span class="setting-label">Unitat de pes</span>
+            <span class="setting-desc">Els pesos es mostren en l'unitat seleccionada. Els valors es guarden sempre en kg.</span>
+          </div>
+          <div class="unit-toggle">
+            <button class="unit-btn" [class.unit-btn--active]="settingsService.weightUnit() === 'kg'" (click)="setWeightUnit('kg')">kg</button>
+            <button class="unit-btn" [class.unit-btn--active]="settingsService.weightUnit() === 'lb'" (click)="setWeightUnit('lb')">lb</button>
+          </div>
         </div>
       </div>
 
@@ -268,6 +278,19 @@ import { GoalMode } from '../../core/models/user-settings.model';
 
     .setting-row {
       display: flex; align-items: center; gap: 14px;
+      &.setting-row--top { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--c-border-2); }
+    }
+
+    /* ── Unit toggle (kg/lb) ── */
+    .unit-toggle {
+      display: flex; border: 1.5px solid var(--c-border); border-radius: 10px; overflow: hidden; flex-shrink: 0;
+    }
+    .unit-btn {
+      padding: 7px 14px; border: none; background: var(--c-card);
+      font-size: 13px; font-weight: 700; color: var(--c-text-3);
+      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+      &:hover:not(.unit-btn--active) { background: var(--c-hover); color: var(--c-text-2); }
+      &.unit-btn--active { background: var(--c-brand); color: white; }
     }
 
     .setting-info {
@@ -429,6 +452,10 @@ export class SettingsComponent {
   async logout(): Promise<void> {
     await this.authService.logout();
     this.router.navigate(['/login']);
+  }
+
+  setWeightUnit(unit: WeightUnit): void {
+    this.settingsService.update({ weightUnit: unit });
   }
 
   toggleDarkMode(): void {

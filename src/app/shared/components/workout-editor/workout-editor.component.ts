@@ -8,8 +8,10 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { CATEGORY_COLORS, CATEGORY_LABELS, SUBCATEGORY_LABELS } from '../../../core/models/exercise.model';
 import { FEELING_EMOJI, FEELING_LABEL, FeelingLevel, Workout, WorkoutEntry, WorkoutSet } from '../../../core/models/workout.model';
 import { ExerciseService } from '../../../core/services/exercise.service';
+import { UserSettingsService } from '../../../core/services/user-settings.service';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component';
+import { kgToDisplay, displayToKg, weightStep } from '../../utils/weight.utils';
 
 // Module-level: persists collapsed state per workout for the entire browser session
 const _collapsedByWorkout = new Map<string, Set<string>>();
@@ -109,7 +111,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                   <span class="we-lsb-date">{{ formatLastDate(lastSessionData()!.date) }}</span>
                 </div>
                 <div class="we-lsb-stats">
-                  <span class="we-lsb-weight">{{ lastSessionData()!.maxWeight }}kg</span>
+                  <span class="we-lsb-weight">{{ dispW(lastSessionData()!.maxWeight) }}{{ unit() }}</span>
                   @if (lastSessionData()!.feeling) {
                     <span class="we-lsb-feeling">{{ getFeelingEmoji(lastSessionData()!.feeling!) }}</span>
                   }
@@ -130,10 +132,10 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                           <div class="we-inline-group">
                             <label>Pes</label>
                             <div class="we-number-input compact">
-                              <button type="button" (click)="adjustEditWeight(-2.5)">−</button>
+                              <button type="button" (click)="adjustEditWeight(-1)">−</button>
                               <input type="number" formControlName="weight" min="0" step="2.5"
                                      (focus)="$any($event.target).select()">
-                              <button type="button" (click)="adjustEditWeight(2.5)">+</button>
+                              <button type="button" (click)="adjustEditWeight(1)">+</button>
                             </div>
                           </div>
                           <div class="we-inline-group">
@@ -159,7 +161,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                          (click)="isEntryEditable(entry.exerciseId) && startEditSet(entry.exerciseId, $index, set)">
                       <span class="we-set-num">{{ $index + 1 }}</span>
                       <div class="we-set-pills">
-                        <span class="we-set-pill weight">{{ set.weight }}<small>kg</small></span>
+                        <span class="we-set-pill weight">{{ dispW(set.weight) }}<small>{{ unit() }}</small></span>
                         <span class="we-set-pill reps">{{ set.reps }}<small>r</small></span>
                       </div>
                       @if (isEntryEditable(entry.exerciseId)) {
@@ -183,12 +185,12 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                 <form [formGroup]="setForm" class="we-set-form">
                   <div class="we-set-inputs">
                     <div class="we-input-group">
-                      <label>Pes (kg)</label>
+                      <label>Pes ({{ unit() }})</label>
                       <div class="we-number-input">
-                        <button type="button" (click)="adjustWeight(-2.5)">−</button>
+                        <button type="button" (click)="adjustWeight(-1)">−</button>
                         <input type="number" formControlName="weight" min="0" step="2.5"
                                (focus)="$any($event.target).select()">
-                        <button type="button" (click)="adjustWeight(2.5)">+</button>
+                        <button type="button" (click)="adjustWeight(1)">+</button>
                       </div>
                     </div>
                     <div class="we-input-group">
@@ -223,9 +225,9 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                   </button>
                   @if (entry.sets.length > 0) {
                     <button class="we-repeat-btn" (click)="repeatLastSet(entry)"
-                            [title]="'Repetir: ' + entry.sets[entry.sets.length - 1].weight + 'kg × ' + entry.sets[entry.sets.length - 1].reps">
+                            [title]="'Repetir: ' + dispW(entry.sets[entry.sets.length - 1].weight) + unit() + ' × ' + entry.sets[entry.sets.length - 1].reps">
                       <span class="material-symbols-outlined">repeat</span>
-                      <span class="we-repeat-label">{{ entry.sets[entry.sets.length - 1].weight }}kg × {{ entry.sets[entry.sets.length - 1].reps }}</span>
+                      <span class="we-repeat-label">{{ dispW(entry.sets[entry.sets.length - 1].weight) }}{{ unit() }} × {{ entry.sets[entry.sets.length - 1].reps }}</span>
                     </button>
                   }
                 </div>
@@ -625,11 +627,14 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
   `],
 })
 export class WorkoutEditorComponent {
-  private workoutService  = inject(WorkoutService);
-  private exerciseService = inject(ExerciseService);
-  private snackBar        = inject(MatSnackBar);
-  private fb              = inject(FormBuilder);
-  private dialog          = inject(MatDialog);
+  private workoutService   = inject(WorkoutService);
+  private exerciseService  = inject(ExerciseService);
+  private settingsService  = inject(UserSettingsService);
+  private snackBar         = inject(MatSnackBar);
+  private fb               = inject(FormBuilder);
+  private dialog           = inject(MatDialog);
+
+  readonly unit = this.settingsService.weightUnit;
 
   readonly workout        = input<Workout | null>(null);
   readonly editMode       = input<boolean>(false);
@@ -763,9 +768,12 @@ export class WorkoutEditorComponent {
     }
   }
 
+  dispW(kg: number): number { return kgToDisplay(kg, this.unit()); }
+
   adjustWeight(delta: number): void {
-    const v = (this.setForm.value.weight ?? 0) + delta;
-    this.setForm.patchValue({ weight: Math.max(0, Math.round(v * 4) / 4) });
+    const step = weightStep(this.unit());
+    const v = (this.setForm.value.weight ?? 0) + delta * step;
+    this.setForm.patchValue({ weight: Math.max(0, Math.round(v * 10) / 10) });
   }
   adjustReps(delta: number): void {
     const v = (this.setForm.value.reps ?? 1) + delta;
@@ -773,8 +781,9 @@ export class WorkoutEditorComponent {
   }
 
   adjustEditWeight(delta: number): void {
-    const v = (this.editSetForm.value.weight ?? 0) + delta;
-    this.editSetForm.patchValue({ weight: Math.max(0, Math.round(v * 4) / 4) });
+    const step = weightStep(this.unit());
+    const v = (this.editSetForm.value.weight ?? 0) + delta * step;
+    this.editSetForm.patchValue({ weight: Math.max(0, Math.round(v * 10) / 10) });
   }
   adjustEditReps(delta: number): void {
     const v = (this.editSetForm.value.reps ?? 1) + delta;
@@ -807,11 +816,12 @@ export class WorkoutEditorComponent {
     this.editingSet.set(null);
     this.addingFor.set(entry.exerciseId);
     const w = this.workout();
+    const u = this.unit();
     if (entry.sets.length === 0 && w) {
       const info = this.workoutService.getLastSessionInfo(entry.exerciseId, w.id);
       if (info) {
         this.lastSessionData.set({ exerciseId: entry.exerciseId, ...info });
-        this.setForm.patchValue({ weight: info.maxWeight, reps: 8 });
+        this.setForm.patchValue({ weight: kgToDisplay(info.maxWeight, u), reps: 8 });
       } else {
         this.lastSessionData.set(null);
         this.setForm.reset({ weight: 0, reps: 8 });
@@ -819,7 +829,7 @@ export class WorkoutEditorComponent {
     } else {
       this.lastSessionData.set(null);
       const last = entry.sets.at(-1);
-      if (last) this.setForm.patchValue({ weight: last.weight, reps: last.reps });
+      if (last) this.setForm.patchValue({ weight: kgToDisplay(last.weight, u), reps: last.reps });
     }
   }
 
@@ -847,7 +857,7 @@ export class WorkoutEditorComponent {
   startEditSet(exerciseId: string, index: number, set: WorkoutSet): void {
     this.addingFor.set(null);
     this.editingSet.set({ exerciseId, index });
-    this.editSetForm.setValue({ weight: set.weight, reps: set.reps });
+    this.editSetForm.setValue({ weight: kgToDisplay(set.weight, this.unit()), reps: set.reps });
   }
 
   cancelEditSet(): void { this.editingSet.set(null); }
@@ -861,7 +871,7 @@ export class WorkoutEditorComponent {
     if (!w) return;
     try {
       await this.workoutService.updateSetInEntry(w.id, es.exerciseId, es.index, {
-        weight: weight!, reps: reps!,
+        weight: displayToKg(weight!, this.unit()), reps: reps!,
       });
       this.cancelEditSet();
     } catch {
@@ -874,7 +884,8 @@ export class WorkoutEditorComponent {
     const { weight, reps } = this.setForm.value;
     const w = this.workout();
     if (!w) return;
-    const sets = Array.from({ length: count }, () => ({ weight: weight!, reps: reps! }));
+    const weightKg = displayToKg(weight!, this.unit());
+    const sets = Array.from({ length: count }, () => ({ weight: weightKg, reps: reps! }));
     try {
       await this.workoutService.addSetsToEntry(w.id, exerciseId, sets);
       this.cancelSet();

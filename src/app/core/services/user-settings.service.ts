@@ -20,6 +20,7 @@ export class UserSettingsService {
   readonly weeklyGymGoal       = computed(() => this._settings().weeklyGymGoal ?? null);
   readonly weeklySportGoal     = computed(() => this._settings().weeklySportGoal ?? null);
   readonly darkMode            = computed(() => this._settings().darkMode);
+  readonly weightUnit          = computed(() => this._settings().weightUnit ?? 'kg');
 
   constructor() {
     effect(() => {

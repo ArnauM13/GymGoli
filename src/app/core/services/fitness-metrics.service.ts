@@ -14,6 +14,7 @@ export type InsightType =
   | 'descansa'
   | 'equilibra_gym'
   | 'objectiu_assolit'
+  | 'augmenta_objectiu'
   | 'camino_objectiu'
   | 'anima_objectiu';
 
@@ -288,9 +289,22 @@ export class FitnessMetricsService {
       }
     }
 
+    // ── Augmenta objectiu (3+ setmanes seguides) ─────────────────────────
+    const streak = this.goalStreak();
+    const hasGoal = mode === 'combined' ? goal !== null : gymGoal !== null || spGoal !== null;
+    if (streak >= 3 && hasGoal) {
+      candidates.push({
+        type: 'augmenta_objectiu',
+        emoji: '🚀',
+        title: `${streak} setmanes seguides!`,
+        message: `Portes ${streak} setmanes assolint el teu objectiu. Potser és hora d'apujar-lo una mica?`,
+        color: '#4caf50',
+      });
+    }
+
     // ── Retorna màxim 2 per prioritat ─────────────────────────────────────
     const priority: InsightType[] = [
-      'objectiu_assolit', 'gran_setmana', 'descansa', 'prova_gym',
+      'objectiu_assolit', 'augmenta_objectiu', 'gran_setmana', 'descansa', 'prova_gym',
       'camino_objectiu', 'setmana_fluixa', 'anima_objectiu',
       'prova_esport', 'recupera_esport', 'equilibra_gym',
     ];

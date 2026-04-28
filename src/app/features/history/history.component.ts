@@ -3,9 +3,11 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
 import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry } from '../../core/models/workout.model';
 import { Sport, SportSubtype } from '../../core/models/sport.model';
+import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
+import { kgToDisplay } from '../../shared/utils/weight.utils';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
 import { ExerciseStatsDialogComponent } from '../../shared/components/exercise-stats-dialog.component';
 import { ExerciseProgressInlineComponent } from '../../shared/components/exercise-progress-inline.component';
@@ -104,7 +106,7 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
                     <div class="ex-card-meta">
                       <span class="ex-card-sets">{{ entry.sets.length }}<small> sèr</small></span>
                       @if (entry.sets.length > 0) {
-                        <span class="ex-card-weight">{{ getMaxWeight(entry) }}<small>kg</small></span>
+                        <span class="ex-card-weight">{{ dispW(getMaxWeight(entry)) }}<small>{{ unit() }}</small></span>
                       }
                     </div>
                   </button>
@@ -119,7 +121,7 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
                       @for (set of selectedEntry()!.sets; track $index) {
                         <div class="ex-set-pill">
                           <span class="ex-set-num">{{ $index + 1 }}</span>
-                          <span class="ex-set-weight">{{ set.weight }}<small>kg</small></span>
+                          <span class="ex-set-weight">{{ dispW(set.weight) }}<small>{{ unit() }}</small></span>
                           <span class="ex-set-reps">×{{ set.reps }}</span>
                         </div>
                       }
@@ -219,7 +221,7 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
                           <div class="sets-list">
                             @for (set of entry.sets; track $index) {
                               <div class="set-pill">
-                                <span class="set-weight">{{ set.weight }}kg</span>
+                                <span class="set-weight">{{ dispW(set.weight) }}{{ unit() }}</span>
                                 <span class="set-reps">× {{ set.reps }}</span>
                               </div>
                             }
@@ -524,9 +526,13 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
   `],
 })
 export class HistoryComponent {
-  private workoutService  = inject(WorkoutService);
-  private exerciseService = inject(ExerciseService);
-  private sportService    = inject(SportService);
+  private workoutService   = inject(WorkoutService);
+  private exerciseService  = inject(ExerciseService);
+  private sportService     = inject(SportService);
+  private settingsService  = inject(UserSettingsService);
+
+  readonly unit = this.settingsService.weightUnit;
+  dispW(kg: number): number { return kgToDisplay(kg, this.unit()); }
 
   readonly viewMode     = signal<'calendar' | 'list'>('calendar');
   readonly selectedDate = signal<string | null>(null);
