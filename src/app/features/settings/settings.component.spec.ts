@@ -14,6 +14,7 @@ describe('SettingsComponent', () => {
   let mockEnabled:       ReturnType<typeof signal<boolean>>;
   let mockDarkMode:      ReturnType<typeof signal<boolean>>;
   let mockWeightUnit:    ReturnType<typeof signal<'kg' | 'lb'>>;
+  let mockRestTimer:     ReturnType<typeof signal<number>>;
   let mockGoalMode:      ReturnType<typeof signal<'combined' | 'separate'>>;
   let mockGoal:          ReturnType<typeof signal<number | null>>;
   let mockGymGoal:       ReturnType<typeof signal<number | null>>;
@@ -29,6 +30,7 @@ describe('SettingsComponent', () => {
     mockEnabled    = signal(false);
     mockDarkMode   = signal(false);
     mockWeightUnit = signal<'kg' | 'lb'>('kg');
+    mockRestTimer  = signal(90);
     mockGoalMode   = signal<'combined' | 'separate'>('combined');
     mockGoal       = signal<number | null>(null);
     mockGymGoal    = signal<number | null>(null);
@@ -49,6 +51,7 @@ describe('SettingsComponent', () => {
             metricsEnabled:     mockEnabled,
             darkMode:           mockDarkMode,
             weightUnit:         mockWeightUnit,
+            restTimerSeconds:   mockRestTimer,
             goalMode:           mockGoalMode,
             weeklyActivityGoal: mockGoal,
             weeklyGymGoal:      mockGymGoal,
@@ -58,6 +61,7 @@ describe('SettingsComponent', () => {
               metricsEnabled: false,
               darkMode: false,
               weightUnit: 'kg',
+              restTimerSeconds: 90,
               weeklyActivityGoal: null,
               weeklyGymGoal: null,
               weeklySportGoal: null,
@@ -149,6 +153,29 @@ describe('SettingsComponent', () => {
       mockWeightUnit.set('kg');
       component.setWeightUnit('lb');
       expect(mockUpdate).toHaveBeenCalledWith({ weightUnit: 'lb' });
+    });
+  });
+
+  // ── setRestTimer() ───────────────────────────────────────────────────────
+
+  describe('setRestTimer()', () => {
+    it('sets restTimerSeconds to 90', () => {
+      component.setRestTimer(90);
+      expect(mockUpdate).toHaveBeenCalledWith({ restTimerSeconds: 90 });
+    });
+
+    it('sets restTimerSeconds to 0 (disabled)', () => {
+      component.setRestTimer(0);
+      expect(mockUpdate).toHaveBeenCalledWith({ restTimerSeconds: 0 });
+    });
+
+    it('sets restTimerSeconds to 180', () => {
+      component.setRestTimer(180);
+      expect(mockUpdate).toHaveBeenCalledWith({ restTimerSeconds: 180 });
+    });
+
+    it('exposes restOptions with expected values', () => {
+      expect(component.restOptions).toEqual([0, 30, 60, 90, 120, 180]);
     });
   });
 

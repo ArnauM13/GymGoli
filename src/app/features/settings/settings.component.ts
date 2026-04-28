@@ -47,6 +47,21 @@ import { GoalMode, WeightUnit } from '../../core/models/user-settings.model';
             <button class="unit-btn" [class.unit-btn--active]="settingsService.weightUnit() === 'lb'" (click)="setWeightUnit('lb')">lb</button>
           </div>
         </div>
+        <div class="setting-row setting-row--top">
+          <div class="setting-info">
+            <span class="setting-label">Descans entre sèries</span>
+            <span class="setting-desc">Temporitzador que arrenca automàticament en afegir sèries. Posat a 0 per desactivar-lo.</span>
+          </div>
+          <div class="unit-toggle rest-toggle">
+            @for (secs of restOptions; track secs) {
+              <button class="unit-btn"
+                [class.unit-btn--active]="settingsService.restTimerSeconds() === secs"
+                (click)="setRestTimer(secs)">
+                {{ secs === 0 ? 'Off' : secs + 's' }}
+              </button>
+            }
+          </div>
+        </div>
       </div>
 
       <div class="section">
@@ -281,12 +296,13 @@ import { GoalMode, WeightUnit } from '../../core/models/user-settings.model';
       &.setting-row--top { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--c-border-2); }
     }
 
-    /* ── Unit toggle (kg/lb) ── */
+    /* ── Unit toggle (kg/lb) and rest-timer toggle ── */
     .unit-toggle {
       display: flex; border: 1.5px solid var(--c-border); border-radius: 10px; overflow: hidden; flex-shrink: 0;
     }
+    .rest-toggle { flex-shrink: 1; flex-wrap: nowrap; }
     .unit-btn {
-      padding: 7px 14px; border: none; background: var(--c-card);
+      padding: 7px 10px; border: none; background: var(--c-card);
       font-size: 13px; font-weight: 700; color: var(--c-text-3);
       cursor: pointer; transition: all 0.15s; touch-action: manipulation;
       &:hover:not(.unit-btn--active) { background: var(--c-hover); color: var(--c-text-2); }
@@ -446,6 +462,7 @@ export class SettingsComponent {
   private snackBar         = inject(MatSnackBar);
 
   readonly deletingAccount = signal(false);
+  readonly restOptions = [0, 30, 60, 90, 120, 180];
 
   back(): void { this.location.back(); }
 
@@ -456,6 +473,10 @@ export class SettingsComponent {
 
   setWeightUnit(unit: WeightUnit): void {
     this.settingsService.update({ weightUnit: unit });
+  }
+
+  setRestTimer(seconds: number): void {
+    this.settingsService.update({ restTimerSeconds: seconds });
   }
 
   toggleDarkMode(): void {

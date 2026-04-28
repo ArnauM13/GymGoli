@@ -1,4 +1,4 @@
-import { Component, ViewEncapsulation, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { Component, OnDestroy, ViewEncapsulation, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { MatButtonModule } from '@angular/material/button';
@@ -50,6 +50,9 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                 </div>
                 <div class="we-entry-name-row">
                   <span class="we-entry-name">{{ entry.exerciseName }}</span>
+                  @if (prEntries().has(entry.exerciseId)) {
+                    <span class="we-pr-badge">🏆</span>
+                  }
                   <span class="we-collapse-chevron material-symbols-outlined"
                         [class.rotated]="isCollapsed(entry.exerciseId)">
                     expand_more
@@ -248,6 +251,24 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
         }
 
       </div>
+
+      <!-- ── Rest timer ── -->
+      @if (timerActive()) {
+        <div class="we-rest-timer" [class.we-rt--ending]="timerRemaining() <= 5">
+          <div class="we-rt-info">
+            <span class="material-symbols-outlined we-rt-icon">timer</span>
+            <span class="we-rt-label">Descans</span>
+          </div>
+          <span class="we-rt-countdown">{{ formatTimer(timerRemaining()) }}</span>
+          <div class="we-rt-controls">
+            <button class="we-rt-btn" (click)="adjustTimer(-30)">−30s</button>
+            <button class="we-rt-btn we-rt-skip" (click)="cancelTimer()" title="Saltar">
+              <span class="material-symbols-outlined">skip_next</span>
+            </button>
+            <button class="we-rt-btn" (click)="adjustTimer(30)">+30s</button>
+          </div>
+        </div>
+      }
 
       <!-- ── Fatiga popup ── -->
       @if (feelingPickerFor()) {
@@ -624,9 +645,63 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     }
 
     .we-set-actions { display: flex; gap: 2px; align-items: center; }
+
+    /* ── Personal Record badge ── */
+    .we-pr-badge {
+      font-size: 14px; line-height: 1; flex-shrink: 0;
+      animation: pr-pop 0.4s cubic-bezier(0.34, 1.6, 0.64, 1) both;
+    }
+    @keyframes pr-pop {
+      from { opacity: 0; transform: scale(0.3) rotate(-20deg); }
+      to   { opacity: 1; transform: scale(1) rotate(0deg); }
+    }
+
+    /* ── Rest timer ── */
+    .we-rest-timer {
+      position: fixed; bottom: 72px; left: 50%; transform: translateX(-50%);
+      z-index: 100; min-width: 280px; max-width: 360px;
+      display: flex; align-items: center; gap: 10px;
+      background: var(--c-card); border-radius: 18px;
+      box-shadow: 0 4px 24px var(--c-shadow-md);
+      padding: 14px 16px;
+      border: 1.5px solid rgba(var(--c-brand-rgb), 0.2);
+      animation: rt-in 0.25s cubic-bezier(0.34, 1.3, 0.64, 1) both;
+      &.we-rt--ending {
+        border-color: rgba(239,83,80,0.4);
+        .we-rt-countdown { color: #ef5350; }
+      }
+    }
+    @keyframes rt-in {
+      from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+    .we-rt-info {
+      display: flex; align-items: center; gap: 5px; flex-shrink: 0;
+    }
+    .we-rt-icon { font-size: 18px; color: var(--c-brand); }
+    .we-rt-label { font-size: 12px; font-weight: 600; color: var(--c-text-2); }
+    .we-rt-countdown {
+      flex: 1; text-align: center;
+      font-size: 26px; font-weight: 800; color: var(--c-text);
+      font-variant-numeric: tabular-nums; letter-spacing: -1px;
+    }
+    .we-rt-controls { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+    .we-rt-btn {
+      padding: 6px 9px; border-radius: 8px;
+      border: 1.5px solid var(--c-border); background: var(--c-subtle);
+      font-size: 12px; font-weight: 700; color: var(--c-text-2);
+      cursor: pointer; touch-action: manipulation;
+      transition: background 0.12s;
+      &:hover { background: var(--c-hover); }
+      &.we-rt-skip {
+        background: rgba(var(--c-brand-rgb), 0.08); border-color: var(--c-brand); color: var(--c-brand);
+        .material-symbols-outlined { font-size: 18px; display: block; }
+        &:hover { background: rgba(var(--c-brand-rgb), 0.16); }
+      }
+    }
   `],
 })
-export class WorkoutEditorComponent {
+export class WorkoutEditorComponent implements OnDestroy {
   private workoutService   = inject(WorkoutService);
   private exerciseService  = inject(ExerciseService);
   private settingsService  = inject(UserSettingsService);
@@ -649,6 +724,15 @@ export class WorkoutEditorComponent {
   readonly lastSessionData  = signal<{ exerciseId: string; date: string; maxWeight: number; feeling?: FeelingLevel } | null>(null);
   readonly feelingPickerFor = signal<string | null>(null);
   readonly collapsedEntries = signal<Set<string>>(new Set());
+
+  // ── Rest timer ─────────────────────────────────────────────────────────────
+  readonly timerActive    = signal(false);
+  readonly timerRemaining = signal(0);
+  readonly timerTotal     = signal(0);
+  private _timerId: ReturnType<typeof setInterval> | null = null;
+
+  // ── Personal Records ───────────────────────────────────────────────────────
+  readonly prEntries = signal<Set<string>>(new Set());
 
   readonly feelingLevels: FeelingLevel[] = [1, 2, 3, 4, 5];
 
@@ -888,6 +972,14 @@ export class WorkoutEditorComponent {
     const sets = Array.from({ length: count }, () => ({ weight: weightKg, reps: reps! }));
     try {
       await this.workoutService.addSetsToEntry(w.id, exerciseId, sets);
+      // PR detection: compare against all historical data excluding this workout
+      const prevMax = this.workoutService.getAllTimeMaxWeight(exerciseId, w.id);
+      if (weightKg > prevMax) {
+        this.prEntries.update(s => new Set([...s, exerciseId]));
+      }
+      // Start rest timer after logging sets
+      const restSecs = this.settingsService.restTimerSeconds();
+      if (restSecs > 0) this.startRestTimer(restSecs);
       this.cancelSet();
     } catch {
       this.snackBar.open('Error en afegir les sèries', '', { duration: 3000 });
@@ -913,4 +1005,42 @@ export class WorkoutEditorComponent {
       this.snackBar.open('Error en eliminar', '', { duration: 2000 });
     }
   }
+
+  // ── Rest timer ─────────────────────────────────────────────────────────────
+  startRestTimer(seconds: number): void {
+    this.cancelTimer();
+    this.timerTotal.set(seconds);
+    this.timerRemaining.set(seconds);
+    this.timerActive.set(true);
+    this._timerId = setInterval(() => {
+      const next = this.timerRemaining() - 1;
+      if (next <= 0) {
+        this.cancelTimer();
+      } else {
+        this.timerRemaining.set(next);
+      }
+    }, 1000);
+  }
+
+  adjustTimer(delta: number): void {
+    if (!this.timerActive()) return;
+    this.timerRemaining.set(Math.max(1, this.timerRemaining() + delta));
+  }
+
+  cancelTimer(): void {
+    if (this._timerId !== null) {
+      clearInterval(this._timerId);
+      this._timerId = null;
+    }
+    this.timerActive.set(false);
+    this.timerRemaining.set(0);
+  }
+
+  formatTimer(sec: number): string {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
+
+  ngOnDestroy(): void { this.cancelTimer(); }
 }

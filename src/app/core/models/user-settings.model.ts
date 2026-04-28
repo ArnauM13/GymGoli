@@ -9,6 +9,7 @@ export interface UserSettings {
   goalMode: GoalMode;
   darkMode: boolean;
   weightUnit: WeightUnit;
+  restTimerSeconds: number;
   onboardingDone: boolean;
 }
 
@@ -20,5 +21,6 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   goalMode: 'combined',
   darkMode: false,
   weightUnit: 'kg',
+  restTimerSeconds: 90,
   onboardingDone: false,
 };
