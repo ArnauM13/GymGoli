@@ -91,7 +91,7 @@ export interface ExercisePickerData {
       cursor: pointer;
       white-space: nowrap;
       transition: all 0.15s;
-      color: #555;
+      color: var(--c-text-2);
       touch-action: manipulation;
 
       &.active {

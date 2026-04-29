@@ -593,7 +593,7 @@ export class HistoryComponent {
     const w = this.selectedWorkout();
     if (!w) return '';
     const cats = w.categories?.length ? w.categories : (w.category ? [w.category] : []);
-    if (cats.length === 0) return 'background: #e0e0e0';
+    if (cats.length === 0) return 'background: var(--c-border-2)';
     if (cats.length === 1) return `background: ${this.getCatColor(cats[0])}`;
     const stops = cats.map((c, i) => {
       const p1 = Math.round((i / cats.length) * 100);
