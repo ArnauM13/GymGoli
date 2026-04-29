@@ -216,6 +216,20 @@ import { GoalMode, WeightUnit } from '../../core/models/user-settings.model';
         </div>
       }
 
+      <!-- ── Entrenaments ── -->
+      <div class="section">
+        <h2 class="section-title">Entrenaments</h2>
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Plantilles</span>
+            <span class="setting-desc">Crea i gestiona les teves plantilles d'entrenament.</span>
+          </div>
+          <a class="nav-link-btn" routerLink="/templates">
+            <span class="material-symbols-outlined">chevron_right</span>
+          </a>
+        </div>
+      </div>
+
       <!-- ── Compte ── -->
       <div class="section section--danger">
         <h2 class="section-title">Compte</h2>
@@ -411,6 +425,16 @@ import { GoalMode, WeightUnit } from '../../core/models/user-settings.model';
     }
     .streak-fire { font-size: 17px; line-height: 1; flex-shrink: 0; }
     .streak-text { font-size: 13px; font-weight: 700; color: #e65100; }
+
+    .nav-link-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--c-subtle); border: 1px solid var(--c-border-2);
+      color: var(--c-text-3); text-decoration: none; flex-shrink: 0;
+      transition: background 0.15s, color 0.15s;
+      .material-symbols-outlined { font-size: 20px; }
+      &:hover { background: var(--c-hover); color: var(--c-brand); }
+    }
 
     /* ── Account / danger section ── */
     .section--danger { margin-top: 8px; }
