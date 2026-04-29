@@ -1,4 +1,5 @@
 import { Component, computed, effect, inject } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
@@ -78,9 +79,9 @@ import { OnboardingComponent } from './shared/components/onboarding/onboarding.c
       align-items: center;
       gap: 8px;
       padding: 8px 12px 8px 16px;
-      background: white;
-      border-bottom: 1px solid #f0f0f0;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+      background: var(--c-card);
+      border-bottom: 1px solid var(--c-border-2);
+      box-shadow: 0 1px 4px var(--c-shadow);
       height: 48px;
       flex-shrink: 0;
       position: relative;
@@ -91,7 +92,7 @@ import { OnboardingComponent } from './shared/components/onboarding/onboarding.c
     }
 
     .app-name {
-      font-size: 17px; font-weight: 700; color: #1a1a1a;
+      font-size: 17px; font-weight: 700; color: var(--c-text);
       letter-spacing: -0.3px; flex: 1;
     }
 
@@ -107,7 +108,7 @@ import { OnboardingComponent } from './shared/components/onboarding/onboarding.c
     .user-avatar {
       width: 34px; height: 34px; border-radius: 50%; object-fit: cover;
     }
-    .user-icon { font-size: 28px; color: #767676; }
+    .user-icon { font-size: 28px; color: var(--c-text-3); }
 
     /* ── User dropdown menu ── */
     .user-menu-backdrop {
@@ -115,8 +116,8 @@ import { OnboardingComponent } from './shared/components/onboarding/onboarding.c
     }
     .user-menu {
       position: absolute; top: 46px; right: 8px; z-index: 1000;
-      background: white; border-radius: 14px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.14);
+      background: var(--c-card); border-radius: 14px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
       padding: 12px 0; min-width: 220px;
       animation: menu-in 0.15s ease;
     }
@@ -129,19 +130,19 @@ import { OnboardingComponent } from './shared/components/onboarding/onboarding.c
       padding: 4px 16px 12px;
       display: flex; flex-direction: column; gap: 2px;
     }
-    .user-menu-name  { font-size: 14px; font-weight: 700; color: #1a1a1a; }
-    .user-menu-email { font-size: 12px; color: #666; }
+    .user-menu-name  { font-size: 14px; font-weight: 700; color: var(--c-text); }
+    .user-menu-email { font-size: 12px; color: var(--c-text-2); }
 
-    .user-menu-divider { margin: 0; border: none; border-top: 1px solid #f0f0f0; }
+    .user-menu-divider { margin: 0; border: none; border-top: 1px solid var(--c-border-2); }
 
     .user-menu-item {
       display: flex; align-items: center; gap: 10px;
       width: 100%; padding: 10px 16px;
       border: none; background: transparent; cursor: pointer;
-      font-size: 14px; font-weight: 500; color: #333;
+      font-size: 14px; font-weight: 500; color: var(--c-text);
       transition: background 0.15s; text-align: left; text-decoration: none;
-      .material-symbols-outlined { font-size: 18px; color: #666; }
-      &:hover { background: #f5f5f5; }
+      .material-symbols-outlined { font-size: 18px; color: var(--c-text-2); }
+      &:hover { background: var(--c-hover); }
       &.logout { color: #ef5350; .material-symbols-outlined { color: #ef5350; } }
     }
 
@@ -165,6 +166,7 @@ export class AppComponent {
   private settingsService  = inject(UserSettingsService);
   private router           = inject(Router);
   private snackBar         = inject(MatSnackBar);
+  private doc              = inject(DOCUMENT);
 
   menuOpen = false;
 
@@ -181,7 +183,7 @@ export class AppComponent {
   constructor() {
     effect(() => {
       if (this.auth.user() === undefined) return;
-      const loader = document.getElementById('app-loader');
+      const loader = this.doc.getElementById('app-loader');
       if (!loader) return;
       loader.classList.add('hiding');
       setTimeout(() => loader.remove(), 300);
@@ -192,6 +194,11 @@ export class AppComponent {
       if (this.auth.isPasswordRecovery()) {
         this.router.navigate(['/reset-password']);
       }
+    });
+
+    // Apply / remove dark class on <html>
+    effect(() => {
+      this.doc.documentElement.classList.toggle('dark', this.settingsService.darkMode());
     });
   }
 

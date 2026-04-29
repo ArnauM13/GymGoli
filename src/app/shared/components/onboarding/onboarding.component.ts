@@ -79,7 +79,7 @@ const SLIDES: OnboardingSlide[] = [
 
     .ob-card {
       width: 100%; max-width: 480px;
-      background: white;
+      background: var(--c-card);
       border-radius: 28px 28px 0 0;
       padding: 32px 28px 36px;
       display: flex; flex-direction: column; align-items: center; gap: 24px;
@@ -108,13 +108,13 @@ const SLIDES: OnboardingSlide[] = [
 
     .ob-title {
       margin: 0;
-      font-size: 22px; font-weight: 800; color: #1a1a1a; letter-spacing: -0.4px;
+      font-size: 22px; font-weight: 800; color: var(--c-text); letter-spacing: -0.4px;
       line-height: 1.2;
     }
 
     .ob-body {
       margin: 0;
-      font-size: 15px; color: #666; line-height: 1.6;
+      font-size: 15px; color: var(--c-text-3); line-height: 1.6;
       max-width: 320px;
     }
 
@@ -124,8 +124,8 @@ const SLIDES: OnboardingSlide[] = [
     }
     .ob-dot {
       width: 6px; height: 6px; border-radius: 50%;
-      background: #e0e0e0; transition: all 0.2s;
-      &.active { background: #006874; width: 20px; border-radius: 3px; }
+      background: var(--c-border-2); transition: all 0.2s;
+      &.active { background: var(--c-brand); width: 20px; border-radius: 3px; }
     }
 
     /* Actions */
@@ -135,29 +135,29 @@ const SLIDES: OnboardingSlide[] = [
 
     .ob-skip {
       flex: 0; padding: 12px 16px; border-radius: 14px;
-      border: 1.5px solid #e0e0e0; background: white;
-      font-size: 14px; font-weight: 600; color: #888;
+      border: 1.5px solid var(--c-border-2); background: var(--c-card);
+      font-size: 14px; font-weight: 600; color: var(--c-text-3);
       cursor: pointer; touch-action: manipulation;
       transition: all 0.15s;
-      &:hover { border-color: #bbb; color: #555; }
+      &:hover { border-color: var(--c-border); color: var(--c-text-2); }
     }
 
     .ob-next {
       flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
       padding: 14px; border-radius: 14px; border: none;
-      background: #006874; color: white;
+      background: var(--c-brand); color: var(--c-card);
       font-size: 15px; font-weight: 700; cursor: pointer;
       transition: all 0.15s; touch-action: manipulation;
       .material-symbols-outlined { font-size: 18px; }
-      &:hover { background: #00565f; }
+      &:hover { background: var(--c-brand-dk); }
     }
 
     .ob-finish {
       flex: 1; padding: 14px; border-radius: 14px; border: none;
-      background: #006874; color: white;
+      background: var(--c-brand); color: var(--c-card);
       font-size: 15px; font-weight: 700; cursor: pointer;
       transition: all 0.15s; touch-action: manipulation;
-      &:hover { background: #00565f; }
+      &:hover { background: var(--c-brand-dk); }
     }
   `],
 })

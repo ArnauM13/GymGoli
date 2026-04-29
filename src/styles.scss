@@ -20,6 +20,43 @@ html {
   @include mat.all-component-typographies($theme);
 }
 
+// ── CSS custom properties ─────────────────────────────────────────────────
+:root {
+  --c-bg:        #f5f5f5;
+  --c-card:      #ffffff;
+  --c-elevated:  #ffffff;
+  --c-subtle:    #fafafa;
+  --c-text:      #1a1a1a;
+  --c-text-2:    #555555;
+  --c-text-3:    #888888;
+  --c-border:    #e0e0e0;
+  --c-border-2:  #f0f0f0;
+  --c-hover:     rgba(0, 0, 0, 0.06);
+  --c-brand:     #006874;
+  --c-brand-dk:  #005a63;
+  --c-brand-rgb: 0, 104, 116;
+  --c-shadow:    rgba(0, 0, 0, 0.07);
+  --c-shadow-md: rgba(0, 0, 0, 0.11);
+}
+
+html.dark {
+  --c-bg:        #121212;
+  --c-card:      #1e1e1e;
+  --c-elevated:  #2a2a2a;
+  --c-subtle:    #252525;
+  --c-text:      #f0f0f0;
+  --c-text-2:    #aaaaaa;
+  --c-text-3:    #686868;
+  --c-border:    #383838;
+  --c-border-2:  #2e2e2e;
+  --c-hover:     rgba(255, 255, 255, 0.07);
+  --c-brand:     #26c6da;
+  --c-brand-dk:  #00acc1;
+  --c-brand-rgb: 38, 198, 218;
+  --c-shadow:    rgba(0, 0, 0, 0.4);
+  --c-shadow-md: rgba(0, 0, 0, 0.5);
+}
+
 // Reset + base
 *, *::before, *::after { box-sizing: border-box; }
 
@@ -33,9 +70,11 @@ html, body {
   margin: 0;
   padding: 0;
   font-family: 'Roboto', 'Helvetica Neue', sans-serif;
-  background: #f5f5f5;
+  background: var(--c-bg);
+  color: var(--c-text);
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 // Material Symbols Outlined font class
@@ -59,11 +98,13 @@ html, body {
 // Scrollbars (desktop)
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: var(--c-border); border-radius: 2px; }
 
 // Global overrides for Angular Material dialogs
 .mat-mdc-dialog-surface {
   border-radius: 20px !important;
+  background: var(--c-card) !important;
+  color: var(--c-text) !important;
 }
 
 // Calendar dialog — no inner padding, clean card look
@@ -76,4 +117,13 @@ html, body {
 .mat-mdc-snack-bar-container {
   --mdc-snackbar-container-color: #323232;
   --mdc-snackbar-supporting-text-color: #fff;
+}
+
+// Dark-mode: Material slide-toggle accent adjustment
+html.dark {
+  --mdc-switch-selected-track-color: var(--c-brand);
+  --mdc-switch-selected-handle-color: #fff;
+  --mdc-switch-selected-hover-track-color: var(--c-brand);
+  --mdc-switch-selected-pressed-track-color: var(--c-brand);
+  --mdc-switch-selected-focus-track-color: var(--c-brand);
 }

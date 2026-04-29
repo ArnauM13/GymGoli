@@ -83,23 +83,23 @@ export interface ExercisePickerData {
 
     .chip {
       padding: 5px 12px;
-      border: 1.5px solid #e0e0e0;
+      border: 1.5px solid var(--c-border-2);
       border-radius: 16px;
-      background: white;
+      background: var(--c-card);
       font-size: 12px;
       font-weight: 500;
       cursor: pointer;
       white-space: nowrap;
       transition: all 0.15s;
-      color: #555;
+      color: var(--c-text-2);
       touch-action: manipulation;
 
       &.active {
-        background: var(--cat-c, #006874);
-        color: white;
-        border-color: var(--cat-c, #006874);
+        background: var(--cat-c, var(--c-brand));
+        color: var(--c-card);
+        border-color: var(--cat-c, var(--c-brand));
       }
-      &:hover:not(.active) { border-color: #006874; color: #006874; }
+      &:hover:not(.active) { border-color: var(--c-brand); color: var(--c-brand); }
     }
 
     .exercise-list { padding: 0 !important; min-height: 200px; max-height: 50vh; }
@@ -117,18 +117,18 @@ export interface ExercisePickerData {
       transition: background 0.15s;
       touch-action: manipulation;
 
-      &:hover { background: #f5f5f5; }
+      &:hover { background: var(--c-subtle); }
     }
 
     .category-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 
     .info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-    .name { font-size: 15px; font-weight: 500; color: #1a1a1a; }
-    .sub { font-size: 12px; color: #666; }
+    .name { font-size: 15px; font-weight: 500; color: var(--c-text); }
+    .sub { font-size: 12px; color: var(--c-text-3); }
 
-    .arrow { color: #767676; font-size: 20px; }
+    .arrow { color: var(--c-text-3); font-size: 20px; }
 
-    .empty { padding: 24px; text-align: center; color: #666; }
+    .empty { padding: 24px; text-align: center; color: var(--c-text-3); }
   `],
 })
 export class ExercisePickerDialogComponent {

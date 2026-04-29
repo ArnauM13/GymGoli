@@ -3,7 +3,9 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 
 import { FEELING_EMOJI, FEELING_LABEL, FeelingLevel } from '../../core/models/workout.model';
+import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
+import { kgToDisplay } from '../utils/weight.utils';
 
 interface SessionPoint {
   date: string;
@@ -52,11 +54,11 @@ interface SessionPoint {
             <span class="esd-stat-label">Sessions</span>
           </div>
           <div class="esd-stat">
-            <span class="esd-stat-value">{{ summary().maxWeight }}kg</span>
+            <span class="esd-stat-value">{{ dispW(summary().maxWeight) }}{{ unit() }}</span>
             <span class="esd-stat-label">Màxim</span>
           </div>
           <div class="esd-stat">
-            <span class="esd-stat-value">{{ summary().last }}kg</span>
+            <span class="esd-stat-value">{{ dispW(summary().last) }}{{ unit() }}</span>
             <span class="esd-stat-label">Últim</span>
           </div>
           <div class="esd-stat">
@@ -78,7 +80,7 @@ interface SessionPoint {
                 <div class="esd-bar-fill" [style.width.%]="s.pct"></div>
               </div>
               <div class="esd-session-right">
-                <span class="esd-session-weight">{{ s.maxWeight }}kg</span>
+                <span class="esd-session-weight">{{ dispW(s.maxWeight) }}{{ unit() }}</span>
                 @if (s.feeling) {
                   <span class="esd-session-feeling" [title]="getFeelingLabel(s.feeling)">
                     {{ getFeelingEmoji(s.feeling) }}
@@ -110,17 +112,17 @@ interface SessionPoint {
       padding: 20px 12px 16px 20px;
     }
     .esd-title-block { display: flex; align-items: center; gap: 8px; }
-    .esd-title-icon { font-size: 22px; color: #006874; }
-    .esd-title { margin: 0; font-size: 18px; font-weight: 700; color: #1a1a1a; }
-    .esd-close-btn { color: #666; }
+    .esd-title-icon { font-size: 22px; color: var(--c-brand); }
+    .esd-title { margin: 0; font-size: 18px; font-weight: 700; color: var(--c-text); }
+    .esd-close-btn { color: var(--c-text-3); }
 
     /* Loading bar */
     .esd-loading-bar-wrap {
       height: 3px; margin: 0 20px 12px; border-radius: 2px;
-      background: rgba(0,104,116,0.1); overflow: hidden;
+      background: rgba(var(--c-brand-rgb), 0.1); overflow: hidden;
     }
     .esd-loading-bar {
-      display: block; height: 100%; width: 40%; background: #006874; border-radius: 2px;
+      display: block; height: 100%; width: 40%; background: var(--c-brand); border-radius: 2px;
       animation: esd-slide 1.2s ease-in-out infinite;
     }
     @keyframes esd-slide {
@@ -131,7 +133,7 @@ interface SessionPoint {
     /* ── Empty state ── */
     .esd-empty {
       display: flex; flex-direction: column; align-items: center;
-      gap: 10px; padding: 40px 24px; color: #767676; text-align: center;
+      gap: 10px; padding: 40px 24px; color: var(--c-text-3); text-align: center;
       .material-symbols-outlined { font-size: 48px; }
       p { margin: 0; font-size: 14px; }
     }
@@ -145,11 +147,11 @@ interface SessionPoint {
       padding: 12px 12px 12px;
     }
     .esd-stat {
-      background: #f7f7f7; border-radius: 10px; padding: 10px 6px;
+      background: var(--c-subtle); border-radius: 10px; padding: 10px 6px;
       display: flex; flex-direction: column; align-items: center; gap: 3px;
     }
-    .esd-stat-value { font-size: 16px; font-weight: 700; color: #1a1a1a; }
-    .esd-stat-label { font-size: 10px; color: #666; text-align: center; }
+    .esd-stat-value { font-size: 16px; font-weight: 700; color: var(--c-text); }
+    .esd-stat-label { font-size: 10px; color: var(--c-text-3); text-align: center; }
     .positive { color: #4caf50 !important; }
     .negative { color: #ef5350 !important; }
 
@@ -165,28 +167,32 @@ interface SessionPoint {
       display: flex; align-items: center; gap: 10px;
     }
     .esd-session-date {
-      font-size: 12px; color: #666; width: 52px; flex-shrink: 0; text-align: right;
+      font-size: 12px; color: var(--c-text-3); width: 52px; flex-shrink: 0; text-align: right;
     }
     .esd-bar-track {
-      flex: 1; height: 10px; background: #f0f0f0; border-radius: 5px; overflow: hidden;
+      flex: 1; height: 10px; background: var(--c-border-2); border-radius: 5px; overflow: hidden;
     }
     .esd-bar-fill {
-      height: 100%; background: #006874; border-radius: 5px;
+      height: 100%; background: var(--c-brand); border-radius: 5px;
       transition: width 0.3s ease;
     }
     .esd-session-right {
       display: flex; align-items: center; gap: 4px; min-width: 70px;
     }
     .esd-session-weight {
-      font-size: 13px; font-weight: 700; color: #006874; min-width: 44px;
+      font-size: 13px; font-weight: 700; color: var(--c-brand); min-width: 44px;
     }
     .esd-session-feeling { font-size: 16px; line-height: 1; }
   `],
 })
 export class ExerciseStatsDialogComponent {
-  private dialogRef = inject(MatDialogRef<ExerciseStatsDialogComponent>, { optional: true });
+  private dialogRef       = inject(MatDialogRef<ExerciseStatsDialogComponent>, { optional: true });
   readonly data: { exerciseId: string; exerciseName: string } | null = inject(MAT_DIALOG_DATA, { optional: true });
-  private workoutService = inject(WorkoutService);
+  private workoutService  = inject(WorkoutService);
+  private settingsService = inject(UserSettingsService);
+
+  readonly unit = this.settingsService.weightUnit;
+  dispW(kg: number): number { return kgToDisplay(kg, this.unit()); }
 
   readonly inlineExerciseId   = input<string | null>(null);
   readonly inlineExerciseName = input<string | null>(null);

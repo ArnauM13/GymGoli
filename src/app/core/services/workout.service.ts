@@ -204,6 +204,16 @@ export class WorkoutService {
       .sort((a, b) => a.date.localeCompare(b.date));
   }
 
+  getAllTimeMaxWeight(exerciseId: string, excludeWorkoutId?: string): number {
+    let max = 0;
+    for (const w of this._historical()) {
+      if (w.id === excludeWorkoutId) continue;
+      const entry = w.entries.find(e => e.exerciseId === exerciseId);
+      if (entry) for (const s of entry.sets) if (s.weight > max) max = s.weight;
+    }
+    return max;
+  }
+
   getLastSessionInfo(exerciseId: string, excludeWorkoutId?: string): { date: string; maxWeight: number; feeling?: FeelingLevel } | null {
     const past = this.workouts()
       .filter(w =>

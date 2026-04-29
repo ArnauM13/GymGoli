@@ -25,7 +25,9 @@ import {
 import { Exercise } from '../../core/models/exercise.model';
 import { Workout } from '../../core/models/workout.model';
 import { ExerciseService } from '../../core/services/exercise.service';
+import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
+import { kgToDisplay } from '../../shared/utils/weight.utils';
 
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, Title, Tooltip, Legend);
 
@@ -130,7 +132,7 @@ interface ChartPoint {
 
     .section { padding: 8px 16px; }
 
-    .select-label { display: block; font-size: 12px; color: #666; font-weight: 500; margin-bottom: 6px; }
+    .select-label { display: block; font-size: 12px; color: var(--c-text-2); font-weight: 500; margin-bottom: 6px; }
 
     .select-wrap { position: relative; }
 
@@ -140,7 +142,7 @@ interface ChartPoint {
     }
     .loading-dot {
       display: block; width: 8px; height: 8px; border-radius: 50%;
-      background: #006874;
+      background: var(--c-brand);
       animation: pulse-dot 1s ease-in-out infinite;
     }
     @keyframes pulse-dot {
@@ -151,11 +153,11 @@ interface ChartPoint {
     .exercise-select {
       width: 100%;
       padding: 10px 12px;
-      border: 1.5px solid #e0e0e0;
+      border: 1.5px solid var(--c-border);
       border-radius: 10px;
       font-size: 15px;
-      background: white;
-      color: #1a1a1a;
+      background: var(--c-card);
+      color: var(--c-text);
       outline: none;
       appearance: none;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24'%3E%3Cpath fill='%23888' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
@@ -164,7 +166,7 @@ interface ChartPoint {
       padding-right: 36px;
       cursor: pointer;
 
-      &:focus { border-color: #006874; }
+      &:focus { border-color: var(--c-brand); }
     }
 
     .metric-tabs {
@@ -176,24 +178,24 @@ interface ChartPoint {
     .metric-tab {
       flex: 1;
       padding: 8px 4px;
-      border: 1.5px solid #e0e0e0;
+      border: 1.5px solid var(--c-border);
       border-radius: 8px;
-      background: white;
+      background: var(--c-card);
       font-size: 13px;
       font-weight: 500;
-      color: #666;
+      color: var(--c-text-2);
       cursor: pointer;
       transition: all 0.2s;
 
-      &.active { background: #006874; color: white; border-color: #006874; }
-      &:hover:not(.active) { border-color: #006874; color: #006874; }
+      &.active { background: var(--c-brand); color: white; border-color: var(--c-brand); }
+      &:hover:not(.active) { border-color: var(--c-brand); color: var(--c-brand); }
     }
 
     .chart-container {
       margin: 0 16px;
-      background: white;
+      background: var(--c-card);
       border-radius: 14px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      box-shadow: 0 2px 8px var(--c-shadow);
       padding: 16px;
       height: 240px;
       display: flex;
@@ -208,7 +210,7 @@ interface ChartPoint {
       flex-direction: column;
       align-items: center;
       gap: 8px;
-      color: #767676;
+      color: var(--c-text-3);
       text-align: center;
 
       .material-symbols-outlined { font-size: 48px; }
@@ -223,18 +225,18 @@ interface ChartPoint {
     }
 
     .stat-card {
-      background: white;
+      background: var(--c-card);
       border-radius: 10px;
       padding: 12px 8px;
       text-align: center;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      box-shadow: 0 1px 4px var(--c-shadow);
       display: flex;
       flex-direction: column;
       gap: 4px;
     }
 
-    .stat-value { font-size: 18px; font-weight: 700; color: #1a1a1a; }
-    .stat-label { font-size: 11px; color: #666; }
+    .stat-value { font-size: 18px; font-weight: 700; color: var(--c-text); }
+    .stat-label { font-size: 11px; color: var(--c-text-2); }
     .positive { color: #4caf50; }
     .negative { color: #ef5350; }
 
@@ -246,9 +248,9 @@ interface ChartPoint {
       padding: 60px 24px;
       text-align: center;
 
-      .empty-icon { font-size: 64px; color: #ddd; }
-      h2 { margin: 0; font-size: 20px; font-weight: 600; color: #444; }
-      p { margin: 0; color: #666; }
+      .empty-icon { font-size: 64px; color: var(--c-border); }
+      h2 { margin: 0; font-size: 20px; font-weight: 600; color: var(--c-text); }
+      p { margin: 0; color: var(--c-text-2); }
     }
   `],
 })
@@ -256,7 +258,10 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
   @ViewChild('chartCanvas') canvasRef!: ElementRef<HTMLCanvasElement>;
 
   private exerciseService = inject(ExerciseService);
-  private workoutService = inject(WorkoutService);
+  private workoutService  = inject(WorkoutService);
+  private settingsService = inject(UserSettingsService);
+
+  readonly unit = this.settingsService.weightUnit;
 
   /** Only show exercises that have at least one set recorded in loaded workouts */
   readonly exercises = computed(() => {
@@ -283,8 +288,13 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
     if (!exId) return [];
     const workouts = this.workoutService.getWorkoutsForExercise(exId);
     const metric = this.selectedMetric();
+    const unit   = this.unit();
     return workouts
-      .map(w => ({ date: w.date, value: this.extractMetric(w, exId, metric) }))
+      .map(w => {
+        let value = this.extractMetric(w, exId, metric);
+        if (metric === 'weight' || metric === 'volume') value = kgToDisplay(value, unit);
+        return { date: w.date, value };
+      })
       .filter(p => metric !== 'feeling' || p.value > 0);
   });
 
@@ -306,8 +316,9 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
     this.workoutService.loadAllWorkouts();
 
     effect(() => {
-      const data = this.chartData();
+      const data   = this.chartData();
       const metric = this.selectedMetric();
+      this.settingsService.darkMode(); // track so chart re-colours on theme change
       this.updateChart(data, metric);
     });
   }
@@ -339,7 +350,8 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
   }
 
   private getMetricLabel(metric: Metric): string {
-    return { weight: 'Pes màxim (kg)', volume: 'Volum total (kg)', feeling: 'Sensació (1-5)' }[metric];
+    const u = this.unit();
+    return { weight: `Pes màxim (${u})`, volume: `Volum total (${u})`, feeling: 'Sensació (1-5)' }[metric];
   }
 
   private updateChart(data: ChartPoint[], metric: Metric): void {
@@ -359,12 +371,24 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  private _chartColors() {
+    const s       = getComputedStyle(document.documentElement);
+    const brand   = s.getPropertyValue('--c-brand').trim()     || '#006874';
+    const rgb     = s.getPropertyValue('--c-brand-rgb').trim() || '0,104,116';
+    const text    = s.getPropertyValue('--c-text').trim()      || '#1a1a1a';
+    const muted   = s.getPropertyValue('--c-text-3').trim()    || '#888';
+    const grid    = s.getPropertyValue('--c-border-2').trim()  || '#f0f0f0';
+    return { brand, brandAlpha: `rgba(${rgb},0.1)`, text, muted, grid };
+  }
+
   private createChart(data: ChartPoint[], metric: Metric): void {
     if (!this.canvasRef) return;
     this.chart?.destroy();
 
     const ctx = this.canvasRef.nativeElement.getContext('2d');
     if (!ctx) return;
+
+    const { brand, brandAlpha, text, muted, grid } = this._chartColors();
 
     this.chart = new Chart(ctx, {
       type: 'line',
@@ -373,10 +397,10 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
         datasets: [{
           label: this.getMetricLabel(metric),
           data: data.map(d => d.value),
-          borderColor: '#006874',
-          backgroundColor: 'rgba(0, 104, 116, 0.1)',
+          borderColor: brand,
+          backgroundColor: brandAlpha,
           borderWidth: 2.5,
-          pointBackgroundColor: '#006874',
+          pointBackgroundColor: brand,
           pointRadius: 5,
           pointHoverRadius: 7,
           fill: true,
@@ -389,7 +413,7 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: '#1a1a1a',
+            backgroundColor: text,
             padding: 10,
             callbacks: {
               title: items => items[0]?.label ?? '',
@@ -402,15 +426,15 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
             grid: { display: false },
             ticks: {
               font: { size: 11 },
-              color: '#888',
+              color: muted,
               maxRotation: 40,
               // Always show all labels (important for single-point charts)
               autoSkip: false,
             },
           },
           y: {
-            grid: { color: '#f0f0f0' },
-            ticks: { font: { size: 11 }, color: '#888' },
+            grid: { color: grid },
+            ticks: { font: { size: 11 }, color: muted },
             // Ensure Y axis has visible range even with a single data point
             beginAtZero: false,
           },

@@ -23,6 +23,7 @@ import {
 } from 'chart.js';
 
 import { Workout } from '../../core/models/workout.model';
+import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
 
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, Title, Tooltip, Legend);
@@ -95,18 +96,18 @@ interface ChartPoint { date: string; value: number; }
     }
     .epi-tab {
       flex: 1; padding: 7px 4px;
-      border: 1.5px solid #e0e0e0; border-radius: 8px;
-      background: white; font-size: 12px; font-weight: 600; color: #666;
+      border: 1.5px solid var(--c-border-2); border-radius: 8px;
+      background: var(--c-card); font-size: 12px; font-weight: 600; color: var(--c-text-3);
       cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      &.active { background: #006874; color: white; border-color: #006874; }
-      &:hover:not(.active) { border-color: #006874; color: #006874; }
+      &.active { background: var(--c-brand); color: var(--c-card); border-color: var(--c-brand); }
+      &:hover:not(.active) { border-color: var(--c-brand); color: var(--c-brand); }
     }
 
     /* ── Chart ── */
     .epi-chart-wrap {
       margin: 0 14px;
-      background: white; border-radius: 12px;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+      background: var(--c-card); border-radius: 12px;
+      box-shadow: 0 1px 6px var(--c-shadow);
       padding: 12px 12px 8px;
       height: 200px;
       display: flex; align-items: center; justify-content: center;
@@ -115,7 +116,7 @@ interface ChartPoint { date: string; value: number; }
 
     .epi-no-data {
       display: flex; flex-direction: column; align-items: center; gap: 6px;
-      color: #ccc; text-align: center;
+      color: var(--c-border); text-align: center;
       .material-symbols-outlined { font-size: 36px; }
       p { margin: 0; font-size: 13px; }
     }
@@ -126,13 +127,13 @@ interface ChartPoint { date: string; value: number; }
       gap: 6px; padding: 10px 14px 14px;
     }
     .epi-stat {
-      background: white; border-radius: 10px;
+      background: var(--c-card); border-radius: 10px;
       padding: 10px 6px; text-align: center;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      box-shadow: 0 1px 4px var(--c-shadow);
       display: flex; flex-direction: column; gap: 3px;
     }
-    .epi-stat-val { font-size: 16px; font-weight: 700; color: #1a1a1a; }
-    .epi-stat-lbl { font-size: 10px; color: #666; }
+    .epi-stat-val { font-size: 16px; font-weight: 700; color: var(--c-text); }
+    .epi-stat-lbl { font-size: 10px; color: var(--c-text-3); }
     .positive { color: #4caf50; }
     .negative { color: #ef5350; }
   `],
@@ -140,7 +141,8 @@ interface ChartPoint { date: string; value: number; }
 export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy {
   @ViewChild('chartCanvas') canvasRef?: ElementRef<HTMLCanvasElement>;
 
-  private workoutService = inject(WorkoutService);
+  private workoutService  = inject(WorkoutService);
+  private settingsService = inject(UserSettingsService);
 
   readonly exerciseId   = input<string | null>(null);
   readonly exerciseName = input<string | null>(null);
@@ -181,6 +183,7 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
     effect(() => {
       const data   = this.chartData();
       const metric = this.selectedMetric();
+      this.settingsService.darkMode(); // track so chart re-colours on theme change
       this._update(data, metric);
     });
   }
@@ -222,11 +225,23 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
     }
   }
 
+  private _chartColors() {
+    const s     = getComputedStyle(document.documentElement);
+    const brand = s.getPropertyValue('--c-brand').trim()     || '#006874';
+    const rgb   = s.getPropertyValue('--c-brand-rgb').trim() || '0,104,116';
+    const text  = s.getPropertyValue('--c-text').trim()      || '#1a1a1a';
+    const muted = s.getPropertyValue('--c-text-3').trim()    || '#888';
+    const grid  = s.getPropertyValue('--c-border-2').trim()  || '#f0f0f0';
+    return { brand, brandAlpha: `rgba(${rgb},0.1)`, text, muted, grid };
+  }
+
   private _create(data: ChartPoint[], metric: Metric): void {
     if (!this.canvasRef) return;
     this.chart?.destroy();
     const ctx = this.canvasRef.nativeElement.getContext('2d');
     if (!ctx) return;
+
+    const { brand, brandAlpha, text, muted, grid } = this._chartColors();
 
     this.chart = new Chart(ctx, {
       type: 'line',
@@ -235,10 +250,10 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
         datasets: [{
           label: this._label(metric),
           data: data.map(d => d.value),
-          borderColor: '#006874',
-          backgroundColor: 'rgba(0,104,116,0.1)',
+          borderColor: brand,
+          backgroundColor: brandAlpha,
           borderWidth: 2.5,
-          pointBackgroundColor: '#006874',
+          pointBackgroundColor: brand,
           pointRadius: 4,
           pointHoverRadius: 6,
           fill: true,
@@ -251,7 +266,7 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: '#1a1a1a', padding: 10,
+            backgroundColor: text, padding: 10,
             callbacks: {
               title: items => items[0]?.label ?? '',
               label: item  => ` ${item.formattedValue}`,
@@ -261,11 +276,11 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
         scales: {
           x: {
             grid: { display: false },
-            ticks: { font: { size: 10 }, color: '#888', maxRotation: 40, autoSkip: true, maxTicksLimit: 8 },
+            ticks: { font: { size: 10 }, color: muted, maxRotation: 40, autoSkip: true, maxTicksLimit: 8 },
           },
           y: {
-            grid: { color: '#f0f0f0' },
-            ticks: { font: { size: 10 }, color: '#888' },
+            grid: { color: grid },
+            ticks: { font: { size: 10 }, color: muted },
             beginAtZero: false,
           },
         },

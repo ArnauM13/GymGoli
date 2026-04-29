@@ -34,8 +34,9 @@ export function workoutCategories(w: Workout): string[] {
 }
 
 export function catDotBackground(cats: string[]): string {
-  if (!cats?.length) return '#006874';
-  if (cats.length === 1) return CATEGORY_COLORS[cats[0] as ExerciseCategory] ?? '#006874';
+  const brand = getComputedStyle(document.documentElement).getPropertyValue('--c-brand').trim() || '#006874';
+  if (!cats?.length) return brand;
+  if (cats.length === 1) return CATEGORY_COLORS[cats[0] as ExerciseCategory] ?? brand;
   const colors = cats.map(c => CATEGORY_COLORS[c as ExerciseCategory] ?? '#bbb');
   const step   = 100 / colors.length;
   return `conic-gradient(${colors.map((c, i) => `${c} ${Math.round(i * step)}% ${Math.round((i + 1) * step)}%`).join(', ')})`;

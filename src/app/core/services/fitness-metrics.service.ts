@@ -14,6 +14,7 @@ export type InsightType =
   | 'descansa'
   | 'equilibra_gym'
   | 'objectiu_assolit'
+  | 'augmenta_objectiu'
   | 'camino_objectiu'
   | 'anima_objectiu';
 
@@ -76,7 +77,11 @@ export class FitnessMetricsService {
     const workouts = this.workoutService.workouts();
     const sessions = this.sportService.sessions();
     const sports   = this.sportService.sports();
-    const goal     = this.settingsService.settings().weeklyActivityGoal;
+    const cfg      = this.settingsService.settings();
+    const goal     = cfg.weeklyActivityGoal;
+    const mode     = cfg.goalMode;
+    const gymGoal  = cfg.weeklyGymGoal;
+    const spGoal   = cfg.weeklySportGoal;
 
     // ── Current week ──────────────────────────────────────────────────────
     const weekWorkouts = workouts.filter(w => w.date >= monday && w.date <= today);
@@ -214,7 +219,7 @@ export class FitnessMetricsService {
     }
 
     // ── Objectiu setmanal ─────────────────────────────────────────────────
-    if (goal !== null) {
+    if (mode === 'combined' && goal !== null) {
       const dow = new Date(today + 'T12:00:00').getDay();
 
       if (weekTotal >= goal) {
@@ -226,7 +231,6 @@ export class FitnessMetricsService {
           color: '#006874',
         });
       } else if (dow === 0) {
-        // Sunday — last day of the week, give a final nudge
         const missing = goal - weekTotal;
         candidates.push({
           type: 'anima_objectiu',
@@ -238,7 +242,6 @@ export class FitnessMetricsService {
           color: '#f57c00',
         });
       } else if (weekTotal >= 1 && weekTotal < goal && dow >= 3) {
-        // Wed-Sat with some progress — encourage
         const missing = goal - weekTotal;
         candidates.push({
           type: 'camino_objectiu',
@@ -250,17 +253,101 @@ export class FitnessMetricsService {
           color: '#006874',
         });
       }
+    } else if (mode === 'separate' && (gymGoal !== null || spGoal !== null)) {
+      const dow    = new Date(today + 'T12:00:00').getDay();
+      const gymW   = weekWorkouts.length;
+      const spW    = weekSessions.length;
+      const gymMet = gymGoal === null || gymW >= gymGoal;
+      const spMet  = spGoal  === null || spW  >= spGoal;
+
+      if (gymMet && spMet) {
+        const parts: string[] = [];
+        if (gymGoal !== null) parts.push(`gym ${gymW}/${gymGoal}`);
+        if (spGoal  !== null) parts.push(`esport ${spW}/${spGoal}`);
+        candidates.push({
+          type: 'objectiu_assolit',
+          emoji: '🎯',
+          title: 'Objectius de la setmana, fets!',
+          message: `Has assolit tots els objectius (${parts.join(', ')}). Quin crack!`,
+          color: '#006874',
+        });
+      } else if (dow >= 3) {
+        const parts: string[] = [];
+        if (gymGoal  !== null && !gymMet) parts.push(`gym ${gymW}/${gymGoal}`);
+        if (spGoal   !== null && !spMet)  parts.push(`esport ${spW}/${spGoal}`);
+        const doneParts: string[] = [];
+        if (gymGoal !== null && gymMet) doneParts.push(`gym ✓`);
+        if (spGoal  !== null && spMet)  doneParts.push(`esport ✓`);
+        const allParts = [...doneParts, ...parts].join(', ');
+        candidates.push({
+          type: 'camino_objectiu',
+          emoji: '💪',
+          title: 'Vas per bon camí!',
+          message: `Setmana en curs: ${allParts}. Continua!`,
+          color: '#006874',
+        });
+      }
+    }
+
+    // ── Augmenta objectiu (3+ setmanes seguides) ─────────────────────────
+    const streak = this.goalStreak();
+    const hasGoal = mode === 'combined' ? goal !== null : gymGoal !== null || spGoal !== null;
+    if (streak >= 3 && hasGoal) {
+      candidates.push({
+        type: 'augmenta_objectiu',
+        emoji: '🚀',
+        title: `${streak} setmanes seguides!`,
+        message: `Portes ${streak} setmanes assolint el teu objectiu. Potser és hora d'apujar-lo una mica?`,
+        color: '#4caf50',
+      });
     }
 
     // ── Retorna màxim 2 per prioritat ─────────────────────────────────────
     const priority: InsightType[] = [
-      'objectiu_assolit', 'gran_setmana', 'descansa', 'prova_gym',
+      'objectiu_assolit', 'augmenta_objectiu', 'gran_setmana', 'descansa', 'prova_gym',
       'camino_objectiu', 'setmana_fluixa', 'anima_objectiu',
       'prova_esport', 'recupera_esport', 'equilibra_gym',
     ];
     return candidates
       .sort((a, b) => priority.indexOf(a.type) - priority.indexOf(b.type))
       .slice(0, 2);
+  });
+
+  readonly goalStreak = computed((): number => {
+    const s        = this.settingsService.settings();
+    const mode     = s.goalMode;
+    const combined = s.weeklyActivityGoal;
+    const gymGoal  = s.weeklyGymGoal;
+    const spGoal   = s.weeklySportGoal;
+
+    const hasGoal = mode === 'combined' ? combined !== null
+                                        : gymGoal !== null || spGoal !== null;
+    if (!hasGoal) return 0;
+
+    const today    = TODAY();
+    const workouts = this.workoutService.workouts();
+    const sessions = this.sportService.sessions();
+
+    let streak = 0;
+    for (let week = 0; week <= 52; week++) {
+      const monday       = mondayOfWeek(offsetDate(today, -(week * 7)));
+      const end          = week === 0 ? today : offsetDate(monday, 6);
+      const weekWorkouts = workouts.filter(w => w.date >= monday && w.date <= end).length;
+      const weekSessions = sessions.filter(s => s.date >= monday && s.date <= end).length;
+
+      let met: boolean;
+      if (mode === 'combined') {
+        met = combined !== null && (weekWorkouts + weekSessions) >= combined;
+      } else {
+        const gymOk = gymGoal === null || weekWorkouts >= gymGoal;
+        const spOk  = spGoal  === null || weekSessions >= spGoal;
+        met = gymOk && spOk;
+      }
+
+      if (met) streak++;
+      else break;
+    }
+    return streak;
   });
 }
 
