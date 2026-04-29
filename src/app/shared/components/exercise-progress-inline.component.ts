@@ -95,18 +95,18 @@ interface ChartPoint { date: string; value: number; }
     }
     .epi-tab {
       flex: 1; padding: 7px 4px;
-      border: 1.5px solid #e0e0e0; border-radius: 8px;
-      background: white; font-size: 12px; font-weight: 600; color: #666;
+      border: 1.5px solid var(--c-border-2); border-radius: 8px;
+      background: var(--c-card); font-size: 12px; font-weight: 600; color: var(--c-text-3);
       cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      &.active { background: #006874; color: white; border-color: #006874; }
-      &:hover:not(.active) { border-color: #006874; color: #006874; }
+      &.active { background: var(--c-brand); color: var(--c-card); border-color: var(--c-brand); }
+      &:hover:not(.active) { border-color: var(--c-brand); color: var(--c-brand); }
     }
 
     /* ── Chart ── */
     .epi-chart-wrap {
       margin: 0 14px;
-      background: white; border-radius: 12px;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+      background: var(--c-card); border-radius: 12px;
+      box-shadow: 0 1px 6px var(--c-shadow);
       padding: 12px 12px 8px;
       height: 200px;
       display: flex; align-items: center; justify-content: center;
@@ -115,7 +115,7 @@ interface ChartPoint { date: string; value: number; }
 
     .epi-no-data {
       display: flex; flex-direction: column; align-items: center; gap: 6px;
-      color: #ccc; text-align: center;
+      color: var(--c-border); text-align: center;
       .material-symbols-outlined { font-size: 36px; }
       p { margin: 0; font-size: 13px; }
     }
@@ -126,13 +126,13 @@ interface ChartPoint { date: string; value: number; }
       gap: 6px; padding: 10px 14px 14px;
     }
     .epi-stat {
-      background: white; border-radius: 10px;
+      background: var(--c-card); border-radius: 10px;
       padding: 10px 6px; text-align: center;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      box-shadow: 0 1px 4px var(--c-shadow);
       display: flex; flex-direction: column; gap: 3px;
     }
-    .epi-stat-val { font-size: 16px; font-weight: 700; color: #1a1a1a; }
-    .epi-stat-lbl { font-size: 10px; color: #666; }
+    .epi-stat-val { font-size: 16px; font-weight: 700; color: var(--c-text); }
+    .epi-stat-lbl { font-size: 10px; color: var(--c-text-3); }
     .positive { color: #4caf50; }
     .negative { color: #ef5350; }
   `],
