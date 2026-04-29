@@ -316,8 +316,9 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
     this.workoutService.loadAllWorkouts();
 
     effect(() => {
-      const data = this.chartData();
+      const data   = this.chartData();
       const metric = this.selectedMetric();
+      this.settingsService.darkMode(); // track so chart re-colours on theme change
       this.updateChart(data, metric);
     });
   }
@@ -370,12 +371,24 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  private _chartColors() {
+    const s       = getComputedStyle(document.documentElement);
+    const brand   = s.getPropertyValue('--c-brand').trim()     || '#006874';
+    const rgb     = s.getPropertyValue('--c-brand-rgb').trim() || '0,104,116';
+    const text    = s.getPropertyValue('--c-text').trim()      || '#1a1a1a';
+    const muted   = s.getPropertyValue('--c-text-3').trim()    || '#888';
+    const grid    = s.getPropertyValue('--c-border-2').trim()  || '#f0f0f0';
+    return { brand, brandAlpha: `rgba(${rgb},0.1)`, text, muted, grid };
+  }
+
   private createChart(data: ChartPoint[], metric: Metric): void {
     if (!this.canvasRef) return;
     this.chart?.destroy();
 
     const ctx = this.canvasRef.nativeElement.getContext('2d');
     if (!ctx) return;
+
+    const { brand, brandAlpha, text, muted, grid } = this._chartColors();
 
     this.chart = new Chart(ctx, {
       type: 'line',
@@ -384,10 +397,10 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
         datasets: [{
           label: this.getMetricLabel(metric),
           data: data.map(d => d.value),
-          borderColor: '#006874',
-          backgroundColor: 'rgba(0, 104, 116, 0.1)',
+          borderColor: brand,
+          backgroundColor: brandAlpha,
           borderWidth: 2.5,
-          pointBackgroundColor: '#006874',
+          pointBackgroundColor: brand,
           pointRadius: 5,
           pointHoverRadius: 7,
           fill: true,
@@ -400,7 +413,7 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: '#1a1a1a',
+            backgroundColor: text,
             padding: 10,
             callbacks: {
               title: items => items[0]?.label ?? '',
@@ -413,15 +426,15 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
             grid: { display: false },
             ticks: {
               font: { size: 11 },
-              color: '#888',
+              color: muted,
               maxRotation: 40,
               // Always show all labels (important for single-point charts)
               autoSkip: false,
             },
           },
           y: {
-            grid: { color: '#f0f0f0' },
-            ticks: { font: { size: 11 }, color: '#888' },
+            grid: { color: grid },
+            ticks: { font: { size: 11 }, color: muted },
             // Ensure Y axis has visible range even with a single data point
             beginAtZero: false,
           },

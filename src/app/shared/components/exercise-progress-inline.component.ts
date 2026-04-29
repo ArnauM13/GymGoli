@@ -23,6 +23,7 @@ import {
 } from 'chart.js';
 
 import { Workout } from '../../core/models/workout.model';
+import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
 
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, Title, Tooltip, Legend);
@@ -140,7 +141,8 @@ interface ChartPoint { date: string; value: number; }
 export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy {
   @ViewChild('chartCanvas') canvasRef?: ElementRef<HTMLCanvasElement>;
 
-  private workoutService = inject(WorkoutService);
+  private workoutService  = inject(WorkoutService);
+  private settingsService = inject(UserSettingsService);
 
   readonly exerciseId   = input<string | null>(null);
   readonly exerciseName = input<string | null>(null);
@@ -181,6 +183,7 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
     effect(() => {
       const data   = this.chartData();
       const metric = this.selectedMetric();
+      this.settingsService.darkMode(); // track so chart re-colours on theme change
       this._update(data, metric);
     });
   }
@@ -222,11 +225,23 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
     }
   }
 
+  private _chartColors() {
+    const s     = getComputedStyle(document.documentElement);
+    const brand = s.getPropertyValue('--c-brand').trim()     || '#006874';
+    const rgb   = s.getPropertyValue('--c-brand-rgb').trim() || '0,104,116';
+    const text  = s.getPropertyValue('--c-text').trim()      || '#1a1a1a';
+    const muted = s.getPropertyValue('--c-text-3').trim()    || '#888';
+    const grid  = s.getPropertyValue('--c-border-2').trim()  || '#f0f0f0';
+    return { brand, brandAlpha: `rgba(${rgb},0.1)`, text, muted, grid };
+  }
+
   private _create(data: ChartPoint[], metric: Metric): void {
     if (!this.canvasRef) return;
     this.chart?.destroy();
     const ctx = this.canvasRef.nativeElement.getContext('2d');
     if (!ctx) return;
+
+    const { brand, brandAlpha, text, muted, grid } = this._chartColors();
 
     this.chart = new Chart(ctx, {
       type: 'line',
@@ -235,10 +250,10 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
         datasets: [{
           label: this._label(metric),
           data: data.map(d => d.value),
-          borderColor: '#006874',
-          backgroundColor: 'rgba(0,104,116,0.1)',
+          borderColor: brand,
+          backgroundColor: brandAlpha,
           borderWidth: 2.5,
-          pointBackgroundColor: '#006874',
+          pointBackgroundColor: brand,
           pointRadius: 4,
           pointHoverRadius: 6,
           fill: true,
@@ -251,7 +266,7 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: '#1a1a1a', padding: 10,
+            backgroundColor: text, padding: 10,
             callbacks: {
               title: items => items[0]?.label ?? '',
               label: item  => ` ${item.formattedValue}`,
@@ -261,11 +276,11 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
         scales: {
           x: {
             grid: { display: false },
-            ticks: { font: { size: 10 }, color: '#888', maxRotation: 40, autoSkip: true, maxTicksLimit: 8 },
+            ticks: { font: { size: 10 }, color: muted, maxRotation: 40, autoSkip: true, maxTicksLimit: 8 },
           },
           y: {
-            grid: { color: '#f0f0f0' },
-            ticks: { font: { size: 10 }, color: '#888' },
+            grid: { color: grid },
+            ticks: { font: { size: 10 }, color: muted },
             beginAtZero: false,
           },
         },
