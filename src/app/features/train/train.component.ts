@@ -747,11 +747,16 @@ export class TrainComponent {
     return cats.map(c => CATEGORY_LABELS[c as ExerciseCategory] ?? c).join(' + ');
   }
 
+  private _brand(): string {
+    return getComputedStyle(document.documentElement).getPropertyValue('--c-brand').trim() || '#006874';
+  }
+
   workoutCardColor(w: Workout): string {
     const cats = workoutCategories(w);
-    if (!cats.length) return '#006874';
-    if (cats.length === 1) return CATEGORY_COLORS[cats[0] as ExerciseCategory] ?? '#006874';
-    const colors = cats.map(c => CATEGORY_COLORS[c as ExerciseCategory] ?? '#006874');
+    if (!cats.length) return this._brand();
+    if (cats.length === 1) return CATEGORY_COLORS[cats[0] as ExerciseCategory] ?? this._brand();
+    const fallback = this._brand();
+    const colors = cats.map(c => CATEGORY_COLORS[c as ExerciseCategory] ?? fallback);
     const step = 100 / colors.length;
     return `linear-gradient(180deg, ${colors.map((c, i) => `${c} ${i * step}%, ${c} ${(i + 1) * step}%`).join(', ')})`;
   }
@@ -761,8 +766,9 @@ export class TrainComponent {
   }
 
   workoutPrimaryColor(w: Workout): string {
-    const cats = workoutCategories(w);
-    return cats.length ? (CATEGORY_COLORS[cats[0] as ExerciseCategory] ?? '#006874') : '#006874';
+    const cats   = workoutCategories(w);
+    const brand  = this._brand();
+    return cats.length ? (CATEGORY_COLORS[cats[0] as ExerciseCategory] ?? brand) : brand;
   }
 
   workoutSetsCount(w: Workout): number {
