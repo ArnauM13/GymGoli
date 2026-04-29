@@ -51,9 +51,8 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               @if (w.entries.length > 0) { · {{ w.entries.length }} exerc }
             </span>
           </div>
-          <button class="topbar-delete" (click)="deleteActiveWorkout()">
+          <button class="topbar-delete" (click)="deleteActiveWorkout()" title="Eliminar entrenament">
             <span class="material-symbols-outlined">delete</span>
-            Eliminar
           </button>
         </div>
 
@@ -149,6 +148,9 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
                 <div class="suggestion-header">
                   <span class="suggestion-title">Últim {{ suggestionTypeLabel() | lowercase }}</span>
                   <span class="suggestion-date">· {{ suggestionAgo() }}</span>
+                  <button class="suggestion-close" (click)="suggestionType.set(null)" title="Tancar">
+                    <span class="material-symbols-outlined">close</span>
+                  </button>
                 </div>
                 @if (suggestionEntries().length > 0) {
                   <div class="suggestion-exercises">
@@ -255,10 +257,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
                 @if (workoutSetsCount(w); as n) { · {{ n }} sèr }
               </span>
             </div>
-            <div class="bar-shortcut-open">
-              <span class="bar-shortcut-open-text">Obrir</span>
-              <span class="material-symbols-outlined bar-shortcut-arrow">arrow_forward_ios</span>
-            </div>
+            <span class="material-symbols-outlined bar-shortcut-arrow">arrow_forward_ios</span>
           </button>
         }
       </div>
@@ -296,15 +295,12 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       font-size: 11px; color: var(--c-text-2); font-weight: 500;
     }
     .topbar-delete {
-      height: 34px; padding: 0 12px; border-radius: 10px;
-      border: 1.5px solid rgba(239,83,80,0.35);
-      background: rgba(239,83,80,0.06); cursor: pointer;
-      color: #ef5350;
-      display: flex; align-items: center; gap: 5px;
+      width: 36px; height: 36px; border-radius: 50%; border: none;
+      background: transparent; cursor: pointer; color: var(--c-text-3);
+      display: flex; align-items: center; justify-content: center;
       transition: all 0.15s; flex-shrink: 0; touch-action: manipulation;
-      font-size: 12px; font-weight: 700;
-      .material-symbols-outlined { font-size: 16px; }
-      &:hover { background: rgba(239,83,80,0.12); border-color: #ef5350; }
+      .material-symbols-outlined { font-size: 20px; }
+      &:hover { background: rgba(239,83,80,0.1); color: #ef5350; }
     }
 
     /* ── Type badges (topbar) ── */
@@ -369,15 +365,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .bar-shortcut-detail { font-size: 12px; font-weight: 500; color: var(--c-text-2); }
-    .bar-shortcut-open {
-      display: flex; flex-direction: column; align-items: center; gap: 1px;
-      flex-shrink: 0; color: var(--wc);
-    }
-    .bar-shortcut-open-text {
-      font-size: 9px; font-weight: 800; letter-spacing: 0.6px;
-      text-transform: uppercase; line-height: 1;
-    }
-    .bar-shortcut-arrow { font-size: 15px; flex-shrink: 0; }
+    .bar-shortcut-arrow { font-size: 18px; flex-shrink: 0; color: var(--wc); opacity: 0.7; }
 
     /* ── Type grid (inside workout-section) ── */
     .type-grid {
@@ -491,7 +479,15 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       display: flex; align-items: center; gap: 6px; margin-bottom: 10px;
     }
     .suggestion-title { font-size: 13px; font-weight: 700; color: var(--c-text); }
-    .suggestion-date  { font-size: 12px; color: var(--c-text-2); }
+    .suggestion-date  { font-size: 12px; color: var(--c-text-2); flex: 1; }
+    .suggestion-close {
+      width: 28px; height: 28px; border-radius: 50%; border: none;
+      background: transparent; cursor: pointer; color: var(--c-text-3);
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover { background: var(--c-hover); color: var(--c-text-2); }
+    }
     .suggestion-exercises {
       display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;
     }

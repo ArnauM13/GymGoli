@@ -83,7 +83,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
               }
 
               @if (editMode() || alwaysEditable()) {
-                <button mat-icon-button class="we-remove-btn" (click)="removeEntry(entry.exerciseId)" title="Eliminar exercici">
+                <button class="we-remove-btn" (click)="removeEntry(entry.exerciseId)" title="Eliminar exercici">
                   <span class="material-symbols-outlined">delete</span>
                 </button>
               } @else if (!alwaysEditable()) {
@@ -206,16 +206,18 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                       </div>
                     </div>
                   </div>
-                  <!-- ×1 ×2 ×3 quick-add buttons -->
                   <div class="we-set-form-actions">
                     <button type="button" class="we-cancel-btn" (click)="cancelSet()">Cancel·lar</button>
                     <div class="we-quick-add">
-                      <button type="button" class="we-quick-btn" (click)="submitSets(entry.exerciseId, 1)"
-                              [disabled]="setForm.invalid">×1</button>
-                      <button type="button" class="we-quick-btn" (click)="submitSets(entry.exerciseId, 2)"
+                      <button type="button" class="we-qty-btn" (click)="submitSets(entry.exerciseId, 2)"
                               [disabled]="setForm.invalid">×2</button>
-                      <button type="button" class="we-quick-btn we-quick-btn-primary" (click)="submitSets(entry.exerciseId, 4)"
+                      <button type="button" class="we-qty-btn" (click)="submitSets(entry.exerciseId, 4)"
                               [disabled]="setForm.invalid">×4</button>
+                      <button type="button" class="we-submit-btn" (click)="submitSets(entry.exerciseId, 1)"
+                              [disabled]="setForm.invalid">
+                        <span class="material-symbols-outlined">add</span>
+                        Afegir
+                      </button>
                     </div>
                   </div>
                 </form>
@@ -255,17 +257,19 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       <!-- ── Rest timer ── -->
       @if (timerActive()) {
         <div class="we-rest-timer" [class.we-rt--ending]="timerRemaining() <= 5">
-          <div class="we-rt-info">
-            <span class="material-symbols-outlined we-rt-icon">timer</span>
-            <span class="we-rt-label">Descans</span>
-          </div>
-          <span class="we-rt-countdown">{{ formatTimer(timerRemaining()) }}</span>
-          <div class="we-rt-controls">
-            <button class="we-rt-btn" (click)="adjustTimer(-30)">−30s</button>
-            <button class="we-rt-btn we-rt-skip" (click)="cancelTimer()" title="Saltar">
-              <span class="material-symbols-outlined">skip_next</span>
+          <div class="we-rt-header">
+            <div class="we-rt-info">
+              <span class="material-symbols-outlined we-rt-icon">timer</span>
+              <span class="we-rt-label">Descans</span>
+            </div>
+            <button class="we-rt-close" (click)="cancelTimer()" title="Saltar descans">
+              <span class="material-symbols-outlined">close</span>
             </button>
-            <button class="we-rt-btn" (click)="adjustTimer(30)">+30s</button>
+          </div>
+          <div class="we-rt-countdown" (click)="cancelTimer()">{{ formatTimer(timerRemaining()) }}</div>
+          <div class="we-rt-controls">
+            <button class="we-rt-adj" (click)="adjustTimer(-30)">−30s</button>
+            <button class="we-rt-adj" (click)="adjustTimer(30)">+30s</button>
           </div>
         </div>
       }
@@ -408,7 +412,14 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       font-size: 11px; font-weight: 500; color: var(--c-text-2); background: var(--c-border-2); width: fit-content;
     }
 
-    .we-remove-btn { color: var(--c-text-3); flex-shrink: 0; }
+    .we-remove-btn {
+      width: 36px; height: 36px; border-radius: 50%;
+      border: none; background: transparent; cursor: pointer;
+      color: var(--c-text-3); display: flex; align-items: center; justify-content: center;
+      touch-action: manipulation; transition: background 0.15s, color 0.15s; flex-shrink: 0;
+      .material-symbols-outlined { font-size: 20px; }
+      &:hover { background: rgba(239,83,80,0.1); color: #ef5350; }
+    }
 
     .we-entry-done-btn {
       background: rgba(var(--c-brand-rgb), 0.1) !important;
@@ -572,36 +583,40 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       }
     }
 
-    /* ── ×1 ×2 ×3 quick-add ── */
+    /* ── Add-set form action buttons ── */
     .we-set-form-actions {
       display: flex; align-items: center; gap: 8px;
     }
     .we-cancel-btn {
-      padding: 11px 16px; border-radius: 10px;
-      border: 1.5px solid rgba(239,83,80,0.3); background: rgba(239,83,80,0.08);
-      color: #ef5350; font-size: 15px; font-weight: 700;
-      cursor: pointer; touch-action: manipulation;
-      transition: all 0.15s;
-      &:hover { background: rgba(239,83,80,0.16); border-color: rgba(239,83,80,0.5); }
+      padding: 10px 14px; border-radius: 10px;
+      border: 1.5px solid var(--c-border); background: transparent;
+      color: var(--c-text-3); font-size: 14px; font-weight: 600;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      &:hover { background: var(--c-subtle); color: var(--c-text-2); }
       &:active { transform: scale(0.95); }
     }
     .we-quick-add {
-      flex: 1; display: flex; gap: 6px; justify-content: flex-end;
+      flex: 1; display: flex; gap: 6px; justify-content: flex-end; align-items: stretch;
     }
-    .we-quick-btn {
-      flex: 1; max-width: 72px;
-      padding: 11px 0; border-radius: 10px;
-      border: 1.5px solid var(--c-brand); background: var(--c-card);
-      color: var(--c-brand); font-size: 15px; font-weight: 700;
-      cursor: pointer; touch-action: manipulation;
-      transition: all 0.15s;
-      &:hover:not(:disabled)  { background: rgba(var(--c-brand-rgb), 0.08); }
+    .we-qty-btn {
+      padding: 10px 14px; border-radius: 10px;
+      border: 1.5px solid var(--c-border); background: var(--c-subtle);
+      color: var(--c-text-2); font-size: 14px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      &:hover:not(:disabled) { background: var(--c-hover); color: var(--c-text); }
       &:active:not(:disabled) { transform: scale(0.95); }
       &:disabled { opacity: 0.4; cursor: default; }
     }
-    .we-quick-btn-primary {
-      background: var(--c-brand); color: white;
+    .we-submit-btn {
+      display: flex; align-items: center; gap: 4px;
+      padding: 10px 16px; border-radius: 10px;
+      border: none; background: var(--c-brand);
+      color: white; font-size: 14px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 18px; }
       &:hover:not(:disabled) { background: var(--c-brand-dk); }
+      &:active:not(:disabled) { transform: scale(0.95); }
+      &:disabled { opacity: 0.4; cursor: default; }
     }
 
     /* ── Add / Repeat row ── */
@@ -659,11 +674,11 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     /* ── Rest timer ── */
     .we-rest-timer {
       position: fixed; bottom: 72px; left: 50%; transform: translateX(-50%);
-      z-index: 100; min-width: 280px; max-width: 360px;
-      display: flex; align-items: center; gap: 10px;
-      background: var(--c-card); border-radius: 18px;
+      z-index: 100; width: calc(100% - 64px); max-width: 300px;
+      display: flex; flex-direction: column; gap: 4px;
+      background: var(--c-card); border-radius: 20px;
       box-shadow: 0 4px 24px var(--c-shadow-md);
-      padding: 14px 16px;
+      padding: 14px 16px 16px;
       border: 1.5px solid rgba(var(--c-brand-rgb), 0.2);
       animation: rt-in 0.25s cubic-bezier(0.34, 1.3, 0.64, 1) both;
       &.we-rt--ending {
@@ -675,29 +690,33 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       from { opacity: 0; transform: translateX(-50%) translateY(12px); }
       to   { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
-    .we-rt-info {
-      display: flex; align-items: center; gap: 5px; flex-shrink: 0;
-    }
-    .we-rt-icon { font-size: 18px; color: var(--c-brand); }
+    .we-rt-header { display: flex; align-items: center; justify-content: space-between; }
+    .we-rt-info { display: flex; align-items: center; gap: 5px; }
+    .we-rt-icon { font-size: 16px; color: var(--c-brand); }
     .we-rt-label { font-size: 12px; font-weight: 600; color: var(--c-text-2); }
-    .we-rt-countdown {
-      flex: 1; text-align: center;
-      font-size: 26px; font-weight: 800; color: var(--c-text);
-      font-variant-numeric: tabular-nums; letter-spacing: -1px;
+    .we-rt-close {
+      width: 28px; height: 28px; border-radius: 50%;
+      border: none; background: transparent; cursor: pointer;
+      color: var(--c-text-3); display: flex; align-items: center; justify-content: center;
+      touch-action: manipulation; transition: background 0.15s;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover { background: var(--c-hover); color: var(--c-text-2); }
     }
-    .we-rt-controls { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-    .we-rt-btn {
-      padding: 6px 9px; border-radius: 8px;
+    .we-rt-countdown {
+      text-align: center; padding: 4px 0;
+      font-size: 42px; font-weight: 800; color: var(--c-text);
+      font-variant-numeric: tabular-nums; letter-spacing: -2px;
+      cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+      transition: color 0.15s;
+      &:active { opacity: 0.7; }
+    }
+    .we-rt-controls { display: flex; gap: 8px; }
+    .we-rt-adj {
+      flex: 1; padding: 8px 12px; border-radius: 10px;
       border: 1.5px solid var(--c-border); background: var(--c-subtle);
-      font-size: 12px; font-weight: 700; color: var(--c-text-2);
-      cursor: pointer; touch-action: manipulation;
-      transition: background 0.12s;
+      font-size: 13px; font-weight: 700; color: var(--c-text-2);
+      cursor: pointer; touch-action: manipulation; transition: background 0.12s;
       &:hover { background: var(--c-hover); }
-      &.we-rt-skip {
-        background: rgba(var(--c-brand-rgb), 0.08); border-color: var(--c-brand); color: var(--c-brand);
-        .material-symbols-outlined { font-size: 18px; display: block; }
-        &:hover { background: rgba(var(--c-brand-rgb), 0.16); }
-      }
     }
   `],
 })
@@ -730,6 +749,7 @@ export class WorkoutEditorComponent implements OnDestroy {
   readonly timerRemaining = signal(0);
   readonly timerTotal     = signal(0);
   private _timerId: ReturnType<typeof setInterval> | null = null;
+  private _timerForExercise: string | null = null;
 
   // ── Personal Records ───────────────────────────────────────────────────────
   readonly prEntries = signal<Set<string>>(new Set());
@@ -979,7 +999,7 @@ export class WorkoutEditorComponent implements OnDestroy {
       }
       // Start rest timer after logging sets
       const restSecs = this.settingsService.restTimerSeconds();
-      if (restSecs > 0) this.startRestTimer(restSecs);
+      if (restSecs > 0) this.startRestTimer(restSecs, exerciseId);
       this.cancelSet();
     } catch {
       this.snackBar.open('Error en afegir les sèries', '', { duration: 3000 });
@@ -999,6 +1019,7 @@ export class WorkoutEditorComponent implements OnDestroy {
   async removeEntry(exerciseId: string): Promise<void> {
     const w = this.workout();
     if (!w) return;
+    if (this._timerForExercise === exerciseId) this.cancelTimer();
     try {
       await this.workoutService.removeEntryFromWorkout(w.id, exerciseId);
     } catch {
@@ -1007,8 +1028,9 @@ export class WorkoutEditorComponent implements OnDestroy {
   }
 
   // ── Rest timer ─────────────────────────────────────────────────────────────
-  startRestTimer(seconds: number): void {
+  startRestTimer(seconds: number, exerciseId?: string): void {
     this.cancelTimer();
+    this._timerForExercise = exerciseId ?? null;
     this.timerTotal.set(seconds);
     this.timerRemaining.set(seconds);
     this.timerActive.set(true);
@@ -1032,6 +1054,7 @@ export class WorkoutEditorComponent implements OnDestroy {
       clearInterval(this._timerId);
       this._timerId = null;
     }
+    this._timerForExercise = null;
     this.timerActive.set(false);
     this.timerRemaining.set(0);
   }

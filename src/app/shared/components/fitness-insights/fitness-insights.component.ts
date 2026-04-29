@@ -88,12 +88,26 @@ export class FitnessInsightsComponent {
   readonly settingsService = inject(UserSettingsService);
   private metricsService   = inject(FitnessMetricsService);
 
-  private readonly dismissed    = signal<Set<string>>(new Set());
+  private static readonly _SK = 'gymgoli_dismissed_insights';
+
+  private readonly dismissed = signal<Set<string>>(FitnessInsightsComponent._loadDismissed());
+
+  private static _loadDismissed(): Set<string> {
+    try {
+      const raw = sessionStorage.getItem(FitnessInsightsComponent._SK);
+      return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+    } catch { return new Set(); }
+  }
+
   readonly visibleInsights = computed(() =>
     this.metricsService.insights().filter(i => !this.dismissed().has(i.type))
   );
 
   dismiss(type: string): void {
-    this.dismissed.update(set => new Set([...set, type]));
+    this.dismissed.update(s => {
+      const next = new Set([...s, type]);
+      try { sessionStorage.setItem(FitnessInsightsComponent._SK, JSON.stringify([...next])); } catch {}
+      return next;
+    });
   }
 }
