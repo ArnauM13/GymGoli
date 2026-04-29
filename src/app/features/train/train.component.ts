@@ -172,7 +172,13 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               <div class="type-grid" [class.type-grid--mt]="dateWorkouts().length > 0"
                    [style.grid-template-columns]="gridCols(workoutTypes.length)">
                 @for (cat of workoutTypes; track cat.value) {
-                  <button class="type-btn" [style.--cat-color]="cat.color" (click)="selectType(cat.value)">
+                  <button class="type-btn"
+                    [style.--cat-color]="cat.color"
+                    [class.type-btn--done]="doneCategories().has(cat.value)"
+                    (click)="selectType(cat.value)">
+                    @if (doneCategories().has(cat.value)) {
+                      <span class="type-done-check material-symbols-outlined">check_circle</span>
+                    }
                     <span class="material-symbols-outlined type-icon">{{ cat.icon }}</span>
                     <span class="type-label">{{ cat.label }}</span>
                   </button>
@@ -234,25 +240,27 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       </button>
     }
 
-    <!-- ── Bottom bar: quick-open last workout (dashboard, when workout exists) ── -->
+    <!-- ── Bottom bar: quick-open workouts (dashboard) ── -->
     @if (!activeWorkout() && dateWorkouts().length > 0) {
-      <div class="bottom-bar">
-        <button class="bar-shortcut"
-                [style.--wc]="workoutPrimaryColor(dateWorkouts()[0])"
-                (click)="openWorkout(dateWorkouts()[0].id)">
-          <span class="material-symbols-outlined bar-shortcut-icon">fitness_center</span>
-          <div class="bar-shortcut-info">
-            <span class="bar-shortcut-label">{{ workoutLabel(dateWorkouts()[0]) }}</span>
-            <span class="bar-shortcut-detail">
-              {{ dateWorkouts()[0].entries.length }} exerc
-              @if (workoutSetsCount(dateWorkouts()[0]); as n) { · {{ n }} sèr }
-            </span>
-          </div>
-          <div class="bar-shortcut-open">
-            <span class="bar-shortcut-open-text">Obrir</span>
-            <span class="material-symbols-outlined bar-shortcut-arrow">arrow_forward_ios</span>
-          </div>
-        </button>
+      <div class="bottom-bar" [class.bottom-bar--multi]="dateWorkouts().length > 1">
+        @for (w of dateWorkouts(); track w.id) {
+          <button class="bar-shortcut"
+                  [style.--wc]="workoutPrimaryColor(w)"
+                  (click)="openWorkout(w.id)">
+            <span class="material-symbols-outlined bar-shortcut-icon">fitness_center</span>
+            <div class="bar-shortcut-info">
+              <span class="bar-shortcut-label">{{ workoutLabel(w) }}</span>
+              <span class="bar-shortcut-detail">
+                {{ w.entries.length }} exerc
+                @if (workoutSetsCount(w); as n) { · {{ n }} sèr }
+              </span>
+            </div>
+            <div class="bar-shortcut-open">
+              <span class="bar-shortcut-open-text">Obrir</span>
+              <span class="material-symbols-outlined bar-shortcut-arrow">arrow_forward_ios</span>
+            </div>
+          </button>
+        }
       </div>
     }
   `,
@@ -325,6 +333,17 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       from { transform: translateY(14px); opacity: 0; }
       to   { transform: translateY(0);    opacity: 1; }
     }
+    .bottom-bar--multi {
+      border-radius: 20px;
+      background: var(--c-card);
+      border: 1.5px solid var(--c-border-2);
+      overflow: hidden;
+      .bar-shortcut {
+        border-radius: 0; border: none;
+        border-bottom: 1px solid var(--c-border-2);
+        &:last-child { border-bottom: none; }
+      }
+    }
     .bar-shortcut {
       width: 100%; display: flex; align-items: center; gap: 12px;
       border: 2px solid color-mix(in srgb, var(--wc) 22%, var(--c-border));
@@ -382,6 +401,17 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       &:active { transform: scale(0.97); }
       .type-icon { font-size: 28px; }
       .type-label { font-size: 11px; font-weight: 700; letter-spacing: 0.2px; text-align: center; }
+      &.type-btn--done {
+        border-color: var(--cat-color);
+        background: color-mix(in srgb, var(--cat-color) 10%, var(--c-card));
+        position: relative;
+      }
+    }
+    .type-done-check {
+      position: absolute; top: 6px; right: 7px;
+      font-size: 15px;
+      color: var(--cat-color);
+      font-variation-settings: 'FILL' 1;
     }
 
     /* ── Add-exercise FAB (active workout mode) ── */
@@ -665,6 +695,10 @@ export class TrainComponent {
       .filter((t): t is typeof WORKOUT_TYPES[0] => !!t)
   );
 
+  readonly doneCategories = computed((): Set<string> =>
+    new Set(this.dateWorkouts().flatMap(w => workoutCategories(w)))
+  );
+
   readonly expandedSports = computed(() =>
     this.sportService.sports().filter(s => {
       if (!s.subtypes?.length) return false;
@@ -799,7 +833,10 @@ export class TrainComponent {
   // ── Workout creation ──────────────────────────────────────────────────────
 
   async selectType(category: ExerciseCategory): Promise<void> {
-    const last = this.workoutService.getLastWorkoutByCategory(category);
+    // If this category already has a workout today, create a second one directly
+    // (skip the suggestion — the user clearly wants a new session)
+    const alreadyToday = this.doneCategories().has(category);
+    const last = alreadyToday ? null : this.workoutService.getLastWorkoutByCategory(category);
     if (last) {
       this.suggestionType.set(category);
     } else {
