@@ -116,11 +116,11 @@ import {
       position: sticky;
       top: 0;
       z-index: 10;
-      background: white;
-      border-bottom: 1.5px solid #f0f0f0;
+      background: var(--c-card);
+      border-bottom: 1.5px solid var(--c-border-2);
     }
 
-    .idp { background: white; padding: 4px 0 0; }
+    .idp { background: var(--c-card); padding: 4px 0 0; }
 
     .idp-header {
       display: flex; align-items: center;
@@ -129,12 +129,12 @@ import {
 
     .idp-nav {
       width: 36px; height: 36px; border: none; background: transparent;
-      border-radius: 50%; cursor: pointer; color: #666; flex-shrink: 0;
+      border-radius: 50%; cursor: pointer; color: var(--c-text-3); flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.15s; touch-action: manipulation;
       .material-symbols-outlined { font-size: 22px; }
-      &:hover:not(:disabled) { background: rgba(0,0,0,0.06); }
-      &:disabled { color: #d0d0d0; cursor: default; }
+      &:hover:not(:disabled) { background: var(--c-hover); }
+      &:disabled { color: var(--c-border-2); cursor: default; }
     }
 
     .idp-period {
@@ -142,25 +142,25 @@ import {
       display: flex; align-items: center; justify-content: center; gap: 2px;
       padding: 5px 8px; border-radius: 10px;
       transition: background 0.15s; touch-action: manipulation;
-      &:hover { background: rgba(0,0,0,0.05); }
-      &:active { background: rgba(0,0,0,0.08); }
+      &:hover { background: var(--c-hover); }
+      &:active { background: var(--c-shadow); }
     }
     .idp-period-text {
-      font-size: 14px; font-weight: 700; color: #1a1a1a; letter-spacing: 0.01em;
+      font-size: 14px; font-weight: 700; color: var(--c-text); letter-spacing: 0.01em;
     }
     .idp-chevron {
-      font-size: 18px; color: #666;
+      font-size: 18px; color: var(--c-text-3);
       transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
       &.flipped { transform: rotate(180deg); }
     }
 
     .idp-today-btn {
       width: 36px; height: 36px; border: none; background: transparent;
-      border-radius: 50%; cursor: pointer; color: #999; flex-shrink: 0;
+      border-radius: 50%; cursor: pointer; color: var(--c-border); flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.15s, color 0.15s; touch-action: manipulation;
       .material-symbols-outlined { font-size: 20px; }
-      &:hover { background: rgba(0,104,116,0.08); color: #006874; }
+      &:hover { background: rgba(var(--c-brand-rgb), 0.08); color: var(--c-brand); }
     }
 
     .idp-dow-row {
@@ -169,7 +169,7 @@ import {
     }
     .idp-dow {
       text-align: center; font-size: 10px; font-weight: 700;
-      color: #c0c0c0; padding: 2px 0 4px; text-transform: uppercase;
+      color: var(--c-border); padding: 2px 0 4px; text-transform: uppercase;
       letter-spacing: 0.03em;
     }
 
@@ -200,20 +200,20 @@ import {
       transition: background 0.15s; touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
 
-      &:hover:not(:disabled):not(.is-selected) { background: rgba(0,104,116,0.07); }
-      &:active:not(:disabled):not(.is-selected) { background: rgba(0,104,116,0.13); }
+      &:hover:not(:disabled):not(.is-selected) { background: rgba(var(--c-brand-rgb), 0.07); }
+      &:active:not(:disabled):not(.is-selected) { background: rgba(var(--c-brand-rgb), 0.13); }
       &:disabled { cursor: default; }
 
-      &.is-today:not(.is-selected) { outline: 2px solid #006874; outline-offset: -2px; }
-      &.is-selected { background: #006874 !important; }
+      &.is-today:not(.is-selected) { outline: 2px solid var(--c-brand); outline-offset: -2px; }
+      &.is-selected { background: var(--c-brand) !important; }
       &.is-future { opacity: 0.28; }
     }
 
     .idp-day-num {
-      font-size: 15px; font-weight: 600; color: #1a1a1a; line-height: 1;
+      font-size: 15px; font-weight: 600; color: var(--c-text); line-height: 1;
     }
-    .is-today:not(.is-selected) .idp-day-num { color: #006874; font-weight: 800; }
-    .is-selected .idp-day-num { color: white; font-weight: 700; }
+    .is-today:not(.is-selected) .idp-day-num { color: var(--c-brand); font-weight: 800; }
+    .is-selected .idp-day-num { color: var(--c-card); font-weight: 700; }
 
     .idp-dots {
       display: flex; align-items: center; justify-content: center; gap: 2px;
@@ -227,11 +227,11 @@ import {
 
     .idp-loading {
       height: 2px; margin: 2px 8px 0; border-radius: 2px;
-      background: rgba(0,104,116,0.1); overflow: hidden;
+      background: rgba(var(--c-brand-rgb), 0.1); overflow: hidden;
     }
     .idp-loading-bar {
       display: block; height: 100%; width: 40%;
-      background: #006874; border-radius: 2px;
+      background: var(--c-brand); border-radius: 2px;
       animation: idp-slide 1.2s ease-in-out infinite;
     }
     @keyframes idp-slide {

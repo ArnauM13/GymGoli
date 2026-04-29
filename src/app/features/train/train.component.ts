@@ -302,13 +302,13 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     /* ── Type badges (topbar) ── */
     .type-badge {
       padding: 3px 10px; border-radius: 10px;
-      font-size: 12px; font-weight: 600; color: white;
+      font-size: 12px; font-weight: 600; color: var(--c-card);
     }
     .hybrid-badge {
       padding: 3px 10px; border-radius: 10px;
       font-size: 11px; font-weight: 700;
       background: linear-gradient(90deg, #ef5350 0%, #9c27b0 50%, #2196f3 100%);
-      color: white; letter-spacing: 0.3px;
+      color: var(--c-card); letter-spacing: 0.3px;
     }
 
     /* ── Bottom bar: last workout shortcut ── */
@@ -318,7 +318,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       left: 12px; right: 12px;
       z-index: 90;
       border-radius: 22px;
-      box-shadow: 0 8px 28px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.1);
+      box-shadow: 0 8px 28px var(--c-shadow-md), 0 2px 6px var(--c-shadow);
       animation: bar-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
     @keyframes bar-in {
@@ -391,10 +391,10 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       right: 20px;
       z-index: 90;
       width: 52px; height: 52px; border-radius: 50%; border: none;
-      background: var(--c-brand); color: white;
+      background: var(--c-brand); color: var(--c-card);
       display: flex; align-items: center; justify-content: center;
       cursor: pointer; touch-action: manipulation;
-      box-shadow: 0 4px 16px rgba(var(--c-brand-rgb), 0.4), 0 1px 4px rgba(0,0,0,0.1);
+      box-shadow: 0 4px 16px rgba(var(--c-brand-rgb), 0.4), 0 1px 4px var(--c-shadow);
       transition: background 0.15s, transform 0.15s;
       .material-symbols-outlined { font-size: 26px; }
       &:hover { background: var(--c-brand-dk); transform: scale(1.06); }
@@ -479,7 +479,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
     .btn-suggestion-template {
       flex: 2; padding: 8px; border: none; border-radius: 10px;
-      background: var(--c-brand); color: white; font-size: 13px; font-weight: 600;
+      background: var(--c-brand); color: var(--c-card); font-size: 13px; font-weight: 600;
       cursor: pointer; touch-action: manipulation;
       &:hover { background: var(--c-brand-dk); }
     }
@@ -575,7 +575,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       background: var(--c-card); font-size: 12px; font-weight: 600; color: var(--c-text-2);
       cursor: pointer; transition: all 0.15s; touch-action: manipulation;
       &.active {
-        background: var(--c-brand); color: white; border-color: var(--c-brand);
+        background: var(--c-brand); color: var(--c-card); border-color: var(--c-brand);
       }
       &:hover:not(.active) { border-color: var(--c-brand); color: var(--c-brand); }
     }

@@ -106,25 +106,25 @@ import { Location } from '@angular/common';
     }
     .back-btn {
       width: 36px; height: 36px; border-radius: 50%; border: none;
-      background: transparent; cursor: pointer; color: #555; flex-shrink: 0;
+      background: transparent; cursor: pointer; color: var(--c-text-2); flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.15s; touch-action: manipulation;
       .material-symbols-outlined { font-size: 20px; }
-      &:hover { background: rgba(0,0,0,0.06); }
+      &:hover { background: var(--c-hover); }
     }
     .page-title {
-      margin: 0; font-size: 20px; font-weight: 800; color: #1a1a1a; letter-spacing: -0.3px;
+      margin: 0; font-size: 20px; font-weight: 800; color: var(--c-text); letter-spacing: -0.3px;
     }
 
     /* ── Content card ── */
     .card {
-      background: white; border-radius: 18px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+      background: var(--c-card); border-radius: 18px;
+      box-shadow: 0 2px 10px var(--c-shadow);
       padding: 20px 20px 24px;
     }
 
     .last-updated {
-      font-size: 11px; color: #999; margin-bottom: 20px;
+      font-size: 11px; color: var(--c-text-3); margin-bottom: 20px;
       text-transform: uppercase; letter-spacing: 0.3px;
     }
 
@@ -132,22 +132,22 @@ import { Location } from '@angular/common';
       margin-bottom: 20px;
       h2 {
         margin: 0 0 8px;
-        font-size: 14px; font-weight: 700; color: #1a1a1a;
+        font-size: 14px; font-weight: 700; color: var(--c-text);
       }
       p, li {
-        font-size: 13px; color: #444; line-height: 1.65; margin: 0 0 6px;
+        font-size: 13px; color: var(--c-text-2); line-height: 1.65; margin: 0 0 6px;
       }
       ul {
         margin: 6px 0 0 0; padding-left: 18px;
         li { margin-bottom: 4px; }
       }
       code {
-        font-size: 12px; background: #f5f5f5; padding: 1px 5px; border-radius: 4px; color: #333;
+        font-size: 12px; background: var(--c-subtle); padding: 1px 5px; border-radius: 4px; color: var(--c-text-2);
       }
     }
 
     .divider {
-      height: 1px; background: #f0f0f0; margin: 8px 0 20px;
+      height: 1px; background: var(--c-border-2); margin: 8px 0 20px;
     }
   `],
 })
