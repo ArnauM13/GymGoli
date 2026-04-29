@@ -119,7 +119,7 @@ export class FitnessMetricsService {
     // ── 3. Setmana fluixa (pocs gym workouts I poca activitat esportiva) ────
     else {
       const dow = new Date(today + 'T12:00:00').getDay();
-      if (weekWorkouts.length < 2 && weekSessions.length < 2 && (dow === 0 || dow >= 3)) {
+      if (weekWorkouts.length < 2 && weekSessions.length < 2 && (dow === 0 || dow >= 4)) {
         candidates.push({
           type: 'setmana_fluixa',
           emoji: '💤',
@@ -241,7 +241,7 @@ export class FitnessMetricsService {
             : `Portes ${weekTotal}/${goal} activitats. Encara hi ha temps avui!`,
           color: '#f57c00',
         });
-      } else if (weekTotal >= 1 && weekTotal < goal && dow >= 3) {
+      } else if (weekTotal >= 1 && weekTotal < goal && dow >= 4) {
         const missing = goal - weekTotal;
         candidates.push({
           type: 'camino_objectiu',
@@ -271,7 +271,7 @@ export class FitnessMetricsService {
           message: `Has assolit tots els objectius (${parts.join(', ')}). Quin crack!`,
           color: '#006874',
         });
-      } else if (dow >= 3) {
+      } else if (dow >= 4) {
         const parts: string[] = [];
         if (gymGoal  !== null && !gymMet) parts.push(`gym ${gymW}/${gymGoal}`);
         if (spGoal   !== null && !spMet)  parts.push(`esport ${spW}/${spGoal}`);
