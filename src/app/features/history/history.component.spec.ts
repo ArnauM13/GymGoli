@@ -242,4 +242,18 @@ describe('HistoryComponent', () => {
       expect(component.viewMode()).toBe('list');
     });
   });
+
+  // ── isLoading computed ───────────────────────────────────────────────────
+
+  describe('isLoading', () => {
+    it('reflects false when the service is not loading', () => {
+      expect(component.isLoading()).toBeFalse();
+    });
+
+    it('reflects true when the service is loading', () => {
+      const svc = TestBed.inject(WorkoutService) as { isLoading: ReturnType<typeof signal<boolean>> };
+      (svc.isLoading as ReturnType<typeof signal<boolean>>).set(true);
+      expect(component.isLoading()).toBeTrue();
+    });
+  });
 });
