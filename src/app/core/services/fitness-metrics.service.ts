@@ -16,7 +16,9 @@ export type InsightType =
   | 'objectiu_assolit'
   | 'augmenta_objectiu'
   | 'camino_objectiu'
-  | 'anima_objectiu';
+  | 'anima_objectiu'
+  | 'feeling_baixant_esport'
+  | 'constancia_esport';
 
 export interface FitnessInsight {
   type: InsightType;
@@ -302,10 +304,61 @@ export class FitnessMetricsService {
       });
     }
 
+    // ── 7. Feeling baixant (últimes 3 sessions d'un esport en descens) ────
+    if (sports.length > 0) {
+      for (const sport of sports) {
+        const sportSessions = sessions
+          .filter(s => s.sportId === sport.id && s.feeling != null)
+          .sort((a, b) => b.date.localeCompare(a.date))
+          .slice(0, 3);
+
+        if (sportSessions.length === 3) {
+          const [f1, f2, f3] = sportSessions.map(s => s.feeling as number);
+          if (f1 < f2 && f2 < f3) {
+            candidates.push({
+              type: 'feeling_baixant_esport',
+              emoji: '📉',
+              title: `Sensació baixant a ${sport.name}`,
+              message: `Les últimes 3 sessions de ${sport.name} has anat de menys en menys bé. Potser necessites descansar o canviar d'intensitat?`,
+              color: sport.color,
+            });
+            break;
+          }
+        }
+      }
+    }
+
+    // ── 8. Constància esport (3+ setmanes consecutives amb el mateix esport) ──
+    if (sports.length > 0) {
+      for (const sport of sports) {
+        let streak = 0;
+        for (let week = 0; week < 8; week++) {
+          const mon = mondayOfWeek(offsetDate(today, -(week * 7)));
+          const end = week === 0 ? today : offsetDate(mon, 6);
+          if (sessions.some(s => s.sportId === sport.id && s.date >= mon && s.date <= end)) {
+            streak++;
+          } else {
+            break;
+          }
+        }
+        if (streak >= 3) {
+          candidates.push({
+            type: 'constancia_esport',
+            emoji: '🏅',
+            title: `${streak} setmanes fent ${sport.name}!`,
+            message: `Portes ${streak} setmanes consecutives amb ${sport.name}. Aquesta constància és el que marca la diferència!`,
+            color: sport.color,
+          });
+          break;
+        }
+      }
+    }
+
     // ── Retorna màxim 2 per prioritat ─────────────────────────────────────
     const priority: InsightType[] = [
       'objectiu_assolit', 'augmenta_objectiu', 'gran_setmana', 'descansa', 'prova_gym',
       'camino_objectiu', 'setmana_fluixa', 'anima_objectiu',
+      'feeling_baixant_esport', 'constancia_esport',
       'prova_esport', 'recupera_esport', 'equilibra_gym',
     ];
     return candidates
