@@ -136,22 +136,22 @@ export interface SportFormDialogData {
     </mat-dialog-actions>
   `,
   styles: [`
-    .form { display: flex; flex-direction: column; gap: 12px; padding-top: 4px; min-width: 300px; }
+    .form { display: flex; flex-direction: column; gap: 12px; padding-top: 4px; }
     .full-width { width: 100%; }
 
     .picker-section { display: flex; flex-direction: column; gap: 8px; }
     .field-label { margin: 0; font-size: 13px; color: var(--c-text-3); font-weight: 500; }
     .optional-hint { font-weight: 400; color: var(--c-text-3); font-size: 11px; }
 
-    /* Icon grid */
+    /* Icon grid — auto-fill so it never overflows the dialog width */
     .icon-grid {
       display: grid;
-      grid-template-columns: repeat(8, 1fr);
+      grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
       gap: 4px;
     }
 
     .icon-btn {
-      width: 36px; height: 36px;
+      aspect-ratio: 1;
       display: flex; align-items: center; justify-content: center;
       border: 1.5px solid var(--c-border-2); border-radius: 8px;
       background: var(--c-subtle); cursor: pointer;
@@ -212,11 +212,11 @@ export interface SportFormDialogData {
     /* Metrics */
     .metric-grid { display: flex; flex-wrap: wrap; gap: 7px; }
     .metric-chip {
-      padding: 6px 12px; border: 1.5px solid #e0e0e0; border-radius: 20px;
-      background: white; font-size: 12px; font-weight: 600; color: #555;
+      padding: 6px 12px; border: 1.5px solid var(--c-border); border-radius: 20px;
+      background: var(--c-card); font-size: 12px; font-weight: 600; color: var(--c-text-2);
       cursor: pointer; transition: all 0.15s;
-      &.selected { background: #006874; color: white; border-color: #006874; }
-      &:hover:not(.selected) { border-color: #006874; color: #006874; }
+      &.selected { background: var(--c-brand); color: white; border-color: var(--c-brand); }
+      &:hover:not(.selected) { border-color: var(--c-brand); color: var(--c-brand); }
     }
     .metric-unit { font-size: 10px; font-weight: 400; opacity: 0.8; margin-left: 3px; }
 
@@ -246,8 +246,10 @@ export interface SportFormDialogData {
       flex: 1; padding: 7px 10px;
       border: 1.5px solid var(--c-border-2); border-radius: 8px;
       font-size: 13px; outline: none;
+      background: var(--c-card); color: var(--c-text);
       transition: border-color 0.15s;
       &:focus { border-color: var(--c-brand); }
+      &::placeholder { color: var(--c-text-3); }
     }
     .subtype-add-btn {
       width: 34px; height: 34px; border-radius: 8px; border: none;

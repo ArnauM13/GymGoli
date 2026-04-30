@@ -376,6 +376,7 @@ export class LibraryComponent {
     const ref = this.dialog.open(SportFormDialogComponent, {
       data: { sport },
       width: '360px',
+      maxHeight: '90vh',
     });
 
     ref.afterClosed().subscribe(async result => {

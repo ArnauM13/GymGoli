@@ -126,4 +126,26 @@ html.dark {
   --mdc-switch-selected-hover-track-color: var(--c-brand);
   --mdc-switch-selected-pressed-track-color: var(--c-brand);
   --mdc-switch-selected-focus-track-color: var(--c-brand);
+
+  // Dark-mode: Material dialog (sport form + exercise form)
+  .mat-mdc-dialog-title { color: var(--c-text) !important; }
+
+  .mat-mdc-form-field {
+    .mdc-text-field--outlined { background: var(--c-subtle); border-radius: 8px; }
+    .mdc-notched-outline__leading,
+    .mdc-notched-outline__notch,
+    .mdc-notched-outline__trailing { border-color: var(--c-border) !important; }
+    .mat-mdc-floating-label,
+    .mdc-floating-label { color: var(--c-text-2) !important; }
+    .mat-mdc-input-element { color: var(--c-text) !important; caret-color: var(--c-brand); }
+  }
+
+  .mat-mdc-dialog-actions {
+    .mat-mdc-button .mdc-button__label { color: var(--c-text-2); }
+    .mat-mdc-raised-button,
+    .mat-mdc-unelevated-button {
+      --mdc-filled-button-container-color: var(--c-brand);
+      --mdc-filled-button-label-text-color: #fff;
+    }
+  }
 }
