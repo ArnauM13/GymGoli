@@ -73,6 +73,12 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
                     @if (item.session.subtypeId && getSubtypeName(item.sport, item.session.subtypeId); as subName) {
                       <span class="sport-tag-subtype">· {{ subName }}</span>
                     }
+                    @if (item.session.duration) {
+                      <span class="sport-tag-subtype">· {{ item.session.duration }}min</span>
+                    }
+                    @if (item.session.feeling) {
+                      <span class="sport-tag-subtype">{{ getFeelingEmoji(item.session.feeling) }}</span>
+                    }
                   </span>
                 }
               </div>
