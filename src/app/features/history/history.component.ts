@@ -72,8 +72,14 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
                   <span class="sport-tag" [style.--sport-color]="item.sport.color">
                     <span class="material-symbols-outlined sport-tag-icon">{{ item.sport.icon }}</span>
                     {{ item.sport.name }}
-                    @if (item.subtypeId && getSubtypeName(item.sport, item.subtypeId ?? ''); as subName) {
+                    @if (item.session.subtypeId && getSubtypeName(item.sport, item.session.subtypeId); as subName) {
                       <span class="sport-tag-subtype">· {{ subName }}</span>
+                    }
+                    @if (item.session.duration) {
+                      <span class="sport-tag-subtype">· {{ item.session.duration }}min</span>
+                    }
+                    @if (item.session.feeling) {
+                      <span class="sport-tag-subtype">{{ getFeelingEmoji(item.session.feeling) }}</span>
                     }
                   </span>
                 }

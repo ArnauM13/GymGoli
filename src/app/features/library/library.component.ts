@@ -132,8 +132,12 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
               </span>
               <div class="ic-info">
                 <span class="ic-name">{{ sport.name }}</span>
-                @if (sport.subtypes?.length) {
-                  <span class="ic-detail">{{ sport.subtypes.length }} subtipus</span>
+                @if (sport.metricDefs?.length || sport.subtypes?.length) {
+                  <span class="ic-detail">
+                    @if (sport.metricDefs?.length) { {{ sport.metricDefs.length }} mètr }
+                    @if (sport.metricDefs?.length && sport.subtypes?.length) { · }
+                    @if (sport.subtypes?.length) { {{ sport.subtypes.length }} subtipus }
+                  </span>
                 }
               </div>
               <button class="ic-action" (click)="openSportForm(sport)" aria-label="Editar">

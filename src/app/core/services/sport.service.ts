@@ -2,18 +2,20 @@ import { Injectable, computed, effect, inject, signal } from '@angular/core';
 
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
-import { DEFAULT_SPORTS, Sport, SportSession, SportSubtype } from '../models/sport.model';
+import { DEFAULT_SPORTS, Sport, SportMetricDef, SportSession, SportSubtype } from '../models/sport.model';
+import { FeelingLevel } from '../models/workout.model';
 
 // ── Row mappers ──────────────────────────────────────────────────────────────
 
 function toSport(row: Record<string, unknown>): Sport {
   return {
-    id:        row['id'] as string,
-    name:      row['name'] as string,
-    icon:      row['icon'] as string,
-    color:     row['color'] as string,
-    subtypes:  (row['subtypes'] as SportSubtype[] | null) ?? [],
-    createdAt: new Date(row['created_at'] as string),
+    id:         row['id'] as string,
+    name:       row['name'] as string,
+    icon:       row['icon'] as string,
+    color:      row['color'] as string,
+    subtypes:   (row['subtypes'] as SportSubtype[] | null) ?? [],
+    metricDefs: (row['metric_defs'] as SportMetricDef[] | null) ?? [],
+    createdAt:  new Date(row['created_at'] as string),
   };
 }
 
@@ -23,7 +25,10 @@ function toSportSession(row: Record<string, unknown>): SportSession {
     date:      row['date'] as string,
     sportId:   row['sport_id'] as string,
     subtypeId: (row['subtype_id'] as string | null) ?? undefined,
-    notes:     row['notes'] as string | undefined,
+    duration:  (row['duration'] as number | null) ?? undefined,
+    feeling:   (row['feeling'] as FeelingLevel | null) ?? undefined,
+    metrics:   (row['metrics'] as Record<string, string | number> | null) ?? undefined,
+    notes:     (row['notes'] as string | null) ?? undefined,
     createdAt: new Date(row['created_at'] as string),
   };
 }
@@ -81,35 +86,38 @@ export class SportService {
 
   private async _seedDefaults(uid: string): Promise<void> {
     for (const s of DEFAULT_SPORTS) {
-      await this.supabase.from('sports').insert({ user_id: uid, ...s, subtypes: [] });
+      await this.supabase.from('sports').insert({
+        user_id: uid, name: s.name, icon: s.icon, color: s.color,
+        subtypes: s.subtypes, metric_defs: s.metricDefs,
+      });
     }
     const { data } = await this.supabase
       .from('sports').select('*').eq('user_id', uid).order('created_at');
     this._sports.set((data ?? []).map(r => toSport(r as Record<string, unknown>)));
   }
 
-  async createSport(payload: Pick<Sport, 'name' | 'icon' | 'color' | 'subtypes'>): Promise<void> {
+  async createSport(payload: Pick<Sport, 'name' | 'icon' | 'color' | 'subtypes' | 'metricDefs'>): Promise<void> {
     const uid = this._uid();
-    const { error } = await this.supabase
-      .from('sports')
-      .insert({ user_id: uid, name: payload.name, icon: payload.icon, color: payload.color, subtypes: payload.subtypes });
+    const { error } = await this.supabase.from('sports').insert({
+      user_id: uid, name: payload.name, icon: payload.icon,
+      color: payload.color, subtypes: payload.subtypes,
+      metric_defs: payload.metricDefs,
+    });
     if (error) throw error;
     await this._loadSports(uid);
   }
 
-  async updateSport(id: string, payload: Partial<Pick<Sport, 'name' | 'icon' | 'color' | 'subtypes'>>): Promise<void> {
+  async updateSport(id: string, payload: Partial<Pick<Sport, 'name' | 'icon' | 'color' | 'subtypes' | 'metricDefs'>>): Promise<void> {
     const uid = this._uid();
     const dbPayload: Record<string, unknown> = {};
-    if (payload.name  !== undefined) dbPayload['name']     = payload.name;
-    if (payload.icon  !== undefined) dbPayload['icon']     = payload.icon;
-    if (payload.color !== undefined) dbPayload['color']    = payload.color;
-    if (payload.subtypes !== undefined) dbPayload['subtypes'] = payload.subtypes;
+    if (payload.name       !== undefined) dbPayload['name']        = payload.name;
+    if (payload.icon       !== undefined) dbPayload['icon']        = payload.icon;
+    if (payload.color      !== undefined) dbPayload['color']       = payload.color;
+    if (payload.subtypes   !== undefined) dbPayload['subtypes']    = payload.subtypes;
+    if (payload.metricDefs !== undefined) dbPayload['metric_defs'] = payload.metricDefs;
 
-    const { error } = await this.supabase
-      .from('sports')
-      .update(dbPayload)
-      .eq('id', id)
-      .eq('user_id', uid);
+    const { error } = await this.supabase.from('sports').update(dbPayload)
+      .eq('id', id).eq('user_id', uid);
     if (error) throw error;
     await this._loadSports(uid);
   }
@@ -180,14 +188,14 @@ export class SportService {
       .filter((s): s is Sport => !!s);
   }
 
-  /** Returns sport + subtypeId pairs for a given date. */
-  getSportSessionsForDate(date: string): Array<{ sport: Sport; subtypeId?: string }> {
+  /** Returns sport + full session pairs for a given date. */
+  getSportSessionsForDate(date: string): Array<{ sport: Sport; session: SportSession }> {
     const sessions  = this._sessions().filter(s => s.date === date);
     const sportsMap = new Map(this._sports().map(s => [s.id, s]));
-    const result: Array<{ sport: Sport; subtypeId?: string }> = [];
+    const result: Array<{ sport: Sport; session: SportSession }> = [];
     for (const s of sessions) {
       const sport = sportsMap.get(s.sportId);
-      if (sport) result.push({ sport, subtypeId: s.subtypeId });
+      if (sport) result.push({ sport, session: s });
     }
     return result;
   }
@@ -205,8 +213,58 @@ export class SportService {
     return this._sessions().some(s => s.date === date);
   }
 
-  // ── Toggle & subtype ──────────────────────────────────────────────────────
+  // ── Session log / toggle ────────────────────────────────────────────────
 
+  /** Full session create with all metrics. Used by the session logger UI. */
+  async logSession(
+    date: string, sportId: string,
+    data: { subtypeId?: string; duration?: number; feeling?: FeelingLevel; metrics?: Record<string, string | number> }
+  ): Promise<void> {
+    const uid = this._uid();
+    const { data: row, error } = await this.supabase.from('sport_sessions').insert({
+      user_id: uid, date, sport_id: sportId,
+      subtype_id: data.subtypeId ?? null,
+      duration:   data.duration  ?? null,
+      feeling:    data.feeling   ?? null,
+      metrics:    data.metrics   ?? null,
+    }).select().single();
+    if (error) throw error;
+
+    const session = toSportSession(row as Record<string, unknown>);
+    const key     = date.substring(0, 7);
+    const bucket  = this._monthCache.get(key) ?? [];
+    this._monthCache.set(key, [...bucket, session]);
+    this._rebuild();
+  }
+
+  /** Update an existing session's data. */
+  async updateSession(
+    id: string, date: string,
+    data: { subtypeId?: string; duration?: number; feeling?: FeelingLevel; metrics?: Record<string, string | number> }
+  ): Promise<void> {
+    const uid = this._uid();
+    const { error } = await this.supabase.from('sport_sessions').update({
+      subtype_id: data.subtypeId ?? null,
+      duration:   data.duration  ?? null,
+      feeling:    data.feeling   ?? null,
+      metrics:    data.metrics   ?? null,
+    }).eq('id', id).eq('user_id', uid);
+    if (error) throw error;
+
+    const key    = date.substring(0, 7);
+    const bucket = this._monthCache.get(key) ?? [];
+    this._monthCache.set(key, bucket.map(s => s.id === id
+      ? { ...s, subtypeId: data.subtypeId, duration: data.duration, feeling: data.feeling, metrics: data.metrics }
+      : s
+    ));
+    this._rebuild();
+  }
+
+  async deleteSession(id: string, date: string): Promise<void> {
+    await this._deleteSession(id, date);
+  }
+
+  /** Backward-compatible toggle (no metrics). */
   async toggleSport(date: string, sportId: string): Promise<void> {
     const existing = this._sessions().find(s => s.date === date && s.sportId === sportId);
     if (existing) {
@@ -218,11 +276,8 @@ export class SportService {
 
   async setSessionSubtype(sessionId: string, date: string, subtypeId: string | null): Promise<void> {
     const uid = this._uid();
-    const { error } = await this.supabase
-      .from('sport_sessions')
-      .update({ subtype_id: subtypeId })
-      .eq('id', sessionId)
-      .eq('user_id', uid);
+    const { error } = await this.supabase.from('sport_sessions')
+      .update({ subtype_id: subtypeId }).eq('id', sessionId).eq('user_id', uid);
     if (error) throw error;
 
     const key    = date.substring(0, 7);
