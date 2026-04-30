@@ -4,9 +4,29 @@ import {
   DEFAULT_EXERCISES,
   Exercise,
   ExerciseCategory,
+  ExerciseSubcategory,
 } from '../models/exercise.model';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
+
+function toExercise(r: Record<string, unknown>): Exercise {
+  const sMin = r['sets_min'] as number | null;
+  const sMax = r['sets_max'] as number | null;
+  const rMin = r['reps_min'] as number | null;
+  const rMax = r['reps_max'] as number | null;
+  return {
+    id:          r['id'] as string,
+    name:        r['name'] as string,
+    category:    r['category'] as ExerciseCategory,
+    subcategory: (r['subcategory'] as ExerciseSubcategory | null) ?? undefined,
+    notes:       (r['notes'] as string | null) ?? undefined,
+    muscles:     (r['muscles'] as string[] | null) ?? undefined,
+    description: (r['description'] as string | null) ?? undefined,
+    setsRange:   sMin != null && sMax != null ? [sMin, sMax] : undefined,
+    repsRange:   rMin != null && rMax != null ? [rMin, rMax] : undefined,
+    createdAt:   new Date(r['created_at'] as string),
+  };
+}
 
 @Injectable({ providedIn: 'root' })
 export class ExerciseService {
@@ -34,17 +54,7 @@ export class ExerciseService {
       .order('name');
 
     if (error) { console.error('ExerciseService._load', error); return; }
-
-    this._exercises.set(
-      (data ?? []).map(r => ({
-        id:          r['id'],
-        name:        r['name'],
-        category:    r['category'] as ExerciseCategory,
-        subcategory: r['subcategory'] ?? undefined,
-        notes:       r['notes'] ?? undefined,
-        createdAt:   new Date(r['created_at']),
-      }))
-    );
+    this._exercises.set((data ?? []).map(r => toExercise(r as Record<string, unknown>)));
   }
 
   // ── Public API ────────────────────────────────────────────────
@@ -60,10 +70,7 @@ export class ExerciseService {
     const uid = this.auth.uid();
     if (!uid) throw new Error('Not authenticated');
 
-    const clean: Record<string, unknown> = { user_id: uid, name: data.name, category: data.category };
-    if (data.subcategory) clean['subcategory'] = data.subcategory;
-    if (data.notes)       clean['notes']       = data.notes;
-
+    const clean = this._toRow(uid, data);
     const { data: inserted, error } = await this.supabase
       .from('exercises')
       .insert(clean)
@@ -72,14 +79,7 @@ export class ExerciseService {
 
     if (error) throw error;
 
-    const newEx: Exercise = {
-      id:          inserted['id'],
-      name:        inserted['name'],
-      category:    inserted['category'] as ExerciseCategory,
-      subcategory: inserted['subcategory'] ?? undefined,
-      notes:       inserted['notes'] ?? undefined,
-      createdAt:   new Date(inserted['created_at']),
-    };
+    const newEx = toExercise(inserted as Record<string, unknown>);
     this._exercises.set(
       [...this._exercises(), newEx].sort((a, b) => a.name.localeCompare(b.name))
     );
@@ -92,10 +92,14 @@ export class ExerciseService {
     const patch: Record<string, unknown> = {};
     if (data.name        !== undefined) patch['name']        = data.name;
     if (data.category    !== undefined) patch['category']    = data.category;
-    if (data.subcategory !== undefined) patch['subcategory'] = data.subcategory;
-    else                                patch['subcategory'] = null;
-    if (data.notes       !== undefined) patch['notes']       = data.notes;
-    else                                patch['notes']       = null;
+    patch['subcategory'] = data.subcategory ?? null;
+    patch['notes']       = data.notes ?? null;
+    patch['muscles']     = data.muscles?.length ? data.muscles : null;
+    patch['description'] = data.description ?? null;
+    patch['sets_min']    = data.setsRange?.[0] ?? null;
+    patch['sets_max']    = data.setsRange?.[1] ?? null;
+    patch['reps_min']    = data.repsRange?.[0] ?? null;
+    patch['reps_max']    = data.repsRange?.[1] ?? null;
 
     const { error } = await this.supabase
       .from('exercises')
@@ -134,13 +138,24 @@ export class ExerciseService {
 
     if (error || (count ?? 0) > 0) return;
 
-    const rows = DEFAULT_EXERCISES.map(e => {
-      const r: Record<string, unknown> = { user_id: uid, name: e.name, category: e.category };
-      if (e.subcategory) r['subcategory'] = e.subcategory;
-      return r;
-    });
-
+    const rows = DEFAULT_EXERCISES.map(e => this._toRow(uid, e));
     await this.supabase.from('exercises').insert(rows);
     await this._load(uid);
+  }
+
+  private _toRow(uid: string, e: Omit<Exercise, 'id' | 'createdAt'>): Record<string, unknown> {
+    return {
+      user_id:     uid,
+      name:        e.name,
+      category:    e.category,
+      subcategory: e.subcategory ?? null,
+      notes:       e.notes ?? null,
+      muscles:     e.muscles?.length ? e.muscles : null,
+      description: e.description ?? null,
+      sets_min:    e.setsRange?.[0] ?? null,
+      sets_max:    e.setsRange?.[1] ?? null,
+      reps_min:    e.repsRange?.[0] ?? null,
+      reps_max:    e.repsRange?.[1] ?? null,
+    };
   }
 }
