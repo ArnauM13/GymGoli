@@ -8,9 +8,10 @@ import { workoutCategories } from '../../shared/utils/calendar-utils';
 import {
   CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, Exercise, ExerciseCategory,
 } from '../../core/models/exercise.model';
-import { Workout, WorkoutEntry } from '../../core/models/workout.model';
-import { WorkoutService } from '../../core/services/workout.service';
+import { Sport, SportMetricDef } from '../../core/models/sport.model';
+import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry } from '../../core/models/workout.model';
 import { SportService } from '../../core/services/sport.service';
+import { WorkoutService } from '../../core/services/workout.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
 import { FitnessInsightsComponent } from '../../shared/components/fitness-insights/fitness-insights.component';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
@@ -193,7 +194,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
                   class="sport-btn"
                   [class.active]="isSportDone(sport.id)"
                   [style.--sport-color]="sport.color"
-                  (click)="toggleSport(sport.id)"
+                  (click)="openSessionLogger(sport)"
                   [disabled]="sportToggling()"
                 >
                   @if (isSportDone(sport.id)) {
@@ -201,25 +202,12 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
                   }
                   <span class="material-symbols-outlined sport-icon">{{ sport.icon }}</span>
                   <span class="sport-name">{{ sport.name }}</span>
-                  @if (isSportDone(sport.id) && getActiveSubtypeName(sport); as subName) {
-                    <span class="sport-subtype-label">{{ subName }}</span>
+                  @if (sessionSummary(sport.id); as sum) {
+                    <span class="sport-summary">{{ sum }}</span>
                   }
                 </button>
               }
             </div>
-
-            @for (sport of expandedSports(); track sport.id) {
-              <div class="subtype-row">
-                <span class="subtype-row-label">{{ sport.name }}:</span>
-                @for (sub of sport.subtypes; track sub.id) {
-                  <button
-                    class="subtype-chip"
-                    [class.active]="getSubtypeIdForSport(sport.id) === sub.id"
-                    (click)="selectSubtype(getSubtypeIdForSport(sport.id) === sub.id ? null : sub.id, sport.id)"
-                  >{{ sub.name }}</button>
-                }
-              </div>
-            }
           </div>
 
         }
@@ -253,6 +241,108 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             <span class="material-symbols-outlined bar-shortcut-arrow">arrow_forward_ios</span>
           </div>
         </button>
+      </div>
+    }
+
+    <!-- ── Session logger bottom sheet ── -->
+    @if (loggerSport()) {
+      <div class="sl-backdrop" (click)="closeSessionLogger()"></div>
+      <div class="sl-sheet">
+        <div class="sl-header">
+          <div class="sl-header-left">
+            <span class="material-symbols-outlined sl-sport-icon" [style.color]="loggerSport()!.color">
+              {{ loggerSport()!.icon }}
+            </span>
+            <span class="sl-sport-name">{{ loggerSport()!.name }}</span>
+          </div>
+          <button class="sl-close" (click)="closeSessionLogger()">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+
+        <!-- Duration -->
+        <div class="sl-field">
+          <span class="sl-field-label">Durada</span>
+          <div class="sl-row">
+            <div class="sl-quick-btns">
+              @for (t of durationPresets; track t) {
+                <button class="sl-quick-btn" [class.active]="loggerDuration() === t"
+                        (click)="loggerDuration.set(t)">{{ t }}min</button>
+              }
+            </div>
+            <div class="sl-stepper">
+              <button class="sl-step-btn" (click)="adjustDuration(-5)">−5</button>
+              <span class="sl-step-val">{{ loggerDuration() }}<small>min</small></span>
+              <button class="sl-step-btn" (click)="adjustDuration(5)">+5</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Subtypes (if any) -->
+        @if (loggerSport()!.subtypes.length) {
+          <div class="sl-field">
+            <span class="sl-field-label">Subtipus</span>
+            <div class="sl-chips">
+              @for (sub of loggerSport()!.subtypes; track sub.id) {
+                <button class="sl-chip" [class.active]="loggerSubtype() === sub.id"
+                        (click)="toggleSubtype(sub.id)">{{ sub.name }}</button>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Metric fields -->
+        @for (def of loggerSport()!.metricDefs; track def.key) {
+          <div class="sl-field">
+            <span class="sl-field-label">{{ def.label }}@if (def.unit) { <small>({{ def.unit }})</small> }</span>
+            @if (def.type === 'select') {
+              <div class="sl-chips">
+                @for (opt of def.options ?? []; track opt.value) {
+                  <button class="sl-chip"
+                          [class.active]="loggerMetric(def.key) === opt.value"
+                          (click)="setMetric(def.key, loggerMetric(def.key) === opt.value ? null : opt.value)">
+                    {{ opt.label }}
+                  </button>
+                }
+              </div>
+            } @else {
+              <div class="sl-stepper">
+                <button class="sl-step-btn" (click)="adjustMetric(def, -1)">−</button>
+                <span class="sl-step-val">{{ loggerMetricNum(def) }}<small>@if (def.unit) { {{ def.unit }} }</small></span>
+                <button class="sl-step-btn" (click)="adjustMetric(def, 1)">+</button>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- Feeling -->
+        <div class="sl-field">
+          <span class="sl-field-label">Sensació</span>
+          <div class="sl-feeling-row">
+            @for (level of feelingLevels; track level) {
+              <button class="sl-feeling-btn" [class.active]="loggerFeeling() === level"
+                      (click)="toggleFeeling(level)">
+                {{ feelingEmoji(level) }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- Footer actions -->
+        <div class="sl-actions">
+          @if (loggerSessionId()) {
+            <button class="sl-delete-btn" (click)="deleteLoggerSession()">
+              <span class="material-symbols-outlined">delete</span>
+              Eliminar
+            </button>
+          }
+          <div class="sl-main-actions">
+            <button class="sl-cancel" (click)="closeSessionLogger()">Cancel·lar</button>
+            <button class="sl-save" (click)="saveSession()" [disabled]="sportToggling()">
+              Guardar
+            </button>
+          </div>
+        </div>
       </div>
     }
   `,
@@ -625,6 +715,125 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       to   { transform: rotate(360deg); }
     }
     .spin { animation: spin 1s linear infinite; }
+
+    /* ── Sport summary line ── */
+    .sport-summary {
+      font-size: 10px; font-weight: 600; color: var(--sport-color);
+      text-align: center; line-height: 1.1;
+    }
+
+    /* ── Session logger bottom sheet ── */
+    .sl-backdrop {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.4);
+      animation: fade-in 0.18s ease;
+    }
+    @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+    .sl-sheet {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 201;
+      background: white; border-radius: 24px 24px 0 0;
+      padding: 0 16px calc(env(safe-area-inset-bottom) + 16px);
+      max-height: 85vh; overflow-y: auto;
+      box-shadow: 0 -4px 24px rgba(0,0,0,0.14);
+      animation: sheet-up 0.22s cubic-bezier(0.34, 1.2, 0.64, 1);
+    }
+    @keyframes sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+    .sl-header {
+      display: flex; align-items: center;
+      padding: 16px 0 12px; border-bottom: 1px solid #f0f0f0; margin-bottom: 12px;
+    }
+    .sl-header-left { flex: 1; display: flex; align-items: center; gap: 10px; }
+    .sl-sport-icon {
+      font-size: 26px;
+      font-variation-settings: 'FILL' 1, 'wght' 400;
+    }
+    .sl-sport-name { font-size: 17px; font-weight: 800; color: #1a1a1a; }
+    .sl-close {
+      width: 34px; height: 34px; border-radius: 50%; border: none;
+      background: #f0f0f0; cursor: pointer; color: #555;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s; flex-shrink: 0;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { background: #e0e0e0; }
+    }
+
+    .sl-field { margin-bottom: 16px; }
+    .sl-field-label {
+      display: block; font-size: 12px; font-weight: 700; color: #666;
+      letter-spacing: 0.3px; text-transform: uppercase; margin-bottom: 8px;
+      small { font-size: 11px; color: #999; font-weight: 400; text-transform: none; margin-left: 4px; }
+    }
+    .sl-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .sl-quick-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+    .sl-quick-btn {
+      padding: 6px 12px; border: 1.5px solid #e0e0e0; border-radius: 20px;
+      background: white; font-size: 13px; font-weight: 600; color: #555;
+      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+      &.active { background: #006874; color: white; border-color: #006874; }
+      &:hover:not(.active) { border-color: #006874; color: #006874; }
+    }
+    .sl-stepper { display: flex; align-items: center; gap: 6px; }
+    .sl-step-btn {
+      width: 34px; height: 34px; border-radius: 10px;
+      border: 1.5px solid #e0e0e0; background: white;
+      font-size: 14px; font-weight: 700; color: #555;
+      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+      display: flex; align-items: center; justify-content: center;
+      &:hover { border-color: #006874; color: #006874; }
+    }
+    .sl-step-val {
+      min-width: 52px; text-align: center;
+      font-size: 18px; font-weight: 800; color: #1a1a1a;
+      small { font-size: 11px; color: #888; margin-left: 2px; }
+    }
+    .sl-chips { display: flex; gap: 7px; flex-wrap: wrap; }
+    .sl-chip {
+      padding: 7px 14px; border: 1.5px solid #e0e0e0; border-radius: 20px;
+      background: white; font-size: 13px; font-weight: 600; color: #555;
+      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+      &.active { background: #006874; color: white; border-color: #006874; }
+      &:hover:not(.active) { border-color: #006874; color: #006874; }
+    }
+    .sl-feeling-row { display: flex; gap: 8px; }
+    .sl-feeling-btn {
+      flex: 1; height: 44px; border-radius: 12px;
+      border: 1.5px solid #e8e8e8; background: #fafafa;
+      font-size: 22px; cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+      display: flex; align-items: center; justify-content: center;
+      &.active { border-color: #006874; background: rgba(0,104,116,0.08); transform: scale(1.1); }
+      &:hover:not(.active) { border-color: #aaa; background: #f0f0f0; }
+    }
+    .sl-actions {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 0 4px; border-top: 1px solid #f0f0f0; margin-top: 4px;
+    }
+    .sl-delete-btn {
+      display: flex; align-items: center; gap: 4px;
+      padding: 0 12px; height: 40px; border-radius: 10px;
+      border: 1.5px solid rgba(239,83,80,0.3); background: rgba(239,83,80,0.06);
+      color: #ef5350; font-size: 12px; font-weight: 700;
+      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 15px; }
+      &:hover { background: rgba(239,83,80,0.12); border-color: #ef5350; }
+    }
+    .sl-main-actions { display: flex; gap: 8px; flex: 1; justify-content: flex-end; }
+    .sl-cancel {
+      height: 40px; padding: 0 18px; border-radius: 10px;
+      border: 1.5px solid #e0e0e0; background: white;
+      font-size: 14px; font-weight: 600; color: #666;
+      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+      &:hover { border-color: #aaa; color: #333; }
+    }
+    .sl-save {
+      height: 40px; padding: 0 22px; border-radius: 10px;
+      border: none; background: #006874; color: white;
+      font-size: 14px; font-weight: 700;
+      cursor: pointer; transition: background 0.15s; touch-action: manipulation;
+      &:hover:not(:disabled) { background: #005a63; }
+      &:disabled { opacity: 0.5; cursor: default; }
+    }
   `],
 })
 export class TrainComponent {
@@ -639,7 +848,12 @@ export class TrainComponent {
   readonly sportToggling   = signal(false);
   readonly workoutTypes    = WORKOUT_TYPES;
   readonly activeWorkoutId = signal<string | null>(null);
-  readonly expandedSportIds = signal<string[]>([]);
+  readonly loggerSport     = signal<Sport | null>(null);
+  readonly loggerSessionId = signal<string | null>(null);
+  readonly loggerDuration  = signal<number>(60);
+  readonly loggerSubtype   = signal<string | null>(null);
+  readonly loggerFeeling   = signal<FeelingLevel | null>(null);
+  readonly loggerMetrics   = signal<Record<string, string | number>>({});
   readonly creating        = signal(false);
 
   readonly isToday = computed(() => this.selectedDate() === TODAY());
@@ -664,18 +878,6 @@ export class TrainComponent {
       .map(c => WORKOUT_TYPES.find(t => t.value === c))
       .filter((t): t is typeof WORKOUT_TYPES[0] => !!t)
   );
-
-  readonly expandedSports = computed(() =>
-    this.sportService.sports().filter(s => {
-      if (!s.subtypes?.length) return false;
-      if (this.expandedSportIds().includes(s.id)) return true;
-      return !!this.sportService.getSessionForDate(this.selectedDate(), s.id)?.subtypeId;
-    })
-  );
-
-  getSubtypeIdForSport(sportId: string): string | null {
-    return this.sportService.getSessionForDate(this.selectedDate(), sportId)?.subtypeId ?? null;
-  }
 
   readonly suggestionType = signal<ExerciseCategory | null>(null);
 
@@ -716,9 +918,9 @@ export class TrainComponent {
       this.workoutService.ensureMonthLoaded(year, month);
       this.sportService.ensureMonthLoaded(year, month);
       untracked(() => {
-        this.expandedSportIds.set([]);
         this.activeWorkoutId.set(null);
         this.suggestionType.set(null);
+        this.loggerSport.set(null);
       });
     });
   }
@@ -872,39 +1074,107 @@ export class TrainComponent {
     return this.sportService.hasSportOnDate(this.selectedDate(), sportId);
   }
 
-  getActiveSubtypeName(sport: { id: string; subtypes: { id: string; name: string }[] }): string | null {
-    const session = this.sportService.getSessionForDate(this.selectedDate(), sport.id);
-    if (!session?.subtypeId) return null;
-    return sport.subtypes.find(s => s.id === session.subtypeId)?.name ?? null;
+  sessionSummary(sportId: string): string | null {
+    const s = this.sportService.getSessionForDate(this.selectedDate(), sportId);
+    if (!s) return null;
+    const parts: string[] = [];
+    if (s.duration) parts.push(`${s.duration}min`);
+    if (s.feeling)  parts.push(FEELING_EMOJI[s.feeling]);
+    return parts.length ? parts.join(' ') : null;
   }
 
-  async toggleSport(sportId: string): Promise<void> {
+  // ── Session logger ────────────────────────────────────────────────────────
+
+  readonly durationPresets: number[] = [30, 45, 60, 90];
+  readonly feelingLevels: FeelingLevel[] = [1, 2, 3, 4, 5];
+
+  openSessionLogger(sport: Sport): void {
+    const existing = this.sportService.getSessionForDate(this.selectedDate(), sport.id);
+    this.loggerSport.set(sport);
+    this.loggerSessionId.set(existing?.id ?? null);
+    this.loggerDuration.set(existing?.duration ?? 60);
+    this.loggerSubtype.set(existing?.subtypeId ?? null);
+    this.loggerFeeling.set(existing?.feeling ?? null);
+    this.loggerMetrics.set({ ...(existing?.metrics ?? {}) });
+  }
+
+  closeSessionLogger(): void { this.loggerSport.set(null); }
+
+  feelingEmoji(level: FeelingLevel): string { return FEELING_EMOJI[level]; }
+
+  loggerMetric(key: string): string | number | null {
+    return this.loggerMetrics()[key] ?? null;
+  }
+
+  loggerMetricNum(def: SportMetricDef): number {
+    const v = this.loggerMetrics()[def.key];
+    return typeof v === 'number' ? v : (def.min ?? 0);
+  }
+
+  adjustMetric(def: SportMetricDef, delta: number): void {
+    const step = def.step ?? 1;
+    const next = Math.max(def.min ?? 0, Math.min(def.max ?? 9999, this.loggerMetricNum(def) + delta * step));
+    this.loggerMetrics.update(m => ({ ...m, [def.key]: next }));
+  }
+
+  setMetric(key: string, value: string | number | null): void {
+    this.loggerMetrics.update(m => {
+      const copy = { ...m };
+      if (value === null) delete copy[key]; else copy[key] = value;
+      return copy;
+    });
+  }
+
+  toggleSubtype(id: string): void {
+    this.loggerSubtype.update(v => v === id ? null : id);
+  }
+
+  adjustDuration(delta: number): void {
+    this.loggerDuration.update(v => Math.max(5, v + delta));
+  }
+
+  toggleFeeling(level: FeelingLevel): void {
+    this.loggerFeeling.update(v => v === level ? null : level);
+  }
+
+  async saveSession(): Promise<void> {
+    const sport = this.loggerSport();
+    if (!sport) return;
     this.sportToggling.set(true);
     try {
-      const wasActive = this.sportService.hasSportOnDate(this.selectedDate(), sportId);
-      await this.sportService.toggleSport(this.selectedDate(), sportId);
-      if (!wasActive) {
-        const sport = this.sportService.sports().find(s => s.id === sportId);
-        if (sport?.subtypes?.length) {
-          this.expandedSportIds.update(ids => [...ids, sportId]);
-        }
+      const date = this.selectedDate();
+      const metrics = this.loggerMetrics();
+      const data = {
+        subtypeId: this.loggerSubtype() ?? undefined,
+        duration:  this.loggerDuration() || undefined,
+        feeling:   this.loggerFeeling() ?? undefined,
+        metrics:   Object.keys(metrics).length ? metrics : undefined,
+      };
+      const existingId = this.loggerSessionId();
+      if (existingId) {
+        await this.sportService.updateSession(existingId, date, data);
       } else {
-        this.expandedSportIds.update(ids => ids.filter(id => id !== sportId));
+        await this.sportService.logSession(date, sport.id, data);
       }
+      this.closeSessionLogger();
     } catch {
-      this.snackBar.open('Error en guardar l\'esport', '', { duration: 2500 });
+      this.snackBar.open('Error en guardar', '', { duration: 2500 });
     } finally {
       this.sportToggling.set(false);
     }
   }
 
-  async selectSubtype(subtypeId: string | null, sportId: string): Promise<void> {
-    const session = this.sportService.getSessionForDate(this.selectedDate(), sportId);
-    if (!session) return;
+  async deleteLoggerSession(): Promise<void> {
+    const id = this.loggerSessionId();
+    if (!id) return;
+    this.sportToggling.set(true);
     try {
-      await this.sportService.setSessionSubtype(session.id, this.selectedDate(), subtypeId);
+      await this.sportService.deleteSession(id, this.selectedDate());
+      this.closeSessionLogger();
     } catch {
-      this.snackBar.open('Error en guardar el subtipus', '', { duration: 2500 });
+      this.snackBar.open('Error en eliminar', '', { duration: 2500 });
+    } finally {
+      this.sportToggling.set(false);
     }
   }
 }

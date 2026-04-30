@@ -5,7 +5,7 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 
-import { DEFAULT_SPORTS, SPORT_COLORS, SPORT_ICONS, Sport, SportSubtype } from '../../../core/models/sport.model';
+import { DEFAULT_SPORTS, METRIC_CATALOGUE, SPORT_COLORS, SPORT_ICONS, Sport, SportMetricDef, SportSubtype } from '../../../core/models/sport.model';
 
 export interface SportFormDialogData {
   sport?: Sport;
@@ -74,6 +74,21 @@ export interface SportFormDialogData {
           <div class="preview-card" [style.--sport-color]="selectedColor()">
             <span class="material-symbols-outlined preview-icon">{{ selectedIcon() }}</span>
             <span class="preview-name">{{ form.get('name')?.value || 'Nom' }}</span>
+          </div>
+        </div>
+
+        <!-- Metric defs -->
+        <div class="picker-section">
+          <p class="field-label">Mètriques <span class="optional-hint">(opcional)</span></p>
+          <div class="metric-grid">
+            @for (m of catalogue; track m.key) {
+              <button type="button" class="metric-chip"
+                      [class.selected]="hasMetric(m.key)"
+                      (click)="toggleMetric(m)">
+                {{ m.label }}
+                @if (m.unit) { <span class="metric-unit">{{ m.unit }}</span> }
+              </button>
+            }
           </div>
         </div>
 
@@ -194,6 +209,17 @@ export interface SportFormDialogData {
       color: color-mix(in srgb, var(--sport-color, #888) 70%, #333);
     }
 
+    /* Metrics */
+    .metric-grid { display: flex; flex-wrap: wrap; gap: 7px; }
+    .metric-chip {
+      padding: 6px 12px; border: 1.5px solid #e0e0e0; border-radius: 20px;
+      background: white; font-size: 12px; font-weight: 600; color: #555;
+      cursor: pointer; transition: all 0.15s;
+      &.selected { background: #006874; color: white; border-color: #006874; }
+      &:hover:not(.selected) { border-color: #006874; color: #006874; }
+    }
+    .metric-unit { font-size: 10px; font-weight: 400; opacity: 0.8; margin-left: 3px; }
+
     /* Subtypes */
     .subtype-list {
       display: flex; flex-wrap: wrap; gap: 6px;
@@ -244,10 +270,23 @@ export class SportFormDialogComponent {
   readonly icons  = SPORT_ICONS;
   readonly colors = SPORT_COLORS;
 
-  readonly selectedIcon     = signal<string>(this.data.sport?.icon  ?? DEFAULT_SPORTS[0].icon);
-  readonly selectedColor    = signal<string>(this.data.sport?.color ?? DEFAULT_SPORTS[0].color);
-  readonly subtypes         = signal<SportSubtype[]>([...(this.data.sport?.subtypes ?? [])]);
-  readonly newSubtypeName   = signal('');
+  readonly selectedIcon   = signal<string>(this.data.sport?.icon  ?? DEFAULT_SPORTS[0].icon);
+  readonly selectedColor  = signal<string>(this.data.sport?.color ?? DEFAULT_SPORTS[0].color);
+  readonly metricDefs     = signal<SportMetricDef[]>([...(this.data.sport?.metricDefs ?? [])]);
+  readonly subtypes       = signal<SportSubtype[]>([...(this.data.sport?.subtypes ?? [])]);
+  readonly newSubtypeName = signal('');
+
+  readonly catalogue = METRIC_CATALOGUE;
+
+  hasMetric(key: string): boolean {
+    return this.metricDefs().some(m => m.key === key);
+  }
+
+  toggleMetric(def: SportMetricDef): void {
+    this.metricDefs.update(list =>
+      list.some(m => m.key === def.key) ? list.filter(m => m.key !== def.key) : [...list, def]
+    );
+  }
 
   readonly form = this.fb.group({
     name: [this.data.sport?.name ?? '', Validators.required],
@@ -267,10 +306,11 @@ export class SportFormDialogComponent {
   save(): void {
     if (this.form.invalid) return;
     this.dialogRef.close({
-      name:     this.form.value.name!.trim(),
-      icon:     this.selectedIcon(),
-      color:    this.selectedColor(),
-      subtypes: this.subtypes(),
+      name:       this.form.value.name!.trim(),
+      icon:       this.selectedIcon(),
+      color:      this.selectedColor(),
+      subtypes:   this.subtypes(),
+      metricDefs: this.metricDefs(),
     });
   }
 
