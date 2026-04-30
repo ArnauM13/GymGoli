@@ -85,9 +85,9 @@ import {
                     <span class="workout-dot"
                           [style.background]="getCatDotBackground(cell.workoutCategories)"></span>
                   }
-                  @if (cell.hasSport) {
-                    <span class="sport-dot"
-                          [style.background]="getSportDotBackground(cell.sportColors)"></span>
+                  @for (icon of cell.sportIcons.slice(0, 2); track icon; let i = $index) {
+                    <span class="week-sport-icon material-symbols-outlined"
+                          [style.color]="cell.sportColors[i]">{{ icon }}</span>
                   }
                 </div>
               }
@@ -293,6 +293,11 @@ import {
     .day-num { line-height: 1; }
 
     /* ── Dots (shared) ── */
+    .week-sport-icon {
+      font-size: 11px; line-height: 1; flex-shrink: 0;
+      font-variation-settings: 'FILL' 1, 'wght' 400;
+    }
+    .is-selected .week-sport-icon { color: rgba(255,255,255,0.9) !important; }
     .dots-row {
       display: flex; align-items: center; justify-content: center; gap: 3px;
     }
@@ -497,6 +502,7 @@ export class CalendarComponent {
         workoutCategories: w?.categories ?? (w?.category ? [w.category] : []),
         hasSport: sports.length > 0,
         sportColors: sports.map(s => s.color),
+        sportIcons:  sports.map(s => s.icon),
         isToday:   dateStr === today,
         isFuture:  dateStr > today,
         isSelected: dateStr === sel,
@@ -530,6 +536,7 @@ export class CalendarComponent {
         workoutCategories: w?.categories ?? (w?.category ? [w.category] : []),
         hasSport: sports.length > 0,
         sportColors: sports.map(s => s.color),
+        sportIcons:  sports.map(s => s.icon),
         isToday:   dateStr === today,
         isFuture:  dateStr > today,
         isSelected: dateStr === sel,

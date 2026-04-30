@@ -218,7 +218,7 @@ export class SportService {
   /** Full session create with all metrics. Used by the session logger UI. */
   async logSession(
     date: string, sportId: string,
-    data: { subtypeId?: string; duration?: number; feeling?: FeelingLevel; metrics?: Record<string, string | number> }
+    data: { subtypeId?: string; duration?: number; feeling?: FeelingLevel; metrics?: Record<string, string | number>; notes?: string }
   ): Promise<void> {
     const uid = this._uid();
     const { data: row, error } = await this.supabase.from('sport_sessions').insert({
@@ -227,6 +227,7 @@ export class SportService {
       duration:   data.duration  ?? null,
       feeling:    data.feeling   ?? null,
       metrics:    data.metrics   ?? null,
+      notes:      data.notes     ?? null,
     }).select().single();
     if (error) throw error;
 
@@ -240,7 +241,7 @@ export class SportService {
   /** Update an existing session's data. */
   async updateSession(
     id: string, date: string,
-    data: { subtypeId?: string; duration?: number; feeling?: FeelingLevel; metrics?: Record<string, string | number> }
+    data: { subtypeId?: string; duration?: number; feeling?: FeelingLevel; metrics?: Record<string, string | number>; notes?: string }
   ): Promise<void> {
     const uid = this._uid();
     const { error } = await this.supabase.from('sport_sessions').update({
@@ -248,13 +249,14 @@ export class SportService {
       duration:   data.duration  ?? null,
       feeling:    data.feeling   ?? null,
       metrics:    data.metrics   ?? null,
+      notes:      data.notes     ?? null,
     }).eq('id', id).eq('user_id', uid);
     if (error) throw error;
 
     const key    = date.substring(0, 7);
     const bucket = this._monthCache.get(key) ?? [];
     this._monthCache.set(key, bucket.map(s => s.id === id
-      ? { ...s, subtypeId: data.subtypeId, duration: data.duration, feeling: data.feeling, metrics: data.metrics }
+      ? { ...s, subtypeId: data.subtypeId, duration: data.duration, feeling: data.feeling, metrics: data.metrics, notes: data.notes }
       : s
     ));
     this._rebuild();

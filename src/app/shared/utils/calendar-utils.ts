@@ -12,7 +12,7 @@ export const MONTHS_SHORT = [
 export interface CalDay {
   date: string; day: number;
   hasWorkout: boolean; workoutCategories: string[];
-  hasSport: boolean; sportColors: string[];
+  hasSport: boolean; sportColors: string[]; sportIcons: string[];
   isToday: boolean; isFuture: boolean; isSelected: boolean;
 }
 
