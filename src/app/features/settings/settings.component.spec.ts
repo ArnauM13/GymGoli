@@ -1,6 +1,7 @@
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
 import { Router } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
@@ -8,6 +9,9 @@ import { SettingsComponent } from './settings.component';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { AuthService } from '../../core/services/auth.service';
 import { FitnessMetricsService } from '../../core/services/fitness-metrics.service';
+import { WorkoutService } from '../../core/services/workout.service';
+import { SportService } from '../../core/services/sport.service';
+import { ExerciseService } from '../../core/services/exercise.service';
 
 describe('SettingsComponent', () => {
   let component: SettingsComponent;
@@ -78,6 +82,18 @@ describe('SettingsComponent', () => {
         {
           provide: AuthService,
           useValue: { logout: mockLogout, deleteAccount: mockDeleteAccount },
+        },
+        {
+          provide: WorkoutService,
+          useValue: { workouts: signal([]) },
+        },
+        {
+          provide: SportService,
+          useValue: { sports: signal([]), sessions: signal([]) },
+        },
+        {
+          provide: ExerciseService,
+          useValue: { exercises: signal([]) },
         },
         {
           provide: Router,
@@ -420,6 +436,51 @@ describe('SettingsComponent', () => {
       await component.deleteAccount();
       expect(mockSnackBarOpen).toHaveBeenCalled();
       expect(component.deletingAccount()).toBeFalse();
+    });
+  });
+
+  // ── exportData() ─────────────────────────────────────────────────────────
+
+  describe('exportData()', () => {
+    let mockAnchor: { href: string; download: string; click: jasmine.Spy };
+
+    beforeEach(() => {
+      mockAnchor = { href: '', download: '', click: jasmine.createSpy('click') };
+      const doc = TestBed.inject(DOCUMENT);
+      spyOn(doc, 'createElement').and.returnValue(mockAnchor as unknown as HTMLAnchorElement);
+      spyOn(URL, 'createObjectURL').and.returnValue('blob:fake-url');
+      spyOn(URL, 'revokeObjectURL');
+    });
+
+    it('triggers a file download', () => {
+      component.exportData();
+      expect(mockAnchor.click).toHaveBeenCalled();
+    });
+
+    it('sets a .json filename with today\'s date', () => {
+      component.exportData();
+      expect(mockAnchor.download).toMatch(/^gymgoli-\d{4}-\d{2}-\d{2}\.json$/);
+    });
+
+    it('creates a JSON blob with the expected top-level keys', () => {
+      const blobSpy = spyOn(window, 'Blob').and.callThrough();
+      component.exportData();
+      const [args] = blobSpy.calls.mostRecent().args as [BlobPart[], BlobPropertyBag];
+      const parsed = JSON.parse(args[0] as string);
+      expect(parsed).toEqual(jasmine.objectContaining({
+        exportDate: jasmine.any(String),
+        version: 1,
+        workouts: jasmine.any(Array),
+        exercises: jasmine.any(Array),
+        sports: jasmine.any(Array),
+        sportSessions: jasmine.any(Array),
+        settings: jasmine.any(Object),
+      }));
+    });
+
+    it('revokes the object URL after download', () => {
+      component.exportData();
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:fake-url');
     });
   });
 });

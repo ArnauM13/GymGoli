@@ -1,12 +1,15 @@
 import { Component, inject, signal } from '@angular/core';
-import { Location } from '@angular/common';
+import { DOCUMENT, Location } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { AuthService } from '../../core/services/auth.service';
+import { ExerciseService } from '../../core/services/exercise.service';
 import { FitnessMetricsService } from '../../core/services/fitness-metrics.service';
+import { SportService } from '../../core/services/sport.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
+import { WorkoutService } from '../../core/services/workout.service';
 import { GoalMode, WeightUnit } from '../../core/models/user-settings.model';
 
 @Component({
@@ -230,6 +233,22 @@ import { GoalMode, WeightUnit } from '../../core/models/user-settings.model';
         </div>
       </div>
 
+      <!-- ── Dades ── -->
+      <div class="section">
+        <h2 class="section-title">Dades</h2>
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Exportar les meves dades</span>
+            <span class="setting-desc">
+              Descarrega un fitxer JSON amb tots els teus entrenaments, esports i configuració.
+            </span>
+          </div>
+          <button class="export-btn" (click)="exportData()" aria-label="Descarregar dades">
+            <span class="material-symbols-outlined">download</span>
+          </button>
+        </div>
+      </div>
+
       <!-- ── Compte ── -->
       <div class="section section--danger">
         <h2 class="section-title">Compte</h2>
@@ -436,6 +455,16 @@ import { GoalMode, WeightUnit } from '../../core/models/user-settings.model';
       &:hover { background: var(--c-hover); color: var(--c-brand); }
     }
 
+    /* ── Export button ── */
+    .export-btn {
+      width: 38px; height: 38px; border-radius: 10px; border: 1.5px solid var(--c-border);
+      background: var(--c-card); cursor: pointer; color: var(--c-text-2); flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 20px; }
+      &:hover { border-color: var(--c-brand); color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.04); }
+    }
+
     /* ── Account / danger section ── */
     .section--danger { margin-top: 8px; }
 
@@ -478,12 +507,16 @@ import { GoalMode, WeightUnit } from '../../core/models/user-settings.model';
   `],
 })
 export class SettingsComponent {
-  readonly settingsService  = inject(UserSettingsService);
-  readonly metricsService   = inject(FitnessMetricsService);
-  private authService       = inject(AuthService);
+  readonly settingsService = inject(UserSettingsService);
+  readonly metricsService  = inject(FitnessMetricsService);
+  private authService      = inject(AuthService);
+  private exerciseService  = inject(ExerciseService);
+  private sportService     = inject(SportService);
+  private workoutService   = inject(WorkoutService);
   private location         = inject(Location);
   private router           = inject(Router);
   private snackBar         = inject(MatSnackBar);
+  private doc              = inject(DOCUMENT);
 
   readonly deletingAccount = signal(false);
   readonly restOptions = [0, 30, 60, 90, 120, 180];
@@ -563,7 +596,29 @@ export class SettingsComponent {
     this.settingsService.update({ weeklySportGoal: null });
   }
 
+  // ── Data export ──────────────────────────────────────────────────────────
+
+  exportData(): void {
+    const payload = {
+      exportDate:   new Date().toISOString(),
+      version:      1,
+      workouts:     this.workoutService.workouts(),
+      exercises:    this.exerciseService.exercises(),
+      sports:       this.sportService.sports(),
+      sportSessions: this.sportService.sessions(),
+      settings:     this.settingsService.settings(),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = this.doc.createElement('a');
+    a.href     = url;
+    a.download = `gymgoli-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   // ── Account ──────────────────────────────────────────────────────────────
+
 
   async deleteAccount(): Promise<void> {
     const confirmed = confirm(
