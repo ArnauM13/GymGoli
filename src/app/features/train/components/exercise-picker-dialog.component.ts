@@ -5,7 +5,7 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 
-import { Exercise, ExerciseCategory, CATEGORY_LABELS, CATEGORY_COLORS, SUBCATEGORY_LABELS } from '../../../core/models/exercise.model';
+import { Exercise, ExerciseCategory, CATEGORY_LABELS, CATEGORY_COLORS, MUSCLE_LABELS, SUBCATEGORY_LABELS } from '../../../core/models/exercise.model';
 import { ExerciseService } from '../../../core/services/exercise.service';
 
 export interface ExercisePickerData {
@@ -53,7 +53,18 @@ export interface ExercisePickerData {
           <span class="category-dot" [style.background]="getCategoryColor(ex.category)"></span>
           <div class="info">
             <span class="name">{{ ex.name }}</span>
-            @if (ex.subcategory) {
+            @if (ex.muscles?.length || ex.setsRange) {
+              <div class="ex-meta">
+                @if (ex.setsRange && ex.repsRange) {
+                  <span class="ex-guide">{{ ex.setsRange[0] }}–{{ ex.setsRange[1] }} × {{ ex.repsRange[0] }}–{{ ex.repsRange[1] }}</span>
+                }
+                @for (m of (ex.muscles ?? []); track m; let i = $index) {
+                  @if (i < 2) {
+                    <span class="ex-muscle">{{ getMuscleLabel(m) }}</span>
+                  }
+                }
+              </div>
+            } @else if (ex.subcategory) {
               <span class="sub">{{ getSubLabel(ex.subcategory) }} · {{ getCategoryLabel(ex.category) }}</span>
             }
           </div>
@@ -128,6 +139,17 @@ export interface ExercisePickerData {
 
     .arrow { color: var(--c-text-3); font-size: 20px; }
 
+    .ex-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+    .ex-guide {
+      font-size: 10px; font-weight: 700; color: var(--c-brand);
+      background: rgba(var(--c-brand-rgb), 0.1); border-radius: 5px; padding: 1px 5px;
+    }
+    .ex-muscle {
+      font-size: 10px; font-weight: 500; color: var(--c-text-3);
+      background: var(--c-subtle); border: 1px solid var(--c-border-2);
+      border-radius: 5px; padding: 1px 5px;
+    }
+
     .empty { padding: 24px; text-align: center; color: var(--c-text-3); }
   `],
 })
@@ -159,6 +181,7 @@ export class ExercisePickerDialogComponent {
   getCategoryColor(cat: ExerciseCategory): string { return CATEGORY_COLORS[cat] ?? '#bbb'; }
   getCategoryLabel(cat: ExerciseCategory): string { return CATEGORY_LABELS[cat]; }
   getSubLabel(sub: string): string { return SUBCATEGORY_LABELS[sub as keyof typeof SUBCATEGORY_LABELS] ?? sub; }
+  getMuscleLabel(m: string): string { return MUSCLE_LABELS[m] ?? m; }
 
   select(exercise: Exercise): void { this.dialogRef.close(exercise); }
   close(): void { this.dialogRef.close(); }

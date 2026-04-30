@@ -8,6 +8,7 @@ import {
   CATEGORY_LABELS,
   Exercise,
   ExerciseCategory,
+  MUSCLE_LABELS,
   SUBCATEGORY_LABELS,
 } from '../../core/models/exercise.model';
 import { Sport } from '../../core/models/sport.model';
@@ -79,13 +80,24 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
               <div class="ic-bar" [style.background]="getCategoryColor(cat.value)"></div>
               <div class="ic-info">
                 <span class="ic-name">{{ exercise.name }}</span>
-                <span class="ic-detail">
-                  @if (exercise.subcategory) {
-                    {{ getSubcategoryLabel(exercise.subcategory) }}
-                  }
-                  @if (exercise.subcategory && exercise.notes) { · }
-                  @if (exercise.notes) { {{ exercise.notes }} }
-                </span>
+                @if (exercise.muscles?.length || exercise.setsRange) {
+                  <div class="ic-meta">
+                    @if (exercise.setsRange && exercise.repsRange) {
+                      <span class="ic-guide">{{ exercise.setsRange[0] }}–{{ exercise.setsRange[1] }} × {{ exercise.repsRange[0] }}–{{ exercise.repsRange[1] }}</span>
+                    }
+                    @for (m of (exercise.muscles ?? []); track m; let i = $index) {
+                      @if (i < 3) {
+                        <span class="ic-muscle">{{ getMuscleLabel(m) }}</span>
+                      }
+                    }
+                  </div>
+                } @else {
+                  <span class="ic-detail">
+                    @if (exercise.subcategory) { {{ getSubcategoryLabel(exercise.subcategory) }} }
+                    @if (exercise.subcategory && exercise.notes) { · }
+                    @if (exercise.notes) { {{ exercise.notes }} }
+                  </span>
+                }
               </div>
               <button class="ic-action" (click)="openForm(exercise)" aria-label="Editar">
                 <span class="material-symbols-outlined">edit</span>
@@ -259,6 +271,19 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       &:empty { display: none; }
     }
+    .ic-meta {
+      display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
+    }
+    .ic-guide {
+      font-size: 11px; font-weight: 700; color: var(--c-brand);
+      background: rgba(var(--c-brand-rgb), 0.1); border-radius: 6px;
+      padding: 1px 5px; flex-shrink: 0;
+    }
+    .ic-muscle {
+      font-size: 10px; font-weight: 500; color: var(--c-text-3);
+      background: var(--c-subtle); border: 1px solid var(--c-border-2);
+      border-radius: 6px; padding: 1px 5px;
+    }
 
     .ic-action {
       width: 36px; height: 36px; flex-shrink: 0;
@@ -332,11 +357,13 @@ export class LibraryComponent {
   getCategoryIcon(cat: ExerciseCategory): string { return CATEGORY_ICONS[cat]; }
   getCategoryColor(cat: ExerciseCategory): string { return CATEGORY_COLORS[cat]; }
   getSubcategoryLabel(sub: string): string { return SUBCATEGORY_LABELS[sub as keyof typeof SUBCATEGORY_LABELS] ?? sub; }
+  getMuscleLabel(m: string): string { return MUSCLE_LABELS[m] ?? m; }
 
   openForm(exercise?: Exercise): void {
     const ref = this.dialog.open(ExerciseFormDialogComponent, {
       data: { exercise },
       width: '360px',
+      maxHeight: '90vh',
     });
 
     ref.afterClosed().subscribe(async result => {
