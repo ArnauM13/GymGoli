@@ -19,6 +19,7 @@ import { WorkoutService } from '../../core/services/workout.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
 import { FitnessInsightsComponent } from '../../shared/components/fitness-insights/fitness-insights.component';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
+import { WeeklySummaryComponent } from './components/weekly-summary.component';
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
 
@@ -31,7 +32,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 @Component({
   selector: 'app-train',
   standalone: true,
-  imports: [WorkoutEditorComponent, LowerCasePipe, InlineDatePickerComponent, FitnessInsightsComponent],
+  imports: [WorkoutEditorComponent, LowerCasePipe, InlineDatePickerComponent, FitnessInsightsComponent, WeeklySummaryComponent],
   template: `
     <div class="page">
 
@@ -122,6 +123,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         @if ((!workoutService.isLoading() || dateWorkouts().length > 0) && !creating()) {
 
           <app-fitness-insights />
+          <app-weekly-summary />
 
           <!-- Entrenaments section -->
           <div class="workout-section">
@@ -373,6 +375,17 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               </button>
             }
           </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="sl-field">
+          <span class="sl-field-label">Notes</span>
+          <textarea class="sl-notes"
+            placeholder="Afegeix una nota opcional..."
+            [value]="loggerNotes()"
+            (input)="loggerNotes.set($any($event.target).value)"
+            rows="2"
+          ></textarea>
         </div>
 
         <!-- Footer actions -->
@@ -896,6 +909,14 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       &.active { border-color: #006874; background: rgba(0,104,116,0.08); transform: scale(1.1); }
       &:hover:not(.active) { border-color: #aaa; background: #f0f0f0; }
     }
+    .sl-notes {
+      width: 100%; box-sizing: border-box;
+      padding: 9px 12px; border: 1.5px solid #e0e0e0; border-radius: 10px;
+      font-size: 13px; font-family: inherit; color: #333; resize: none;
+      outline: none; transition: border-color 0.15s;
+      &:focus { border-color: #006874; }
+      &::placeholder { color: #bbb; }
+    }
     .sl-actions {
       display: flex; align-items: center; gap: 8px;
       padding: 12px 0 4px; border-top: 1px solid #f0f0f0; margin-top: 4px;
@@ -948,6 +969,7 @@ export class TrainComponent {
   readonly loggerSubtype   = signal<string | null>(null);
   readonly loggerFeeling   = signal<FeelingLevel | null>(null);
   readonly loggerMetrics   = signal<Record<string, string | number>>({});
+  readonly loggerNotes     = signal<string>('');
   readonly creating        = signal(false);
 
   readonly isToday = computed(() => this.selectedDate() === TODAY());
@@ -1250,6 +1272,7 @@ export class TrainComponent {
     this.loggerSubtype.set(existing?.subtypeId ?? null);
     this.loggerFeeling.set(existing?.feeling ?? null);
     this.loggerMetrics.set({ ...(existing?.metrics ?? {}) });
+    this.loggerNotes.set(existing?.notes ?? '');
   }
 
   closeSessionLogger(): void { this.loggerSport.set(null); }
@@ -1303,6 +1326,7 @@ export class TrainComponent {
         duration:  this.loggerDuration() || undefined,
         feeling:   this.loggerFeeling() ?? undefined,
         metrics:   Object.keys(metrics).length ? metrics : undefined,
+        notes:     this.loggerNotes().trim() || undefined,
       };
       const existingId = this.loggerSessionId();
       if (existingId) {
