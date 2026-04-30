@@ -5,7 +5,9 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { AuthService } from '../../core/services/auth.service';
+import { FitnessMetricsService } from '../../core/services/fitness-metrics.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
+import { GoalMode, WeightUnit } from '../../core/models/user-settings.model';
 
 @Component({
   selector: 'app-settings',
@@ -19,6 +21,47 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
           <span class="material-symbols-outlined">arrow_back_ios</span>
         </button>
         <h1 class="page-title">Configuració</h1>
+      </div>
+
+      <!-- ── Aparença ── -->
+      <div class="section">
+        <h2 class="section-title">Aparença</h2>
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Mode fosc</span>
+            <span class="setting-desc">Redueix la llum de la pantalla per a un ús nocturn còmode.</span>
+          </div>
+          <mat-slide-toggle
+            [checked]="settingsService.darkMode()"
+            (change)="toggleDarkMode()"
+            color="primary"
+          />
+        </div>
+        <div class="setting-row setting-row--top">
+          <div class="setting-info">
+            <span class="setting-label">Unitat de pes</span>
+            <span class="setting-desc">Els pesos es mostren en l'unitat seleccionada. Els valors es guarden sempre en kg.</span>
+          </div>
+          <div class="unit-toggle">
+            <button class="unit-btn" [class.unit-btn--active]="settingsService.weightUnit() === 'kg'" (click)="setWeightUnit('kg')">kg</button>
+            <button class="unit-btn" [class.unit-btn--active]="settingsService.weightUnit() === 'lb'" (click)="setWeightUnit('lb')">lb</button>
+          </div>
+        </div>
+        <div class="setting-row setting-row--top">
+          <div class="setting-info">
+            <span class="setting-label">Descans entre sèries</span>
+            <span class="setting-desc">Temporitzador que arrenca automàticament en afegir sèries. Posat a 0 per desactivar-lo.</span>
+          </div>
+          <div class="unit-toggle rest-toggle">
+            @for (secs of restOptions; track secs) {
+              <button class="unit-btn"
+                [class.unit-btn--active]="settingsService.restTimerSeconds() === secs"
+                (click)="setRestTimer(secs)">
+                {{ secs === 0 ? 'Off' : secs + 's' }}
+              </button>
+            }
+          </div>
+        </div>
       </div>
 
       <div class="section">
@@ -51,36 +94,141 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
         <div class="section">
           <h2 class="section-title">Objectiu setmanal</h2>
 
-          <div class="setting-row">
-            <div class="setting-info">
-              <span class="setting-label">Activitats per setmana</span>
-              <span class="setting-desc">
-                Gym i esport compten igual. Els consells t'animaran quan ho aconsegueixis.
+          <!-- Mode selector -->
+          <div class="mode-selector">
+            <button
+              class="mode-btn"
+              [class.mode-btn--active]="settingsService.goalMode() === 'combined'"
+              (click)="setGoalMode('combined')"
+            >Combinat</button>
+            <button
+              class="mode-btn"
+              [class.mode-btn--active]="settingsService.goalMode() === 'separate'"
+              (click)="setGoalMode('separate')"
+            >Separat</button>
+          </div>
+
+          @if (settingsService.goalMode() === 'combined') {
+            <!-- Combined goal (gym + sport together) -->
+            <div class="setting-row">
+              <div class="setting-info">
+                <span class="setting-label">Activitats per setmana</span>
+                <span class="setting-desc">
+                  Gym i esport compten igual. Els consells t'animaran quan ho aconsegueixis.
+                </span>
+              </div>
+
+              @if (settingsService.weeklyActivityGoal() === null) {
+                <button class="goal-set-btn" (click)="setGoal(3)">
+                  <span class="material-symbols-outlined">add</span>
+                  Definir
+                </button>
+              } @else {
+                <div class="goal-stepper">
+                  <button class="step-btn" (click)="adjustGoal(-1)" [disabled]="settingsService.weeklyActivityGoal()! <= 1" aria-label="Menys">
+                    <span class="material-symbols-outlined">remove</span>
+                  </button>
+                  <span class="goal-value">{{ settingsService.weeklyActivityGoal() }}</span>
+                  <button class="step-btn" (click)="adjustGoal(1)" [disabled]="settingsService.weeklyActivityGoal()! >= 7" aria-label="Més">
+                    <span class="material-symbols-outlined">add</span>
+                  </button>
+                  <button class="step-btn step-btn--danger" (click)="clearGoal()" aria-label="Eliminar objectiu">
+                    <span class="material-symbols-outlined">close</span>
+                  </button>
+                </div>
+              }
+            </div>
+          } @else {
+            <!-- Separate goals (gym and sport independently) -->
+            <div class="separate-goals">
+
+              <div class="goal-row">
+                <div class="goal-row-info">
+                  <span class="material-symbols-outlined goal-icon">fitness_center</span>
+                  <div class="setting-info">
+                    <span class="setting-label">Entrenos de gym</span>
+                    <span class="setting-desc">Sessions de musculació per setmana.</span>
+                  </div>
+                </div>
+                @if (settingsService.weeklyGymGoal() === null) {
+                  <button class="goal-set-btn" (click)="setGymGoal(2)">
+                    <span class="material-symbols-outlined">add</span>
+                    Definir
+                  </button>
+                } @else {
+                  <div class="goal-stepper">
+                    <button class="step-btn" (click)="adjustGymGoal(-1)" [disabled]="settingsService.weeklyGymGoal()! <= 1" aria-label="Menys">
+                      <span class="material-symbols-outlined">remove</span>
+                    </button>
+                    <span class="goal-value">{{ settingsService.weeklyGymGoal() }}</span>
+                    <button class="step-btn" (click)="adjustGymGoal(1)" [disabled]="settingsService.weeklyGymGoal()! >= 7" aria-label="Més">
+                      <span class="material-symbols-outlined">add</span>
+                    </button>
+                    <button class="step-btn step-btn--danger" (click)="clearGymGoal()" aria-label="Eliminar objectiu gym">
+                      <span class="material-symbols-outlined">close</span>
+                    </button>
+                  </div>
+                }
+              </div>
+
+              <div class="goal-row">
+                <div class="goal-row-info">
+                  <span class="material-symbols-outlined goal-icon">directions_run</span>
+                  <div class="setting-info">
+                    <span class="setting-label">Sessions d'esport</span>
+                    <span class="setting-desc">Activitats esportives per setmana.</span>
+                  </div>
+                </div>
+                @if (settingsService.weeklySportGoal() === null) {
+                  <button class="goal-set-btn" (click)="setSportGoal(2)">
+                    <span class="material-symbols-outlined">add</span>
+                    Definir
+                  </button>
+                } @else {
+                  <div class="goal-stepper">
+                    <button class="step-btn" (click)="adjustSportGoal(-1)" [disabled]="settingsService.weeklySportGoal()! <= 1" aria-label="Menys">
+                      <span class="material-symbols-outlined">remove</span>
+                    </button>
+                    <span class="goal-value">{{ settingsService.weeklySportGoal() }}</span>
+                    <button class="step-btn" (click)="adjustSportGoal(1)" [disabled]="settingsService.weeklySportGoal()! >= 7" aria-label="Més">
+                      <span class="material-symbols-outlined">add</span>
+                    </button>
+                    <button class="step-btn step-btn--danger" (click)="clearSportGoal()" aria-label="Eliminar objectiu esport">
+                      <span class="material-symbols-outlined">close</span>
+                    </button>
+                  </div>
+                }
+              </div>
+
+            </div>
+          }
+
+          @if (metricsService.goalStreak() > 0) {
+            <div class="streak-row">
+              <span class="streak-fire">🔥</span>
+              <span class="streak-text">
+                {{ metricsService.goalStreak() }}
+                setmana{{ metricsService.goalStreak() !== 1 ? 'nes' : '' }}
+                consecutiva{{ metricsService.goalStreak() !== 1 ? 's' : '' }}
               </span>
             </div>
-
-            @if (settingsService.weeklyActivityGoal() === null) {
-              <button class="goal-set-btn" (click)="setGoal(3)">
-                <span class="material-symbols-outlined">add</span>
-                Definir
-              </button>
-            } @else {
-              <div class="goal-stepper">
-                <button class="step-btn" (click)="adjustGoal(-1)" [disabled]="settingsService.weeklyActivityGoal()! <= 1" aria-label="Menys">
-                  <span class="material-symbols-outlined">remove</span>
-                </button>
-                <span class="goal-value">{{ settingsService.weeklyActivityGoal() }}</span>
-                <button class="step-btn" (click)="adjustGoal(1)" [disabled]="settingsService.weeklyActivityGoal()! >= 7" aria-label="Més">
-                  <span class="material-symbols-outlined">add</span>
-                </button>
-                <button class="step-btn step-btn--danger" (click)="clearGoal()" aria-label="Eliminar objectiu">
-                  <span class="material-symbols-outlined">close</span>
-                </button>
-              </div>
-            }
-          </div>
+          }
         </div>
       }
+
+      <!-- ── Entrenaments ── -->
+      <div class="section">
+        <h2 class="section-title">Entrenaments</h2>
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Plantilles</span>
+            <span class="setting-desc">Crea i gestiona les teves plantilles d'entrenament.</span>
+          </div>
+          <a class="nav-link-btn" routerLink="/templates">
+            <span class="material-symbols-outlined">chevron_right</span>
+          </a>
+        </div>
+      </div>
 
       <!-- ── Compte ── -->
       <div class="section section--danger">
@@ -132,33 +280,47 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
 
     .back-btn {
       width: 36px; height: 36px; border-radius: 50%; border: none;
-      background: transparent; cursor: pointer; color: #555; flex-shrink: 0;
+      background: transparent; cursor: pointer; color: var(--c-text-2); flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.15s; touch-action: manipulation;
       .material-symbols-outlined { font-size: 20px; }
-      &:hover { background: rgba(0,0,0,0.06); }
+      &:hover { background: var(--c-hover); }
     }
 
     .page-title {
       margin: 0;
-      font-size: 20px; font-weight: 800; color: #1a1a1a; letter-spacing: -0.3px;
+      font-size: 20px; font-weight: 800; color: var(--c-text); letter-spacing: -0.3px;
     }
 
     .section {
-      background: white;
+      background: var(--c-card);
       border-radius: 18px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+      box-shadow: 0 2px 10px var(--c-shadow);
       padding: 16px; margin-bottom: 16px;
     }
 
     .section-title {
       margin: 0 0 14px;
-      font-size: 13px; font-weight: 700; color: #666;
+      font-size: 13px; font-weight: 700; color: var(--c-text-2);
       letter-spacing: 0.3px; text-transform: uppercase;
     }
 
     .setting-row {
       display: flex; align-items: center; gap: 14px;
+      &.setting-row--top { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--c-border-2); }
+    }
+
+    /* ── Unit toggle (kg/lb) and rest-timer toggle ── */
+    .unit-toggle {
+      display: flex; border: 1.5px solid var(--c-border); border-radius: 10px; overflow: hidden; flex-shrink: 0;
+    }
+    .rest-toggle { flex-shrink: 1; flex-wrap: nowrap; }
+    .unit-btn {
+      padding: 7px 10px; border: none; background: var(--c-card);
+      font-size: 13px; font-weight: 700; color: var(--c-text-3);
+      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+      &:hover:not(.unit-btn--active) { background: var(--c-hover); color: var(--c-text-2); }
+      &.unit-btn--active { background: var(--c-brand); color: white; }
     }
 
     .setting-info {
@@ -167,36 +329,72 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
     }
 
     .setting-label {
-      font-size: 15px; font-weight: 700; color: #1a1a1a;
+      font-size: 15px; font-weight: 700; color: var(--c-text);
     }
 
     .setting-desc {
-      font-size: 12px; color: #666; line-height: 1.4;
+      font-size: 12px; color: var(--c-text-2); line-height: 1.4;
     }
 
     /* ── Hint ── */
     .setting-hint {
       display: flex; align-items: flex-start; gap: 6px;
       margin-top: 12px; padding: 10px 12px;
-      background: rgba(0, 104, 116, 0.06); border-radius: 10px;
-      border: 1px solid rgba(0, 104, 116, 0.15);
-      font-size: 12px; color: #555; line-height: 1.4;
+      background: rgba(var(--c-brand-rgb), 0.06); border-radius: 10px;
+      border: 1px solid rgba(var(--c-brand-rgb), 0.15);
+      font-size: 12px; color: var(--c-text-2); line-height: 1.4;
     }
 
     .hint-icon {
-      font-size: 15px; color: #006874; flex-shrink: 0; margin-top: 1px;
+      font-size: 15px; color: var(--c-brand); flex-shrink: 0; margin-top: 1px;
       font-variation-settings: 'FILL' 1;
+    }
+
+    /* ── Mode selector ── */
+    .mode-selector {
+      display: flex; gap: 6px;
+      margin-bottom: 16px;
+    }
+
+    .mode-btn {
+      flex: 1; padding: 8px 12px; border-radius: 10px;
+      border: 1.5px solid var(--c-border); background: var(--c-card);
+      font-size: 13px; font-weight: 600; color: var(--c-text-3);
+      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+      &:hover { border-color: var(--c-text-3); color: var(--c-text-2); }
+      &.mode-btn--active {
+        border-color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.07);
+        color: var(--c-brand);
+      }
+    }
+
+    /* ── Separate goals ── */
+    .separate-goals {
+      display: flex; flex-direction: column; gap: 12px;
+    }
+
+    .goal-row {
+      display: flex; align-items: center; gap: 12px;
+    }
+
+    .goal-row-info {
+      display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0;
+    }
+
+    .goal-icon {
+      font-size: 20px; color: var(--c-text-3); flex-shrink: 0;
+      font-variation-settings: 'FILL' 0;
     }
 
     /* ── Goal stepper ── */
     .goal-set-btn {
       display: flex; align-items: center; gap: 4px;
-      padding: 8px 14px; border-radius: 10px; border: 1.5px solid #e0e0e0;
-      background: white; color: #555; font-size: 13px; font-weight: 600;
+      padding: 8px 14px; border-radius: 10px; border: 1.5px solid var(--c-border);
+      background: var(--c-card); color: var(--c-text-2); font-size: 13px; font-weight: 600;
       cursor: pointer; white-space: nowrap; touch-action: manipulation;
       transition: all 0.15s; flex-shrink: 0;
       .material-symbols-outlined { font-size: 16px; }
-      &:hover { border-color: #006874; color: #006874; }
+      &:hover { border-color: var(--c-brand); color: var(--c-brand); }
     }
 
     .goal-stepper {
@@ -205,25 +403,44 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
 
     .goal-value {
       min-width: 28px; text-align: center;
-      font-size: 20px; font-weight: 800; color: #006874;
+      font-size: 20px; font-weight: 800; color: var(--c-brand);
     }
 
     .step-btn {
-      width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid #e0e0e0;
-      background: white; cursor: pointer; color: #555;
+      width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid var(--c-border);
+      background: var(--c-card); cursor: pointer; color: var(--c-text-2);
       display: flex; align-items: center; justify-content: center;
       transition: all 0.15s; touch-action: manipulation;
       .material-symbols-outlined { font-size: 16px; }
-      &:hover:not(:disabled) { border-color: #006874; color: #006874; background: rgba(0,104,116,0.04); }
+      &:hover:not(:disabled) { border-color: var(--c-brand); color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.04); }
       &:disabled { opacity: 0.3; cursor: default; }
       &.step-btn--danger:hover:not(:disabled) { border-color: #ef5350; color: #ef5350; background: rgba(239,83,80,0.06); }
+    }
+
+    /* ── Goal streak ── */
+    .streak-row {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 10px; padding: 8px 12px;
+      background: rgba(230, 81, 0, 0.07); border-radius: 10px;
+    }
+    .streak-fire { font-size: 17px; line-height: 1; flex-shrink: 0; }
+    .streak-text { font-size: 13px; font-weight: 700; color: #e65100; }
+
+    .nav-link-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--c-subtle); border: 1px solid var(--c-border-2);
+      color: var(--c-text-3); text-decoration: none; flex-shrink: 0;
+      transition: background 0.15s, color 0.15s;
+      .material-symbols-outlined { font-size: 20px; }
+      &:hover { background: var(--c-hover); color: var(--c-brand); }
     }
 
     /* ── Account / danger section ── */
     .section--danger { margin-top: 8px; }
 
     .setting-divider {
-      height: 1px; background: #f0f0f0; margin: 10px 0;
+      height: 1px; background: var(--c-border-2); margin: 10px 0;
     }
 
     .danger-label { color: #c62828; }
@@ -231,12 +448,12 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
     .danger-btn {
       display: flex; align-items: center; justify-content: center; gap: 4px;
       padding: 8px 14px; border-radius: 10px;
-      border: 1.5px solid #e0e0e0; background: white;
-      font-size: 13px; font-weight: 600; color: #555;
+      border: 1.5px solid var(--c-border); background: var(--c-card);
+      font-size: 13px; font-weight: 600; color: var(--c-text-2);
       cursor: pointer; white-space: nowrap; flex-shrink: 0;
       transition: all 0.15s; touch-action: manipulation;
       .material-symbols-outlined { font-size: 15px; }
-      &:hover:not(:disabled) { border-color: #bbb; color: #333; }
+      &:hover:not(:disabled) { border-color: var(--c-text-3); color: var(--c-text); }
       &:disabled { opacity: 0.5; cursor: default; }
       &:not(.danger-btn--soft) {
         border-color: #ffcdd2; color: #c62828;
@@ -251,23 +468,25 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
     .legal-link {
       display: flex; align-items: center; gap: 8px;
       margin-top: 12px; padding: 12px 14px;
-      background: white; border-radius: 14px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
-      font-size: 13px; font-weight: 500; color: #555;
+      background: var(--c-card); border-radius: 14px;
+      box-shadow: 0 2px 10px var(--c-shadow);
+      font-size: 13px; font-weight: 500; color: var(--c-text-2);
       text-decoration: none; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 18px; color: #888; }
-      &:hover { color: #006874; box-shadow: 0 2px 14px rgba(0,0,0,0.11); }
+      .material-symbols-outlined { font-size: 18px; color: var(--c-text-3); }
+      &:hover { color: var(--c-brand); box-shadow: 0 2px 14px var(--c-shadow-md); }
     }
   `],
 })
 export class SettingsComponent {
-  readonly settingsService = inject(UserSettingsService);
-  private authService      = inject(AuthService);
+  readonly settingsService  = inject(UserSettingsService);
+  readonly metricsService   = inject(FitnessMetricsService);
+  private authService       = inject(AuthService);
   private location         = inject(Location);
   private router           = inject(Router);
   private snackBar         = inject(MatSnackBar);
 
   readonly deletingAccount = signal(false);
+  readonly restOptions = [0, 30, 60, 90, 120, 180];
 
   back(): void { this.location.back(); }
 
@@ -276,9 +495,27 @@ export class SettingsComponent {
     this.router.navigate(['/login']);
   }
 
+  setWeightUnit(unit: WeightUnit): void {
+    this.settingsService.update({ weightUnit: unit });
+  }
+
+  setRestTimer(seconds: number): void {
+    this.settingsService.update({ restTimerSeconds: seconds });
+  }
+
+  toggleDarkMode(): void {
+    this.settingsService.update({ darkMode: !this.settingsService.darkMode() });
+  }
+
   toggleMetrics(): void {
     this.settingsService.update({ metricsEnabled: !this.settingsService.metricsEnabled() });
   }
+
+  setGoalMode(mode: GoalMode): void {
+    this.settingsService.update({ goalMode: mode });
+  }
+
+  // ── Combined goal ────────────────────────────────────────────────────────
 
   setGoal(n: number): void {
     this.settingsService.update({ weeklyActivityGoal: n });
@@ -287,13 +524,46 @@ export class SettingsComponent {
   adjustGoal(delta: number): void {
     const current = this.settingsService.weeklyActivityGoal();
     if (current === null) return;
-    const next = Math.max(1, Math.min(7, current + delta));
-    this.settingsService.update({ weeklyActivityGoal: next });
+    this.settingsService.update({ weeklyActivityGoal: Math.max(1, Math.min(7, current + delta)) });
   }
 
   clearGoal(): void {
     this.settingsService.update({ weeklyActivityGoal: null });
   }
+
+  // ── Gym goal ─────────────────────────────────────────────────────────────
+
+  setGymGoal(n: number): void {
+    this.settingsService.update({ weeklyGymGoal: n });
+  }
+
+  adjustGymGoal(delta: number): void {
+    const current = this.settingsService.weeklyGymGoal();
+    if (current === null) return;
+    this.settingsService.update({ weeklyGymGoal: Math.max(1, Math.min(7, current + delta)) });
+  }
+
+  clearGymGoal(): void {
+    this.settingsService.update({ weeklyGymGoal: null });
+  }
+
+  // ── Sport goal ───────────────────────────────────────────────────────────
+
+  setSportGoal(n: number): void {
+    this.settingsService.update({ weeklySportGoal: n });
+  }
+
+  adjustSportGoal(delta: number): void {
+    const current = this.settingsService.weeklySportGoal();
+    if (current === null) return;
+    this.settingsService.update({ weeklySportGoal: Math.max(1, Math.min(7, current + delta)) });
+  }
+
+  clearSportGoal(): void {
+    this.settingsService.update({ weeklySportGoal: null });
+  }
+
+  // ── Account ──────────────────────────────────────────────────────────────
 
   async deleteAccount(): Promise<void> {
     const confirmed = confirm(

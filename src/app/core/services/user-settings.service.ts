@@ -15,7 +15,13 @@ export class UserSettingsService {
   readonly settings            = this._settings.asReadonly();
   readonly loaded              = this._loaded.asReadonly();
   readonly metricsEnabled      = computed(() => this._settings().metricsEnabled);
+  readonly goalMode            = computed(() => this._settings().goalMode);
   readonly weeklyActivityGoal  = computed(() => this._settings().weeklyActivityGoal ?? null);
+  readonly weeklyGymGoal       = computed(() => this._settings().weeklyGymGoal ?? null);
+  readonly weeklySportGoal     = computed(() => this._settings().weeklySportGoal ?? null);
+  readonly darkMode            = computed(() => this._settings().darkMode);
+  readonly weightUnit          = computed(() => this._settings().weightUnit ?? 'kg');
+  readonly restTimerSeconds    = computed(() => this._settings().restTimerSeconds ?? 90);
 
   constructor() {
     effect(() => {

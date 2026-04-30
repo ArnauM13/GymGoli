@@ -35,9 +35,9 @@ import { UserSettingsService } from '../../../core/services/user-settings.servic
 
     .insight-card {
       display: flex; align-items: center; gap: 0;
-      background: white;
+      background: var(--c-card);
       border-radius: 18px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+      box-shadow: 0 2px 10px var(--c-shadow);
       overflow: hidden;
       animation: ic-in 0.25s cubic-bezier(0.34, 1.4, 0.64, 1) both;
     }
@@ -65,22 +65,22 @@ import { UserSettingsService } from '../../../core/services/user-settings.servic
 
     .ic-title {
       font-size: 13px; font-weight: 800; line-height: 1.2;
-      color: color-mix(in srgb, var(--ic) 60%, #1a1a1a);
+      color: color-mix(in srgb, var(--ic) 60%, var(--c-text));
     }
 
     .ic-msg {
-      font-size: 12px; font-weight: 500; color: #666; line-height: 1.4;
+      font-size: 12px; font-weight: 500; color: var(--c-text-2); line-height: 1.4;
     }
 
     .ic-dismiss {
       flex-shrink: 0;
       width: 40px; height: 40px;
       border: none; background: transparent; cursor: pointer;
-      color: #ccc; touch-action: manipulation; margin-right: 4px;
+      color: var(--c-border); touch-action: manipulation; margin-right: 4px;
       display: flex; align-items: center; justify-content: center;
       transition: color 0.15s;
       .material-symbols-outlined { font-size: 16px; }
-      &:hover { color: #999; }
+      &:hover { color: var(--c-text-3); }
     }
   `],
 })
@@ -88,12 +88,26 @@ export class FitnessInsightsComponent {
   readonly settingsService = inject(UserSettingsService);
   private metricsService   = inject(FitnessMetricsService);
 
-  private readonly dismissed    = signal<Set<string>>(new Set());
+  private static readonly _SK = 'gymgoli_dismissed_insights';
+
+  private readonly dismissed = signal<Set<string>>(FitnessInsightsComponent._loadDismissed());
+
+  private static _loadDismissed(): Set<string> {
+    try {
+      const raw = sessionStorage.getItem(FitnessInsightsComponent._SK);
+      return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+    } catch { return new Set(); }
+  }
+
   readonly visibleInsights = computed(() =>
     this.metricsService.insights().filter(i => !this.dismissed().has(i.type))
   );
 
   dismiss(type: string): void {
-    this.dismissed.update(set => new Set([...set, type]));
+    this.dismissed.update(s => {
+      const next = new Set([...s, type]);
+      try { sessionStorage.setItem(FitnessInsightsComponent._SK, JSON.stringify([...next])); } catch {}
+      return next;
+    });
   }
 }

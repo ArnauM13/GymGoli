@@ -140,8 +140,8 @@ export interface SportFormDialogData {
     .full-width { width: 100%; }
 
     .picker-section { display: flex; flex-direction: column; gap: 8px; }
-    .field-label { margin: 0; font-size: 13px; color: #616161; font-weight: 500; }
-    .optional-hint { font-weight: 400; color: #666; font-size: 11px; }
+    .field-label { margin: 0; font-size: 13px; color: var(--c-text-3); font-weight: 500; }
+    .optional-hint { font-weight: 400; color: var(--c-text-3); font-size: 11px; }
 
     /* Icon grid */
     .icon-grid {
@@ -153,17 +153,17 @@ export interface SportFormDialogData {
     .icon-btn {
       width: 36px; height: 36px;
       display: flex; align-items: center; justify-content: center;
-      border: 1.5px solid #e0e0e0; border-radius: 8px;
-      background: #fafafa; cursor: pointer;
+      border: 1.5px solid var(--c-border-2); border-radius: 8px;
+      background: var(--c-subtle); cursor: pointer;
       transition: all 0.15s;
       .material-symbols-outlined {
-        font-size: 20px; color: #555;
+        font-size: 20px; color: var(--c-text-3);
         font-variation-settings: 'FILL' 0, 'wght' 300;
       }
-      &:hover { border-color: #666; background: #f0f0f0; }
+      &:hover { border-color: var(--c-text-3); background: var(--c-border-2); }
       &.selected {
         border-color: currentColor;
-        background: color-mix(in srgb, currentColor 8%, white);
+        background: color-mix(in srgb, currentColor 8%, var(--c-card));
         .material-symbols-outlined {
           font-variation-settings: 'FILL' 1, 'wght' 400;
           color: inherit;
@@ -183,7 +183,7 @@ export interface SportFormDialogData {
       outline: none;
       &:hover { transform: scale(1.15); }
       &.selected {
-        border-color: #1a1a1a;
+        border-color: var(--c-text);
         transform: scale(1.15);
       }
     }
@@ -195,18 +195,18 @@ export interface SportFormDialogData {
     .preview-card {
       display: flex; flex-direction: column; align-items: center; gap: 6px;
       padding: 14px 24px;
-      border: 1.5px solid var(--sport-color, #ccc);
+      border: 1.5px solid var(--sport-color, var(--c-border));
       border-radius: 14px;
-      background: color-mix(in srgb, var(--sport-color, #ccc) 8%, white);
+      background: color-mix(in srgb, var(--sport-color, var(--c-border)) 8%, var(--c-card));
       min-width: 80px;
     }
     .preview-icon {
-      font-size: 28px; color: var(--sport-color, #888);
+      font-size: 28px; color: var(--sport-color, var(--c-text-3));
       font-variation-settings: 'FILL' 1, 'wght' 400;
     }
     .preview-name {
       font-size: 12px; font-weight: 700;
-      color: color-mix(in srgb, var(--sport-color, #888) 70%, #333);
+      color: color-mix(in srgb, var(--sport-color, var(--c-text-3)) 70%, var(--c-text-2));
     }
 
     /* Metrics */
@@ -227,16 +227,16 @@ export interface SportFormDialogData {
     .subtype-chip {
       display: inline-flex; align-items: center; gap: 4px;
       padding: 4px 8px 4px 10px;
-      background: #f0f0f0; border-radius: 20px;
-      font-size: 12px; font-weight: 500; color: #444;
+      background: var(--c-border-2); border-radius: 20px;
+      font-size: 12px; font-weight: 500; color: var(--c-text-2);
     }
     .subtype-remove {
       display: flex; align-items: center; justify-content: center;
       width: 18px; height: 18px; border-radius: 50%; border: none;
-      background: transparent; cursor: pointer; color: #888; padding: 0;
+      background: transparent; cursor: pointer; color: var(--c-text-3); padding: 0;
       transition: background 0.12s, color 0.12s;
       .material-symbols-outlined { font-size: 13px; }
-      &:hover { background: #ddd; color: #333; }
+      &:hover { background: var(--c-border-2); color: var(--c-text-2); }
     }
 
     .subtype-add-row {
@@ -244,19 +244,19 @@ export interface SportFormDialogData {
     }
     .subtype-input {
       flex: 1; padding: 7px 10px;
-      border: 1.5px solid #e0e0e0; border-radius: 8px;
+      border: 1.5px solid var(--c-border-2); border-radius: 8px;
       font-size: 13px; outline: none;
       transition: border-color 0.15s;
-      &:focus { border-color: #006874; }
+      &:focus { border-color: var(--c-brand); }
     }
     .subtype-add-btn {
       width: 34px; height: 34px; border-radius: 8px; border: none;
-      background: #006874; color: white; cursor: pointer;
+      background: var(--c-brand); color: var(--c-card); cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.15s;
       .material-symbols-outlined { font-size: 18px; }
-      &:hover:not(:disabled) { background: #005a63; }
-      &:disabled { background: #ccc; cursor: default; }
+      &:hover:not(:disabled) { background: var(--c-brand-dk); }
+      &:disabled { background: var(--c-border); cursor: default; }
     }
   `],
 })

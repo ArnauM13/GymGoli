@@ -160,15 +160,15 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
       display: flex; align-items: center; justify-content: space-between;
       padding: 16px 16px 8px;
       &.page-header--mt { padding-top: 24px; }
-      h1 { margin: 0; font-size: 20px; font-weight: 700; color: #1a1a1a; letter-spacing: -0.2px; }
+      h1 { margin: 0; font-size: 20px; font-weight: 700; color: var(--c-text); letter-spacing: -0.2px; }
     }
     .header-add {
       width: 36px; height: 36px; border-radius: 50%; border: none;
-      background: #006874; color: white; cursor: pointer;
+      background: var(--c-brand); color: white; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.15s, transform 0.1s; touch-action: manipulation;
       .material-symbols-outlined { font-size: 20px; }
-      &:hover  { background: #005a63; }
+      &:hover  { background: var(--c-brand-dk); }
       &:active { transform: scale(0.94); }
     }
 
@@ -183,19 +183,19 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
     .filter-chip {
       display: flex; align-items: center; gap: 4px;
       padding: 6px 12px;
-      border: 1.5px solid #e0e0e0; border-radius: 20px;
-      background: white;
-      font-size: 12px; font-weight: 600; color: #666;
+      border: 1.5px solid var(--c-border); border-radius: 20px;
+      background: var(--c-card);
+      font-size: 12px; font-weight: 600; color: var(--c-text-2);
       cursor: pointer; white-space: nowrap; touch-action: manipulation;
       transition: all 0.15s;
       .material-symbols-outlined { font-size: 15px; }
       &:hover:not(.active) {
-        border-color: var(--cat-color, #006874);
-        color: var(--cat-color, #006874);
+        border-color: var(--cat-color, var(--c-brand));
+        color: var(--cat-color, var(--c-brand));
       }
       &.active {
-        background: var(--cat-color, #006874);
-        border-color: var(--cat-color, #006874);
+        background: var(--cat-color, var(--c-brand));
+        border-color: var(--cat-color, var(--c-brand));
         color: white;
       }
     }
@@ -204,9 +204,9 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
     .card-section {
       margin: 12px 16px 0;
       padding: 14px 14px 10px;
-      background: white;
+      background: var(--c-card);
       border-radius: 18px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+      box-shadow: 0 2px 10px var(--c-shadow);
     }
 
     .section-header {
@@ -214,27 +214,27 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
       margin-bottom: 12px;
     }
     .section-icon {
-      font-size: 18px; color: #666;
+      font-size: 18px; color: var(--c-text-2);
       font-variation-settings: 'FILL' 0, 'wght' 300;
     }
     .section-title {
       margin: 0; flex: 1;
-      font-size: 14px; font-weight: 700; color: #555; letter-spacing: 0.2px;
+      font-size: 14px; font-weight: 700; color: var(--c-text-2); letter-spacing: 0.2px;
     }
     .section-count {
-      font-size: 11px; font-weight: 700; color: #666;
-      background: #f0f0f0; border-radius: 10px; padding: 2px 8px;
+      font-size: 11px; font-weight: 700; color: var(--c-text-2);
+      background: var(--c-border-2); border-radius: 10px; padding: 2px 8px;
     }
 
     /* ── Item card (exercise / sport) ── */
     .item-card {
       display: flex; align-items: center;
       margin-bottom: 6px;
-      border: 1.5px solid #efefef; border-radius: 14px;
-      background: white; overflow: hidden;
+      border: 1.5px solid var(--c-border-2); border-radius: 14px;
+      background: var(--c-card); overflow: hidden;
       transition: box-shadow 0.15s, border-color 0.15s;
       &:last-child  { margin-bottom: 4px; }
-      &:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-color: #ddd; }
+      &:hover { box-shadow: 0 2px 8px var(--c-shadow); border-color: var(--c-border); }
     }
 
     .ic-bar { width: 5px; align-self: stretch; flex-shrink: 0; }
@@ -251,11 +251,11 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
       padding: 10px 10px;
     }
     .ic-name {
-      font-size: 13px; font-weight: 700; color: #1a1a1a;
+      font-size: 13px; font-weight: 700; color: var(--c-text);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .ic-detail {
-      font-size: 11px; color: #666;
+      font-size: 11px; color: var(--c-text-2);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       &:empty { display: none; }
     }
@@ -264,10 +264,10 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
       width: 36px; height: 36px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
       border: none; background: transparent; cursor: pointer;
-      color: #ccc; touch-action: manipulation;
+      color: var(--c-border); touch-action: manipulation;
       transition: color 0.15s, background 0.15s;
       .material-symbols-outlined { font-size: 17px; }
-      &:hover { color: #666; background: rgba(0,0,0,0.04); }
+      &:hover { color: var(--c-text-2); background: var(--c-hover); }
       &.ic-action--danger:hover { color: #ef5350; background: rgba(239,83,80,0.08); }
       &:last-child { margin-right: 4px; }
     }
@@ -276,9 +276,9 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
     .empty-state {
       display: flex; flex-direction: column; align-items: center; gap: 12px;
       padding: 28px 16px;
-      text-align: center; color: #666;
+      text-align: center; color: var(--c-text-2);
       .empty-icon {
-        font-size: 48px; color: #d8d8d8;
+        font-size: 48px; color: var(--c-border);
         font-variation-settings: 'FILL' 0, 'wght' 200;
       }
       p { margin: 0; font-size: 14px; font-weight: 500; }
@@ -286,17 +286,17 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
     .empty-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
     .btn-primary {
       padding: 8px 16px; border: none; border-radius: 10px;
-      background: #006874; color: white;
+      background: var(--c-brand); color: white;
       font-size: 13px; font-weight: 700; cursor: pointer;
       transition: background 0.15s; touch-action: manipulation;
-      &:hover { background: #005a63; }
+      &:hover { background: var(--c-brand-dk); }
     }
     .btn-secondary {
       padding: 8px 16px; border-radius: 10px;
-      border: 1.5px solid #e0e0e0; background: white; color: #666;
+      border: 1.5px solid var(--c-border); background: var(--c-card); color: var(--c-text-2);
       font-size: 13px; font-weight: 600; cursor: pointer;
       transition: all 0.15s; touch-action: manipulation;
-      &:hover { border-color: #767676; color: #333; }
+      &:hover { border-color: var(--c-text-3); color: var(--c-text); }
     }
   `],
 })

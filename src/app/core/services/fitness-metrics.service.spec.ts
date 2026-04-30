@@ -629,4 +629,215 @@ describe('FitnessMetricsService', () => {
       expect(insight?.message).toContain('3');
     });
   });
+
+  // ── goalStreak ───────────────────────────────────────────────────────────
+  // MOCK_DATE is Wednesday 2025-04-23. Week starts Monday 2025-04-21.
+
+  describe('goalStreak', () => {
+    it('returns 0 when no goal is set', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: null });
+      expect(service.goalStreak()).toBe(0);
+    });
+
+    it('returns 0 when current week has no activity', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 3 });
+      mockWorkouts.set([]);
+      mockSessions.set([]);
+      expect(service.goalStreak()).toBe(0);
+    });
+
+    it('returns 0 when current week has activity but below goal', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 3 });
+      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]); // 2 < 3
+      mockSessions.set([]);
+      expect(service.goalStreak()).toBe(0);
+    });
+
+    it('returns 1 when current week meets the goal', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 3 });
+      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1)), makeWorkout(d(-2))]);
+      mockSessions.set([]);
+      expect(service.goalStreak()).toBe(1);
+    });
+
+    it('counts sport sessions toward the streak', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 2 });
+      mockWorkouts.set([makeWorkout(d(0))]);
+      mockSessions.set([makeSession(d(-1))]);
+      expect(service.goalStreak()).toBe(1);
+    });
+
+    it('returns 2 when current and previous week both met the goal', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 2 });
+      // Current week (Apr 21–23): 2 workouts
+      mockWorkouts.set([
+        makeWorkout(d(0)),   // Apr 23 (Wed)
+        makeWorkout(d(-1)),  // Apr 22 (Tue)
+        // Previous week (Apr 14–20): 3 workouts
+        makeWorkout(d(-7)),  // Apr 16
+        makeWorkout(d(-8)),  // Apr 15
+        makeWorkout(d(-9)),  // Apr 14
+      ]);
+      mockSessions.set([]);
+      expect(service.goalStreak()).toBe(2);
+    });
+
+    it('stops counting when a week did not meet the goal', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 2 });
+      // Current week: met (2 workouts)
+      // Previous week: not met (1 workout)
+      // 2 weeks ago: met (but streak already broken)
+      mockWorkouts.set([
+        makeWorkout(d(0)),    // current week
+        makeWorkout(d(-1)),   // current week
+        makeWorkout(d(-8)),   // previous week: only 1
+        makeWorkout(d(-14)),  // 2 weeks ago
+        makeWorkout(d(-15)),  // 2 weeks ago
+      ]);
+      mockSessions.set([]);
+      expect(service.goalStreak()).toBe(1);
+    });
+
+    // ── Separate mode ─────────────────────────────────────────────────────
+
+    it('returns 0 in separate mode when no sub-goal is set', () => {
+      mockSettings.set({
+        ...DEFAULT_USER_SETTINGS, goalMode: 'separate',
+        weeklyGymGoal: null, weeklySportGoal: null,
+      });
+      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]);
+      mockSessions.set([makeSession(d(0))]);
+      expect(service.goalStreak()).toBe(0);
+    });
+
+    it('counts streak when only gym goal is set and met', () => {
+      mockSettings.set({
+        ...DEFAULT_USER_SETTINGS, goalMode: 'separate',
+        weeklyGymGoal: 2, weeklySportGoal: null,
+      });
+      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]);
+      mockSessions.set([]);
+      expect(service.goalStreak()).toBe(1);
+    });
+
+    it('counts streak when only sport goal is set and met', () => {
+      mockSettings.set({
+        ...DEFAULT_USER_SETTINGS, goalMode: 'separate',
+        weeklyGymGoal: null, weeklySportGoal: 1,
+      });
+      mockWorkouts.set([]);
+      mockSessions.set([makeSession(d(0))]);
+      expect(service.goalStreak()).toBe(1);
+    });
+
+    it('requires both sub-goals to be met when both are set', () => {
+      mockSettings.set({
+        ...DEFAULT_USER_SETTINGS, goalMode: 'separate',
+        weeklyGymGoal: 2, weeklySportGoal: 1,
+      });
+      // gym met (2) but sport not met (0)
+      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]);
+      mockSessions.set([]);
+      expect(service.goalStreak()).toBe(0);
+    });
+
+    it('returns 1 when both separate goals are met this week', () => {
+      mockSettings.set({
+        ...DEFAULT_USER_SETTINGS, goalMode: 'separate',
+        weeklyGymGoal: 2, weeklySportGoal: 1,
+      });
+      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]);
+      mockSessions.set([makeSession(d(0))]);
+      expect(service.goalStreak()).toBe(1);
+    });
+  });
+
+  // ── objectiu_assolit (separate mode) ─────────────────────────────────────
+
+  describe('objectiu_assolit (separate mode)', () => {
+    it('triggers when both separate goals are met', () => {
+      mockSettings.set({
+        ...DEFAULT_USER_SETTINGS, goalMode: 'separate',
+        weeklyGymGoal: 2, weeklySportGoal: 1,
+      });
+      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]);
+      mockSessions.set([makeSession(d(0))]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).toContain('objectiu_assolit');
+    });
+
+    it('does NOT trigger when gym goal is not met in separate mode', () => {
+      mockSettings.set({
+        ...DEFAULT_USER_SETTINGS, goalMode: 'separate',
+        weeklyGymGoal: 3, weeklySportGoal: 1,
+      });
+      mockWorkouts.set([makeWorkout(d(0))]); // only 1 workout, need 3
+      mockSessions.set([makeSession(d(0))]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).not.toContain('objectiu_assolit');
+    });
+
+    it('triggers when only gym goal is set and met in separate mode', () => {
+      mockSettings.set({
+        ...DEFAULT_USER_SETTINGS, goalMode: 'separate',
+        weeklyGymGoal: 2, weeklySportGoal: null,
+      });
+      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]);
+      mockSessions.set([]);
+
+      const types = service.insights().map(i => i.type);
+      expect(types).toContain('objectiu_assolit');
+    });
+  });
+
+  // ── augmenta_objectiu ─────────────────────────────────────────────────────
+
+  describe('augmenta_objectiu', () => {
+    beforeEach(() => jasmine.clock().mockDate(new Date(MOCK_DATE + 'T12:00:00')));
+
+    function weekWorkouts(weekOffset: number): Workout[] {
+      const monday = d(-(weekOffset * 7) - (new Date(MOCK_DATE + 'T12:00:00').getDay() === 0 ? 6 : new Date(MOCK_DATE + 'T12:00:00').getDay() - 1));
+      return [makeWorkout(monday), makeWorkout(d(-(weekOffset * 7)))];
+    }
+
+    it('does not appear when streak < 3', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, metricsEnabled: true, weeklyActivityGoal: 2 });
+      // Only 1 week met
+      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]);
+      mockSessions.set([]);
+      const types = service.insights().map(i => i.type);
+      expect(types).not.toContain('augmenta_objectiu');
+    });
+
+    it('does not appear when no goal is set', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, metricsEnabled: true, weeklyActivityGoal: null });
+      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]);
+      mockSessions.set([]);
+      const types = service.insights().map(i => i.type);
+      expect(types).not.toContain('augmenta_objectiu');
+    });
+
+    it('appears when streak >= 3 with a combined goal', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, metricsEnabled: true, weeklyActivityGoal: 1 });
+      // 3 weeks each with 1+ workout
+      mockWorkouts.set([
+        makeWorkout(d(0)),       // this week
+        makeWorkout(d(-7)),      // last week
+        makeWorkout(d(-14)),     // 2 weeks ago
+      ]);
+      mockSessions.set([]);
+      const types = service.insights().map(i => i.type);
+      expect(types).toContain('augmenta_objectiu');
+    });
+
+    it('insight message mentions the streak count', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, metricsEnabled: true, weeklyActivityGoal: 1 });
+      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-7)), makeWorkout(d(-14))]);
+      mockSessions.set([]);
+      const insight = service.insights().find(i => i.type === 'augmenta_objectiu');
+      expect(insight?.title).toContain('3');
+    });
+  });
 });

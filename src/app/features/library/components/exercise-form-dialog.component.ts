@@ -89,7 +89,7 @@ export interface ExerciseFormDialogData {
   styles: [`
     .form { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; min-width: 300px; }
     .full-width { width: 100%; }
-    .field-label { margin: 0 0 8px; font-size: 14px; color: #616161; font-weight: 500; }
+    .field-label { margin: 0 0 8px; font-size: 14px; color: var(--c-text-3); font-weight: 500; }
 
     .category-selector { margin-bottom: 8px; }
     .category-buttons { display: flex; gap: 8px; }
@@ -101,23 +101,23 @@ export interface ExerciseFormDialogData {
       align-items: center;
       gap: 4px;
       padding: 12px 8px;
-      border: 2px solid #e0e0e0;
+      border: 2px solid var(--c-border-2);
       border-radius: 12px;
-      background: #fafafa;
+      background: var(--c-subtle);
       cursor: pointer;
       font-size: 12px;
       font-weight: 500;
-      color: #757575;
+      color: var(--c-text-3);
       transition: all 0.2s;
 
       span.material-symbols-outlined { font-size: 22px; }
 
-      &:hover { border-color: #006874; color: #006874; background: rgba(0,104,116,0.06); }
+      &:hover { border-color: var(--c-brand); color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.06); }
 
       &.selected {
-        border-color: #006874;
-        background: rgba(0, 104, 116, 0.1);
-        color: #006874;
+        border-color: var(--c-brand);
+        background: rgba(var(--c-brand-rgb), 0.1);
+        color: var(--c-brand);
       }
     }
   `],

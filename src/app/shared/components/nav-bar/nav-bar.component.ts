@@ -32,9 +32,9 @@ interface NavItem {
     .bottom-nav {
       display: flex;
       height: 64px;
-      background: #ffffff;
-      border-top: 1px solid #e0e0e0;
-      box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+      background: var(--c-card);
+      border-top: 1px solid var(--c-border);
+      box-shadow: 0 -2px 8px var(--c-shadow);
       padding-bottom: env(safe-area-inset-bottom);
     }
 
@@ -46,18 +46,18 @@ interface NavItem {
       justify-content: center;
       gap: 2px;
       text-decoration: none;
-      color: #9e9e9e;
+      color: var(--c-text-3);
       transition: color 0.2s ease;
       cursor: pointer;
       touch-action: manipulation;
 
-      &:hover { color: #006874; }
+      &:hover { color: var(--c-brand); }
 
       &.active {
-        color: #006874;
+        color: var(--c-brand);
 
         .nav-icon-wrap {
-          background: rgba(0, 104, 116, 0.12);
+          background: rgba(var(--c-brand-rgb), 0.12);
         }
 
         .nav-icon {
