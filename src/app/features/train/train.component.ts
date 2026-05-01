@@ -3,7 +3,8 @@ import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { InlineDatePickerComponent } from '../../shared/components/inline-date-picker/inline-date-picker.component';
-import { workoutCategories } from '../../shared/utils/calendar-utils';
+import { workoutCategories, mondayOf, addDays } from '../../shared/utils/calendar-utils';
+import { UserSettingsService } from '../../core/services/user-settings.service';
 
 import {
   CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, Exercise, ExerciseCategory,
@@ -121,6 +122,18 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         @if ((!workoutService.isLoading() || dateWorkouts().length > 0) && !creating()) {
 
           <app-fitness-insights />
+
+          <!-- ── Avui toca ── -->
+          @if (todaySuggestion(); as s) {
+            <button class="today-suggestion" [style.--sg-c]="s.color" (click)="selectType(s.category)">
+              <span class="material-symbols-outlined sg-icon">{{ s.icon }}</span>
+              <div class="sg-info">
+                <span class="sg-hint">Avui toca</span>
+                <span class="sg-cat">{{ s.label }}</span>
+              </div>
+              <span class="material-symbols-outlined sg-arrow">arrow_forward_ios</span>
+            </button>
+          }
 
           <!-- Entrenaments section -->
           <div class="workout-section">
@@ -565,6 +578,26 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .material-symbols-outlined { font-size: 32px; color: var(--c-border); }
     }
 
+    /* ── Avui toca ── */
+    .today-suggestion {
+      display: flex; align-items: center; gap: 12px;
+      margin: 12px 16px 0; padding: 12px 14px;
+      background: var(--c-card); border-radius: 14px;
+      border: 2px solid var(--sg-c, var(--c-brand));
+      box-shadow: 0 2px 10px var(--c-shadow);
+      cursor: pointer; text-align: left; touch-action: manipulation;
+      transition: background 0.15s;
+      &:hover { background: var(--c-subtle); }
+    }
+    .sg-icon {
+      font-size: 22px; color: var(--sg-c, var(--c-brand));
+      font-variation-settings: 'FILL' 1, 'wght' 400; flex-shrink: 0;
+    }
+    .sg-info { flex: 1; display: flex; flex-direction: column; gap: 1px; }
+    .sg-hint { font-size: 11px; font-weight: 600; color: var(--c-text-3); text-transform: uppercase; letter-spacing: 0.4px; }
+    .sg-cat  { font-size: 15px; font-weight: 700; color: var(--sg-c, var(--c-brand)); }
+    .sg-arrow { font-size: 16px; color: var(--c-text-3); flex-shrink: 0; }
+
     /* ── Workout section (dashboard) ── */
     .workout-section {
       margin: 12px 16px 0;
@@ -948,6 +981,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 export class TrainComponent {
   readonly workoutService  = inject(WorkoutService);
   readonly sportService    = inject(SportService);
+  private settingsService  = inject(UserSettingsService);
   private exerciseService  = inject(ExerciseService);
   private templateService  = inject(TemplateService);
   private router           = inject(Router);
@@ -970,6 +1004,28 @@ export class TrainComponent {
   readonly creating        = signal(false);
 
   readonly isToday = computed(() => this.selectedDate() === TODAY());
+
+  readonly todaySuggestion = computed(() => {
+    const goal = this.settingsService.fitnessGoal();
+    if (!goal || goal === 'sport') return null;
+
+    const today = TODAY();
+    if (this.selectedDate() !== today) return null;
+    if (this.workoutService.getWorkoutsForDate(today).length > 0) return null;
+
+    const monday = mondayOf(today);
+    const doneCats = new Set(
+      Array.from({ length: 7 }, (_, i) => addDays(monday, i))
+        .filter(d => d < today)
+        .flatMap(d => this.workoutService.getWorkoutsForDate(d).flatMap(w => workoutCategories(w)))
+    );
+
+    const order: ExerciseCategory[] = ['push', 'pull', 'legs'];
+    const next = order.find(c => !doneCats.has(c));
+    if (!next) return null;
+
+    return { category: next, label: CATEGORY_LABELS[next], color: CATEGORY_COLORS[next], icon: CATEGORY_ICONS[next] };
+  });
 
   readonly dateWorkouts = computed(() =>
     this.workoutService.getWorkoutsForDate(this.selectedDate())
