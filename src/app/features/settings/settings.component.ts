@@ -99,6 +99,9 @@ import {
       <!-- ── Objectiu de fitness ── -->
       <div class="section">
         <h2 class="section-title">El teu objectiu</h2>
+        @if (!settingsService.fitnessGoal()) {
+          <p class="section-desc">Tria un objectiu i l'app adaptarà els consells i l'objectiu setmanal per a tu.</p>
+        }
         <div class="fitness-goal-grid">
           @for (g of fitnessGoalOptions; track g.value) {
             <button class="fg-btn" [class.selected]="settingsService.fitnessGoal() === g.value"
@@ -340,6 +343,9 @@ import {
       font-size: 13px; font-weight: 700; color: var(--c-text-2);
       letter-spacing: 0.3px; text-transform: uppercase;
     }
+    .section-desc {
+      margin: -8px 0 12px; font-size: 13px; color: var(--c-text-3); line-height: 1.5;
+    }
 
     .setting-row {
       display: flex; align-items: center; gap: 14px;
@@ -564,6 +570,10 @@ export class SettingsComponent {
     if (!this.settingsService.metricsEnabled()) {
       patch['metricsEnabled']     = true;
       patch['weeklyActivityGoal'] = FITNESS_GOAL_WEEKLY_DEFAULTS[goal];
+    }
+    if (goal === 'sport' && this.settingsService.goalMode() === 'combined') {
+      patch['goalMode']       = 'separate';
+      patch['weeklySportGoal'] = FITNESS_GOAL_WEEKLY_DEFAULTS['sport'];
     }
     this.settingsService.update(patch as Parameters<typeof this.settingsService.update>[0]);
   }
