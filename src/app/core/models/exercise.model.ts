@@ -23,6 +23,12 @@ export const CATEGORY_COLORS: Record<ExerciseCategory, string> = {
   legs: '#81c784',
 };
 
+export const CATEGORY_MUSCLES: Record<ExerciseCategory, string> = {
+  push: 'Pit · Espatlles · Tríceps',
+  pull: 'Esquena · Bíceps · Avantbraços',
+  legs: 'Quàdriceps · Isquiotibials · Glutis',
+};
+
 export const SUBCATEGORY_OPTIONS: Record<ExerciseCategory, { value: ExerciseSubcategory; label: string }[]> = {
   push: [
     { value: 'chest', label: 'Pit' },

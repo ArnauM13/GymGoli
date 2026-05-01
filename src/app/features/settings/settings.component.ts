@@ -10,7 +10,10 @@ import { FitnessMetricsService } from '../../core/services/fitness-metrics.servi
 import { SportService } from '../../core/services/sport.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
-import { GoalMode, WeightUnit } from '../../core/models/user-settings.model';
+import {
+  FitnessGoal, GoalMode, WeightUnit,
+  FITNESS_GOAL_EMOJIS, FITNESS_GOAL_LABELS, FITNESS_GOAL_WEEKLY_DEFAULTS,
+} from '../../core/models/user-settings.model';
 
 @Component({
   selector: 'app-settings',
@@ -91,6 +94,20 @@ import { GoalMode, WeightUnit } from '../../core/models/user-settings.model';
             Els consells apareixen a la pantalla d'inici. Pots tancar-los individualment en qualsevol moment.
           </div>
         }
+      </div>
+
+      <!-- ── Objectiu de fitness ── -->
+      <div class="section">
+        <h2 class="section-title">El teu objectiu</h2>
+        <div class="fitness-goal-grid">
+          @for (g of fitnessGoalOptions; track g.value) {
+            <button class="fg-btn" [class.selected]="settingsService.fitnessGoal() === g.value"
+                    (click)="setFitnessGoal(g.value)">
+              <span class="fg-emoji">{{ g.emoji }}</span>
+              <span class="fg-label">{{ g.label }}</span>
+            </button>
+          }
+        </div>
       </div>
 
       @if (settingsService.metricsEnabled()) {
@@ -436,6 +453,24 @@ import { GoalMode, WeightUnit } from '../../core/models/user-settings.model';
       &.step-btn--danger:hover:not(:disabled) { border-color: #ef5350; color: #ef5350; background: rgba(239,83,80,0.06); }
     }
 
+    /* ── Fitness goal grid ── */
+    .fitness-goal-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    }
+    .fg-btn {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px; border-radius: 14px;
+      border: 2px solid var(--c-border-2); background: var(--c-subtle);
+      cursor: pointer; transition: all 0.15s; touch-action: manipulation; text-align: left;
+      &:hover { border-color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.05); }
+      &.selected {
+        border-color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.1);
+        .fg-label { color: var(--c-brand); }
+      }
+    }
+    .fg-emoji { font-size: 22px; line-height: 1; flex-shrink: 0; }
+    .fg-label { font-size: 13px; font-weight: 700; color: var(--c-text-2); line-height: 1.2; }
+
     /* ── Goal streak ── */
     .streak-row {
       display: flex; align-items: center; gap: 8px;
@@ -520,6 +555,18 @@ export class SettingsComponent {
 
   readonly deletingAccount = signal(false);
   readonly restOptions = [0, 30, 60, 90, 120, 180];
+  readonly fitnessGoalOptions = (Object.keys(FITNESS_GOAL_LABELS) as FitnessGoal[]).map(v => ({
+    value: v, emoji: FITNESS_GOAL_EMOJIS[v], label: FITNESS_GOAL_LABELS[v],
+  }));
+
+  setFitnessGoal(goal: FitnessGoal): void {
+    const patch: Record<string, unknown> = { fitnessGoal: goal };
+    if (!this.settingsService.metricsEnabled()) {
+      patch['metricsEnabled']     = true;
+      patch['weeklyActivityGoal'] = FITNESS_GOAL_WEEKLY_DEFAULTS[goal];
+    }
+    this.settingsService.update(patch as Parameters<typeof this.settingsService.update>[0]);
+  }
 
   back(): void { this.location.back(); }
 

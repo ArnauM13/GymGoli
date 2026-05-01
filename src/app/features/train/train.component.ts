@@ -7,7 +7,8 @@ import { workoutCategories, mondayOf, addDays } from '../../shared/utils/calenda
 import { UserSettingsService } from '../../core/services/user-settings.service';
 
 import {
-  CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, Exercise, ExerciseCategory,
+  CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_MUSCLES,
+  Exercise, ExerciseCategory,
 } from '../../core/models/exercise.model';
 import { Sport, SportMetricDef } from '../../core/models/sport.model';
 import { BUILT_IN_TEMPLATES, BuiltInTemplate, WorkoutTemplate } from '../../core/models/template.model';
@@ -245,7 +246,10 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         <div class="tp-header">
           <div class="tp-header-left">
             <div class="tp-dot" [style.background]="pickerColor()"></div>
-            <span class="tp-title">{{ pickerLabel() }}</span>
+            <div class="tp-header-info">
+              <span class="tp-title">{{ pickerLabel() }}</span>
+              <span class="tp-muscles">{{ pickerMuscles() }}</span>
+            </div>
           </div>
           <button class="tp-close" (click)="closePicker()">
             <span class="material-symbols-outlined">close</span>
@@ -663,6 +667,8 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       margin-bottom: 16px;
     }
     .tp-header-left { display: flex; align-items: center; gap: 10px; }
+    .tp-header-info { display: flex; flex-direction: column; gap: 1px; }
+    .tp-muscles { font-size: 12px; color: var(--c-text-3); }
     .tp-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
     .tp-title { font-size: 18px; font-weight: 800; color: var(--c-text); }
     .tp-close {
@@ -1067,6 +1073,11 @@ export class TrainComponent {
   readonly pickerColor = computed(() => {
     const cat = this.pickerCat();
     return cat ? CATEGORY_COLORS[cat] : '';
+  });
+
+  readonly pickerMuscles = computed(() => {
+    const cat = this.pickerCat();
+    return cat ? CATEGORY_MUSCLES[cat] : '';
   });
 
   readonly pickerLastAgo = computed(() => {
