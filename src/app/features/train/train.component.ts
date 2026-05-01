@@ -1,4 +1,3 @@
-import { LowerCasePipe } from '@angular/common';
 import { Component, ViewChild, computed, effect, inject, signal, untracked } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
@@ -19,7 +18,6 @@ import { WorkoutService } from '../../core/services/workout.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
 import { FitnessInsightsComponent } from '../../shared/components/fitness-insights/fitness-insights.component';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
-import { WeeklySummaryComponent } from './components/weekly-summary.component';
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
 
@@ -32,7 +30,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 @Component({
   selector: 'app-train',
   standalone: true,
-  imports: [WorkoutEditorComponent, LowerCasePipe, InlineDatePickerComponent, FitnessInsightsComponent, WeeklySummaryComponent],
+  imports: [WorkoutEditorComponent, InlineDatePickerComponent, FitnessInsightsComponent],
   template: `
     <div class="page">
 
@@ -123,7 +121,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         @if ((!workoutService.isLoading() || dateWorkouts().length > 0) && !creating()) {
 
           <app-fitness-insights />
-          <app-weekly-summary />
 
           <!-- Entrenaments section -->
           <div class="workout-section">
