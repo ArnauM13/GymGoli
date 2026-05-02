@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 
 import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
 import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry } from '../../core/models/workout.model';
@@ -15,7 +16,7 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
 @Component({
   selector: 'app-history',
   standalone: true,
-  imports: [CalendarComponent, ExerciseStatsDialogComponent, ExerciseProgressInlineComponent],
+  imports: [CalendarComponent, ExerciseStatsDialogComponent, ExerciseProgressInlineComponent, FormsModule],
   template: `
     <div class="page">
 
@@ -184,6 +185,18 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
             }
           </div>
         } @else {
+
+        <!-- ── Cerca ── -->
+        <div class="search-wrap">
+          <span class="material-symbols-outlined search-icon">search</span>
+          <input class="search-input" type="search" [(ngModel)]="searchQueryValue"
+                 placeholder="Cerca per exercici..." autocomplete="off">
+          @if (searchQuery()) {
+            <button class="search-clear" (click)="searchQuery.set('')">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          }
+        </div>
 
         <!-- ── Filtres i ordenació ── -->
         <div class="filter-bar">
@@ -432,6 +445,32 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
     /* ════════════════════════════════
        LIST MODE
     ════════════════════════════════ */
+    /* ── Search ── */
+    .search-wrap {
+      position: relative; margin: 0 16px 10px;
+      display: flex; align-items: center;
+    }
+    .search-icon {
+      position: absolute; left: 12px; font-size: 18px;
+      color: var(--c-text-3); pointer-events: none;
+    }
+    .search-input {
+      width: 100%; padding: 10px 36px 10px 38px;
+      border: 1.5px solid var(--c-border); border-radius: 12px;
+      font-size: 14px; background: var(--c-card); color: var(--c-text);
+      outline: none; box-sizing: border-box;
+      &:focus { border-color: var(--c-brand); }
+      &::-webkit-search-cancel-button { display: none; }
+    }
+    .search-clear {
+      position: absolute; right: 10px;
+      width: 24px; height: 24px; border-radius: 50%;
+      border: none; background: var(--c-border-2); cursor: pointer;
+      color: var(--c-text-3); display: flex; align-items: center; justify-content: center;
+      .material-symbols-outlined { font-size: 14px; }
+      &:hover { background: var(--c-hover); color: var(--c-text-2); }
+    }
+
     .filter-bar {
       display: flex; align-items: center; gap: 6px;
       padding: 0 16px 12px; overflow-x: auto;
@@ -603,19 +642,26 @@ export class HistoryComponent {
   readonly expandedId   = signal<string | null>(null);
   readonly selectedExerciseId = signal<string | null>(null);
 
-  readonly sortDesc  = signal(true);
-  readonly filterCat = signal<string | null>(null);
+  readonly sortDesc    = signal(true);
+  readonly filterCat   = signal<string | null>(null);
+  readonly searchQuery = signal('');
+  get searchQueryValue(): string { return this.searchQuery(); }
+  set searchQueryValue(v: string) { this.searchQuery.set(v); }
 
   readonly allWorkouts = this.workoutService.workouts;
 
   readonly filteredWorkouts = computed(() => {
-    const cat = this.filterCat();
-    let list = this.allWorkouts(); // already sorted desc by service
+    const cat   = this.filterCat();
+    const query = this.searchQuery().trim().toLowerCase();
+    let list = this.allWorkouts();
     if (cat) {
       list = list.filter(w => {
         const cats = w.categories?.length ? w.categories : (w.category ? [w.category] : []);
         return cats.includes(cat);
       });
+    }
+    if (query) {
+      list = list.filter(w => w.entries.some(e => e.exerciseName.toLowerCase().includes(query)));
     }
     return this.sortDesc() ? list : [...list].reverse();
   });

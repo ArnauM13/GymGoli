@@ -43,6 +43,14 @@ export class TemplateService {
     this._save();
   }
 
+  recordUse(id: string): void {
+    const today = new Date().toISOString().split('T')[0];
+    this.templates.update(list => list.map(t =>
+      t.id === id ? { ...t, useCount: (t.useCount ?? 0) + 1, lastUsed: today } : t
+    ));
+    this._save();
+  }
+
   forCategory(category: ExerciseCategory | 'mixed'): WorkoutTemplate[] {
     return this.templates().filter(t => t.category === category || t.category === 'mixed');
   }

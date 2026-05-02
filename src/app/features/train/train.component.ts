@@ -1236,6 +1236,7 @@ export class TrainComponent {
     if (!cat) return;
     this.closePicker();
     this.creating.set(true);
+    this.templateService.recordUse(t.id);
     try {
       const useCat = t.category === 'mixed' ? cat : t.category as ExerciseCategory;
       const entries: WorkoutEntry[] = t.entries.map(e => ({ ...e, sets: [] }));
