@@ -2,7 +2,7 @@ import { Injectable, computed, effect, inject, signal } from '@angular/core';
 
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
-import { DEFAULT_USER_SETTINGS, UserSettings } from '../models/user-settings.model';
+import { DEFAULT_USER_SETTINGS, FitnessGoal, UserSettings } from '../models/user-settings.model';
 
 @Injectable({ providedIn: 'root' })
 export class UserSettingsService {
@@ -22,6 +22,7 @@ export class UserSettingsService {
   readonly darkMode            = computed(() => this._settings().darkMode);
   readonly weightUnit          = computed(() => this._settings().weightUnit ?? 'kg');
   readonly restTimerSeconds    = computed(() => this._settings().restTimerSeconds ?? 90);
+  readonly fitnessGoal         = computed(() => (this._settings().fitnessGoal ?? null) as FitnessGoal | null);
 
   constructor() {
     effect(() => {

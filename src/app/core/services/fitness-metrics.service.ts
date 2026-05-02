@@ -1,6 +1,7 @@
 import { Injectable, computed, inject } from '@angular/core';
 
 import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../models/exercise.model';
+import { FitnessGoal } from '../models/user-settings.model';
 import { SportService } from './sport.service';
 import { UserSettingsService } from './user-settings.service';
 import { WorkoutService } from './workout.service';
@@ -79,11 +80,12 @@ export class FitnessMetricsService {
     const workouts = this.workoutService.workouts();
     const sessions = this.sportService.sessions();
     const sports   = this.sportService.sports();
-    const cfg      = this.settingsService.settings();
-    const goal     = cfg.weeklyActivityGoal;
-    const mode     = cfg.goalMode;
-    const gymGoal  = cfg.weeklyGymGoal;
-    const spGoal   = cfg.weeklySportGoal;
+    const cfg         = this.settingsService.settings();
+    const goal        = cfg.weeklyActivityGoal;
+    const mode        = cfg.goalMode;
+    const gymGoal     = cfg.weeklyGymGoal;
+    const spGoal      = cfg.weeklySportGoal;
+    const fitnessGoal = this.settingsService.fitnessGoal();
 
     // ── Current week ──────────────────────────────────────────────────────
     const weekWorkouts = workouts.filter(w => w.date >= monday && w.date <= today);
@@ -122,18 +124,19 @@ export class FitnessMetricsService {
     else {
       const dow = new Date(today + 'T12:00:00').getDay();
       if (weekWorkouts.length < 2 && weekSessions.length < 2 && (dow === 0 || dow >= 4)) {
+        const fluixaMsg = _fluixaMessage(fitnessGoal);
         candidates.push({
           type: 'setmana_fluixa',
           emoji: '💤',
           title: 'Setmana tranquil·la...',
-          message: 'Poc moviment aquesta setmana. Avui seria un bon dia per moure\'t una mica, no creus?',
+          message: fluixaMsg,
           color: '#0288d1',
         });
       }
     }
 
     // ── 4. Prova gym (2+ sessions esport però 0 gym en 7 dies) ───────────
-    if (last7Sessions.length >= 2 && last7Workouts.length === 0) {
+    if (last7Sessions.length >= 2 && last7Workouts.length === 0 && fitnessGoal !== 'sport') {
       candidates.push({
         type: 'prova_gym',
         emoji: '🏋️',
@@ -144,7 +147,7 @@ export class FitnessMetricsService {
     }
 
     // ── 6. Prova esport (3+ gym però 0 esport en 7 dies) ─────────────────
-    if (last7Workouts.length >= 3 && last7Sessions.length === 0 && sports.length > 0) {
+    if (last7Workouts.length >= 3 && last7Sessions.length === 0 && sports.length > 0 && fitnessGoal !== 'strength') {
       const favSport  = _favoriteSport(sessions, sports);
       const sportName = favSport ? favSport.name : 'algun esport';
       candidates.push({
@@ -157,7 +160,7 @@ export class FitnessMetricsService {
     }
 
     // ── 5. Recupera esport preferit (fa 7+ dies sense fer-lo) ────────────
-    if (sports.length > 0) {
+    if (sports.length > 0 && fitnessGoal !== 'strength') {
       const favSport = _favoriteSport(sessions, sports);
       if (favSport) {
         const lastFav = sessions
@@ -182,7 +185,7 @@ export class FitnessMetricsService {
     const last28Str      = offsetDate(today, -28);
     const last28Workouts = workouts.filter(w => w.date > last28Str && w.date <= today);
 
-    if (last28Workouts.length >= 3) {
+    if (last28Workouts.length >= 3 && fitnessGoal !== 'sport' && fitnessGoal !== 'weight') {
       const counts = { push: 0, pull: 0, legs: 0 } as Record<ExerciseCategory, number>;
       for (const w of last28Workouts) {
         const cats = w.categories?.length ? w.categories : (w.category ? [w.category] : []);
@@ -225,11 +228,13 @@ export class FitnessMetricsService {
       const dow = new Date(today + 'T12:00:00').getDay();
 
       if (weekTotal >= goal) {
+        const extra = weekTotal > goal ? `, ${weekTotal - goal} més del que et proposaves` : '';
+        const suffix = _assolitSuffix(fitnessGoal);
         candidates.push({
           type: 'objectiu_assolit',
           emoji: '🎯',
           title: 'Objectiu de la setmana, fet!',
-          message: `Has fet ${weekTotal} activitats${weekTotal > goal ? `, ${weekTotal - goal} més del que et proposaves` : ''}. Quin crack!`,
+          message: `Has fet ${weekTotal} activitats${extra}. ${suffix}`,
           color: '#006874',
         });
       } else if (dow === 0) {
@@ -402,6 +407,26 @@ export class FitnessMetricsService {
     }
     return streak;
   });
+}
+
+function _fluixaMessage(goal: FitnessGoal | null): string {
+  switch (goal) {
+    case 'strength': return 'Pocs entrenos al gym aquesta setmana. Recorda el teu programa de força!';
+    case 'fitness':  return 'Poc moviment aquesta setmana. Avui seria un bon dia per entrenar, no creus?';
+    case 'weight':   return 'Moure\'t regularment és clau per al teu objectiu. Avui és un bon dia per suar!';
+    case 'sport':    return 'Poca activitat esportiva aquesta setmana. Potser una sessió lleugera avui t\'activa!';
+    default:         return 'Poc moviment aquesta setmana. Avui seria un bon dia per moure\'t una mica, no creus?';
+  }
+}
+
+function _assolitSuffix(goal: FitnessGoal | null): string {
+  switch (goal) {
+    case 'strength': return 'La constància construeix múscul!';
+    case 'fitness':  return 'Et trobes millor i es nota!';
+    case 'weight':   return 'Cada setmana activa compta!';
+    case 'sport':    return 'La regularitat és la clau de l\'esport!';
+    default:         return 'Quin crack!';
+  }
 }
 
 function _favoriteSport(

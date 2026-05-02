@@ -9,6 +9,7 @@ import {
   Exercise,
   ExerciseCategory,
   MUSCLE_LABELS,
+  MUSCLE_OPTIONS,
   SUBCATEGORY_LABELS,
 } from '../../core/models/exercise.model';
 import { Sport } from '../../core/models/sport.model';
@@ -33,21 +34,20 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
 
       <!-- Category filter -->
       <div class="filter-bar">
-        <button
-          class="filter-chip"
-          [class.active]="!activeFilter()"
-          (click)="activeFilter.set(null)"
-        >Tots</button>
+        <button class="filter-chip" [class.active]="!activeFilter() && !muscleFilter()"
+                (click)="clearFilters()">Tots</button>
         @for (cat of categoryList; track cat.value) {
-          <button
-            class="filter-chip"
-            [class.active]="activeFilter() === cat.value"
-            [style.--cat-color]="getCategoryColor(cat.value)"
-            (click)="activeFilter.set(cat.value)"
-          >
+          <button class="filter-chip" [class.active]="activeFilter() === cat.value"
+                  [style.--cat-color]="getCategoryColor(cat.value)"
+                  (click)="setCategory(cat.value)">
             <span class="material-symbols-outlined">{{ cat.icon }}</span>
             {{ cat.label }}
           </button>
+        }
+        <div class="filter-sep"></div>
+        @for (m of muscleList; track m.value) {
+          <button class="filter-chip filter-chip--muscle" [class.active]="muscleFilter() === m.value"
+                  (click)="setMuscle(m.value)">{{ m.label }}</button>
         }
       </div>
 
@@ -192,6 +192,11 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
       scrollbar-width: none;
       &::-webkit-scrollbar { display: none; }
     }
+    .filter-sep {
+      width: 1px; height: 20px; background: var(--c-border-2);
+      flex-shrink: 0; align-self: center; margin: 0 2px;
+    }
+
     .filter-chip {
       display: flex; align-items: center; gap: 4px;
       padding: 6px 12px;
@@ -209,6 +214,9 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
         background: var(--cat-color, var(--c-brand));
         border-color: var(--cat-color, var(--c-brand));
         color: white;
+      }
+      &--muscle.active {
+        background: var(--c-brand); border-color: var(--c-brand); color: white;
       }
     }
 
@@ -335,6 +343,7 @@ export class LibraryComponent {
   readonly sports = this.sportService.sports;
 
   readonly activeFilter = signal<ExerciseCategory | null>(null);
+  readonly muscleFilter = signal<string | null>(null);
   readonly exercises = this.exerciseService.exercises;
 
   readonly categoryList = (Object.keys(CATEGORY_LABELS) as ExerciseCategory[]).map(value => ({
@@ -343,6 +352,8 @@ export class LibraryComponent {
     icon: CATEGORY_ICONS[value],
   }));
 
+  readonly muscleList = MUSCLE_OPTIONS;
+
   readonly visibleCategories = computed(() => {
     const filter = this.activeFilter();
     if (filter) return this.categoryList.filter(c => c.value === filter);
@@ -350,7 +361,17 @@ export class LibraryComponent {
   });
 
   exercisesByCategory(cat: ExerciseCategory): Exercise[] {
-    return this.exercises().filter(e => e.category === cat);
+    const muscle = this.muscleFilter();
+    return this.exercises().filter(e =>
+      e.category === cat && (!muscle || (e.muscles ?? []).includes(muscle))
+    );
+  }
+
+  clearFilters(): void { this.activeFilter.set(null); this.muscleFilter.set(null); }
+  setCategory(cat: ExerciseCategory): void { this.activeFilter.set(cat); this.muscleFilter.set(null); }
+  setMuscle(m: string): void {
+    this.muscleFilter.set(this.muscleFilter() === m ? null : m);
+    this.activeFilter.set(null);
   }
 
   getCategoryLabel(cat: ExerciseCategory): string { return CATEGORY_LABELS[cat]; }
