@@ -1,4 +1,6 @@
 import { Component, computed, effect, inject, input, linkedSignal, output, signal } from '@angular/core';
+import { CATEGORY_COLORS, ExerciseCategory } from '../../../core/models/exercise.model';
+import { UserSettingsService } from '../../../core/services/user-settings.service';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { SportService } from '../../../core/services/sport.service';
 import {
@@ -56,13 +58,12 @@ import {
                 <span class="idp-day-num">{{ cell.day }}</span>
                 @if (cell.hasWorkout || cell.hasSport) {
                   <div class="idp-dots">
-                    @if (cell.hasWorkout) {
-                      <span class="idp-dot idp-dot--workout"
-                            [style.background]="catDotBg(cell.workoutCategories)"></span>
+                    @for (cat of cell.workoutCategories.slice(0, 2); track cat) {
+                      <span class="idp-pip" [style.background]="catColor(cat)"></span>
                     }
-                    @if (cell.hasSport) {
-                      <span class="idp-dot idp-dot--sport"
-                            [style.background]="sportDotBg(cell.sportColors)"></span>
+                    @for (icon of cell.sportIcons.slice(0, 1); track icon; let i = $index) {
+                      <span class="idp-sport-icon material-symbols-outlined"
+                            [style.color]="cell.sportColors[i]">{{ icon }}</span>
                     }
                   </div>
                 }
@@ -103,6 +104,18 @@ import {
         }
 
       </div>
+
+      @if (weeklyGoal() && isShowingCurrent() && settingsSvc.loaded()) {
+        <div class="idp-goal">
+          <div class="idp-goal-track">
+            <div class="idp-goal-fill" [style.width.%]="weeklyBarPct()"></div>
+          </div>
+          <span class="idp-goal-badge" [class.done]="weeklyGoalMet()">
+            {{ weeklyDone() }}/{{ weeklyGoal() }}
+            <span class="material-symbols-outlined">{{ weeklyGoalMet() ? 'check_circle' : 'directions_run' }}</span>
+          </span>
+        </div>
+      }
 
       @if (workoutSvc.isLoading()) {
         <div class="idp-loading"><span class="idp-loading-bar"></span></div>
@@ -223,7 +236,33 @@ import {
       &--workout { width: 5px; height: 5px; border-radius: 50%; }
       &--sport   { width: 4px; height: 4px; border-radius: 1.5px; }
     }
-    .is-selected .idp-dot { background: rgba(255,255,255,0.75) !important; }
+    .idp-pip { width: 6px; height: 6px; border-radius: 2px; flex-shrink: 0; }
+    .idp-sport-icon {
+      font-size: 10px; line-height: 1;
+      font-variation-settings: 'FILL' 1, 'wght' 400;
+    }
+    .is-selected .idp-dot       { background: rgba(255,255,255,0.75) !important; }
+    .is-selected .idp-pip       { background: rgba(255,255,255,0.75) !important; }
+    .is-selected .idp-sport-icon { color: rgba(255,255,255,0.75) !important; }
+
+    .idp-goal {
+      display: flex; align-items: center; gap: 8px; padding: 0 12px 8px;
+    }
+    .idp-goal-track {
+      flex: 1; height: 3px; background: var(--c-border); border-radius: 2px; overflow: hidden;
+    }
+    .idp-goal-fill {
+      height: 100%; background: var(--c-brand); border-radius: 2px;
+      transition: width 0.4s ease; max-width: 100%;
+    }
+    .idp-goal-badge {
+      display: flex; align-items: center; gap: 2px;
+      font-size: 11px; font-weight: 700; color: var(--c-text-3); white-space: nowrap;
+      .material-symbols-outlined { font-size: 12px; font-variation-settings: 'FILL' 0, 'wght' 300; }
+      &.done { color: var(--c-brand);
+        .material-symbols-outlined { font-variation-settings: 'FILL' 1, 'wght' 400; }
+      }
+    }
 
     .idp-loading {
       height: 2px; margin: 2px 8px 0; border-radius: 2px;
@@ -241,8 +280,9 @@ import {
   `],
 })
 export class InlineDatePickerComponent {
-  readonly workoutSvc = inject(WorkoutService);
-  private sportSvc    = inject(SportService);
+  readonly workoutSvc  = inject(WorkoutService);
+  private sportSvc     = inject(SportService);
+  readonly settingsSvc = inject(UserSettingsService);
 
   readonly selectedDate = input<string | null>(null);
   readonly dateSelected = output<string>();
@@ -441,8 +481,30 @@ export class InlineDatePickerComponent {
     }
   }
 
+  // ── Weekly goal progress ──────────────────────────────────────────────────
+
+  readonly weeklyGoal = computed(() =>
+    this.settingsSvc.metricsEnabled() ? this.settingsSvc.weeklyActivityGoal() : null
+  );
+  readonly weeklyDone = computed(() =>
+    this.weekDays().filter(d => !d.isFuture && (d.hasWorkout || d.hasSport)).length
+  );
+  readonly weeklyGoalMet = computed(() => {
+    const g = this.weeklyGoal();
+    return g !== null && this.weeklyDone() >= g;
+  });
+  readonly weeklyBarPct = computed(() => {
+    const g = this.weeklyGoal();
+    if (!g) return 0;
+    return Math.min(100, Math.round((this.weeklyDone() / g) * 100));
+  });
+
   // ── Dot helpers (delegate to shared utils) ────────────────────────────────
 
   readonly catDotBg   = catDotBackground;
   readonly sportDotBg = sportDotBackground;
+
+  catColor(cat: string): string {
+    return CATEGORY_COLORS[cat as ExerciseCategory] ?? '#006874';
+  }
 }
