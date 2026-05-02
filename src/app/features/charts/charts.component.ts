@@ -23,7 +23,7 @@ import {
   Tooltip,
 } from 'chart.js';
 
-import { CATEGORY_COLORS } from '../../core/models/exercise.model';
+import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
 import { Sport, SportSession } from '../../core/models/sport.model';
 import { Workout } from '../../core/models/workout.model';
 import { ExerciseService } from '../../core/services/exercise.service';
@@ -84,8 +84,12 @@ interface ChartPoint {
         <div class="select-wrap">
           <select class="exercise-select" [(ngModel)]="selectedExerciseId" (ngModelChange)="onExerciseChange()">
             <option value="">Selecciona un exercici...</option>
-            @for (ex of exercises(); track ex.id) {
-              <option [value]="ex.id">{{ ex.name }}</option>
+            @for (group of exercisesByCategory(); track group.cat) {
+              <optgroup [label]="group.label">
+                @for (ex of group.exercises; track ex.id) {
+                  <option [value]="ex.id">{{ ex.name }}</option>
+                }
+              </optgroup>
             }
           </select>
           @if (isLoading()) {
@@ -394,6 +398,17 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
   readonly exercises = computed(() => {
     const withData = this.workoutService.exercisesWithData();
     return this.exerciseService.exercises().filter(e => withData.has(e.id));
+  });
+
+  readonly exercisesByCategory = computed(() => {
+    const exList = this.exercises();
+    return (['push', 'pull', 'legs'] as ExerciseCategory[])
+      .map(cat => ({
+        cat,
+        label: CATEGORY_LABELS[cat],
+        exercises: exList.filter(e => e.category === cat),
+      }))
+      .filter(g => g.exercises.length > 0);
   });
   readonly isLoading  = this.workoutService.isLoading;
 
