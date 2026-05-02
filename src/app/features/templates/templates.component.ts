@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Location } from '@angular/common';
 import { MatDialog } from '@angular/material/dialog';
@@ -48,7 +48,7 @@ const CAT_LABEL: Record<EditorCat, string> = {
       </div>
 
       <!-- Empty state -->
-      @if (templateService.templates().length === 0 && !editorOpen()) {
+      @if (sortedTemplates().length === 0 && !editorOpen()) {
         <div class="empty-state">
           <span class="material-symbols-outlined empty-icon">bookmark_border</span>
           <p class="empty-title">Sense plantilles</p>
@@ -57,10 +57,10 @@ const CAT_LABEL: Record<EditorCat, string> = {
       }
 
       <!-- Template list -->
-      @if (templateService.templates().length > 0) {
+      @if (sortedTemplates().length > 0) {
         <div class="section">
           <div class="list">
-            @for (t of templateService.templates(); track t.id) {
+            @for (t of sortedTemplates(); track t.id) {
               <div class="template-card" [style.--tc]="catColor(t.category)">
                 <div class="tc-accent"></div>
                 <div class="tc-body">
@@ -68,10 +68,18 @@ const CAT_LABEL: Record<EditorCat, string> = {
                     <span class="tc-name">{{ t.name }}</span>
                     <span class="tc-badge" [style.background]="catColor(t.category)">{{ catLabel(t.category) }}</span>
                   </div>
-                  <span class="tc-sub">
-                    @if (t.entries.length === 0) { Sense exercicis }
-                    @else { {{ t.entries.length }} exercici{{ t.entries.length === 1 ? '' : 's' }} }
-                  </span>
+                  <div class="tc-meta-row">
+                    <span class="tc-sub">
+                      @if (t.entries.length === 0) { Sense exercicis }
+                      @else { {{ t.entries.length }} exercici{{ t.entries.length === 1 ? '' : 's' }} }
+                    </span>
+                    @if (t.useCount && t.useCount > 0) {
+                      <span class="tc-use-count">
+                        <span class="material-symbols-outlined">replay</span>
+                        {{ t.useCount }}
+                      </span>
+                    }
+                  </div>
                   @if (t.entries.length > 0) {
                     <div class="tc-exercises">
                       @for (e of t.entries.slice(0, 4); track e.exerciseId) {
@@ -207,7 +215,13 @@ const CAT_LABEL: Record<EditorCat, string> = {
       padding: 2px 8px; border-radius: 10px;
       font-size: 11px; font-weight: 600; color: white; flex-shrink: 0;
     }
-    .tc-sub { font-size: 12px; color: var(--c-text-3); }
+    .tc-meta-row { display: flex; align-items: center; gap: 8px; margin-top: 1px; }
+    .tc-sub { font-size: 12px; color: var(--c-text-3); flex: 1; }
+    .tc-use-count {
+      display: flex; align-items: center; gap: 3px;
+      font-size: 11px; font-weight: 600; color: var(--c-text-3);
+      .material-symbols-outlined { font-size: 13px; }
+    }
     .tc-exercises { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
     .tc-ex-pill {
       padding: 2px 8px; border-radius: 10px;
@@ -372,6 +386,10 @@ export class TemplatesComponent {
   private location         = inject(Location);
   private dialog           = inject(MatDialog);
   private snackBar         = inject(MatSnackBar);
+
+  readonly sortedTemplates = computed(() =>
+    [...this.templateService.templates()].sort((a, b) => (b.useCount ?? 0) - (a.useCount ?? 0))
+  );
 
   readonly catOptions = CAT_OPTIONS;
 

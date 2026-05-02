@@ -11,6 +11,8 @@ export interface WorkoutTemplate {
   category: ExerciseCategory | 'mixed';
   entries: TemplateEntry[];
   createdAt: string;
+  useCount?: number;
+  lastUsed?: string;
 }
 
 export interface BuiltInTemplate {
