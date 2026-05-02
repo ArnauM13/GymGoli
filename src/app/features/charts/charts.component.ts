@@ -10,6 +10,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import {
   CategoryScale,
   Chart,
@@ -22,13 +23,14 @@ import {
   Tooltip,
 } from 'chart.js';
 
-import { Exercise } from '../../core/models/exercise.model';
+import { CATEGORY_COLORS } from '../../core/models/exercise.model';
 import { Sport, SportSession } from '../../core/models/sport.model';
 import { Workout } from '../../core/models/workout.model';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
+import { addDays, mondayOf } from '../../shared/utils/calendar-utils';
 import { kgToDisplay } from '../../shared/utils/weight.utils';
 
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, Title, Tooltip, Legend);
@@ -44,12 +46,37 @@ interface ChartPoint {
 @Component({
   selector: 'app-charts',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   template: `
     <div class="page">
       <header class="page-header">
         <h1>Progrés</h1>
       </header>
+
+      <!-- Summary strip (only when there is data) -->
+      @if (!isLoading() && totalWorkouts() > 0) {
+        <div class="summary-strip">
+          <div class="summary-tile">
+            <span class="summary-val">{{ totalWorkouts() }}</span>
+            <span class="summary-lbl">Entrenaments</span>
+          </div>
+          <div class="summary-tile">
+            <span class="summary-val">
+              {{ thisWeekCount() }}
+              @if (weeklyGoal()) {
+                <span class="summary-sub">/ {{ weeklyGoal() }}</span>
+              }
+            </span>
+            <span class="summary-lbl">Aquesta setmana</span>
+          </div>
+          <div class="summary-tile">
+            <span class="summary-val">
+              @if (weekStreak() > 0) { 🔥 }{{ weekStreak() }}
+            </span>
+            <span class="summary-lbl">Set. consecutives</span>
+          </div>
+        </div>
+      }
 
       <!-- Exercise selector -->
       <div class="section">
@@ -116,11 +143,32 @@ interface ChartPoint {
             </div>
           </div>
         }
-      } @else {
+      } @else if (isLoading()) {
+        <!-- Loading skeleton -->
         <div class="empty-state">
-          <span class="material-symbols-outlined empty-icon">bar_chart</span>
-          <h2>Visualitza el teu progrés</h2>
-          <p>Selecciona un exercici per veure les gràfiques d'evolució</p>
+          <span class="material-symbols-outlined empty-icon loading-icon">bar_chart</span>
+          <p style="color:var(--c-text-2)">Carregant historial...</p>
+        </div>
+      } @else if (personalRecords().length > 0) {
+        <!-- Personal records -->
+        <div class="pr-section">
+          <h3 class="pr-title">Records personals</h3>
+          @for (r of personalRecords(); track r.exercise.id) {
+            <button class="pr-row" (click)="selectRecord(r.exercise.id)">
+              <span class="pr-bar" [style.background]="r.color"></span>
+              <span class="pr-name">{{ r.exercise.name }}</span>
+              <span class="pr-weight">{{ r.display }} {{ unit() }}</span>
+              <span class="material-symbols-outlined pr-chevron">chevron_right</span>
+            </button>
+          }
+        </div>
+      } @else {
+        <!-- New user empty state -->
+        <div class="empty-state">
+          <span class="material-symbols-outlined empty-icon">fitness_center</span>
+          <h2>Comença a entrenar</h2>
+          <p>Registra els teus primers entrenaments per veure aquí les gràfiques de progrés</p>
+          <a class="btn-cta" routerLink="/train">Anar a Entrena</a>
         </div>
       }
     </div>
@@ -196,10 +244,27 @@ interface ChartPoint {
       h1 { margin: 0; font-size: 22px; font-weight: 600; }
     }
 
+    /* ── Summary strip ───────────────────────────────────── */
+    .summary-strip {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px; padding: 4px 16px 8px;
+    }
+    .summary-tile {
+      background: var(--c-card); border-radius: 12px;
+      box-shadow: 0 1px 4px var(--c-shadow);
+      padding: 12px 8px; text-align: center;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .summary-val {
+      font-size: 20px; font-weight: 700; color: var(--c-text);
+      display: flex; align-items: baseline; justify-content: center; gap: 2px;
+    }
+    .summary-sub { font-size: 14px; font-weight: 400; color: var(--c-text-2); }
+    .summary-lbl { font-size: 10px; color: var(--c-text-2); font-weight: 500; }
+
+    /* ── Section / select ────────────────────────────────── */
     .section { padding: 8px 16px; }
-
     .select-label { display: block; font-size: 12px; color: var(--c-text-2); font-weight: 500; margin-bottom: 6px; }
-
     .select-wrap { position: relative; }
 
     .select-loading {
@@ -208,8 +273,7 @@ interface ChartPoint {
     }
     .loading-dot {
       display: block; width: 8px; height: 8px; border-radius: 50%;
-      background: var(--c-brand);
-      animation: pulse-dot 1s ease-in-out infinite;
+      background: var(--c-brand); animation: pulse-dot 1s ease-in-out infinite;
     }
     @keyframes pulse-dot {
       0%, 100% { opacity: 0.3; transform: scale(0.8); }
@@ -217,106 +281,102 @@ interface ChartPoint {
     }
 
     .exercise-select {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1.5px solid var(--c-border);
-      border-radius: 10px;
-      font-size: 15px;
-      background: var(--c-card);
-      color: var(--c-text);
-      outline: none;
-      appearance: none;
+      width: 100%; padding: 10px 12px;
+      border: 1.5px solid var(--c-border); border-radius: 10px;
+      font-size: 15px; background: var(--c-card); color: var(--c-text);
+      outline: none; appearance: none;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24'%3E%3Cpath fill='%23888' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 12px center;
-      padding-right: 36px;
-      cursor: pointer;
-
+      background-repeat: no-repeat; background-position: right 12px center;
+      padding-right: 36px; cursor: pointer;
       &:focus { border-color: var(--c-brand); }
     }
 
-    .metric-tabs {
-      display: flex;
-      gap: 6px;
-      padding: 4px 16px 12px;
-    }
-
+    /* ── Metric tabs ─────────────────────────────────────── */
+    .metric-tabs { display: flex; gap: 6px; padding: 4px 16px 12px; }
     .metric-tab {
-      flex: 1;
-      padding: 8px 4px;
-      border: 1.5px solid var(--c-border);
-      border-radius: 8px;
-      background: var(--c-card);
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--c-text-2);
-      cursor: pointer;
-      transition: all 0.2s;
-
+      flex: 1; padding: 8px 4px;
+      border: 1.5px solid var(--c-border); border-radius: 8px;
+      background: var(--c-card); font-size: 13px; font-weight: 500;
+      color: var(--c-text-2); cursor: pointer; transition: all 0.2s;
       &.active { background: var(--c-brand); color: white; border-color: var(--c-brand); }
       &:hover:not(.active) { border-color: var(--c-brand); color: var(--c-brand); }
     }
 
+    /* ── Chart ───────────────────────────────────────────── */
     .chart-container {
-      margin: 0 16px;
-      background: var(--c-card);
-      border-radius: 14px;
-      box-shadow: 0 2px 8px var(--c-shadow);
-      padding: 16px;
-      height: 240px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      margin: 0 16px; background: var(--c-card);
+      border-radius: 14px; box-shadow: 0 2px 8px var(--c-shadow);
+      padding: 16px; height: 240px;
+      display: flex; align-items: center; justify-content: center;
     }
-
     .chart-canvas { max-height: 208px; }
 
     .no-data {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-      color: var(--c-text-3);
-      text-align: center;
-
+      display: flex; flex-direction: column; align-items: center;
+      gap: 8px; color: var(--c-text-3); text-align: center;
       .material-symbols-outlined { font-size: 48px; }
       p { margin: 0; font-size: 14px; }
     }
 
+    /* ── Stats grid ──────────────────────────────────────── */
     .stats-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr 1fr;
-      gap: 8px;
-      padding: 12px 16px;
+      display: grid; grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 8px; padding: 12px 16px;
     }
-
     .stat-card {
-      background: var(--c-card);
-      border-radius: 10px;
-      padding: 12px 8px;
-      text-align: center;
+      background: var(--c-card); border-radius: 10px;
+      padding: 12px 8px; text-align: center;
       box-shadow: 0 1px 4px var(--c-shadow);
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
+      display: flex; flex-direction: column; gap: 4px;
     }
-
     .stat-value { font-size: 18px; font-weight: 700; color: var(--c-text); }
     .stat-label { font-size: 11px; color: var(--c-text-2); }
     .positive { color: #4caf50; }
     .negative { color: #ef5350; }
 
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 10px;
-      padding: 60px 24px;
-      text-align: center;
+    /* ── Personal records ────────────────────────────────── */
+    .pr-section {
+      margin: 4px 16px 0; background: var(--c-card);
+      border-radius: 14px; box-shadow: 0 2px 8px var(--c-shadow);
+      overflow: hidden;
+    }
+    .pr-title {
+      margin: 0; padding: 14px 16px 10px;
+      font-size: 13px; font-weight: 600; color: var(--c-text-2);
+      text-transform: uppercase; letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--c-border);
+    }
+    .pr-row {
+      width: 100%; display: flex; align-items: center; gap: 12px;
+      padding: 13px 14px 13px 0; background: none; border: none;
+      border-bottom: 1px solid var(--c-border-2); cursor: pointer;
+      text-align: left; color: var(--c-text);
+      transition: background 0.15s;
+      &:last-child { border-bottom: none; }
+      &:active { background: var(--c-border-2); }
+    }
+    .pr-bar { width: 5px; min-width: 5px; height: 44px; border-radius: 0 3px 3px 0; }
+    .pr-name { flex: 1; font-size: 15px; font-weight: 500; }
+    .pr-weight { font-size: 15px; font-weight: 700; color: var(--c-brand); min-width: 64px; text-align: right; }
+    .pr-chevron { font-size: 18px; color: var(--c-text-3); }
 
+    /* ── Empty / new-user state ──────────────────────────── */
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 10px; padding: 60px 24px; text-align: center;
       .empty-icon { font-size: 64px; color: var(--c-border); }
       h2 { margin: 0; font-size: 20px; font-weight: 600; color: var(--c-text); }
       p { margin: 0; color: var(--c-text-2); }
+    }
+    .loading-icon { animation: pulse-dot 1.2s ease-in-out infinite; }
+    .btn-cta {
+      margin-top: 6px; padding: 12px 28px;
+      background: var(--c-brand); color: white;
+      border: none; border-radius: 12px;
+      font-size: 15px; font-weight: 600;
+      cursor: pointer; text-decoration: none;
+      display: inline-block;
+      &:active { opacity: 0.85; }
     }
   `],
 })
@@ -331,7 +391,6 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
 
   readonly unit = this.settingsService.weightUnit;
 
-  /** Only show exercises that have at least one set recorded in loaded workouts */
   readonly exercises = computed(() => {
     const withData = this.workoutService.exercisesWithData();
     return this.exerciseService.exercises().filter(e => withData.has(e.id));
@@ -351,7 +410,62 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
 
   private chart: Chart | null = null;
 
-  // ── Sport chart ─────────────────────────────────────────────────────────────
+  // ── Summary strip ────────────────────────────────────────────────────────
+
+  readonly totalWorkouts = computed(() => this.workoutService.workouts().length);
+
+  readonly thisWeekCount = computed(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const monday = mondayOf(today);
+    const sunday = addDays(monday, 6);
+    return this.workoutService.workouts().filter(w => w.date >= monday && w.date <= sunday).length;
+  });
+
+  readonly weeklyGoal = computed(() => this.settingsService.weeklyActivityGoal());
+
+  readonly weekStreak = computed(() => {
+    const workouts = this.workoutService.workouts();
+    if (workouts.length === 0) return 0;
+    const today = new Date().toISOString().slice(0, 10);
+    let streak = 0;
+    let weekStart = mondayOf(today);
+    for (let i = 0; i < 52; i++) {
+      const weekEnd = addDays(weekStart, 6);
+      if (!workouts.some(w => w.date >= weekStart && w.date <= weekEnd)) break;
+      streak++;
+      weekStart = addDays(weekStart, -7);
+    }
+    return streak;
+  });
+
+  // ── Personal records ─────────────────────────────────────────────────────
+
+  readonly personalRecords = computed(() => {
+    const exercises = this.exerciseService.exercises();
+    const withData  = this.workoutService.exercisesWithData();
+    const unit      = this.unit();
+    return exercises
+      .filter(e => withData.has(e.id))
+      .map(ex => {
+        const allWeights = this.workoutService.getWorkoutsForExercise(ex.id)
+          .flatMap(w => w.entries.filter(e => e.exerciseId === ex.id).flatMap(e => e.sets.map(s => s.weight)))
+          .filter(w => w > 0);
+        if (allWeights.length === 0) return null;
+        const maxKg  = Math.max(...allWeights);
+        const display = kgToDisplay(maxKg, unit);
+        return { exercise: ex, maxKg, display, color: CATEGORY_COLORS[ex.category] };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null)
+      .sort((a, b) => b.display - a.display);
+  });
+
+  selectRecord(exerciseId: string): void {
+    this._selectedExerciseId.set(exerciseId);
+    this.chart?.destroy();
+    this.chart = null;
+  }
+
+  // ── Sport chart ──────────────────────────────────────────────────────────
 
   readonly sports = computed(() => this.sportService.sports());
 
@@ -416,24 +530,21 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
   readonly stats = computed(() => {
     const data = this.chartData();
     if (data.length === 0) return { total: 0, max: 0, last: 0, trend: 0 };
-
     const values = data.map(d => d.value);
-    const max = Math.max(...values);
-    const last = values.at(-1) ?? 0;
-    const first = values[0] ?? 0;
-    const trend = first === 0 ? 0 : Math.round(((last - first) / first) * 100);
-
+    const max    = Math.max(...values);
+    const last   = values.at(-1) ?? 0;
+    const first  = values[0] ?? 0;
+    const trend  = first === 0 ? 0 : Math.round(((last - first) / first) * 100);
     return { total: data.length, max, last, trend };
   });
 
   constructor() {
-    // Load all workout history once (lazy, cached — no-op if already loaded)
     this.workoutService.loadAllWorkouts();
 
     effect(() => {
       const data   = this.chartData();
       const metric = this.selectedMetric();
-      this.settingsService.darkMode(); // track so chart re-colours on theme change
+      this.settingsService.darkMode();
       this.updateChart(data, metric);
     });
 
@@ -470,7 +581,6 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
   private extractMetric(workout: Workout, exerciseId: string, metric: Metric): number {
     const entry = workout.entries.find(e => e.exerciseId === exerciseId);
     if (!entry) return 0;
-    // Feeling is now an entry-level property (not per-set)
     if (metric === 'feeling') return entry.feeling ?? 0;
     if (entry.sets.length === 0) return 0;
     if (metric === 'weight') return Math.max(...entry.sets.map(s => s.weight));
@@ -485,7 +595,6 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
 
   private updateChart(data: ChartPoint[], metric: Metric): void {
     if (data.length === 0) { this.chart?.destroy(); this.chart = null; return; }
-    // Canvas may not be in DOM yet (rendered by @if after data arrives) — retry after render
     if (!this.canvasRef) {
       setTimeout(() => this.updateChart(data, metric), 0);
       return;
@@ -501,24 +610,21 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
   }
 
   private _chartColors() {
-    const s       = getComputedStyle(document.documentElement);
-    const brand   = s.getPropertyValue('--c-brand').trim()     || '#006874';
-    const rgb     = s.getPropertyValue('--c-brand-rgb').trim() || '0,104,116';
-    const text    = s.getPropertyValue('--c-text').trim()      || '#1a1a1a';
-    const muted   = s.getPropertyValue('--c-text-3').trim()    || '#888';
-    const grid    = s.getPropertyValue('--c-border-2').trim()  || '#f0f0f0';
+    const s     = getComputedStyle(document.documentElement);
+    const brand = s.getPropertyValue('--c-brand').trim()     || '#006874';
+    const rgb   = s.getPropertyValue('--c-brand-rgb').trim() || '0,104,116';
+    const text  = s.getPropertyValue('--c-text').trim()      || '#1a1a1a';
+    const muted = s.getPropertyValue('--c-text-3').trim()    || '#888';
+    const grid  = s.getPropertyValue('--c-border-2').trim()  || '#f0f0f0';
     return { brand, brandAlpha: `rgba(${rgb},0.1)`, text, muted, grid };
   }
 
   private createChart(data: ChartPoint[], metric: Metric): void {
     if (!this.canvasRef) return;
     this.chart?.destroy();
-
     const ctx = this.canvasRef.nativeElement.getContext('2d');
     if (!ctx) return;
-
     const { brand, brandAlpha, text, muted, grid } = this._chartColors();
-
     this.chart = new Chart(ctx, {
       type: 'line',
       data: {
@@ -526,47 +632,24 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
         datasets: [{
           label: this.getMetricLabel(metric),
           data: data.map(d => d.value),
-          borderColor: brand,
-          backgroundColor: brandAlpha,
+          borderColor: brand, backgroundColor: brandAlpha,
           borderWidth: 2.5,
-          pointBackgroundColor: brand,
-          pointRadius: 5,
-          pointHoverRadius: 7,
-          fill: true,
-          tension: 0.3,
+          pointBackgroundColor: brand, pointRadius: 5, pointHoverRadius: 7,
+          fill: true, tension: 0.3,
         }],
       },
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
+        responsive: true, maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: text,
-            padding: 10,
-            callbacks: {
-              title: items => items[0]?.label ?? '',
-              label: item => ` ${item.formattedValue}`,
-            },
+            backgroundColor: text, padding: 10,
+            callbacks: { title: items => items[0]?.label ?? '', label: item => ` ${item.formattedValue}` },
           },
         },
         scales: {
-          x: {
-            grid: { display: false },
-            ticks: {
-              font: { size: 11 },
-              color: muted,
-              maxRotation: 40,
-              // Always show all labels (important for single-point charts)
-              autoSkip: false,
-            },
-          },
-          y: {
-            grid: { color: grid },
-            ticks: { font: { size: 11 }, color: muted },
-            // Ensure Y axis has visible range even with a single data point
-            beginAtZero: false,
-          },
+          x: { grid: { display: false }, ticks: { font: { size: 11 }, color: muted, maxRotation: 40, autoSkip: false } },
+          y: { grid: { color: grid }, ticks: { font: { size: 11 }, color: muted }, beginAtZero: false },
         },
       },
     });
@@ -593,16 +676,13 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
   private createSportChart(data: ChartPoint[], metric: SportMetric, color: string): void {
     if (!this.sportCanvasRef) return;
     this.sportChart?.destroy();
-
     const ctx = this.sportCanvasRef.nativeElement.getContext('2d');
     if (!ctx) return;
-
     const { text, muted, grid } = this._chartColors();
     const r = parseInt(color.slice(1, 3), 16);
     const g = parseInt(color.slice(3, 5), 16);
     const b = parseInt(color.slice(5, 7), 16);
-    const colorAlpha = `rgba(${r},${g},${b},0.1)`;
-
+    const colorAlpha = isNaN(r) ? 'rgba(0,104,116,0.1)' : `rgba(${r},${g},${b},0.1)`;
     this.sportChart = new Chart(ctx, {
       type: 'line',
       data: {
@@ -610,40 +690,24 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
         datasets: [{
           label: this.getSportMetricLabel(metric),
           data: data.map(d => d.value),
-          borderColor: color,
-          backgroundColor: colorAlpha,
+          borderColor: color, backgroundColor: colorAlpha,
           borderWidth: 2.5,
-          pointBackgroundColor: color,
-          pointRadius: 5,
-          pointHoverRadius: 7,
-          fill: true,
-          tension: 0.3,
+          pointBackgroundColor: color, pointRadius: 5, pointHoverRadius: 7,
+          fill: true, tension: 0.3,
         }],
       },
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
+        responsive: true, maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: text,
-            padding: 10,
-            callbacks: {
-              title: items => items[0]?.label ?? '',
-              label: item  => ` ${item.formattedValue}`,
-            },
+            backgroundColor: text, padding: 10,
+            callbacks: { title: items => items[0]?.label ?? '', label: item => ` ${item.formattedValue}` },
           },
         },
         scales: {
-          x: {
-            grid: { display: false },
-            ticks: { font: { size: 11 }, color: muted, maxRotation: 40, autoSkip: false },
-          },
-          y: {
-            grid: { color: grid },
-            ticks: { font: { size: 11 }, color: muted },
-            beginAtZero: false,
-          },
+          x: { grid: { display: false }, ticks: { font: { size: 11 }, color: muted, maxRotation: 40, autoSkip: false } },
+          y: { grid: { color: grid }, ticks: { font: { size: 11 }, color: muted }, beginAtZero: false },
         },
       },
     });
@@ -655,7 +719,6 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
 
   private formatDate(dateStr: string): string {
     const d = new Date(dateStr + 'T12:00:00');
-    // "3 feb" → readable day label on X axis
     return d.toLocaleDateString('ca-ES', { day: 'numeric', month: 'short' });
   }
 }
