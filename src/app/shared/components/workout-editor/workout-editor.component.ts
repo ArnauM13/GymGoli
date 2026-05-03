@@ -1,7 +1,6 @@
 import { Component, OnDestroy, ViewEncapsulation, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
-import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
@@ -19,7 +18,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 @Component({
   selector: 'app-workout-editor',
   standalone: true,
-  imports: [ReactiveFormsModule, MatButtonModule, DragDropModule],
+  imports: [ReactiveFormsModule, DragDropModule],
   encapsulation: ViewEncapsulation.None,
   template: `
     @if (workout(); as w) {
@@ -152,8 +151,8 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                           </div>
                         </div>
                         <div class="we-inline-actions">
-                          <button type="button" mat-button (click)="cancelEditSet()">Cancel·lar</button>
-                          <button type="submit" mat-flat-button [disabled]="editSetForm.invalid">Desar</button>
+                          <button type="button" class="we-inline-cancel" (click)="cancelEditSet()">Cancel·lar</button>
+                          <button type="submit" class="we-inline-save" [disabled]="editSetForm.invalid">Desar</button>
                         </div>
                       </form>
                     </div>
@@ -553,6 +552,21 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       input  { font-size: 16px; font-weight: 600; padding: 4px 0; min-width: 48px; }
     }
     .we-inline-actions { display: flex; justify-content: flex-end; gap: 6px; }
+    .we-inline-cancel {
+      padding: 7px 14px; border-radius: 8px;
+      border: 1.5px solid var(--c-border); background: transparent;
+      color: var(--c-text-2); font-size: 13px; font-weight: 600;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      &:hover { background: var(--c-subtle); }
+    }
+    .we-inline-save {
+      padding: 7px 18px; border-radius: 8px;
+      border: none; background: var(--c-brand); color: white;
+      font-size: 13px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      &:hover:not(:disabled) { opacity: 0.9; }
+      &:disabled { opacity: 0.4; cursor: default; }
+    }
 
     /* ── Add-sets form ── */
     .we-set-form {

@@ -566,13 +566,15 @@ export class SettingsComponent {
   }));
 
   setFitnessGoal(goal: FitnessGoal): void {
-    const patch: Record<string, unknown> = { fitnessGoal: goal };
+    const patch: Record<string, unknown> = {
+      fitnessGoal: goal,
+      weeklyActivityGoal: FITNESS_GOAL_WEEKLY_DEFAULTS[goal],
+    };
     if (!this.settingsService.metricsEnabled()) {
-      patch['metricsEnabled']     = true;
-      patch['weeklyActivityGoal'] = FITNESS_GOAL_WEEKLY_DEFAULTS[goal];
+      patch['metricsEnabled'] = true;
     }
     if (goal === 'sport' && this.settingsService.goalMode() === 'combined') {
-      patch['goalMode']       = 'separate';
+      patch['goalMode']        = 'separate';
       patch['weeklySportGoal'] = FITNESS_GOAL_WEEKLY_DEFAULTS['sport'];
     }
     this.settingsService.update(patch as Parameters<typeof this.settingsService.update>[0]);

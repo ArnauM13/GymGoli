@@ -98,6 +98,12 @@ interface ChartPoint {
             </span>
           }
         </div>
+        @if (selectedExerciseId) {
+          <button class="clear-exercise-btn" (click)="clearExercise()">
+            <span class="material-symbols-outlined">close</span>
+            Canviar exercici
+          </button>
+        }
       </div>
 
       @if (selectedExerciseId) {
@@ -153,19 +159,21 @@ interface ChartPoint {
           <span class="material-symbols-outlined empty-icon loading-icon">bar_chart</span>
           <p style="color:var(--c-text-2)">Carregant historial...</p>
         </div>
-      } @else if (personalRecords().length > 0) {
-        <!-- Personal records -->
-        <div class="pr-section">
-          <h3 class="pr-title">Records personals</h3>
-          @for (r of personalRecords(); track r.exercise.id) {
-            <button class="pr-row" (click)="selectRecord(r.exercise.id)">
-              <span class="pr-bar" [style.background]="r.color"></span>
-              <span class="pr-name">{{ r.exercise.name }}</span>
-              <span class="pr-weight">{{ r.display }} {{ unit() }}</span>
-              <span class="material-symbols-outlined pr-chevron">chevron_right</span>
-            </button>
-          }
-        </div>
+      } @else if (!isLoading() && personalRecordGroups().length > 0) {
+        <!-- Personal records grouped -->
+        @for (group of personalRecordGroups(); track group.cat) {
+          <div class="pr-section" [style.--pr-g]="group.color">
+            <h3 class="pr-title">{{ group.label }}</h3>
+            @for (r of group.records; track r.exercise.id) {
+              <button class="pr-row" (click)="selectRecord(r.exercise.id)">
+                <span class="pr-bar" [style.background]="r.color"></span>
+                <span class="pr-name">{{ r.exercise.name }}</span>
+                <span class="pr-weight">{{ r.display }} {{ unit() }}</span>
+                <span class="material-symbols-outlined pr-chevron">chevron_right</span>
+              </button>
+            }
+          </div>
+        }
       } @else {
         <!-- New user empty state -->
         <div class="empty-state">
@@ -293,6 +301,16 @@ interface ChartPoint {
       background-repeat: no-repeat; background-position: right 12px center;
       padding-right: 36px; cursor: pointer;
       &:focus { border-color: var(--c-brand); }
+    }
+
+    .clear-exercise-btn {
+      display: flex; align-items: center; gap: 6px;
+      margin-top: 8px; padding: 8px 12px; border-radius: 10px;
+      border: 1.5px solid var(--c-border); background: transparent;
+      color: var(--c-text-2); font-size: 13px; font-weight: 500;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover { border-color: var(--c-brand); color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.05); }
     }
 
     /* ── Metric tabs ─────────────────────────────────────── */
@@ -474,8 +492,41 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
       .sort((a, b) => b.display - a.display);
   });
 
+  readonly personalRecordGroups = computed(() => {
+    const exercises = this.exerciseService.exercises();
+    const withData  = this.workoutService.exercisesWithData();
+    const unit      = this.unit();
+    const allRecords = exercises
+      .filter(e => withData.has(e.id))
+      .map(ex => {
+        const allWeights = this.workoutService.getWorkoutsForExercise(ex.id)
+          .flatMap(w => w.entries.filter(e => e.exerciseId === ex.id).flatMap(e => e.sets.map(s => s.weight)))
+          .filter(w => w > 0);
+        if (allWeights.length === 0) return null;
+        const maxKg  = Math.max(...allWeights);
+        const display = kgToDisplay(maxKg, unit);
+        return { exercise: ex, maxKg, display, color: CATEGORY_COLORS[ex.category] };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+
+    return (['push', 'pull', 'legs'] as ExerciseCategory[])
+      .map(cat => ({
+        cat,
+        label: CATEGORY_LABELS[cat],
+        color: CATEGORY_COLORS[cat],
+        records: allRecords.filter(r => r.exercise.category === cat),
+      }))
+      .filter(g => g.records.length > 0);
+  });
+
   selectRecord(exerciseId: string): void {
     this._selectedExerciseId.set(exerciseId);
+    this.chart?.destroy();
+    this.chart = null;
+  }
+
+  clearExercise(): void {
+    this._selectedExerciseId.set('');
     this.chart?.destroy();
     this.chart = null;
   }

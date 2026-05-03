@@ -124,18 +124,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
           <app-fitness-insights />
 
-          <!-- ── Avui toca ── -->
-          @if (todaySuggestion(); as s) {
-            <button class="today-suggestion" [style.--sg-c]="s.color" (click)="selectType(s.category)">
-              <span class="material-symbols-outlined sg-icon">{{ s.icon }}</span>
-              <div class="sg-info">
-                <span class="sg-hint">Avui toca</span>
-                <span class="sg-cat">{{ s.label }}</span>
-              </div>
-              <span class="material-symbols-outlined sg-arrow">arrow_forward_ios</span>
-            </button>
-          }
-
           <!-- Entrenaments section -->
           <div class="workout-section">
             <div class="sports-header">
@@ -419,6 +407,16 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         </div>
       </div>
     }
+
+    <!-- ── Avui toca FAB ── -->
+    @if (todaySuggestion(); as s) {
+      <button class="avui-toca-fab" [style.--sg-c]="s.color" (click)="selectType(s.category)"
+              title="Avui toca: {{ s.label }}">
+        <span class="material-symbols-outlined fab-icon" [style.font-variation-settings]="'FILL 1, WGHT 400'">{{ s.icon }}</span>
+        <span class="fab-label">Avui toca</span>
+        <span class="fab-cat">{{ s.label }}</span>
+      </button>
+    }
   `,
   styles: [`
     .page { padding: 0 0 84px; }
@@ -582,25 +580,29 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .material-symbols-outlined { font-size: 32px; color: var(--c-border); }
     }
 
-    /* ── Avui toca ── */
-    .today-suggestion {
-      display: flex; align-items: center; gap: 12px;
-      margin: 12px 16px 0; padding: 12px 14px;
-      background: var(--c-card); border-radius: 14px;
-      border: 2px solid var(--sg-c, var(--c-brand));
-      box-shadow: 0 2px 10px var(--c-shadow);
-      cursor: pointer; text-align: left; touch-action: manipulation;
-      transition: background 0.15s;
-      &:hover { background: var(--c-subtle); }
+    /* ── Avui toca FAB ── */
+    .avui-toca-fab {
+      position: fixed; bottom: 88px; right: 16px; z-index: 50;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      padding: 14px 16px; border-radius: 20px;
+      background: var(--sg-c, var(--c-brand));
+      border: none; cursor: pointer; touch-action: manipulation;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+      animation: fab-in 0.3s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+      transition: transform 0.15s, box-shadow 0.15s;
+      &:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
+      &:active { transform: scale(0.94); }
     }
-    .sg-icon {
-      font-size: 22px; color: var(--sg-c, var(--c-brand));
-      font-variation-settings: 'FILL' 1, 'wght' 400; flex-shrink: 0;
+    @keyframes fab-in {
+      from { transform: scale(0.6) translateY(20px); opacity: 0; }
+      to   { transform: scale(1) translateY(0); opacity: 1; }
     }
-    .sg-info { flex: 1; display: flex; flex-direction: column; gap: 1px; }
-    .sg-hint { font-size: 11px; font-weight: 600; color: var(--c-text-3); text-transform: uppercase; letter-spacing: 0.4px; }
-    .sg-cat  { font-size: 15px; font-weight: 700; color: var(--sg-c, var(--c-brand)); }
-    .sg-arrow { font-size: 16px; color: var(--c-text-3); flex-shrink: 0; }
+    .fab-icon {
+      font-size: 26px; color: white; line-height: 1;
+      font-variation-settings: 'FILL' 1, 'WGHT' 400;
+    }
+    .fab-label { font-size: 9px; font-weight: 700; color: rgba(255,255,255,0.75); text-transform: uppercase; letter-spacing: 0.5px; }
+    .fab-cat   { font-size: 12px; font-weight: 800; color: white; }
 
     /* ── Workout section (dashboard) ── */
     .workout-section {
@@ -872,7 +874,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     .sl-sheet {
       position: fixed; bottom: 0; left: 0; right: 0; z-index: 201;
-      background: white; border-radius: 24px 24px 0 0;
+      background: var(--c-card); border-radius: 24px 24px 0 0;
       padding: 0 16px calc(env(safe-area-inset-bottom) + 16px);
       max-height: 85vh; overflow-y: auto;
       box-shadow: 0 -4px 24px rgba(0,0,0,0.14);
@@ -882,80 +884,80 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     .sl-header {
       display: flex; align-items: center;
-      padding: 16px 0 12px; border-bottom: 1px solid #f0f0f0; margin-bottom: 12px;
+      padding: 16px 0 12px; border-bottom: 1px solid var(--c-border-2); margin-bottom: 12px;
     }
     .sl-header-left { flex: 1; display: flex; align-items: center; gap: 10px; }
     .sl-sport-icon {
       font-size: 26px;
       font-variation-settings: 'FILL' 1, 'wght' 400;
     }
-    .sl-sport-name { font-size: 17px; font-weight: 800; color: #1a1a1a; }
+    .sl-sport-name { font-size: 17px; font-weight: 800; color: var(--c-text); }
     .sl-close {
       width: 34px; height: 34px; border-radius: 50%; border: none;
-      background: #f0f0f0; cursor: pointer; color: #555;
+      background: var(--c-subtle); cursor: pointer; color: var(--c-text-2);
       display: flex; align-items: center; justify-content: center;
       transition: background 0.15s; flex-shrink: 0;
       .material-symbols-outlined { font-size: 18px; }
-      &:hover { background: #e0e0e0; }
+      &:hover { background: var(--c-hover); }
     }
 
     .sl-field { margin-bottom: 16px; }
     .sl-field-label {
-      display: block; font-size: 12px; font-weight: 700; color: #666;
+      display: block; font-size: 12px; font-weight: 700; color: var(--c-text-2);
       letter-spacing: 0.3px; text-transform: uppercase; margin-bottom: 8px;
-      small { font-size: 11px; color: #999; font-weight: 400; text-transform: none; margin-left: 4px; }
+      small { font-size: 11px; color: var(--c-text-3); font-weight: 400; text-transform: none; margin-left: 4px; }
     }
     .sl-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     .sl-quick-btns { display: flex; gap: 6px; flex-wrap: wrap; }
     .sl-quick-btn {
-      padding: 6px 12px; border: 1.5px solid #e0e0e0; border-radius: 20px;
-      background: white; font-size: 13px; font-weight: 600; color: #555;
+      padding: 6px 12px; border: 1.5px solid var(--c-border); border-radius: 20px;
+      background: var(--c-card); font-size: 13px; font-weight: 600; color: var(--c-text-2);
       cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      &.active { background: #006874; color: white; border-color: #006874; }
-      &:hover:not(.active) { border-color: #006874; color: #006874; }
+      &.active { background: var(--c-brand); color: white; border-color: var(--c-brand); }
+      &:hover:not(.active) { border-color: var(--c-brand); color: var(--c-brand); }
     }
     .sl-stepper { display: flex; align-items: center; gap: 6px; }
     .sl-step-btn {
       width: 34px; height: 34px; border-radius: 10px;
-      border: 1.5px solid #e0e0e0; background: white;
-      font-size: 14px; font-weight: 700; color: #555;
+      border: 1.5px solid var(--c-border); background: var(--c-card);
+      font-size: 14px; font-weight: 700; color: var(--c-text-2);
       cursor: pointer; transition: all 0.15s; touch-action: manipulation;
       display: flex; align-items: center; justify-content: center;
-      &:hover { border-color: #006874; color: #006874; }
+      &:hover { border-color: var(--c-brand); color: var(--c-brand); }
     }
     .sl-step-val {
       min-width: 52px; text-align: center;
-      font-size: 18px; font-weight: 800; color: #1a1a1a;
-      small { font-size: 11px; color: #888; margin-left: 2px; }
+      font-size: 18px; font-weight: 800; color: var(--c-text);
+      small { font-size: 11px; color: var(--c-text-3); margin-left: 2px; }
     }
     .sl-chips { display: flex; gap: 7px; flex-wrap: wrap; }
     .sl-chip {
-      padding: 7px 14px; border: 1.5px solid #e0e0e0; border-radius: 20px;
-      background: white; font-size: 13px; font-weight: 600; color: #555;
+      padding: 7px 14px; border: 1.5px solid var(--c-border); border-radius: 20px;
+      background: var(--c-card); font-size: 13px; font-weight: 600; color: var(--c-text-2);
       cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      &.active { background: #006874; color: white; border-color: #006874; }
-      &:hover:not(.active) { border-color: #006874; color: #006874; }
+      &.active { background: var(--c-brand); color: white; border-color: var(--c-brand); }
+      &:hover:not(.active) { border-color: var(--c-brand); color: var(--c-brand); }
     }
     .sl-feeling-row { display: flex; gap: 8px; }
     .sl-feeling-btn {
       flex: 1; height: 44px; border-radius: 12px;
-      border: 1.5px solid #e8e8e8; background: #fafafa;
+      border: 1.5px solid var(--c-border-2); background: var(--c-subtle);
       font-size: 22px; cursor: pointer; transition: all 0.15s; touch-action: manipulation;
       display: flex; align-items: center; justify-content: center;
-      &.active { border-color: #006874; background: rgba(0,104,116,0.08); transform: scale(1.1); }
-      &:hover:not(.active) { border-color: #aaa; background: #f0f0f0; }
+      &.active { border-color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.08); transform: scale(1.1); }
+      &:hover:not(.active) { border-color: var(--c-border); background: var(--c-hover); }
     }
     .sl-notes {
       width: 100%; box-sizing: border-box;
-      padding: 9px 12px; border: 1.5px solid #e0e0e0; border-radius: 10px;
-      font-size: 13px; font-family: inherit; color: #333; resize: none;
+      padding: 9px 12px; border: 1.5px solid var(--c-border); border-radius: 10px;
+      font-size: 13px; font-family: inherit; color: var(--c-text); resize: none; background: var(--c-card);
       outline: none; transition: border-color 0.15s;
-      &:focus { border-color: #006874; }
-      &::placeholder { color: #bbb; }
+      &:focus { border-color: var(--c-brand); }
+      &::placeholder { color: var(--c-text-3); }
     }
     .sl-actions {
       display: flex; align-items: center; gap: 8px;
-      padding: 12px 0 4px; border-top: 1px solid #f0f0f0; margin-top: 4px;
+      padding: 12px 0 4px; border-top: 1px solid var(--c-border-2); margin-top: 4px;
     }
     .sl-delete-btn {
       display: flex; align-items: center; gap: 4px;
@@ -969,17 +971,17 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .sl-main-actions { display: flex; gap: 8px; flex: 1; justify-content: flex-end; }
     .sl-cancel {
       height: 40px; padding: 0 18px; border-radius: 10px;
-      border: 1.5px solid #e0e0e0; background: white;
-      font-size: 14px; font-weight: 600; color: #666;
+      border: 1.5px solid var(--c-border); background: var(--c-card);
+      font-size: 14px; font-weight: 600; color: var(--c-text-2);
       cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      &:hover { border-color: #aaa; color: #333; }
+      &:hover { border-color: var(--c-text-3); color: var(--c-text); }
     }
     .sl-save {
       height: 40px; padding: 0 22px; border-radius: 10px;
-      border: none; background: #006874; color: white;
+      border: none; background: var(--c-brand); color: white;
       font-size: 14px; font-weight: 700;
       cursor: pointer; transition: background 0.15s; touch-action: manipulation;
-      &:hover:not(:disabled) { background: #005a63; }
+      &:hover:not(:disabled) { background: var(--c-brand-dk); }
       &:disabled { opacity: 0.5; cursor: default; }
     }
   `],
