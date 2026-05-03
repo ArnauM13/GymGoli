@@ -514,9 +514,7 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
         cat,
         label: CATEGORY_LABELS[cat],
         color: CATEGORY_COLORS[cat],
-        records: allRecords
-          .filter(r => r.exercise.category === cat)
-          .sort((a, b) => b.display - a.display),
+        records: allRecords.filter(r => r.exercise.category === cat),
       }))
       .filter(g => g.records.length > 0);
   });
