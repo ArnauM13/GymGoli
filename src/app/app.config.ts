@@ -1,7 +1,8 @@
-import { ApplicationConfig, LOCALE_ID, provideZoneChangeDetection } from '@angular/core';
+import { ApplicationConfig, LOCALE_ID, isDevMode, provideZoneChangeDetection } from '@angular/core';
 import { registerLocaleData } from '@angular/common';
 import { PreloadAllModules, RouteReuseStrategy, provideRouter, withPreloading } from '@angular/router';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
+import { provideServiceWorker } from '@angular/service-worker';
 import localeCA from '@angular/common/locales/ca';
 
 import { routes } from './app.routes';
@@ -16,5 +17,9 @@ export const appConfig: ApplicationConfig = {
     provideAnimationsAsync(),
     { provide: RouteReuseStrategy, useClass: AppReuseStrategy },
     { provide: LOCALE_ID, useValue: 'ca' },
+    provideServiceWorker('ngsw-worker.js', {
+      enabled: !isDevMode(),
+      registrationStrategy: 'registerWhenStable:30000',
+    }),
   ],
 };
