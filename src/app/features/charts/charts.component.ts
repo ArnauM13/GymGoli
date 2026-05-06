@@ -55,46 +55,44 @@ interface ChartPoint {
 
       <!-- Summary strip (only when there is data) -->
       @if (!isLoading() && totalWorkouts() > 0) {
-        <div class="summary-strip">
-          <div class="summary-tile">
-            <span class="summary-val">{{ totalWorkouts() }}</span>
-            <span class="summary-lbl">Entrenaments</span>
+        <div class="summary-block">
+          <div class="summary-section">
+            <span class="summary-section-title">Resum</span>
+            <div class="summary-grid">
+              <div class="summary-tile">
+                <span class="summary-val">{{ totalWorkouts() }}</span>
+                <span class="summary-lbl">Entrenaments</span>
+              </div>
+              <div class="summary-tile">
+                <span class="summary-val">
+                  @if (weekStreak() > 0) { 🔥 }{{ weekStreak() }}
+                </span>
+                <span class="summary-lbl">Set. consecutives</span>
+              </div>
+            </div>
           </div>
-          @if (goalMode() === 'separate') {
-            <div class="summary-tile">
-              <span class="summary-val">
-                {{ thisWeekCount() }}
-                @if (weeklyGymGoal()) {
-                  <span class="summary-sub">/ {{ weeklyGymGoal() }}</span>
-                }
-              </span>
-              <span class="summary-lbl">Gimnàs setmana</span>
+          <div class="summary-section">
+            <span class="summary-section-title">Setmana actual</span>
+            <div class="summary-grid">
+              <div class="summary-tile">
+                <span class="summary-val">
+                  {{ thisWeekCount() }}
+                  @if (goalMode() === 'separate' ? weeklyGymGoal() : weeklyGoal()) {
+                    <span class="summary-sub">/ {{ goalMode() === 'separate' ? weeklyGymGoal() : weeklyGoal() }}</span>
+                  }
+                </span>
+                <span class="summary-lbl">Gimnàs</span>
+              </div>
+              <div class="summary-tile">
+                <span class="summary-val">
+                  {{ thisWeekSportCount() }}
+                  @if (weeklySportGoal()) {
+                    <span class="summary-sub">/ {{ weeklySportGoal() }}</span>
+                  }
+                </span>
+                <span class="summary-lbl">Esport</span>
+              </div>
             </div>
-            <div class="summary-tile">
-              <span class="summary-val">
-                {{ thisWeekSportCount() }}
-                @if (weeklySportGoal()) {
-                  <span class="summary-sub">/ {{ weeklySportGoal() }}</span>
-                }
-              </span>
-              <span class="summary-lbl">Esport setmana</span>
-            </div>
-          } @else {
-            <div class="summary-tile">
-              <span class="summary-val">
-                {{ thisWeekCount() + thisWeekSportCount() }}
-                @if (weeklyGoal()) {
-                  <span class="summary-sub">/ {{ weeklyGoal() }}</span>
-                }
-              </span>
-              <span class="summary-lbl">Aquesta setmana</span>
-            </div>
-          }
-          <div class="summary-tile">
-            <span class="summary-val">
-              @if (weekStreak() > 0) { 🔥 }{{ weekStreak() }}
-            </span>
-            <span class="summary-lbl">Set. consecutives</span>
           </div>
         </div>
       }
@@ -277,11 +275,14 @@ interface ChartPoint {
       h1 { margin: 0; font-size: 22px; font-weight: 600; }
     }
 
-    /* ── Summary strip ───────────────────────────────────── */
-    .summary-strip {
-      display: grid; grid-template-columns: 1fr 1fr 1fr;
-      gap: 8px; padding: 4px 16px 8px;
+    /* ── Summary block ───────────────────────────────────── */
+    .summary-block { display: flex; flex-direction: column; gap: 12px; padding: 8px 16px 4px; }
+    .summary-section { display: flex; flex-direction: column; gap: 6px; }
+    .summary-section-title {
+      font-size: 11px; font-weight: 600; color: var(--c-text-2);
+      text-transform: uppercase; letter-spacing: 0.05em;
     }
+    .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .summary-tile {
       background: var(--c-card); border-radius: 12px;
       box-shadow: 0 1px 4px var(--c-shadow);

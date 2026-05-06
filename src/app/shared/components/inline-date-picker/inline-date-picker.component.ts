@@ -105,16 +105,43 @@ import {
 
       </div>
 
-      @if (weeklyGoal() && isShowingCurrent() && settingsSvc.loaded()) {
-        <div class="idp-goal">
-          <div class="idp-goal-track">
-            <div class="idp-goal-fill" [style.width.%]="weeklyBarPct()"></div>
+      @if (isShowingCurrent() && settingsSvc.loaded()) {
+        @if (goalMode() === 'separate') {
+          @if (weeklyGymGoal()) {
+            <div class="idp-goal">
+              <span class="material-symbols-outlined idp-goal-icon">fitness_center</span>
+              <div class="idp-goal-track">
+                <div class="idp-goal-fill" [style.width.%]="weeklyGymBarPct()"></div>
+              </div>
+              <span class="idp-goal-badge" [class.done]="weeklyGymGoalMet()">
+                {{ weeklyGymDone() }}/{{ weeklyGymGoal() }}
+                <span class="material-symbols-outlined">{{ weeklyGymGoalMet() ? 'check_circle' : 'radio_button_unchecked' }}</span>
+              </span>
+            </div>
+          }
+          @if (weeklySportGoal()) {
+            <div class="idp-goal">
+              <span class="material-symbols-outlined idp-goal-icon">sports_soccer</span>
+              <div class="idp-goal-track idp-goal-track--sport">
+                <div class="idp-goal-fill idp-goal-fill--sport" [style.width.%]="weeklySportBarPct()"></div>
+              </div>
+              <span class="idp-goal-badge" [class.done]="weeklySportGoalMet()">
+                {{ weeklySportDone() }}/{{ weeklySportGoal() }}
+                <span class="material-symbols-outlined">{{ weeklySportGoalMet() ? 'check_circle' : 'radio_button_unchecked' }}</span>
+              </span>
+            </div>
+          }
+        } @else if (weeklyGoal()) {
+          <div class="idp-goal">
+            <div class="idp-goal-track">
+              <div class="idp-goal-fill" [style.width.%]="weeklyBarPct()"></div>
+            </div>
+            <span class="idp-goal-badge" [class.done]="weeklyGoalMet()">
+              {{ weeklyDone() }}/{{ weeklyGoal() }}
+              <span class="material-symbols-outlined">{{ weeklyGoalMet() ? 'check_circle' : 'directions_run' }}</span>
+            </span>
           </div>
-          <span class="idp-goal-badge" [class.done]="weeklyGoalMet()">
-            {{ weeklyDone() }}/{{ weeklyGoal() }}
-            <span class="material-symbols-outlined">{{ weeklyGoalMet() ? 'check_circle' : 'directions_run' }}</span>
-          </span>
-        </div>
+        }
       }
 
       @if (workoutSvc.isLoading()) {
@@ -246,8 +273,9 @@ import {
     .is-selected .idp-sport-icon { color: rgba(255,255,255,0.75) !important; }
 
     .idp-goal {
-      display: flex; align-items: center; gap: 8px; padding: 0 12px 8px;
+      display: flex; align-items: center; gap: 8px; padding: 0 12px 6px;
     }
+    .idp-goal-icon { font-size: 13px; color: var(--c-text-3); flex-shrink: 0; }
     .idp-goal-track {
       flex: 1; height: 3px; background: var(--c-border); border-radius: 2px; overflow: hidden;
     }
@@ -255,6 +283,7 @@ import {
       height: 100%; background: var(--c-brand); border-radius: 2px;
       transition: width 0.4s ease; max-width: 100%;
     }
+    .idp-goal-track--sport .idp-goal-fill--sport { background: #5c8a3c; }
     .idp-goal-badge {
       display: flex; align-items: center; gap: 2px;
       font-size: 11px; font-weight: 700; color: var(--c-text-3); white-space: nowrap;
@@ -483,21 +512,34 @@ export class InlineDatePickerComponent {
 
   // ── Weekly goal progress ──────────────────────────────────────────────────
 
-  readonly weeklyGoal = computed(() =>
+  readonly goalMode        = computed(() => this.settingsSvc.goalMode());
+  readonly weeklyGoal      = computed(() =>
     this.settingsSvc.metricsEnabled() ? this.settingsSvc.weeklyActivityGoal() : null
   );
+  readonly weeklyGymGoal   = computed(() =>
+    this.settingsSvc.metricsEnabled() ? this.settingsSvc.weeklyGymGoal() : null
+  );
+  readonly weeklySportGoal = computed(() =>
+    this.settingsSvc.metricsEnabled() ? this.settingsSvc.weeklySportGoal() : null
+  );
+
   readonly weeklyDone = computed(() =>
     this.weekDays().filter(d => !d.isFuture && (d.hasWorkout || d.hasSport)).length
   );
-  readonly weeklyGoalMet = computed(() => {
-    const g = this.weeklyGoal();
-    return g !== null && this.weeklyDone() >= g;
-  });
-  readonly weeklyBarPct = computed(() => {
-    const g = this.weeklyGoal();
-    if (!g) return 0;
-    return Math.min(100, Math.round((this.weeklyDone() / g) * 100));
-  });
+  readonly weeklyGymDone = computed(() =>
+    this.weekDays().filter(d => !d.isFuture && d.hasWorkout).length
+  );
+  readonly weeklySportDone = computed(() =>
+    this.weekDays().filter(d => !d.isFuture && d.hasSport).length
+  );
+
+  readonly weeklyGoalMet     = computed(() => { const g = this.weeklyGoal();      return g !== null && this.weeklyDone()      >= g; });
+  readonly weeklyGymGoalMet  = computed(() => { const g = this.weeklyGymGoal();   return g !== null && this.weeklyGymDone()   >= g; });
+  readonly weeklySportGoalMet= computed(() => { const g = this.weeklySportGoal(); return g !== null && this.weeklySportDone() >= g; });
+
+  readonly weeklyBarPct      = computed(() => { const g = this.weeklyGoal();      if (!g) return 0; return Math.min(100, Math.round((this.weeklyDone()      / g) * 100)); });
+  readonly weeklyGymBarPct   = computed(() => { const g = this.weeklyGymGoal();   if (!g) return 0; return Math.min(100, Math.round((this.weeklyGymDone()   / g) * 100)); });
+  readonly weeklySportBarPct = computed(() => { const g = this.weeklySportGoal(); if (!g) return 0; return Math.min(100, Math.round((this.weeklySportDone() / g) * 100)); });
 
   // ── Dot helpers (delegate to shared utils) ────────────────────────────────
 
