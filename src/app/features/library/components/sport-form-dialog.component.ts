@@ -1,6 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -17,7 +16,7 @@ export interface SportFormDialogData {
   imports: [
     ReactiveFormsModule,
     MatDialogModule,
-    MatButtonModule,
+
     MatFormFieldModule,
     MatInputModule,
   ],
@@ -129,8 +128,8 @@ export interface SportFormDialogData {
     </mat-dialog-content>
 
     <mat-dialog-actions align="end">
-      <button mat-button (click)="close()">Cancel·lar</button>
-      <button mat-flat-button (click)="save()" [disabled]="form.invalid">
+      <button class="dlg-btn dlg-btn--cancel" type="button" (click)="close()">Cancel·lar</button>
+      <button class="dlg-btn dlg-btn--save" type="button" (click)="save()" [disabled]="form.invalid">
         {{ isEdit ? 'Desar' : 'Crear' }}
       </button>
     </mat-dialog-actions>
@@ -259,6 +258,22 @@ export interface SportFormDialogData {
       .material-symbols-outlined { font-size: 18px; }
       &:hover:not(:disabled) { background: var(--c-brand-dk); }
       &:disabled { background: var(--c-border); cursor: default; }
+    }
+
+    .dlg-btn {
+      padding: 9px 18px; border-radius: 10px; font-size: 13px; font-weight: 600;
+      cursor: pointer; border: none; transition: background 0.15s, color 0.15s;
+      touch-action: manipulation;
+    }
+    .dlg-btn--cancel {
+      background: transparent; color: var(--c-text-2);
+      border: 1.5px solid var(--c-border-2);
+      &:hover { background: var(--c-hover); color: var(--c-text); }
+    }
+    .dlg-btn--save {
+      background: var(--c-brand); color: #fff; font-weight: 700;
+      &:hover:not(:disabled) { background: var(--c-brand-hover, #005a63); }
+      &:disabled { opacity: 0.4; cursor: not-allowed; }
     }
   `],
 })

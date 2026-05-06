@@ -1,6 +1,6 @@
 import { Component, computed, inject, input } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { MatButtonModule } from '@angular/material/button';
+
 
 import { FEELING_EMOJI, FEELING_LABEL, FeelingLevel } from '../../core/models/workout.model';
 import { UserSettingsService } from '../../core/services/user-settings.service';
@@ -17,7 +17,7 @@ interface SessionPoint {
 @Component({
   selector: 'app-exercise-stats',
   standalone: true,
-  imports: [MatButtonModule],
+  imports: [],
   template: `
     <div class="esd-wrap" [class.esd-inline]="isInline()">
       <!-- Header (dialog mode only) -->
@@ -27,7 +27,7 @@ interface SessionPoint {
             <span class="material-symbols-outlined esd-title-icon">bar_chart</span>
             <h2 class="esd-title">{{ resolvedName() }}</h2>
           </div>
-          <button mat-icon-button class="esd-close-btn" (click)="close()">
+          <button class="esd-close-btn" type="button" (click)="close()">
             <span class="material-symbols-outlined">close</span>
           </button>
         </div>
@@ -114,7 +114,14 @@ interface SessionPoint {
     .esd-title-block { display: flex; align-items: center; gap: 8px; }
     .esd-title-icon { font-size: 22px; color: var(--c-brand); }
     .esd-title { margin: 0; font-size: 18px; font-weight: 700; color: var(--c-text); }
-    .esd-close-btn { color: var(--c-text-3); }
+    .esd-close-btn {
+      width: 36px; height: 36px; border-radius: 50%; border: none;
+      background: transparent; cursor: pointer; color: var(--c-text-3);
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, color 0.15s;
+      .material-symbols-outlined { font-size: 20px; }
+      &:hover { background: var(--c-hover); color: var(--c-text); }
+    }
 
     /* Loading bar */
     .esd-loading-bar-wrap {
