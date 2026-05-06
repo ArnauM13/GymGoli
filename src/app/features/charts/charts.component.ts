@@ -60,15 +60,36 @@ interface ChartPoint {
             <span class="summary-val">{{ totalWorkouts() }}</span>
             <span class="summary-lbl">Entrenaments</span>
           </div>
-          <div class="summary-tile">
-            <span class="summary-val">
-              {{ thisWeekCount() }}
-              @if (weeklyGoal()) {
-                <span class="summary-sub">/ {{ weeklyGoal() }}</span>
-              }
-            </span>
-            <span class="summary-lbl">Aquesta setmana</span>
-          </div>
+          @if (goalMode() === 'separate') {
+            <div class="summary-tile">
+              <span class="summary-val">
+                {{ thisWeekCount() }}
+                @if (weeklyGymGoal()) {
+                  <span class="summary-sub">/ {{ weeklyGymGoal() }}</span>
+                }
+              </span>
+              <span class="summary-lbl">Gimnàs setmana</span>
+            </div>
+            <div class="summary-tile">
+              <span class="summary-val">
+                {{ thisWeekSportCount() }}
+                @if (weeklySportGoal()) {
+                  <span class="summary-sub">/ {{ weeklySportGoal() }}</span>
+                }
+              </span>
+              <span class="summary-lbl">Esport setmana</span>
+            </div>
+          } @else {
+            <div class="summary-tile">
+              <span class="summary-val">
+                {{ thisWeekCount() + thisWeekSportCount() }}
+                @if (weeklyGoal()) {
+                  <span class="summary-sub">/ {{ weeklyGoal() }}</span>
+                }
+              </span>
+              <span class="summary-lbl">Aquesta setmana</span>
+            </div>
+          }
           <div class="summary-tile">
             <span class="summary-val">
               @if (weekStreak() > 0) { 🔥 }{{ weekStreak() }}
@@ -454,7 +475,17 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
     return this.workoutService.workouts().filter(w => w.date >= monday && w.date <= sunday).length;
   });
 
-  readonly weeklyGoal = computed(() => this.settingsService.weeklyActivityGoal());
+  readonly goalMode        = computed(() => this.settingsService.goalMode());
+  readonly weeklyGoal      = computed(() => this.settingsService.weeklyActivityGoal());
+  readonly weeklyGymGoal   = computed(() => this.settingsService.weeklyGymGoal());
+  readonly weeklySportGoal = computed(() => this.settingsService.weeklySportGoal());
+
+  readonly thisWeekSportCount = computed(() => {
+    const today  = new Date().toISOString().slice(0, 10);
+    const monday = mondayOf(today);
+    const sunday = addDays(monday, 6);
+    return this.sportService.sessions().filter(s => s.date >= monday && s.date <= sunday).length;
+  });
 
   readonly weekStreak = computed(() => {
     const workouts = this.workoutService.workouts();
