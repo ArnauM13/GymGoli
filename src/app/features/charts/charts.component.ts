@@ -73,26 +73,46 @@ interface ChartPoint {
           </div>
           <div class="summary-section">
             <span class="summary-section-title">Setmana actual</span>
-            <div class="summary-grid">
-              <div class="summary-tile">
-                <span class="summary-val">
-                  {{ thisWeekCount() }}
-                  @if (goalMode() === 'separate' ? weeklyGymGoal() : weeklyGoal()) {
-                    <span class="summary-sub">/ {{ goalMode() === 'separate' ? weeklyGymGoal() : weeklyGoal() }}</span>
-                  }
-                </span>
-                <span class="summary-lbl">Gimnàs</span>
+            @if (goalMode() === 'separate') {
+              <div class="summary-grid">
+                <div class="summary-tile">
+                  <span class="summary-val">
+                    {{ thisWeekCount() }}
+                    @if (weeklyGymGoal()) { <span class="summary-sub">/ {{ weeklyGymGoal() }}</span> }
+                  </span>
+                  <span class="summary-lbl">Gimnàs</span>
+                </div>
+                <div class="summary-tile">
+                  <span class="summary-val">
+                    {{ thisWeekSportCount() }}
+                    @if (weeklySportGoal()) { <span class="summary-sub">/ {{ weeklySportGoal() }}</span> }
+                  </span>
+                  <span class="summary-lbl">Esport</span>
+                </div>
               </div>
-              <div class="summary-tile">
-                <span class="summary-val">
-                  {{ thisWeekSportCount() }}
-                  @if (weeklySportGoal()) {
-                    <span class="summary-sub">/ {{ weeklySportGoal() }}</span>
-                  }
-                </span>
-                <span class="summary-lbl">Esport</span>
+            } @else {
+              <div class="summary-grid">
+                <div class="summary-tile">
+                  <span class="summary-val">{{ thisWeekCount() }}</span>
+                  <span class="summary-lbl">Gimnàs</span>
+                </div>
+                <div class="summary-tile">
+                  <span class="summary-val">{{ thisWeekSportCount() }}</span>
+                  <span class="summary-lbl">Esport</span>
+                </div>
               </div>
-            </div>
+              @if (weeklyGoal()) {
+                <div class="summary-combined-goal">
+                  <div class="scg-track">
+                    <div class="scg-fill" [style.width.%]="combinedWeeklyBarPct()"></div>
+                  </div>
+                  <span class="scg-label">
+                    {{ thisWeekCount() + thisWeekSportCount() }}/{{ weeklyGoal() }} activitats
+                    @if (combinedWeeklyMet()) { ✓ }
+                  </span>
+                </div>
+              }
+            }
           </div>
         </div>
       }
@@ -295,6 +315,16 @@ interface ChartPoint {
     }
     .summary-sub { font-size: 14px; font-weight: 400; color: var(--c-text-2); }
     .summary-lbl { font-size: 10px; color: var(--c-text-2); font-weight: 500; }
+    .summary-combined-goal {
+      margin-top: 6px; display: flex; align-items: center; gap: 8px;
+    }
+    .scg-track {
+      flex: 1; height: 4px; background: var(--c-border); border-radius: 2px; overflow: hidden;
+    }
+    .scg-fill {
+      height: 100%; background: var(--c-brand); border-radius: 2px; transition: width 0.4s ease;
+    }
+    .scg-label { font-size: 11px; font-weight: 600; color: var(--c-text-2); white-space: nowrap; }
 
     /* ── Section / select ────────────────────────────────── */
     .section { padding: 8px 16px; }
@@ -486,6 +516,16 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
     const monday = mondayOf(today);
     const sunday = addDays(monday, 6);
     return this.sportService.sessions().filter(s => s.date >= monday && s.date <= sunday).length;
+  });
+
+  readonly combinedWeeklyBarPct = computed(() => {
+    const g = this.weeklyGoal();
+    if (!g) return 0;
+    return Math.min(100, Math.round(((this.thisWeekCount() + this.thisWeekSportCount()) / g) * 100));
+  });
+  readonly combinedWeeklyMet = computed(() => {
+    const g = this.weeklyGoal();
+    return !!g && (this.thisWeekCount() + this.thisWeekSportCount()) >= g;
   });
 
   readonly weekStreak = computed(() => {

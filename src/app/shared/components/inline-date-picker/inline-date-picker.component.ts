@@ -513,15 +513,9 @@ export class InlineDatePickerComponent {
   // ── Weekly goal progress ──────────────────────────────────────────────────
 
   readonly goalMode        = computed(() => this.settingsSvc.goalMode());
-  readonly weeklyGoal      = computed(() =>
-    this.settingsSvc.metricsEnabled() ? this.settingsSvc.weeklyActivityGoal() : null
-  );
-  readonly weeklyGymGoal   = computed(() =>
-    this.settingsSvc.metricsEnabled() ? this.settingsSvc.weeklyGymGoal() : null
-  );
-  readonly weeklySportGoal = computed(() =>
-    this.settingsSvc.metricsEnabled() ? this.settingsSvc.weeklySportGoal() : null
-  );
+  readonly weeklyGoal      = computed(() => this.settingsSvc.weeklyActivityGoal());
+  readonly weeklyGymGoal   = computed(() => this.settingsSvc.weeklyGymGoal());
+  readonly weeklySportGoal = computed(() => this.settingsSvc.weeklySportGoal());
 
   readonly weeklyDone = computed(() =>
     this.weekDays().filter(d => !d.isFuture && (d.hasWorkout || d.hasSport)).length
