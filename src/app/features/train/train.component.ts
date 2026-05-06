@@ -413,8 +413,11 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       <button class="avui-toca-fab" [style.--sg-c]="s.color" (click)="selectType(s.category)"
               title="Avui toca: {{ s.label }}">
         <span class="material-symbols-outlined fab-icon" [style.font-variation-settings]="'FILL 1, WGHT 400'">{{ s.icon }}</span>
-        <span class="fab-label">Avui toca</span>
-        <span class="fab-cat">{{ s.label }}</span>
+        <span class="fab-text">
+          <span class="fab-label">Avui toca</span>
+          <span class="fab-cat">{{ s.label }}</span>
+        </span>
+        <span class="material-symbols-outlined fab-arrow">chevron_right</span>
       </button>
     }
   `,
@@ -582,27 +585,27 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     /* ── Avui toca FAB ── */
     .avui-toca-fab {
-      position: fixed; bottom: 88px; right: 16px; z-index: 50;
-      display: flex; flex-direction: column; align-items: center; gap: 2px;
-      padding: 14px 16px; border-radius: 20px;
-      background: var(--sg-c, var(--c-brand));
-      border: none; cursor: pointer; touch-action: manipulation;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
-      animation: fab-in 0.3s cubic-bezier(0.34, 1.4, 0.64, 1) both;
-      transition: transform 0.15s, box-shadow 0.15s;
-      &:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
-      &:active { transform: scale(0.94); }
+      position: fixed; bottom: 88px; left: 16px; right: 16px; z-index: 50;
+      display: flex; flex-direction: row; align-items: center; gap: 12px;
+      padding: 12px 14px; border-radius: 14px;
+      background: var(--c-card);
+      border: none; border-left: 5px solid var(--sg-c, var(--c-brand));
+      cursor: pointer; touch-action: manipulation;
+      box-shadow: 0 2px 10px var(--c-shadow);
+      animation: fab-in 0.22s ease-out both;
+      transition: box-shadow 0.15s, transform 0.15s;
+      &:hover { box-shadow: 0 4px 14px var(--c-shadow); transform: translateY(-1px); }
+      &:active { transform: scale(0.98); }
     }
     @keyframes fab-in {
-      from { transform: scale(0.6) translateY(20px); opacity: 0; }
-      to   { transform: scale(1) translateY(0); opacity: 1; }
+      from { transform: translateY(12px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
     }
-    .fab-icon {
-      font-size: 26px; color: white; line-height: 1;
-      font-variation-settings: 'FILL' 1, 'WGHT' 400;
-    }
-    .fab-label { font-size: 9px; font-weight: 700; color: rgba(255,255,255,0.75); text-transform: uppercase; letter-spacing: 0.5px; }
-    .fab-cat   { font-size: 12px; font-weight: 800; color: white; }
+    .fab-icon  { font-size: 22px; color: var(--sg-c, var(--c-brand)); flex-shrink: 0; }
+    .fab-text  { display: flex; flex-direction: column; gap: 1px; flex: 1; }
+    .fab-label { font-size: 10px; font-weight: 600; color: var(--c-text-2); text-transform: uppercase; letter-spacing: 0.04em; }
+    .fab-cat   { font-size: 14px; font-weight: 700; color: var(--c-text); }
+    .fab-arrow { font-size: 18px; color: var(--c-text-2); flex-shrink: 0; }
 
     /* ── Workout section (dashboard) ── */
     .workout-section {
