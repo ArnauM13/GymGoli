@@ -136,13 +136,12 @@ interface ChartPoint {
               <span class="loading-dot"></span>
             </span>
           }
+          @if (selectedExerciseId) {
+            <button class="clear-exercise-btn" (click)="clearExercise()" title="Canviar exercici">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          }
         </div>
-        @if (selectedExerciseId) {
-          <button class="clear-exercise-btn" (click)="clearExercise()">
-            <span class="material-symbols-outlined">close</span>
-            Canviar exercici
-          </button>
-        }
       </div>
 
       @if (selectedExerciseId) {
@@ -356,13 +355,13 @@ interface ChartPoint {
     }
 
     .clear-exercise-btn {
-      display: flex; align-items: center; gap: 6px;
-      margin-top: 8px; padding: 8px 12px; border-radius: 10px;
-      border: 1.5px solid var(--c-border); background: transparent;
-      color: var(--c-text-2); font-size: 13px; font-weight: 500;
-      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      position: absolute; right: 36px; top: 50%; transform: translateY(-50%);
+      width: 28px; height: 28px; border-radius: 50%;
+      border: none; background: var(--c-border-2); color: var(--c-text-2);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s, color 0.15s;
       .material-symbols-outlined { font-size: 16px; }
-      &:hover { border-color: var(--c-brand); color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.05); }
+      &:hover { background: var(--c-brand); color: #fff; }
     }
 
     /* ── Metric tabs ─────────────────────────────────────── */
