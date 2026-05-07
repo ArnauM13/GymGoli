@@ -102,13 +102,18 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     }
 
     .ws-bar-track {
-      height: 5px; background: var(--c-border); border-radius: 3px;
+      position: relative;
+      height: 10px; background: var(--c-subtle); border-radius: 6px;
       overflow: hidden; margin-bottom: 12px;
+      border: 1px solid var(--c-border-2);
     }
     .ws-bar-fill {
-      height: 100%; background: var(--c-brand); border-radius: 3px;
-      transition: width 0.4s ease;
+      height: 100%;
+      background: linear-gradient(90deg, var(--c-brand) 0%, color-mix(in srgb, var(--c-brand) 75%, white) 100%);
+      border-radius: 6px;
+      transition: width 0.5s ease;
       max-width: 100%;
+      box-shadow: 0 0 6px rgba(var(--c-brand-rgb), 0.4);
     }
 
     .ws-days {
