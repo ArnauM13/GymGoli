@@ -530,6 +530,11 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       &:hover  { background: color-mix(in srgb, var(--wc) 6%, var(--c-card)); }
       &:active { transform: scale(0.98); }
     }
+    .bar-shortcut--suggestion {
+      background: color-mix(in srgb, var(--wc) 18%, var(--c-card));
+      border-color: color-mix(in srgb, var(--wc) 55%, var(--c-border-2));
+      &:hover { background: color-mix(in srgb, var(--wc) 28%, var(--c-card)); border-color: var(--wc); }
+    }
     .bar-shortcut-accent {
       width: 5px; align-self: stretch; flex-shrink: 0;
       background: var(--wc);
