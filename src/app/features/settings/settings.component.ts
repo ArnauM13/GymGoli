@@ -1,5 +1,5 @@
-import { Component, inject, signal } from '@angular/core';
-import { DOCUMENT, Location } from '@angular/common';
+import { Component, computed, inject, signal } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -22,83 +22,17 @@ import {
   template: `
     <div class="page">
 
-      <div class="page-header">
-        <button class="back-btn" (click)="back()" title="Tornar">
-          <span class="material-symbols-outlined">arrow_back_ios</span>
-        </button>
-        <h1 class="page-title">Configuració</h1>
+      <!-- ── Identity ── -->
+      <div class="identity">
+        <span class="material-symbols-outlined identity-icon">account_circle</span>
+        @if (userName(); as n) { <span class="identity-name">{{ n }}</span> }
+        @if (authService.user()?.email; as e) { <span class="identity-email">{{ e }}</span> }
       </div>
 
-      <!-- ── Aparença ── -->
+      <!-- ── Bloc 1: El meu objectiu ── -->
       <div class="section">
-        <h2 class="section-title">Aparença</h2>
-        <div class="setting-row">
-          <div class="setting-info">
-            <span class="setting-label">Mode fosc</span>
-            <span class="setting-desc">Redueix la llum de la pantalla per a un ús nocturn còmode.</span>
-          </div>
-          <mat-slide-toggle
-            [checked]="settingsService.darkMode()"
-            (change)="toggleDarkMode()"
-            color="primary"
-          />
-        </div>
-        <div class="setting-row setting-row--top">
-          <div class="setting-info">
-            <span class="setting-label">Unitat de pes</span>
-            <span class="setting-desc">Els pesos es mostren en l'unitat seleccionada. Els valors es guarden sempre en kg.</span>
-          </div>
-          <div class="unit-toggle">
-            <button class="unit-btn" [class.unit-btn--active]="settingsService.weightUnit() === 'kg'" (click)="setWeightUnit('kg')">kg</button>
-            <button class="unit-btn" [class.unit-btn--active]="settingsService.weightUnit() === 'lb'" (click)="setWeightUnit('lb')">lb</button>
-          </div>
-        </div>
-        <div class="setting-row setting-row--top">
-          <div class="setting-info">
-            <span class="setting-label">Descans entre sèries</span>
-            <span class="setting-desc">Temporitzador que arrenca automàticament en afegir sèries. Posat a 0 per desactivar-lo.</span>
-          </div>
-          <div class="unit-toggle rest-toggle">
-            @for (secs of restOptions; track secs) {
-              <button class="unit-btn"
-                [class.unit-btn--active]="settingsService.restTimerSeconds() === secs"
-                (click)="setRestTimer(secs)">
-                {{ secs === 0 ? 'Off' : secs + 's' }}
-              </button>
-            }
-          </div>
-        </div>
-      </div>
+        <h2 class="section-title">El meu objectiu</h2>
 
-      <div class="section">
-        <h2 class="section-title">Estadístiques i mètriques</h2>
-
-        <div class="setting-row">
-          <div class="setting-info">
-            <span class="setting-label">Consells personalitzats</span>
-            <span class="setting-desc">
-              Rep suggeriments basats en el teu historial: setmanes fluixes,
-              esports que fa dies que no fas, i molt més.
-            </span>
-          </div>
-          <mat-slide-toggle
-            [checked]="settingsService.metricsEnabled()"
-            (change)="toggleMetrics()"
-            color="primary"
-          />
-        </div>
-
-        @if (settingsService.metricsEnabled()) {
-          <div class="setting-hint">
-            <span class="material-symbols-outlined hint-icon">info</span>
-            Els consells apareixen a la pantalla d'inici. Pots tancar-los individualment en qualsevol moment.
-          </div>
-        }
-      </div>
-
-      <!-- ── Objectiu de fitness ── -->
-      <div class="section">
-        <h2 class="section-title">El teu objectiu</h2>
         @if (!settingsService.fitnessGoal()) {
           <p class="section-desc">Tria un objectiu i l'app adaptarà els consells i l'objectiu setmanal per a tu.</p>
         }
@@ -111,11 +45,11 @@ import {
             </button>
           }
         </div>
-      </div>
 
-      @if (settingsService.metricsEnabled()) {
-        <div class="section">
-          <h2 class="section-title">Objectiu setmanal</h2>
+        @if (settingsService.metricsEnabled()) {
+          <div class="setting-divider"></div>
+
+          <h3 class="subsection-title">Objectiu setmanal</h3>
 
           <!-- Mode selector -->
           <div class="mode-selector">
@@ -132,13 +66,10 @@ import {
           </div>
 
           @if (settingsService.goalMode() === 'combined') {
-            <!-- Combined goal (gym + sport together) -->
             <div class="setting-row">
               <div class="setting-info">
                 <span class="setting-label">Activitats per setmana</span>
-                <span class="setting-desc">
-                  Gym i esport compten igual. Els consells t'animaran quan ho aconsegueixis.
-                </span>
+                <span class="setting-desc">Gym i esport compten igual.</span>
               </div>
 
               @if (settingsService.weeklyActivityGoal() === null) {
@@ -162,7 +93,6 @@ import {
               }
             </div>
           } @else {
-            <!-- Separate goals (gym and sport independently) -->
             <div class="separate-goals">
 
               <div class="goal-row">
@@ -236,32 +166,86 @@ import {
               </span>
             </div>
           }
-        </div>
-      }
+        } @else {
+          <div class="setting-hint">
+            <span class="material-symbols-outlined hint-icon">info</span>
+            Activa els insights personalitzats a Preferències per definir un objectiu setmanal.
+          </div>
+        }
+      </div>
 
-      <!-- ── Entrenaments ── -->
+      <!-- ── Bloc 2: Preferències ── -->
       <div class="section">
-        <h2 class="section-title">Entrenaments</h2>
+        <h2 class="section-title">Preferències</h2>
+
         <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Mode fosc</span>
+            <span class="setting-desc">Redueix la llum de la pantalla per a un ús nocturn còmode.</span>
+          </div>
+          <mat-slide-toggle
+            [checked]="settingsService.darkMode()"
+            (change)="toggleDarkMode()"
+            color="primary"
+          />
+        </div>
+
+        <div class="setting-row setting-row--top">
+          <div class="setting-info">
+            <span class="setting-label">Unitat de pes</span>
+            <span class="setting-desc">Els valors es guarden sempre en kg.</span>
+          </div>
+          <div class="unit-toggle">
+            <button class="unit-btn" [class.unit-btn--active]="settingsService.weightUnit() === 'kg'" (click)="setWeightUnit('kg')">kg</button>
+            <button class="unit-btn" [class.unit-btn--active]="settingsService.weightUnit() === 'lb'" (click)="setWeightUnit('lb')">lb</button>
+          </div>
+        </div>
+
+        <div class="setting-row setting-row--top">
+          <div class="setting-info">
+            <span class="setting-label">Descans entre sèries</span>
+            <span class="setting-desc">Temporitzador automàtic en afegir sèries. Posa 0 per desactivar-lo.</span>
+          </div>
+          <div class="unit-toggle rest-toggle">
+            @for (secs of restOptions; track secs) {
+              <button class="unit-btn"
+                [class.unit-btn--active]="settingsService.restTimerSeconds() === secs"
+                (click)="setRestTimer(secs)">
+                {{ secs === 0 ? 'Off' : secs + 's' }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="setting-row setting-row--top">
+          <div class="setting-info">
+            <span class="setting-label">Insights personalitzats</span>
+            <span class="setting-desc">Consells basats en el teu historial i seguiment de l'objectiu setmanal.</span>
+          </div>
+          <mat-slide-toggle
+            [checked]="settingsService.metricsEnabled()"
+            (change)="toggleMetrics()"
+            color="primary"
+          />
+        </div>
+      </div>
+
+      <!-- ── Bloc 3: Contingut ── -->
+      <div class="section">
+        <h2 class="section-title">Contingut</h2>
+
+        <a class="nav-row" routerLink="/templates">
           <div class="setting-info">
             <span class="setting-label">Plantilles</span>
             <span class="setting-desc">Crea i gestiona les teves plantilles d'entrenament.</span>
           </div>
-          <a class="nav-link-btn" routerLink="/templates">
-            <span class="material-symbols-outlined">chevron_right</span>
-          </a>
-        </div>
-      </div>
+          <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
+        </a>
 
-      <!-- ── Dades ── -->
-      <div class="section">
-        <h2 class="section-title">Dades</h2>
-        <div class="setting-row">
+        <div class="setting-row setting-row--top">
           <div class="setting-info">
             <span class="setting-label">Exportar les meves dades</span>
-            <span class="setting-desc">
-              Descarrega un fitxer JSON amb tots els teus entrenaments, esports i configuració.
-            </span>
+            <span class="setting-desc">Descarrega un JSON amb tots els teus entrenaments, esports i configuració.</span>
           </div>
           <button class="export-btn" (click)="exportData()" aria-label="Descarregar dades">
             <span class="material-symbols-outlined">download</span>
@@ -269,7 +253,7 @@ import {
         </div>
       </div>
 
-      <!-- ── Compte ── -->
+      <!-- ── Bloc 4: Compte ── -->
       <div class="section section--danger">
         <h2 class="section-title">Compte</h2>
 
@@ -280,6 +264,14 @@ import {
           </div>
           <button class="danger-btn danger-btn--soft" (click)="logout()">Sortir</button>
         </div>
+
+        <a class="nav-row nav-row--top" routerLink="/privacy">
+          <div class="setting-info">
+            <span class="setting-label">Política de privacitat</span>
+            <span class="setting-desc">Condicions d'ús i tractament de dades.</span>
+          </div>
+          <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
+        </a>
 
         <div class="setting-divider"></div>
 
@@ -298,11 +290,6 @@ import {
         </div>
       </div>
 
-      <a class="legal-link" routerLink="/privacy">
-        <span class="material-symbols-outlined">policy</span>
-        Política de privacitat i Condicions d'ús
-      </a>
-
     </div>
   `,
   styles: [`
@@ -311,25 +298,17 @@ import {
       max-width: 540px; margin: 0 auto;
     }
 
-    /* ── Header ── */
-    .page-header {
-      display: flex; align-items: center; gap: 4px;
-      padding: 12px 0 16px;
+    /* ── Identity ── */
+    .identity {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 24px 16px 20px;
     }
-
-    .back-btn {
-      width: 36px; height: 36px; border-radius: 50%; border: none;
-      background: transparent; cursor: pointer; color: var(--c-text-2); flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center;
-      transition: background 0.15s; touch-action: manipulation;
-      .material-symbols-outlined { font-size: 20px; }
-      &:hover { background: var(--c-hover); }
+    .identity-icon {
+      font-size: 64px; color: var(--c-text-3);
+      font-variation-settings: 'FILL' 1, 'wght' 300;
     }
-
-    .page-title {
-      margin: 0;
-      font-size: 20px; font-weight: 800; color: var(--c-text); letter-spacing: -0.3px;
-    }
+    .identity-name  { font-size: 18px; font-weight: 800; color: var(--c-text); letter-spacing: -0.3px; }
+    .identity-email { font-size: 13px; color: var(--c-text-2); }
 
     .section {
       background: var(--c-card);
@@ -343,6 +322,10 @@ import {
       font-size: 13px; font-weight: 700; color: var(--c-text-2);
       letter-spacing: 0.3px; text-transform: uppercase;
     }
+    .subsection-title {
+      margin: 0 0 12px;
+      font-size: 13px; font-weight: 700; color: var(--c-text);
+    }
     .section-desc {
       margin: -8px 0 12px; font-size: 13px; color: var(--c-text-3); line-height: 1.5;
     }
@@ -352,7 +335,20 @@ import {
       &.setting-row--top { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--c-border-2); }
     }
 
-    /* ── Unit toggle (kg/lb) and rest-timer toggle ── */
+    /* ── Nav row (link with chevron) ── */
+    .nav-row {
+      display: flex; align-items: center; gap: 14px;
+      text-decoration: none; color: inherit;
+      cursor: pointer; touch-action: manipulation;
+      transition: opacity 0.15s;
+      &:hover { opacity: 0.8; }
+      &.nav-row--top { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--c-border-2); }
+    }
+    .nav-row-arrow {
+      font-size: 22px; color: var(--c-text-3); flex-shrink: 0;
+    }
+
+    /* ── Unit toggle ── */
     .unit-toggle {
       display: flex; border: 1.5px solid var(--c-border); border-radius: 10px; overflow: hidden; flex-shrink: 0;
     }
@@ -411,13 +407,9 @@ import {
     }
 
     /* ── Separate goals ── */
-    .separate-goals {
-      display: flex; flex-direction: column; gap: 12px;
-    }
+    .separate-goals { display: flex; flex-direction: column; gap: 12px; }
 
-    .goal-row {
-      display: flex; align-items: center; gap: 12px;
-    }
+    .goal-row { display: flex; align-items: center; gap: 12px; }
 
     .goal-row-info {
       display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0;
@@ -439,9 +431,7 @@ import {
       &:hover { border-color: var(--c-brand); color: var(--c-brand); }
     }
 
-    .goal-stepper {
-      display: flex; align-items: center; gap: 4px; flex-shrink: 0;
-    }
+    .goal-stepper { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 
     .goal-value {
       min-width: 28px; text-align: center;
@@ -486,16 +476,6 @@ import {
     .streak-fire { font-size: 17px; line-height: 1; flex-shrink: 0; }
     .streak-text { font-size: 13px; font-weight: 700; color: #e65100; }
 
-    .nav-link-btn {
-      display: flex; align-items: center; justify-content: center;
-      width: 36px; height: 36px; border-radius: 50%;
-      background: var(--c-subtle); border: 1px solid var(--c-border-2);
-      color: var(--c-text-3); text-decoration: none; flex-shrink: 0;
-      transition: background 0.15s, color 0.15s;
-      .material-symbols-outlined { font-size: 20px; }
-      &:hover { background: var(--c-hover); color: var(--c-brand); }
-    }
-
     /* ── Export button ── */
     .export-btn {
       width: 38px; height: 38px; border-radius: 10px; border: 1.5px solid var(--c-border);
@@ -510,7 +490,7 @@ import {
     .section--danger { margin-top: 8px; }
 
     .setting-divider {
-      height: 1px; background: var(--c-border-2); margin: 10px 0;
+      height: 1px; background: var(--c-border-2); margin: 14px 0;
     }
 
     .danger-label { color: #c62828; }
@@ -533,31 +513,22 @@ import {
 
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     .spin { animation: spin 1s linear infinite; font-size: 15px !important; }
-
-    /* ── Legal link ── */
-    .legal-link {
-      display: flex; align-items: center; gap: 8px;
-      margin-top: 12px; padding: 12px 14px;
-      background: var(--c-card); border-radius: 14px;
-      box-shadow: 0 2px 10px var(--c-shadow);
-      font-size: 13px; font-weight: 500; color: var(--c-text-2);
-      text-decoration: none; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 18px; color: var(--c-text-3); }
-      &:hover { color: var(--c-brand); box-shadow: 0 2px 14px var(--c-shadow-md); }
-    }
   `],
 })
 export class SettingsComponent {
+  readonly authService     = inject(AuthService);
   readonly settingsService = inject(UserSettingsService);
   readonly metricsService  = inject(FitnessMetricsService);
-  private authService      = inject(AuthService);
   private exerciseService  = inject(ExerciseService);
   private sportService     = inject(SportService);
   private workoutService   = inject(WorkoutService);
-  private location         = inject(Location);
   private router           = inject(Router);
   private snackBar         = inject(MatSnackBar);
   private doc              = inject(DOCUMENT);
+
+  readonly userName = computed(() =>
+    this.authService.user()?.user_metadata?.['full_name'] as string | undefined
+  );
 
   readonly deletingAccount = signal(false);
   readonly restOptions = [0, 30, 60, 90, 120, 180];
@@ -580,11 +551,10 @@ export class SettingsComponent {
     this.settingsService.update(patch as Parameters<typeof this.settingsService.update>[0]);
   }
 
-  back(): void { this.location.back(); }
-
   async logout(): Promise<void> {
     await this.authService.logout();
-    this.router.navigate(['/login']);
+    await this.router.navigate(['/login']);
+    this.snackBar.open('Sessió tancada', '', { duration: 2000 });
   }
 
   setWeightUnit(unit: WeightUnit): void {
@@ -677,7 +647,6 @@ export class SettingsComponent {
   }
 
   // ── Account ──────────────────────────────────────────────────────────────
-
 
   async deleteAccount(): Promise<void> {
     const confirmed = confirm(
