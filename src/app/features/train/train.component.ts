@@ -1018,7 +1018,7 @@ export class TrainComponent {
 
   readonly todaySuggestion = computed(() => {
     const goal = this.settingsService.fitnessGoal();
-    if (!goal || goal === 'sport') return null;
+    if (goal === 'sport') return null;
 
     const today = TODAY();
     if (this.selectedDate() !== today) return null;
