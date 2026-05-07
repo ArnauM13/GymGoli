@@ -466,10 +466,17 @@ import {
       padding: 12px 14px; border-radius: 14px;
       border: 2px solid var(--c-border-2); background: var(--c-subtle);
       cursor: pointer; transition: all 0.15s; touch-action: manipulation; text-align: left;
-      &:hover { border-color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.05); }
+      outline: none;
+      &:focus-visible { box-shadow: 0 0 0 3px rgba(var(--c-brand-rgb), 0.25); }
       &.selected {
-        border-color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.1);
+        border-color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.12);
         .fg-label { color: var(--c-brand); }
+      }
+    }
+    @media (hover: hover) {
+      .fg-btn:not(.selected):hover {
+        border-color: color-mix(in srgb, var(--c-brand) 50%, var(--c-border-2));
+        background: rgba(var(--c-brand-rgb), 0.04);
       }
     }
     .fg-emoji { font-size: 22px; line-height: 1; flex-shrink: 0; }
