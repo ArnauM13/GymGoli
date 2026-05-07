@@ -165,7 +165,7 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
     </div>
   `,
   styles: [`
-    .page { padding: 0 0 84px; }
+    .page { padding: 0 0 16px; }
 
     /* ── Page header ── */
     .page-header {

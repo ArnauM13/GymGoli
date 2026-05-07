@@ -307,7 +307,7 @@ import {
   `,
   styles: [`
     .page {
-      padding: 0 16px 84px;
+      padding: 0 16px 16px;
       max-width: 540px; margin: 0 auto;
     }
 

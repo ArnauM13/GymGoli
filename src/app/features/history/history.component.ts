@@ -320,7 +320,7 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
     </div>
   `,
   styles: [`
-    .page { padding: 0 0 100px; }
+    .page { padding: 0 0 16px; }
 
     /* ── Page header ── */
     .page-header {

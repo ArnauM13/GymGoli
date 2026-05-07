@@ -34,7 +34,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
   standalone: true,
   imports: [WorkoutEditorComponent, InlineDatePickerComponent, FitnessInsightsComponent],
   template: `
-    <div class="page">
+    <div class="page" [class.page--with-fab]="hasFloatingBar()">
 
       @if (activeWorkout(); as w) {
 
@@ -124,21 +124,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
           <app-fitness-insights />
 
-          <!-- ── Avui toca ── -->
-          @if (todaySuggestion(); as s) {
-            <button class="avui-toca-card" [style.--sg-c]="s.color" (click)="selectType(s.category)">
-              <div class="atc-bar" [style.background]="s.color"></div>
-              <div class="atc-info">
-                <span class="atc-hint">Avui toca</span>
-                <span class="atc-label">
-                  <span class="material-symbols-outlined atc-icon" [style.font-variation-settings]="'FILL 1, WGHT 400'">{{ s.icon }}</span>
-                  {{ s.label }}
-                </span>
-              </div>
-              <span class="material-symbols-outlined atc-arrow">chevron_right</span>
-            </button>
-          }
-
           <!-- Entrenaments section -->
           <div class="workout-section">
             <div class="sports-header">
@@ -187,26 +172,41 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               <span class="material-symbols-outlined sports-header-icon">sports_soccer</span>
               <h2 class="sports-title">Esports</h2>
             </div>
-            <div class="sports-grid" [style.grid-template-columns]="gridCols(sportService.sports().length)">
-              @for (sport of sportService.sports(); track sport.id) {
-                <button
-                  class="sport-btn"
-                  [class.active]="isSportDone(sport.id)"
-                  [style.--sport-color]="sport.color"
-                  (click)="openSessionLogger(sport)"
-                  [disabled]="sportToggling()"
-                >
-                  @if (isSportDone(sport.id)) {
-                    <span class="sport-check material-symbols-outlined">check_circle</span>
+
+            <!-- Existing sport session cards -->
+            @for (item of dateSportSessions(); track item.session.id) {
+              <div class="workout-card" [style.--wc]="item.sport.color" (click)="openSessionLogger(item.sport)">
+                <div class="wc-bar" [style.background]="item.sport.color"></div>
+                <div class="wc-info">
+                  <span class="wc-label">
+                    <span class="material-symbols-outlined wc-icon" [style.color]="item.sport.color">{{ item.sport.icon }}</span>
+                    {{ item.sport.name }}
+                  </span>
+                  @if (sportSummary(item.session, item.sport); as sum) {
+                    <span class="wc-detail">{{ sum }}</span>
                   }
-                  <span class="material-symbols-outlined sport-icon">{{ sport.icon }}</span>
-                  <span class="sport-name">{{ sport.name }}</span>
-                  @if (sessionSummary(sport.id); as sum) {
-                    <span class="sport-summary">{{ sum }}</span>
-                  }
+                </div>
+                <button class="wc-delete" (click)="deleteSportSession(item.session.id, $event)" [disabled]="sportToggling()" title="Eliminar">
+                  <span class="material-symbols-outlined">delete</span>
                 </button>
-              }
-            </div>
+              </div>
+            }
+
+            <!-- Add-sport grid (only pending sports) -->
+            @if (pendingSports().length > 0) {
+              <div class="type-grid" [class.type-grid--mt]="dateSportSessions().length > 0"
+                   [style.grid-template-columns]="gridCols(pendingSports().length)">
+                @for (sport of pendingSports(); track sport.id) {
+                  <button class="type-btn"
+                    [style.--cat-color]="sport.color"
+                    (click)="openSessionLogger(sport)"
+                    [disabled]="sportToggling()">
+                    <span class="material-symbols-outlined type-icon">{{ sport.icon }}</span>
+                    <span class="type-label">{{ sport.name }}</span>
+                  </button>
+                }
+              </div>
+            }
           </div>
 
         }
@@ -221,6 +221,23 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       </button>
     }
 
+    <!-- ── Floating "Avui toca" suggestion ── -->
+    @if (!activeWorkout() && dateWorkouts().length === 0 && todaySuggestion(); as s) {
+      <div class="bottom-bar">
+        <button class="bar-shortcut bar-shortcut--suggestion"
+                [style.--wc]="s!.color"
+                (click)="selectType(s!.category)">
+          <span class="bar-shortcut-accent"></span>
+          <span class="material-symbols-outlined bar-shortcut-icon">{{ s!.icon }}</span>
+          <div class="bar-shortcut-info">
+            <span class="bar-shortcut-hint">Avui toca</span>
+            <span class="bar-shortcut-label">{{ s!.label }}</span>
+          </div>
+          <span class="material-symbols-outlined bar-shortcut-arrow">chevron_right</span>
+        </button>
+      </div>
+    }
+
     <!-- ── Bottom bar: quick-open workouts (dashboard) ── -->
     @if (!activeWorkout() && dateWorkouts().length > 0) {
       <div class="bottom-bar" [class.bottom-bar--multi]="dateWorkouts().length > 1">
@@ -228,6 +245,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           <button class="bar-shortcut"
                   [style.--wc]="workoutPrimaryColor(w)"
                   (click)="openWorkout(w.id)">
+            <span class="bar-shortcut-accent"></span>
             <span class="material-symbols-outlined bar-shortcut-icon">fitness_center</span>
             <div class="bar-shortcut-info">
               <span class="bar-shortcut-label">{{ workoutLabel(w) }}</span>
@@ -425,7 +443,8 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
   `,
   styles: [`
-    .page { padding: 0 0 84px; }
+    .page { padding: 0; }
+    .page--with-fab { padding-bottom: 84px; }
 
     /* ── Workout topbar (active mode, sticky) ── */
     .workout-topbar {
@@ -482,7 +501,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       bottom: calc(64px + env(safe-area-inset-bottom) + 10px);
       left: 12px; right: 12px;
       z-index: 90;
-      border-radius: 22px;
+      border-radius: 18px;
       box-shadow: 0 8px 28px var(--c-shadow-md), 0 2px 6px var(--c-shadow);
       animation: bar-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
@@ -491,9 +510,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       to   { transform: translateY(0);    opacity: 1; }
     }
     .bottom-bar--multi {
-      border-radius: 20px;
       background: var(--c-card);
-      border: 1.5px solid var(--c-border-2);
       overflow: hidden;
       .bar-shortcut {
         border-radius: 0; border: none;
@@ -502,31 +519,46 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       }
     }
     .bar-shortcut {
-      width: 100%; display: flex; align-items: center; gap: 12px;
-      border: 2px solid color-mix(in srgb, var(--wc) 35%, var(--c-border));
-      background: color-mix(in srgb, var(--wc) 14%, var(--c-card));
-      border-radius: 22px;
-      padding: 14px 16px;
+      position: relative;
+      width: 100%; display: flex; align-items: center; gap: 0;
+      border: 1px solid var(--c-border-2);
+      background: var(--c-card);
+      border-radius: 18px; overflow: hidden;
+      padding: 0;
       cursor: pointer; touch-action: manipulation;
-      transition: background 0.15s, transform 0.1s;
-      &:hover  { background: color-mix(in srgb, var(--wc) 22%, var(--c-card)); }
+      transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+      &:hover  { background: color-mix(in srgb, var(--wc) 6%, var(--c-card)); }
       &:active { transform: scale(0.98); }
     }
+    .bar-shortcut-accent {
+      width: 5px; align-self: stretch; flex-shrink: 0;
+      background: var(--wc);
+    }
     .bar-shortcut-icon {
-      font-size: 26px; flex-shrink: 0;
+      font-size: 24px; flex-shrink: 0;
       color: var(--wc);
+      padding: 13px 10px 13px 12px;
       font-variation-settings: 'FILL' 1, 'wght' 400;
     }
     .bar-shortcut-info {
       flex: 1; min-width: 0;
       display: flex; flex-direction: column; gap: 2px;
+      padding: 12px 4px 12px 0;
+    }
+    .bar-shortcut-hint {
+      font-size: 11px; font-weight: 700; line-height: 1.2;
+      color: color-mix(in srgb, var(--wc) 60%, var(--c-text));
+      text-transform: uppercase; letter-spacing: 0.4px;
     }
     .bar-shortcut-label {
       font-size: 15px; font-weight: 800; color: var(--c-text);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .bar-shortcut-detail { font-size: 12px; font-weight: 500; color: var(--c-text-2); }
-    .bar-shortcut-arrow { font-size: 18px; flex-shrink: 0; color: var(--wc); opacity: 0.7; }
+    .bar-shortcut-arrow {
+      font-size: 18px; flex-shrink: 0; color: var(--wc); opacity: 0.7;
+      margin-right: 12px;
+    }
 
     /* ── Type grid (inside workout-section) ── */
     .type-grid {
@@ -586,34 +618,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .material-symbols-outlined { font-size: 32px; color: var(--c-border); }
     }
 
-    /* ── Avui toca (inline, estil workout-card) ── */
-    .avui-toca-card {
-      display: flex; align-items: center;
-      margin: 12px 16px 0; width: calc(100% - 32px);
-      border: 1.5px solid color-mix(in srgb, var(--sg-c) 30%, var(--c-border-2));
-      border-radius: 14px;
-      background: color-mix(in srgb, var(--sg-c) 8%, var(--c-card));
-      overflow: hidden;
-      cursor: pointer; touch-action: manipulation;
-      transition: box-shadow 0.15s, border-color 0.15s, background 0.15s;
-      animation: atc-in 0.22s ease-out both;
-      &:hover {
-        box-shadow: 0 2px 8px var(--c-shadow);
-        background: color-mix(in srgb, var(--sg-c) 14%, var(--c-card));
-        border-color: color-mix(in srgb, var(--sg-c) 50%, var(--c-border));
-      }
-    }
-    @keyframes atc-in {
-      from { opacity: 0; transform: translateY(-4px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    .atc-bar  { width: 5px; align-self: stretch; flex-shrink: 0; }
-    .atc-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 10px 10px; text-align: left; }
-    .atc-hint { font-size: 11px; color: var(--c-text-2); }
-    .atc-label { font-size: 13px; font-weight: 700; color: var(--c-text); display: flex; align-items: center; gap: 4px; }
-    .atc-icon { font-size: 15px; color: var(--sg-c); }
-    .atc-arrow { font-size: 18px; color: var(--c-border); flex-shrink: 0; margin-right: 8px; }
-
     /* ── Workout section (dashboard) ── */
     .workout-section {
       margin: 12px 16px 0;
@@ -649,7 +653,9 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
     .wc-label {
       font-size: 13px; font-weight: 700; color: var(--c-text);
+      display: inline-flex; align-items: center; gap: 5px;
     }
+    .wc-icon { font-size: 15px; font-variation-settings: 'FILL' 1, 'wght' 400; }
     .wc-detail {
       font-size: 11px; color: var(--c-text-2);
     }
@@ -1054,6 +1060,44 @@ export class TrainComponent {
   readonly dateWorkouts = computed(() =>
     this.workoutService.getWorkoutsForDate(this.selectedDate())
   );
+
+  readonly hasFloatingBar = computed(() =>
+    this.activeWorkoutId() !== null ||
+    this.dateWorkouts().length > 0 ||
+    this.todaySuggestion() !== null
+  );
+
+  readonly dateSportSessions = computed(() =>
+    this.sportService.getSportSessionsForDate(this.selectedDate())
+  );
+
+  readonly pendingSports = computed(() => {
+    const doneIds = new Set(this.dateSportSessions().map(x => x.sport.id));
+    return this.sportService.sports().filter(s => !doneIds.has(s.id));
+  });
+
+  async deleteSportSession(sessionId: string, ev: Event): Promise<void> {
+    ev.stopPropagation();
+    this.sportToggling.set(true);
+    try {
+      await this.sportService.deleteSession(sessionId, this.selectedDate());
+    } catch {
+      this.snackBar.open('Error en eliminar', '', { duration: 2500 });
+    } finally {
+      this.sportToggling.set(false);
+    }
+  }
+
+  sportSummary(sub: { duration?: number; feeling?: FeelingLevel; subtypeId?: string }, sport: Sport): string {
+    const parts: string[] = [];
+    if (sub.subtypeId) {
+      const sub2 = sport.subtypes.find(s => s.id === sub.subtypeId);
+      if (sub2) parts.push(sub2.name);
+    }
+    if (sub.duration) parts.push(`${sub.duration}min`);
+    if (sub.feeling)  parts.push(FEELING_EMOJI[sub.feeling]);
+    return parts.join(' · ');
+  }
 
   readonly activeWorkout = computed((): Workout | null => {
     const id = this.activeWorkoutId();
