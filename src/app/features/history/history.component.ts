@@ -112,12 +112,15 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
                       <span class="ex-card-feeling">{{ getFeelingEmoji(entry.feeling) }}</span>
                     }
                     <span class="ex-card-name">{{ entry.exerciseName }}</span>
-                    <div class="ex-card-meta">
-                      <span class="ex-card-sets">{{ entry.sets.length }}<small> sèr</small></span>
-                      @if (entry.sets.length > 0) {
-                        <span class="ex-card-weight">{{ dispW(getMaxWeight(entry)) }}<small>{{ unit() }}</small></span>
-                      }
-                    </div>
+                    @if (entry.sets.length > 0) {
+                      <span class="ex-card-max">{{ dispW(getMaxWeight(entry)) }}<small> {{ unit() }}</small></span>
+                      <div class="ex-card-progress">
+                        @for (set of entry.sets; track $index; let last = $last) {
+                          <span class="ex-cp-w" [class.ex-cp-max]="isMaxSet(entry, set)">{{ dispW(set.weight) }}</span>
+                          @if (!last) { <span class="ex-cp-sep">›</span> }
+                        }
+                      </div>
+                    }
                   </button>
                 }
               </div>
@@ -128,7 +131,7 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
                   @if ((selectedEntry()?.sets ?? []).length > 0) {
                     <div class="ex-sets-row">
                       @for (set of selectedEntry()!.sets; track $index) {
-                        <div class="ex-set-pill">
+                        <div class="ex-set-pill" [class.ex-set-pill--max]="isMaxSet(selectedEntry()!, set)">
                           <span class="ex-set-num">{{ $index + 1 }}</span>
                           <span class="ex-set-weight">{{ dispW(set.weight) }}<small>{{ unit() }}</small></span>
                           <span class="ex-set-reps">×{{ set.reps }}</span>
@@ -265,9 +268,10 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
                         @if (entry.sets.length > 0) {
                           <div class="sets-list">
                             @for (set of entry.sets; track $index) {
-                              <div class="set-pill" [class.set-pill--max]="isMaxSet(entry, set)">
-                                <span class="set-weight">{{ dispW(set.weight) }}{{ unit() }}</span>
-                                <span class="set-reps">×{{ set.reps }}</span>
+                              <div class="set-row" [class.set-row--max]="isMaxSet(entry, set)">
+                                <span class="set-row-num">{{ $index + 1 }}</span>
+                                <span class="set-row-weight">{{ dispW(set.weight) }}<small> {{ unit() }}</small></span>
+                                <span class="set-row-reps">×{{ set.reps }}</span>
                               </div>
                             }
                           </div>
@@ -420,21 +424,22 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
     }
     .ex-card-name {
       font-size: 13px; font-weight: 700; color: var(--c-text);
-      line-height: 1.3; margin-top: 4px; flex: 1; word-break: break-word;
+      line-height: 1.3; margin-top: 4px; word-break: break-word;
     }
-    .ex-card-meta {
-      display: flex; align-items: baseline; gap: 6px;
-      margin-top: 10px; padding-top: 6px;
-      border-top: 1px solid var(--c-hover); width: 100%;
+    .ex-card-max {
+      font-size: 22px; font-weight: 800; color: var(--cat); line-height: 1;
+      margin-top: 8px;
+      small { font-size: 12px; font-weight: 500; color: var(--c-text-2); }
     }
-    .ex-card-sets {
-      font-size: 20px; font-weight: 800; color: var(--cat); line-height: 1;
-      small { font-size: 11px; font-weight: 500; color: var(--c-text-2); margin-left: 1px; }
+    .ex-card-progress {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 2px;
+      margin-top: 5px;
     }
-    .ex-card-weight {
-      font-size: 13px; font-weight: 600; color: var(--c-text-2);
-      small { font-size: 10px; font-weight: 400; }
+    .ex-cp-w {
+      font-size: 11px; font-weight: 600; color: var(--c-text-2);
     }
+    .ex-cp-max { font-weight: 800; color: var(--cat); }
+    .ex-cp-sep { font-size: 10px; color: var(--c-border); }
 
     /* Exercise detail panel */
     .ex-detail-panel {
@@ -454,6 +459,7 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
     .ex-set-weight { font-size: 13px; font-weight: 700; color: var(--c-text); }
     .ex-set-weight small { font-size: 9px; font-weight: 400; color: var(--c-text-2); }
     .ex-set-reps { font-size: 12px; color: var(--c-text-2); }
+    .ex-set-pill--max .ex-set-weight { font-weight: 800; color: var(--c-brand); }
     .ex-card-analysis { border-top: 1px solid var(--c-hover); }
 
     /* ════════════════════════════════
@@ -582,17 +588,17 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
       font-size: 12px; font-weight: 700; color: var(--c-brand);
       small { font-weight: 400; color: var(--c-text-3); }
     }
-    .sets-list { display: flex; flex-wrap: wrap; gap: 5px; padding-left: 15px; }
-    .set-pill {
-      display: flex; align-items: center; gap: 3px;
-      padding: 3px 9px; background: var(--c-subtle); border-radius: 16px; font-size: 12px;
-      .set-weight { font-weight: 600; color: var(--c-text); }
-      .set-reps { color: var(--c-text-2); }
-      &.set-pill--max {
-        background: rgba(var(--c-brand-rgb), 0.12);
-        .set-weight { color: var(--c-brand); }
-      }
+    .sets-list { display: flex; flex-direction: column; gap: 3px; padding-left: 15px; }
+    .set-row {
+      display: flex; align-items: baseline; gap: 8px;
     }
+    .set-row-num { font-size: 10px; font-weight: 600; color: var(--c-text-3); min-width: 14px; }
+    .set-row-weight {
+      font-size: 13px; font-weight: 600; color: var(--c-text);
+      small { font-size: 10px; font-weight: 400; color: var(--c-text-3); }
+    }
+    .set-row-reps { font-size: 12px; color: var(--c-text-2); }
+    .set-row--max .set-row-weight { font-weight: 800; color: var(--c-brand); }
     .no-sets { font-size: 12px; color: var(--c-text-3); font-style: italic; padding-left: 15px; }
     .workout-notes {
       display: flex; align-items: flex-start; gap: 6px;
