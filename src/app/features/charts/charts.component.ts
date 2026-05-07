@@ -223,7 +223,7 @@ interface ChartPoint {
       }
     </div>
 
-    <!-- ══ SECCIÓ ESPORTS ══ -->
+    <!-- ══ SECCIÓ ESPORTS (comentada temporalment) ══
     @if (sports().length > 0) {
       <header class="page-header">
         <h1>Esports</h1>
@@ -234,6 +234,7 @@ interface ChartPoint {
         <p class="wip-msg">Estem treballant en això</p>
       </div>
     }
+    ══ FI SECCIÓ ESPORTS ══ -->
   `,
   styles: [`
     .page { padding: 0; }
@@ -358,7 +359,7 @@ interface ChartPoint {
 
     /* ── Personal records ────────────────────────────────── */
     .pr-section {
-      margin: 12px 16px 0; background: var(--c-card);
+      margin: 16px 16px 0; background: var(--c-card);
       border-radius: 14px; box-shadow: 0 2px 8px var(--c-shadow);
       overflow: hidden;
     }
