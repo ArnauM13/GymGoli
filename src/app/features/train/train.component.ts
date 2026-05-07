@@ -124,6 +124,18 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
           <app-fitness-insights />
 
+          <!-- ── Avui toca ── -->
+          @if (todaySuggestion(); as s) {
+            <button class="today-suggestion" [style.--sg-c]="s.color" (click)="selectType(s.category)">
+              <span class="material-symbols-outlined sg-icon">{{ s.icon }}</span>
+              <div class="sg-info">
+                <span class="sg-hint">Avui toca</span>
+                <span class="sg-cat">{{ s.label }}</span>
+              </div>
+              <span class="material-symbols-outlined sg-arrow">arrow_forward_ios</span>
+            </button>
+          }
+
           <!-- Entrenaments section -->
           <div class="workout-section">
             <div class="sports-header">
@@ -583,29 +595,26 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .material-symbols-outlined { font-size: 32px; color: var(--c-border); }
     }
 
-    /* ── Avui toca FAB ── */
-    .avui-toca-fab {
-      position: fixed; bottom: 88px; left: 16px; right: 16px; z-index: 50;
-      display: flex; flex-direction: row; align-items: center; gap: 12px;
-      padding: 12px 14px; border-radius: 14px;
+    /* ── Avui toca ── */
+    .today-suggestion {
+      display: flex; align-items: center; gap: 12px;
+      margin: 12px 16px 0; padding: 12px 14px;
       background: color-mix(in srgb, var(--sg-c, var(--c-brand)) 8%, var(--c-card));
-      border: none; border-left: 5px solid var(--sg-c, var(--c-brand));
-      cursor: pointer; touch-action: manipulation;
+      border-radius: 14px;
+      border: 2px solid var(--sg-c, var(--c-brand));
       box-shadow: 0 2px 10px var(--c-shadow);
-      animation: fab-in 0.22s ease-out both;
-      transition: box-shadow 0.15s, transform 0.15s;
-      &:hover { box-shadow: 0 4px 14px var(--c-shadow); transform: translateY(-1px); }
-      &:active { transform: scale(0.98); }
+      cursor: pointer; text-align: left; touch-action: manipulation;
+      transition: background 0.15s;
+      &:hover { background: color-mix(in srgb, var(--sg-c, var(--c-brand)) 14%, var(--c-card)); }
     }
-    @keyframes fab-in {
-      from { transform: translateY(12px); opacity: 0; }
-      to   { transform: translateY(0);    opacity: 1; }
+    .sg-icon {
+      font-size: 22px; color: var(--sg-c, var(--c-brand));
+      font-variation-settings: 'FILL' 1, 'wght' 400; flex-shrink: 0;
     }
-    .fab-icon  { font-size: 22px; color: var(--sg-c, var(--c-brand)); flex-shrink: 0; }
-    .fab-text  { display: flex; flex-direction: column; gap: 1px; flex: 1; }
-    .fab-label { font-size: 10px; font-weight: 600; color: var(--c-text-2); text-transform: uppercase; letter-spacing: 0.04em; }
-    .fab-cat   { font-size: 14px; font-weight: 700; color: var(--c-text); }
-    .fab-arrow { font-size: 18px; color: var(--c-text-2); flex-shrink: 0; }
+    .sg-info { flex: 1; display: flex; flex-direction: column; gap: 1px; }
+    .sg-hint { font-size: 11px; font-weight: 600; color: var(--c-text-3); text-transform: uppercase; letter-spacing: 0.4px; }
+    .sg-cat  { font-size: 15px; font-weight: 700; color: var(--sg-c, var(--c-brand)); }
+    .sg-arrow { font-size: 16px; color: var(--c-text-3); flex-shrink: 0; }
 
     /* ── Workout section (dashboard) ── */
     .workout-section {
