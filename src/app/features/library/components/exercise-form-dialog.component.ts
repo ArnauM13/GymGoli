@@ -1,11 +1,9 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 
 import {
+  CATEGORY_COLORS,
   CATEGORY_ICONS,
   CATEGORY_LABELS,
   Exercise,
@@ -18,174 +16,277 @@ export interface ExerciseFormDialogData {
   exercise?: Exercise;
 }
 
+const MUSCLE_GROUPS: { label: string; values: string[] }[] = [
+  { label: 'Tronc',  values: ['pit', 'esquena', 'espatlles', 'core'] },
+  { label: 'Braços', values: ['biceps', 'triceps', 'avantbracos'] },
+  { label: 'Cames',  values: ['quadriceps', 'isquiotibials', 'glutis', 'bessons'] },
+];
+
 @Component({
   selector: 'app-exercise-form-dialog',
   standalone: true,
-  imports: [
-    ReactiveFormsModule,
-    MatDialogModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatSelectModule,
-  ],
+  imports: [ReactiveFormsModule, MatDialogModule],
   template: `
-    <h2 mat-dialog-title>{{ isEdit ? 'Editar exercici' : 'Nou exercici' }}</h2>
+    <h2 mat-dialog-title class="dlg-title">{{ isEdit ? 'Editar exercici' : 'Nou exercici' }}</h2>
 
-    <mat-dialog-content>
+    <mat-dialog-content class="dlg-content">
       <form [formGroup]="form" class="form">
 
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Nom de l'exercici</mat-label>
-          <input matInput formControlName="name" placeholder="Ex: Press banca" autocomplete="off">
+        <!-- Nom -->
+        <div class="field">
+          <label class="field-label" for="ex-name">Nom de l'exercici</label>
+          <input id="ex-name" class="field-input" type="text" formControlName="name"
+                 placeholder="Ex: Press banca" autocomplete="off">
           @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
-            <mat-error>El nom és obligatori</mat-error>
+            <span class="field-error">El nom és obligatori</span>
           }
-        </mat-form-field>
+        </div>
 
-        <div class="category-selector">
-          <p class="field-label">Tipus</p>
-          <div class="category-buttons">
+        <!-- Tipus -->
+        <div class="field">
+          <span class="field-label">Tipus</span>
+          <div class="cat-grid">
             @for (cat of categories; track cat.value) {
-              <button
-                type="button"
-                class="cat-btn"
-                [class.selected]="selectedCategory() === cat.value"
-                (click)="selectCategory(cat.value)"
-              >
+              <button type="button" class="cat-btn"
+                      [class.selected]="selectedCategory() === cat.value"
+                      [style.--cat-color]="cat.color"
+                      (click)="selectCategory(cat.value)">
                 <span class="material-symbols-outlined">{{ cat.icon }}</span>
-                <span>{{ cat.label }}</span>
+                <span class="cat-btn-label">{{ cat.label }}</span>
               </button>
             }
           </div>
         </div>
 
+        <!-- Grup muscular principal -->
         @if (subcategoryOptions().length > 0) {
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Grup muscular principal</mat-label>
-            <mat-select formControlName="subcategory">
+          <div class="field">
+            <span class="field-label">Grup muscular principal</span>
+            <div class="chips-row">
               @for (sub of subcategoryOptions(); track sub.value) {
-                <mat-option [value]="sub.value">{{ sub.label }}</mat-option>
+                <button type="button" class="chip"
+                        [class.selected]="form.get('subcategory')?.value === sub.value"
+                        (click)="selectSubcategory(sub.value)">
+                  {{ sub.label }}
+                </button>
               }
-            </mat-select>
-          </mat-form-field>
+            </div>
+          </div>
         }
 
-        <!-- Músculs implicats -->
-        <div class="picker-section">
-          <p class="field-label">Músculs <span class="optional-hint">(opcional)</span></p>
-          <div class="muscle-grid">
-            @for (m of muscleOptions; track m.value) {
-              <button type="button" class="muscle-chip"
-                      [class.selected]="hasMuscle(m.value)"
-                      (click)="toggleMuscle(m.value)">
-                {{ m.label }}
-              </button>
+        <!-- Músculs -->
+        <div class="field">
+          <span class="field-label">Músculs implicats <span class="optional-hint">(opcional)</span></span>
+          <div class="muscle-groups">
+            @for (group of muscleGroups; track group.label) {
+              <div class="muscle-group">
+                <span class="muscle-group-title">{{ group.label }}</span>
+                <div class="chips-row">
+                  @for (v of group.values; track v) {
+                    <button type="button" class="chip"
+                            [class.selected]="hasMuscle(v)"
+                            (click)="toggleMuscle(v)">
+                      {{ muscleLabel(v) }}
+                    </button>
+                  }
+                </div>
+              </div>
             }
           </div>
         </div>
 
-        <!-- Guia de sèries i repeticions -->
-        <div class="picker-section">
-          <p class="field-label">Guia de sèries i reps <span class="optional-hint">(opcional)</span></p>
-          <div class="range-row">
-            <div class="range-group">
-              <span class="range-label">Sèries</span>
-              <div class="range-inputs">
-                <input class="range-input" type="number" min="1" max="10" placeholder="mín"
-                       [value]="setsMin()" (input)="setsMin.set(+$any($event.target).value || 0)">
-                <span class="range-sep">–</span>
-                <input class="range-input" type="number" min="1" max="10" placeholder="màx"
-                       [value]="setsMax()" (input)="setsMax.set(+$any($event.target).value || 0)">
+        <!-- Guia sèries i reps -->
+        <div class="field">
+          <span class="field-label">Guia de sèries i reps <span class="optional-hint">(opcional)</span></span>
+          <div class="guide-row">
+            <div class="guide-group">
+              <span class="guide-group-label">Sèries</span>
+              <div class="guide-inputs">
+                <input class="guide-input" type="number" min="1" max="10" inputmode="numeric"
+                       [value]="setsMin() || null" placeholder="—"
+                       (input)="setsMin.set(numFromEvent($event))">
+                @if (setsRange()) {
+                  <span class="guide-sep">–</span>
+                  <input class="guide-input" type="number" min="1" max="10" inputmode="numeric"
+                         [value]="setsMax() || null" placeholder="—"
+                         (input)="setsMax.set(numFromEvent($event))">
+                  <button type="button" class="guide-toggle" (click)="setsRange.set(false)" title="Treure rang">
+                    <span class="material-symbols-outlined">remove</span>
+                  </button>
+                } @else {
+                  <button type="button" class="guide-toggle" (click)="setsRange.set(true)" title="Afegir rang">
+                    <span class="material-symbols-outlined">add</span>
+                    <span class="guide-toggle-label">rang</span>
+                  </button>
+                }
               </div>
             </div>
-            <div class="range-divider"></div>
-            <div class="range-group">
-              <span class="range-label">Reps</span>
-              <div class="range-inputs">
-                <input class="range-input" type="number" min="1" max="100" placeholder="mín"
-                       [value]="repsMin()" (input)="repsMin.set(+$any($event.target).value || 0)">
-                <span class="range-sep">–</span>
-                <input class="range-input" type="number" min="1" max="100" placeholder="màx"
-                       [value]="repsMax()" (input)="repsMax.set(+$any($event.target).value || 0)">
+            <div class="guide-group">
+              <span class="guide-group-label">Reps</span>
+              <div class="guide-inputs">
+                <input class="guide-input" type="number" min="1" max="100" inputmode="numeric"
+                       [value]="repsMin() || null" placeholder="—"
+                       (input)="repsMin.set(numFromEvent($event))">
+                @if (repsRange()) {
+                  <span class="guide-sep">–</span>
+                  <input class="guide-input" type="number" min="1" max="100" inputmode="numeric"
+                         [value]="repsMax() || null" placeholder="—"
+                         (input)="repsMax.set(numFromEvent($event))">
+                  <button type="button" class="guide-toggle" (click)="repsRange.set(false)" title="Treure rang">
+                    <span class="material-symbols-outlined">remove</span>
+                  </button>
+                } @else {
+                  <button type="button" class="guide-toggle" (click)="repsRange.set(true)" title="Afegir rang">
+                    <span class="material-symbols-outlined">add</span>
+                    <span class="guide-toggle-label">rang</span>
+                  </button>
+                }
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Descripció de tècnica -->
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Descripció de tècnica <span style="font-size:11px;opacity:.6">(opcional)</span></mat-label>
-          <textarea matInput formControlName="description" rows="3"
+        <!-- Descripció -->
+        <div class="field">
+          <label class="field-label" for="ex-desc">
+            Descripció de tècnica <span class="optional-hint">(opcional)</span>
+          </label>
+          <textarea id="ex-desc" class="field-input field-textarea" rows="3" formControlName="description"
                     placeholder="Com fer l'exercici, consells de tècnica..."></textarea>
-        </mat-form-field>
+        </div>
 
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Notes personals <span style="font-size:11px;opacity:.6">(opcional)</span></mat-label>
-          <textarea matInput formControlName="notes" rows="2" placeholder="Variants, equipament..."></textarea>
-        </mat-form-field>
+        <!-- Notes -->
+        <div class="field">
+          <label class="field-label" for="ex-notes">
+            Notes personals <span class="optional-hint">(opcional)</span>
+          </label>
+          <textarea id="ex-notes" class="field-input field-textarea" rows="2" formControlName="notes"
+                    placeholder="Variants, equipament..."></textarea>
+        </div>
 
       </form>
     </mat-dialog-content>
 
-    <mat-dialog-actions align="end">
+    <mat-dialog-actions align="end" class="dlg-actions">
       <button class="dlg-btn dlg-btn--cancel" type="button" (click)="close()">Cancel·lar</button>
-      <button class="dlg-btn dlg-btn--save" type="button" (click)="save()" [disabled]="form.invalid || !selectedCategory()">
+      <button class="dlg-btn dlg-btn--save" type="button" (click)="save()"
+              [disabled]="form.invalid || !selectedCategory()">
         {{ isEdit ? 'Desar' : 'Crear' }}
       </button>
     </mat-dialog-actions>
   `,
   styles: [`
-    .form { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
-    .full-width { width: 100%; }
-    .field-label { margin: 0 0 8px; font-size: 13px; color: var(--c-text-3); font-weight: 500; }
-    .optional-hint { font-weight: 400; font-size: 11px; }
+    :host { display: block; }
 
-    .category-selector { margin-bottom: 4px; }
-    .category-buttons { display: flex; gap: 8px; }
+    .dlg-title { margin: 0 0 4px; font-size: 17px; font-weight: 800; color: var(--c-text); padding: 16px 20px 8px; }
+    .dlg-content { padding: 0 20px !important; }
+    .dlg-actions { padding: 12px 20px 16px !important; gap: 8px; }
 
-    .cat-btn {
-      flex: 1; display: flex; flex-direction: column; align-items: center;
-      gap: 4px; padding: 12px 8px;
-      border: 2px solid var(--c-border-2); border-radius: 12px;
-      background: var(--c-subtle); cursor: pointer;
-      font-size: 12px; font-weight: 500; color: var(--c-text-3); transition: all 0.2s;
-      span.material-symbols-outlined { font-size: 22px; }
-      &:hover { border-color: var(--c-brand); color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.06); }
-      &.selected { border-color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.1); color: var(--c-brand); }
+    .form { display: flex; flex-direction: column; gap: 18px; padding: 4px 0 8px; }
+
+    /* ── Field (label + control) ── */
+    .field { display: flex; flex-direction: column; gap: 8px; }
+    .field-label {
+      font-size: 11px; font-weight: 700; color: var(--c-text-3);
+      text-transform: uppercase; letter-spacing: 0.5px;
     }
-
-    /* Músculs */
-    .picker-section { display: flex; flex-direction: column; gap: 8px; }
-    .muscle-grid { display: flex; flex-wrap: wrap; gap: 6px; }
-    .muscle-chip {
-      padding: 5px 10px; border: 1.5px solid var(--c-border); border-radius: 20px;
-      background: var(--c-card); font-size: 12px; font-weight: 500; color: var(--c-text-2);
-      cursor: pointer; transition: all 0.15s;
-      &.selected { background: var(--c-brand); color: white; border-color: var(--c-brand); }
-      &:hover:not(.selected) { border-color: var(--c-brand); color: var(--c-brand); }
+    .optional-hint {
+      font-size: 10px; font-weight: 500; color: var(--c-text-3);
+      text-transform: none; letter-spacing: 0; opacity: 0.85;
     }
+    .field-error { font-size: 12px; color: #ef5350; }
 
-    /* Rang sèries/reps */
-    .range-row {
-      display: flex; align-items: center; gap: 12px;
-      background: var(--c-subtle); border-radius: 10px; padding: 10px 12px;
-    }
-    .range-group { display: flex; flex-direction: column; gap: 6px; flex: 1; }
-    .range-label { font-size: 11px; color: var(--c-text-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-    .range-inputs { display: flex; align-items: center; gap: 4px; }
-    .range-sep { font-size: 13px; color: var(--c-text-3); }
-    .range-input {
-      width: 44px; padding: 5px 6px; text-align: center;
-      border: 1.5px solid var(--c-border-2); border-radius: 8px;
-      font-size: 13px; font-weight: 600; background: var(--c-card); color: var(--c-text);
-      outline: none; transition: border-color 0.15s;
+    /* ── Inputs ── */
+    .field-input {
+      width: 100%; padding: 10px 12px; box-sizing: border-box;
+      border: 1.5px solid var(--c-border-2); border-radius: 12px;
+      background: var(--c-card); color: var(--c-text);
+      font-size: 14px; font-family: inherit; outline: none;
+      transition: border-color 0.15s;
+      &::placeholder { color: var(--c-text-3); }
       &:focus { border-color: var(--c-brand); }
-      &::placeholder { color: var(--c-text-3); font-weight: 400; }
     }
-    .range-divider { width: 1px; height: 36px; background: var(--c-border-2); }
+    .field-textarea { resize: vertical; min-height: 60px; line-height: 1.4; }
 
+    /* ── Categoria ── */
+    .cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .cat-btn {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      padding: 12px 6px;
+      border: 2px solid var(--c-border-2); border-radius: 12px;
+      background: var(--c-card); color: var(--c-text-2);
+      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 22px; }
+      .cat-btn-label { font-size: 12px; font-weight: 600; }
+      &:hover {
+        border-color: color-mix(in srgb, var(--cat-color, var(--c-brand)) 55%, var(--c-border));
+        background: color-mix(in srgb, var(--cat-color, var(--c-brand)) 6%, var(--c-card));
+      }
+      &.selected {
+        border-color: var(--cat-color, var(--c-brand));
+        background: color-mix(in srgb, var(--cat-color, var(--c-brand)) 14%, var(--c-card));
+        color: color-mix(in srgb, var(--cat-color, var(--c-brand)) 80%, var(--c-text));
+      }
+    }
+
+    /* ── Chips (subcategoria + músculs) ── */
+    .chips-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip {
+      padding: 6px 12px; border-radius: 16px;
+      border: 1.5px solid var(--c-border-2); background: var(--c-card);
+      font-size: 12px; font-weight: 600; color: var(--c-text-2);
+      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+      &:hover:not(.selected) { border-color: var(--c-brand); color: var(--c-brand); }
+      &.selected { background: var(--c-brand); border-color: var(--c-brand); color: #fff; }
+    }
+
+    /* ── Músculs agrupats ── */
+    .muscle-groups { display: flex; flex-direction: column; gap: 12px; }
+    .muscle-group { display: flex; flex-direction: column; gap: 6px; }
+    .muscle-group-title {
+      font-size: 11px; font-weight: 600; color: var(--c-text-2);
+      letter-spacing: 0.2px;
+    }
+
+    /* ── Guia sèries / reps ── */
+    .guide-row { display: flex; gap: 10px; }
+    .guide-group {
+      flex: 1; display: flex; flex-direction: column; gap: 6px;
+      padding: 10px 12px;
+      background: var(--c-subtle); border-radius: 12px;
+      border: 1.5px solid var(--c-border-2);
+    }
+    .guide-group-label {
+      font-size: 10px; font-weight: 700; color: var(--c-text-3);
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .guide-inputs { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .guide-input {
+      width: 50px; padding: 6px 8px; box-sizing: border-box;
+      border: 1.5px solid var(--c-border-2); border-radius: 8px;
+      background: var(--c-card); color: var(--c-text);
+      font-size: 14px; font-weight: 700; text-align: center;
+      outline: none; transition: border-color 0.15s;
+      -moz-appearance: textfield;
+      &::-webkit-outer-spin-button, &::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+      &::placeholder { color: var(--c-text-3); font-weight: 400; }
+      &:focus { border-color: var(--c-brand); }
+    }
+    .guide-sep { font-size: 13px; color: var(--c-text-3); font-weight: 700; }
+    .guide-toggle {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 5px 8px; border-radius: 8px;
+      border: 1.5px dashed var(--c-border); background: transparent;
+      color: var(--c-text-3); font-size: 11px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 14px; }
+      &:hover { color: var(--c-brand); border-color: var(--c-brand); border-style: solid; }
+    }
+    .guide-toggle-label { letter-spacing: 0.2px; }
+
+    /* ── Botons ── */
     .dlg-btn {
-      padding: 9px 18px; border-radius: 10px; font-size: 13px; font-weight: 600;
+      padding: 9px 18px; border-radius: 10px; font-size: 13px; font-weight: 700;
       cursor: pointer; border: none; transition: background 0.15s, color 0.15s;
       touch-action: manipulation;
     }
@@ -195,7 +296,7 @@ export interface ExerciseFormDialogData {
       &:hover { background: var(--c-hover); color: var(--c-text); }
     }
     .dlg-btn--save {
-      background: var(--c-brand); color: #fff; font-weight: 700;
+      background: var(--c-brand); color: #fff;
       &:hover:not(:disabled) { background: var(--c-brand-hover, #005a63); }
       &:disabled { opacity: 0.4; cursor: not-allowed; }
     }
@@ -207,28 +308,33 @@ export class ExerciseFormDialogComponent {
   readonly data: ExerciseFormDialogData = inject(MAT_DIALOG_DATA);
 
   readonly isEdit = !!this.data.exercise;
-  readonly selectedCategory = signal<ExerciseCategory | null>(
-    this.data.exercise?.category ?? null
-  );
+  readonly selectedCategory = signal<ExerciseCategory | null>(this.data.exercise?.category ?? null);
 
-  readonly muscleOptions = MUSCLE_OPTIONS;
+  readonly muscleGroups = MUSCLE_GROUPS;
   readonly selectedMuscles = signal<string[]>([...(this.data.exercise?.muscles ?? [])]);
 
-  readonly setsMin = signal(this.data.exercise?.setsRange?.[0] ?? 0);
-  readonly setsMax = signal(this.data.exercise?.setsRange?.[1] ?? 0);
-  readonly repsMin = signal(this.data.exercise?.repsRange?.[0] ?? 0);
-  readonly repsMax = signal(this.data.exercise?.repsRange?.[1] ?? 0);
+  private readonly _setsInit = this.data.exercise?.setsRange;
+  private readonly _repsInit = this.data.exercise?.repsRange;
+
+  readonly setsMin = signal(this._setsInit?.[0] ?? 0);
+  readonly setsMax = signal(this._setsInit?.[1] ?? 0);
+  readonly repsMin = signal(this._repsInit?.[0] ?? 0);
+  readonly repsMax = signal(this._repsInit?.[1] ?? 0);
+
+  readonly setsRange = signal(!!this._setsInit && this._setsInit[0] !== this._setsInit[1]);
+  readonly repsRange = signal(!!this._repsInit && this._repsInit[0] !== this._repsInit[1]);
 
   readonly categories = (Object.keys(CATEGORY_LABELS) as ExerciseCategory[]).map(value => ({
     value,
     label: CATEGORY_LABELS[value],
     icon: CATEGORY_ICONS[value],
+    color: CATEGORY_COLORS[value],
   }));
 
-  readonly subcategoryOptions = () => {
+  readonly subcategoryOptions = computed(() => {
     const cat = this.selectedCategory();
     return cat ? SUBCATEGORY_OPTIONS[cat] : [];
-  };
+  });
 
   readonly form = this.fb.group({
     name:        [this.data.exercise?.name ?? '', Validators.required],
@@ -238,6 +344,10 @@ export class ExerciseFormDialogComponent {
   });
 
   hasMuscle(v: string): boolean { return this.selectedMuscles().includes(v); }
+
+  muscleLabel(v: string): string {
+    return MUSCLE_OPTIONS.find(m => m.value === v)?.label ?? v;
+  }
 
   toggleMuscle(v: string): void {
     this.selectedMuscles.update(list =>
@@ -250,14 +360,22 @@ export class ExerciseFormDialogComponent {
     this.form.patchValue({ subcategory: '' });
   }
 
+  selectSubcategory(value: string): void {
+    const current = this.form.get('subcategory')?.value;
+    this.form.patchValue({ subcategory: current === value ? '' : value });
+  }
+
+  numFromEvent(ev: Event): number {
+    const v = +(ev.target as HTMLInputElement).value;
+    return Number.isFinite(v) && v > 0 ? v : 0;
+  }
+
   save(): void {
     if (this.form.invalid || !this.selectedCategory()) return;
     const { name, subcategory, description, notes } = this.form.value;
 
-    const setsRange: [number, number] | undefined =
-      this.setsMin() > 0 && this.setsMax() > 0 ? [this.setsMin(), this.setsMax()] : undefined;
-    const repsRange: [number, number] | undefined =
-      this.repsMin() > 0 && this.repsMax() > 0 ? [this.repsMin(), this.repsMax()] : undefined;
+    const setsRange = this.buildRange(this.setsMin(), this.setsMax(), this.setsRange());
+    const repsRange = this.buildRange(this.repsMin(), this.repsMax(), this.repsRange());
 
     this.dialogRef.close({
       name:        name!.trim(),
@@ -269,6 +387,12 @@ export class ExerciseFormDialogComponent {
       setsRange,
       repsRange,
     });
+  }
+
+  private buildRange(min: number, max: number, asRange: boolean): [number, number] | undefined {
+    if (min <= 0) return undefined;
+    if (asRange && max > 0 && max !== min) return [Math.min(min, max), Math.max(min, max)];
+    return [min, min];
   }
 
   close(): void { this.dialogRef.close(); }
