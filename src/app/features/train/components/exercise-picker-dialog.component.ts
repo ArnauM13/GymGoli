@@ -1,6 +1,5 @@
 import { Component, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -22,7 +21,7 @@ export interface ExercisePickerData {
 @Component({
   selector: 'app-exercise-picker-dialog',
   standalone: true,
-  imports: [FormsModule, MatDialogModule, MatButtonModule, MatInputModule, MatFormFieldModule],
+  imports: [FormsModule, MatDialogModule, MatInputModule, MatFormFieldModule],
   template: `
     <h2 mat-dialog-title>Selecciona exercici</h2>
 
@@ -74,7 +73,7 @@ export interface ExercisePickerData {
     </mat-dialog-content>
 
     <mat-dialog-actions align="end">
-      <button mat-button (click)="close()">Cancel·lar</button>
+      <button class="dlg-btn dlg-btn--cancel" type="button" (click)="close()">Cancel·lar</button>
     </mat-dialog-actions>
   `,
   styles: [`
@@ -151,6 +150,17 @@ export interface ExercisePickerData {
     }
 
     .empty { padding: 24px; text-align: center; color: var(--c-text-3); }
+
+    .dlg-btn {
+      padding: 9px 18px; border-radius: 10px; font-size: 13px; font-weight: 600;
+      cursor: pointer; border: none; transition: background 0.15s, color 0.15s;
+      touch-action: manipulation;
+    }
+    .dlg-btn--cancel {
+      background: transparent; color: var(--c-text-2);
+      border: 1.5px solid var(--c-border-2);
+      &:hover { background: var(--c-hover); color: var(--c-text); }
+    }
   `],
 })
 export class ExercisePickerDialogComponent {

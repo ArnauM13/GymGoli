@@ -2,7 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
-import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry } from '../../core/models/workout.model';
+import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry, WorkoutSet } from '../../core/models/workout.model';
 import { Sport, SportSubtype } from '../../core/models/sport.model';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
@@ -226,6 +226,7 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
 
                 <button class="workout-header" (click)="toggleExpanded(workout.id)">
                   <div class="workout-date-block">
+                    <span class="weekday">{{ getWeekday(workout.date) }}</span>
                     <span class="day">{{ getDay(workout.date) }}</span>
                     <span class="month-year">{{ getMonthYear(workout.date) }}</span>
                   </div>
@@ -240,10 +241,8 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
                         }
                       </div>
                     }
-                    <span class="exercise-count">
-                      {{ workout.entries.length }} exercici{{ workout.entries.length !== 1 ? 's' : '' }}
-                      <span class="set-count-inline">· {{ totalSets(workout) }} sèries</span>
-                    </span>
+                    <span class="exercise-names">{{ getExerciseNames(workout) }}</span>
+                    <span class="workout-stats">{{ totalSets(workout) }} sèries · {{ dispW(totalVolume(workout)) }} {{ unit() }}</span>
                   </div>
                   <span class="material-symbols-outlined chevron">
                     {{ expandedId() === workout.id ? 'expand_less' : 'expand_more' }}
@@ -260,13 +259,16 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
                           @if (entry.feeling) {
                             <span class="entry-feeling">{{ getFeelingEmoji(entry.feeling) }}</span>
                           }
+                          @if (getMaxWeight(entry) > 0) {
+                            <span class="entry-max-weight">{{ dispW(getMaxWeight(entry)) }}<small> {{ unit() }}</small></span>
+                          }
                         </div>
                         @if (entry.sets.length > 0) {
                           <div class="sets-list">
                             @for (set of entry.sets; track $index) {
-                              <div class="set-pill">
+                              <div class="set-pill" [class.set-pill--max]="isMaxSet(entry, set)">
                                 <span class="set-weight">{{ dispW(set.weight) }}{{ unit() }}</span>
-                                <span class="set-reps">× {{ set.reps }}</span>
+                                <span class="set-reps">×{{ set.reps }}</span>
                               </div>
                             }
                           </div>
@@ -275,6 +277,19 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
                         }
                       </div>
                     }
+                    @if (workout.notes) {
+                      <div class="workout-notes">
+                        <span class="material-symbols-outlined">notes</span>
+                        {{ workout.notes }}
+                      </div>
+                    }
+                    <div class="workout-volume-footer">
+                      <span>{{ workout.entries.length }} exercici{{ workout.entries.length !== 1 ? 's' : '' }}</span>
+                      <span class="wvf-sep">·</span>
+                      <span>{{ totalSets(workout) }} sèries</span>
+                      <span class="wvf-sep">·</span>
+                      <span>{{ dispW(totalVolume(workout)) }} {{ unit() }} volum</span>
+                    </div>
                   </div>
                 }
 
@@ -529,18 +544,15 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
 
     .workout-date-block {
       display: flex; flex-direction: column; align-items: center;
-      min-width: 36px; flex-shrink: 0;
-      .day { font-size: 20px; font-weight: 700; color: var(--c-text); line-height: 1; }
-      .month-year { font-size: 10px; color: var(--c-text-2); text-transform: uppercase; margin-top: 2px; }
+      min-width: 38px; flex-shrink: 0;
+      .weekday { font-size: 9px; font-weight: 700; color: var(--c-brand); text-transform: uppercase; letter-spacing: 0.04em; line-height: 1; }
+      .day { font-size: 22px; font-weight: 800; color: var(--c-text); line-height: 1.1; }
+      .month-year { font-size: 9px; color: var(--c-text-3); text-transform: uppercase; margin-top: 1px; }
     }
 
-    .workout-summary {
-      flex: 1; display: flex; flex-direction: column; gap: 5px;
-    }
-    .exercise-count {
-      font-size: 13px; font-weight: 600; color: var(--c-text);
-    }
-    .set-count-inline { font-size: 12px; font-weight: 400; color: var(--c-text-2); }
+    .workout-summary { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+    .exercise-names { font-size: 13px; font-weight: 600; color: var(--c-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .workout-stats { font-size: 11px; color: var(--c-text-3); }
 
     .workout-badges-row { display: flex; flex-wrap: wrap; gap: 4px; }
     .workout-type-badge {
@@ -564,19 +576,37 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
       &:last-child { border-bottom: none; padding-bottom: 0; }
     }
     .entry-name-row { display: flex; align-items: center; gap: 7px; }
-    .entry-cat-dot {
-      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
-    }
+    .entry-cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
     .entry-name { font-size: 13px; font-weight: 600; color: var(--c-text); flex: 1; }
-    .entry-feeling { font-size: 17px; line-height: 1; }
+    .entry-feeling { font-size: 16px; line-height: 1; }
+    .entry-max-weight {
+      font-size: 12px; font-weight: 700; color: var(--c-brand);
+      small { font-weight: 400; color: var(--c-text-3); }
+    }
     .sets-list { display: flex; flex-wrap: wrap; gap: 5px; padding-left: 15px; }
     .set-pill {
       display: flex; align-items: center; gap: 3px;
       padding: 3px 9px; background: var(--c-subtle); border-radius: 16px; font-size: 12px;
       .set-weight { font-weight: 600; color: var(--c-text); }
       .set-reps { color: var(--c-text-2); }
+      &.set-pill--max {
+        background: rgba(var(--c-brand-rgb), 0.12);
+        .set-weight { color: var(--c-brand); }
+      }
     }
     .no-sets { font-size: 12px; color: var(--c-text-3); font-style: italic; padding-left: 15px; }
+    .workout-notes {
+      display: flex; align-items: flex-start; gap: 6px;
+      font-size: 12px; color: var(--c-text-2); font-style: italic;
+      padding: 8px 10px; background: var(--c-subtle); border-radius: 8px;
+      .material-symbols-outlined { font-size: 15px; color: var(--c-text-3); flex-shrink: 0; margin-top: 1px; }
+    }
+    .workout-volume-footer {
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+      padding-top: 8px; border-top: 1px solid var(--c-border-2);
+      font-size: 11px; font-weight: 600; color: var(--c-text-3);
+      .wvf-sep { color: var(--c-border-2); }
+    }
 
     /* ── Select-day hint ── */
     .select-day-hint {
@@ -750,9 +780,30 @@ export class HistoryComponent {
   getMonthYear(date: string): string {
     return new Date(date + 'T12:00:00').toLocaleDateString('ca-ES', { month: 'short', year: '2-digit' });
   }
+  getWeekday(date: string): string {
+    const days = ['dg', 'dl', 'dt', 'dc', 'dj', 'dv', 'ds'];
+    return days[new Date(date + 'T12:00:00').getDay()];
+  }
 
   totalSets(workout: Workout): number {
     return workout.entries.reduce((s, e) => s + e.sets.length, 0);
+  }
+  totalVolume(workout: Workout): number {
+    return Math.round(workout.entries.reduce((t, e) =>
+      t + e.sets.reduce((s, set) => s + set.weight * set.reps, 0), 0
+    ));
+  }
+  getExerciseNames(workout: Workout): string {
+    const names = workout.entries.map(e => e.exerciseName);
+    if (names.length === 0) return '—';
+    if (names.length <= 2) return names.join(' · ');
+    return names.slice(0, 2).join(' · ') + ` +${names.length - 2}`;
+  }
+  isMaxSet(entry: WorkoutEntry, set: WorkoutSet): boolean {
+    if (entry.sets.length <= 1) return false;
+    const max = this.getMaxWeight(entry);
+    if (max === 0) return false;
+    return entry.sets.some(s => s.weight !== max) && set.weight === max;
   }
 
   selectDate(date: string): void {
