@@ -588,7 +588,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       position: fixed; bottom: 88px; left: 16px; right: 16px; z-index: 50;
       display: flex; flex-direction: row; align-items: center; gap: 12px;
       padding: 12px 14px; border-radius: 14px;
-      background: var(--c-card);
+      background: color-mix(in srgb, var(--sg-c, var(--c-brand)) 8%, var(--c-card));
       border: none; border-left: 5px solid var(--sg-c, var(--c-brand));
       cursor: pointer; touch-action: manipulation;
       box-shadow: 0 2px 10px var(--c-shadow);
