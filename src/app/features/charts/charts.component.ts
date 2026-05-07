@@ -223,7 +223,7 @@ interface ChartPoint {
 
   `,
   styles: [`
-    .page { padding: 0 0 80px; }
+    .page { padding: 0 0 16px; }
 
     .page-header {
       padding: 16px 16px 8px;
