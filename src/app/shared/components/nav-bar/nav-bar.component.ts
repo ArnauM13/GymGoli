@@ -95,5 +95,6 @@ export class NavBarComponent {
     { path: '/history', icon: 'calendar_month', label: 'Historial' },
     { path: '/library', icon: 'fitness_center', label: 'Exercicis' },
     { path: '/charts', icon: 'bar_chart', label: 'Progrés' },
+    { path: '/settings', icon: 'account_circle', label: 'Perfil' },
   ];
 }
