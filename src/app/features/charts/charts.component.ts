@@ -229,65 +229,14 @@ interface ChartPoint {
         <h1>Esports</h1>
       </header>
 
-      <div class="section">
-        <label class="select-label">Esport</label>
-        <div class="select-wrap">
-          <select class="exercise-select" [(ngModel)]="selectedSportId" (ngModelChange)="onSportChange()">
-            <option value="">Selecciona un esport...</option>
-            @for (s of sports(); track s.id) {
-              <option [value]="s.id">{{ s.name }}</option>
-            }
-          </select>
-        </div>
+      <div class="wip-state">
+        <span class="material-symbols-outlined wip-icon">construction</span>
+        <p class="wip-msg">Estem treballant en això</p>
       </div>
-
-      @if (selectedSportId) {
-        <div class="metric-tabs">
-          @for (m of sportMetrics; track m.value) {
-            <button class="metric-tab"
-                    [class.active]="selectedSportMetric() === m.value"
-                    (click)="selectedSportMetric.set(m.value)">{{ m.label }}</button>
-          }
-        </div>
-
-        <div class="chart-container" [style.--sport-c]="selectedSportColor()">
-          @if (sportChartData().length === 0) {
-            <div class="no-data">
-              <span class="material-symbols-outlined">show_chart</span>
-              <p>Cap dada per a aquest esport</p>
-            </div>
-          } @else {
-            <canvas #sportChartCanvas class="chart-canvas"></canvas>
-          }
-        </div>
-
-        @if (sportChartData().length > 0) {
-          <div class="stats-grid">
-            <div class="stat-card">
-              <span class="stat-value">{{ sportStats().total }}</span>
-              <span class="stat-label">Sessions</span>
-            </div>
-            <div class="stat-card">
-              <span class="stat-value">{{ sportStats().avg }}</span>
-              <span class="stat-label">{{ selectedSportMetric() === 'duration' ? 'Mitjana (min)' : 'Sensació mit.' }}</span>
-            </div>
-            <div class="stat-card">
-              <span class="stat-value">{{ sportStats().max }}</span>
-              <span class="stat-label">{{ selectedSportMetric() === 'duration' ? 'Màxim (min)' : 'Millor' }}</span>
-            </div>
-            <div class="stat-card">
-              <span class="stat-value" [class.positive]="sportStats().trend > 0" [class.negative]="sportStats().trend < 0">
-                {{ sportStats().trend > 0 ? '+' : '' }}{{ sportStats().trend }}%
-              </span>
-              <span class="stat-label">Tendència</span>
-            </div>
-          </div>
-        }
-      }
     }
   `,
   styles: [`
-    .page { padding: 0 0 80px; }
+    .page { padding: 0; }
 
     .page-header {
       padding: 16px 16px 8px;
@@ -409,7 +358,7 @@ interface ChartPoint {
 
     /* ── Personal records ────────────────────────────────── */
     .pr-section {
-      margin: 4px 16px 0; background: var(--c-card);
+      margin: 12px 16px 0; background: var(--c-card);
       border-radius: 14px; box-shadow: 0 2px 8px var(--c-shadow);
       overflow: hidden;
     }
@@ -442,6 +391,15 @@ interface ChartPoint {
       p { margin: 0; color: var(--c-text-2); }
     }
     .loading-icon { animation: pulse-dot 1.2s ease-in-out infinite; }
+
+    /* ── WIP state (esports) ─────────────────────────────── */
+    .wip-state {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 10px; padding: 40px 24px 24px; text-align: center;
+    }
+    .wip-icon { font-size: 48px; color: var(--c-text-3); }
+    .wip-msg  { margin: 0; font-size: 15px; color: var(--c-text-2); }
+
     .btn-cta {
       margin-top: 6px; padding: 12px 28px;
       background: var(--c-brand); color: white;
