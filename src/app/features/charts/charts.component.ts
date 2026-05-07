@@ -24,7 +24,6 @@ import {
 } from 'chart.js';
 
 import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
-import { Sport, SportSession } from '../../core/models/sport.model';
 import { Workout } from '../../core/models/workout.model';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
@@ -35,8 +34,7 @@ import { kgToDisplay } from '../../shared/utils/weight.utils';
 
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, Title, Tooltip, Legend);
 
-type Metric      = 'weight' | 'volume' | 'feeling';
-type SportMetric = 'duration' | 'feeling';
+type Metric = 'weight' | 'volume' | 'feeling';
 
 interface ChartPoint {
   date: string;
@@ -223,18 +221,6 @@ interface ChartPoint {
       }
     </div>
 
-    <!-- ══ SECCIÓ ESPORTS (comentada temporalment) ══
-    @if (sports().length > 0) {
-      <header class="page-header">
-        <h1>Esports</h1>
-      </header>
-
-      <div class="wip-state">
-        <span class="material-symbols-outlined wip-icon">construction</span>
-        <p class="wip-msg">Estem treballant en això</p>
-      </div>
-    }
-    ══ FI SECCIÓ ESPORTS ══ -->
   `,
   styles: [`
     .page { padding: 0 0 80px; }
@@ -393,14 +379,6 @@ interface ChartPoint {
     }
     .loading-icon { animation: pulse-dot 1.2s ease-in-out infinite; }
 
-    /* ── WIP state (esports) ─────────────────────────────── */
-    .wip-state {
-      display: flex; flex-direction: column; align-items: center;
-      gap: 10px; padding: 40px 24px 24px; text-align: center;
-    }
-    .wip-icon { font-size: 48px; color: var(--c-text-3); }
-    .wip-msg  { margin: 0; font-size: 15px; color: var(--c-text-2); }
-
     .btn-cta {
       margin-top: 6px; padding: 12px 28px;
       background: var(--c-brand); color: white;
@@ -413,8 +391,7 @@ interface ChartPoint {
   `],
 })
 export class ChartsComponent implements AfterViewInit, OnDestroy {
-  @ViewChild('chartCanvas')      canvasRef!:     ElementRef<HTMLCanvasElement>;
-  @ViewChild('sportChartCanvas') sportCanvasRef!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('chartCanvas') canvasRef!: ElementRef<HTMLCanvasElement>;
 
   private exerciseService = inject(ExerciseService);
   private workoutService  = inject(WorkoutService);
@@ -561,53 +538,6 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
     this.chart = null;
   }
 
-  // ── Sport chart ──────────────────────────────────────────────────────────
-
-  readonly sports = computed(() => this.sportService.sports());
-
-  private _selectedSportId = signal('');
-  get selectedSportId(): string { return this._selectedSportId(); }
-  set selectedSportId(v: string) { this._selectedSportId.set(v); }
-
-  readonly selectedSportMetric = signal<SportMetric>('duration');
-
-  readonly sportMetrics: { value: SportMetric; label: string }[] = [
-    { value: 'duration', label: 'Durada' },
-    { value: 'feeling',  label: 'Sensació' },
-  ];
-
-  private sportChart: Chart | null = null;
-
-  readonly selectedSportColor = computed(() =>
-    this.sports().find(s => s.id === this._selectedSportId())?.color ?? 'var(--c-brand)'
-  );
-
-  readonly sportChartData = computed<ChartPoint[]>(() => {
-    const sportId = this._selectedSportId();
-    if (!sportId) return [];
-    const metric = this.selectedSportMetric();
-    return this.sportService.sessions()
-      .filter(s => s.sportId === sportId)
-      .filter(s => metric === 'feeling' ? s.feeling != null : s.duration != null)
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .map(s => ({
-        date:  s.date,
-        value: metric === 'duration' ? (s.duration ?? 0) : (s.feeling ?? 0),
-      }));
-  });
-
-  readonly sportStats = computed(() => {
-    const data = this.sportChartData();
-    if (data.length === 0) return { total: 0, avg: 0, max: 0, trend: 0 };
-    const values = data.map(d => d.value);
-    const max    = Math.max(...values);
-    const avg    = Math.round(values.reduce((s, v) => s + v, 0) / values.length);
-    const last   = values.at(-1) ?? 0;
-    const first  = values[0] ?? 0;
-    const trend  = first === 0 ? 0 : Math.round(((last - first) / first) * 100);
-    return { total: data.length, avg, max, trend };
-  });
-
   readonly chartData = computed<ChartPoint[]>(() => {
     const exId = this._selectedExerciseId();
     if (!exId) return [];
@@ -643,14 +573,6 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
       this.settingsService.darkMode();
       this.updateChart(data, metric);
     });
-
-    effect(() => {
-      const data   = this.sportChartData();
-      const metric = this.selectedSportMetric();
-      const color  = this.selectedSportColor();
-      this.settingsService.darkMode();
-      this.updateSportChart(data, metric, color);
-    });
   }
 
   ngAfterViewInit(): void {
@@ -661,17 +583,11 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.chart?.destroy();
-    this.sportChart?.destroy();
   }
 
   onExerciseChange(): void {
     this.chart?.destroy();
     this.chart = null;
-  }
-
-  onSportChange(): void {
-    this.sportChart?.destroy();
-    this.sportChart = null;
   }
 
   private extractMetric(workout: Workout, exerciseId: string, metric: Metric): number {
@@ -749,68 +665,6 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
         },
       },
     });
-  }
-
-  private updateSportChart(data: ChartPoint[], metric: SportMetric, color: string): void {
-    if (data.length === 0) { this.sportChart?.destroy(); this.sportChart = null; return; }
-    if (!this.sportCanvasRef) {
-      setTimeout(() => this.updateSportChart(data, metric, color), 0);
-      return;
-    }
-    if (this.sportChart) {
-      this.sportChart.data.labels = data.map(d => this.formatDate(d.date));
-      this.sportChart.data.datasets[0].data  = data.map(d => d.value);
-      this.sportChart.data.datasets[0].label = this.getSportMetricLabel(metric);
-      (this.sportChart.data.datasets[0] as { borderColor: string }).borderColor = color;
-      (this.sportChart.data.datasets[0] as { pointBackgroundColor: string }).pointBackgroundColor = color;
-      this.sportChart.update();
-    } else {
-      this.createSportChart(data, metric, color);
-    }
-  }
-
-  private createSportChart(data: ChartPoint[], metric: SportMetric, color: string): void {
-    if (!this.sportCanvasRef) return;
-    this.sportChart?.destroy();
-    const ctx = this.sportCanvasRef.nativeElement.getContext('2d');
-    if (!ctx) return;
-    const { text, muted, grid } = this._chartColors();
-    const r = parseInt(color.slice(1, 3), 16);
-    const g = parseInt(color.slice(3, 5), 16);
-    const b = parseInt(color.slice(5, 7), 16);
-    const colorAlpha = isNaN(r) ? 'rgba(0,104,116,0.1)' : `rgba(${r},${g},${b},0.1)`;
-    this.sportChart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: data.map(d => this.formatDate(d.date)),
-        datasets: [{
-          label: this.getSportMetricLabel(metric),
-          data: data.map(d => d.value),
-          borderColor: color, backgroundColor: colorAlpha,
-          borderWidth: 2.5,
-          pointBackgroundColor: color, pointRadius: 5, pointHoverRadius: 7,
-          fill: true, tension: 0.3,
-        }],
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            backgroundColor: text, padding: 10,
-            callbacks: { title: items => items[0]?.label ?? '', label: item => ` ${item.formattedValue}` },
-          },
-        },
-        scales: {
-          x: { grid: { display: false }, ticks: { font: { size: 11 }, color: muted, maxRotation: 40, autoSkip: false } },
-          y: { grid: { color: grid }, ticks: { font: { size: 11 }, color: muted }, beginAtZero: false },
-        },
-      },
-    });
-  }
-
-  private getSportMetricLabel(metric: SportMetric): string {
-    return metric === 'duration' ? 'Durada (min)' : 'Sensació (1-5)';
   }
 
   private formatDate(dateStr: string): string {
