@@ -10,13 +10,12 @@ import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
 import { kgToDisplay } from '../../shared/utils/weight.utils';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
-import { ExerciseStatsDialogComponent } from '../../shared/components/exercise-stats-dialog.component';
 import { ExerciseProgressInlineComponent } from '../../shared/components/exercise-progress-inline.component';
 
 @Component({
   selector: 'app-history',
   standalone: true,
-  imports: [CalendarComponent, ExerciseStatsDialogComponent, ExerciseProgressInlineComponent, FormsModule],
+  imports: [CalendarComponent, ExerciseProgressInlineComponent, FormsModule],
   template: `
     <div class="page">
 
