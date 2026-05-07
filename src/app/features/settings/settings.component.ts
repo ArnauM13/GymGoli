@@ -24,7 +24,11 @@ import {
 
       <!-- ── Identity ── -->
       <div class="identity">
-        <span class="material-symbols-outlined identity-icon">account_circle</span>
+        @if (userAvatarUrl(); as url) {
+          <img [src]="url" class="identity-avatar" [alt]="userName() ?? ''" referrerpolicy="no-referrer">
+        } @else {
+          <span class="material-symbols-outlined identity-icon">account_circle</span>
+        }
         @if (userName(); as n) { <span class="identity-name">{{ n }}</span> }
         @if (authService.user()?.email; as e) { <span class="identity-email">{{ e }}</span> }
       </div>
@@ -307,6 +311,10 @@ import {
       font-size: 64px; color: var(--c-text-3);
       font-variation-settings: 'FILL' 1, 'wght' 300;
     }
+    .identity-avatar {
+      width: 72px; height: 72px; border-radius: 50%; object-fit: cover;
+      box-shadow: 0 2px 8px var(--c-shadow);
+    }
     .identity-name  { font-size: 18px; font-weight: 800; color: var(--c-text); letter-spacing: -0.3px; }
     .identity-email { font-size: 13px; color: var(--c-text-2); }
 
@@ -528,6 +536,10 @@ export class SettingsComponent {
 
   readonly userName = computed(() =>
     this.authService.user()?.user_metadata?.['full_name'] as string | undefined
+  );
+
+  readonly userAvatarUrl = computed(() =>
+    this.authService.user()?.user_metadata?.['avatar_url'] as string | undefined
   );
 
   readonly deletingAccount = signal(false);
