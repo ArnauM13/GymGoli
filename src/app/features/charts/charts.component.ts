@@ -237,7 +237,7 @@ interface ChartPoint {
     ══ FI SECCIÓ ESPORTS ══ -->
   `,
   styles: [`
-    .page { padding: 0; }
+    .page { padding: 0 0 80px; }
 
     .page-header {
       padding: 16px 16px 8px;

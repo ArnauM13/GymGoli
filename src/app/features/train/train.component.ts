@@ -124,17 +124,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
           <app-fitness-insights />
 
-          <!-- ── Avui toca ── -->
-          @if (todaySuggestion(); as s) {
-            <button class="today-suggestion" [style.--sg-c]="s.color" (click)="selectType(s.category)">
-              <span class="material-symbols-outlined sg-icon">{{ s.icon }}</span>
-              <div class="sg-info">
-                <span class="sg-hint">Avui toca</span>
-                <span class="sg-cat">{{ s.label }}</span>
-              </div>
-              <span class="material-symbols-outlined sg-arrow">arrow_forward_ios</span>
-            </button>
-          }
 
           <!-- Entrenaments section -->
           <div class="workout-section">
@@ -424,11 +413,12 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     @if (todaySuggestion(); as s) {
       <button class="avui-toca-fab" [style.--sg-c]="s.color" (click)="selectType(s.category)"
               title="Avui toca: {{ s.label }}">
+        <div class="fab-accent"></div>
         <span class="material-symbols-outlined fab-icon" [style.font-variation-settings]="'FILL 1, WGHT 400'">{{ s.icon }}</span>
-        <span class="fab-text">
-          <span class="fab-label">Avui toca</span>
+        <div class="fab-body">
+          <span class="fab-hint">Avui toca</span>
           <span class="fab-cat">{{ s.label }}</span>
-        </span>
+        </div>
         <span class="material-symbols-outlined fab-arrow">chevron_right</span>
       </button>
     }
@@ -595,26 +585,29 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .material-symbols-outlined { font-size: 32px; color: var(--c-border); }
     }
 
-    /* ── Avui toca ── */
-    .today-suggestion {
-      display: flex; align-items: center; gap: 12px;
-      margin: 12px 16px 0; padding: 12px 14px;
-      background: color-mix(in srgb, var(--sg-c, var(--c-brand)) 8%, var(--c-card));
-      border-radius: 14px;
-      border: 2px solid var(--sg-c, var(--c-brand));
-      box-shadow: 0 2px 10px var(--c-shadow);
-      cursor: pointer; text-align: left; touch-action: manipulation;
-      transition: background 0.15s;
-      &:hover { background: color-mix(in srgb, var(--sg-c, var(--c-brand)) 14%, var(--c-card)); }
+    /* ── Avui toca FAB (baix-dreta, estil insight-card) ── */
+    .avui-toca-fab {
+      position: fixed; bottom: 88px; right: 16px; z-index: 50;
+      display: flex; align-items: center; gap: 0;
+      border: none; border-radius: 18px; overflow: hidden;
+      background: var(--c-card);
+      box-shadow: 0 4px 16px var(--c-shadow);
+      cursor: pointer; touch-action: manipulation;
+      animation: fab-in 0.25s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+      transition: box-shadow 0.15s, transform 0.15s;
+      &:hover { box-shadow: 0 6px 20px var(--c-shadow); transform: translateY(-2px); }
+      &:active { transform: scale(0.97); }
     }
-    .sg-icon {
-      font-size: 22px; color: var(--sg-c, var(--c-brand));
-      font-variation-settings: 'FILL' 1, 'wght' 400; flex-shrink: 0;
+    @keyframes fab-in {
+      from { opacity: 0; transform: translateY(8px) scale(0.96); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
     }
-    .sg-info { flex: 1; display: flex; flex-direction: column; gap: 1px; }
-    .sg-hint { font-size: 11px; font-weight: 600; color: var(--c-text-3); text-transform: uppercase; letter-spacing: 0.4px; }
-    .sg-cat  { font-size: 15px; font-weight: 700; color: var(--sg-c, var(--c-brand)); }
-    .sg-arrow { font-size: 16px; color: var(--c-text-3); flex-shrink: 0; }
+    .fab-accent { width: 5px; align-self: stretch; flex-shrink: 0; background: var(--sg-c, var(--c-brand)); }
+    .fab-icon   { font-size: 22px; color: var(--sg-c, var(--c-brand)); flex-shrink: 0; padding: 13px 10px 13px 12px; }
+    .fab-body   { display: flex; flex-direction: column; gap: 2px; padding: 12px 4px 12px 0; }
+    .fab-hint   { font-size: 11px; font-weight: 600; color: var(--c-text-3); text-transform: uppercase; letter-spacing: 0.4px; }
+    .fab-cat    { font-size: 13px; font-weight: 800; color: color-mix(in srgb, var(--sg-c, var(--c-brand)) 60%, var(--c-text)); line-height: 1.2; }
+    .fab-arrow  { font-size: 16px; color: var(--c-border); flex-shrink: 0; margin: 0 12px 0 8px; }
 
     /* ── Workout section (dashboard) ── */
     .workout-section {
