@@ -124,6 +124,20 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
           <app-fitness-insights />
 
+          <!-- ── Avui toca ── -->
+          @if (todaySuggestion(); as s) {
+            <button class="avui-toca-card" [style.--sg-c]="s.color" (click)="selectType(s.category)">
+              <div class="atc-bar" [style.background]="s.color"></div>
+              <div class="atc-info">
+                <span class="atc-hint">Avui toca</span>
+                <span class="atc-label">
+                  <span class="material-symbols-outlined atc-icon" [style.font-variation-settings]="'FILL 1, WGHT 400'">{{ s.icon }}</span>
+                  {{ s.label }}
+                </span>
+              </div>
+              <span class="material-symbols-outlined atc-arrow">chevron_right</span>
+            </button>
+          }
 
           <!-- Entrenaments section -->
           <div class="workout-section">
@@ -409,19 +423,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       </div>
     }
 
-    <!-- ── Avui toca FAB ── -->
-    @if (todaySuggestion(); as s) {
-      <button class="avui-toca-fab" [style.--sg-c]="s.color" (click)="selectType(s.category)"
-              title="Avui toca: {{ s.label }}">
-        <div class="fab-accent"></div>
-        <span class="material-symbols-outlined fab-icon" [style.font-variation-settings]="'FILL 1, WGHT 400'">{{ s.icon }}</span>
-        <div class="fab-body">
-          <span class="fab-hint">Avui toca</span>
-          <span class="fab-cat">{{ s.label }}</span>
-        </div>
-        <span class="material-symbols-outlined fab-arrow">chevron_right</span>
-      </button>
-    }
   `,
   styles: [`
     .page { padding: 0 0 84px; }
@@ -585,29 +586,33 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .material-symbols-outlined { font-size: 32px; color: var(--c-border); }
     }
 
-    /* ── Avui toca FAB (baix-dreta, estil insight-card) ── */
-    .avui-toca-fab {
-      position: fixed; bottom: 88px; right: 16px; z-index: 50;
-      display: flex; align-items: center; gap: 0;
-      border: none; border-radius: 18px; overflow: hidden;
-      background: var(--c-card);
-      box-shadow: 0 4px 16px var(--c-shadow);
+    /* ── Avui toca (inline, estil workout-card) ── */
+    .avui-toca-card {
+      display: flex; align-items: center;
+      margin: 12px 16px 0; width: calc(100% - 32px);
+      border: 1.5px solid color-mix(in srgb, var(--sg-c) 30%, var(--c-border-2));
+      border-radius: 14px;
+      background: color-mix(in srgb, var(--sg-c) 8%, var(--c-card));
+      overflow: hidden;
       cursor: pointer; touch-action: manipulation;
-      animation: fab-in 0.25s cubic-bezier(0.34, 1.4, 0.64, 1) both;
-      transition: box-shadow 0.15s, transform 0.15s;
-      &:hover { box-shadow: 0 6px 20px var(--c-shadow); transform: translateY(-2px); }
-      &:active { transform: scale(0.97); }
+      transition: box-shadow 0.15s, border-color 0.15s, background 0.15s;
+      animation: atc-in 0.22s ease-out both;
+      &:hover {
+        box-shadow: 0 2px 8px var(--c-shadow);
+        background: color-mix(in srgb, var(--sg-c) 14%, var(--c-card));
+        border-color: color-mix(in srgb, var(--sg-c) 50%, var(--c-border));
+      }
     }
-    @keyframes fab-in {
-      from { opacity: 0; transform: translateY(8px) scale(0.96); }
-      to   { opacity: 1; transform: translateY(0) scale(1); }
+    @keyframes atc-in {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
-    .fab-accent { width: 5px; align-self: stretch; flex-shrink: 0; background: var(--sg-c, var(--c-brand)); }
-    .fab-icon   { font-size: 22px; color: var(--sg-c, var(--c-brand)); flex-shrink: 0; padding: 13px 10px 13px 12px; }
-    .fab-body   { display: flex; flex-direction: column; gap: 2px; padding: 12px 4px 12px 0; }
-    .fab-hint   { font-size: 11px; font-weight: 600; color: var(--c-text-3); text-transform: uppercase; letter-spacing: 0.4px; }
-    .fab-cat    { font-size: 13px; font-weight: 800; color: color-mix(in srgb, var(--sg-c, var(--c-brand)) 60%, var(--c-text)); line-height: 1.2; }
-    .fab-arrow  { font-size: 16px; color: var(--c-border); flex-shrink: 0; margin: 0 12px 0 8px; }
+    .atc-bar  { width: 5px; align-self: stretch; flex-shrink: 0; }
+    .atc-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 10px 10px; text-align: left; }
+    .atc-hint { font-size: 11px; color: var(--c-text-2); }
+    .atc-label { font-size: 13px; font-weight: 700; color: var(--c-text); display: flex; align-items: center; gap: 4px; }
+    .atc-icon { font-size: 15px; color: var(--sg-c); }
+    .atc-arrow { font-size: 18px; color: var(--c-border); flex-shrink: 0; margin-right: 8px; }
 
     /* ── Workout section (dashboard) ── */
     .workout-section {
