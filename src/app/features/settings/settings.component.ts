@@ -537,6 +537,15 @@ export class SettingsComponent {
   }));
 
   setFitnessGoal(goal: FitnessGoal): void {
+    if (this.settingsService.fitnessGoal() === goal) {
+      this.settingsService.update({
+        fitnessGoal: null,
+        weeklyActivityGoal: null,
+        weeklyGymGoal: null,
+        weeklySportGoal: null,
+      });
+      return;
+    }
     const patch: Record<string, unknown> = {
       fitnessGoal: goal,
       weeklyActivityGoal: FITNESS_GOAL_WEEKLY_DEFAULTS[goal],
