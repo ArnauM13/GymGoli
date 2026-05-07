@@ -133,7 +133,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
             <!-- Existing workout cards -->
             @for (w of dateWorkouts(); track w.id) {
-              <div class="workout-card" (click)="openWorkout(w.id)">
+              <div class="workout-card" [style.--wc]="workoutPrimaryColor(w)" (click)="openWorkout(w.id)">
                 <div class="wc-bar" [style.background]="workoutCardColor(w)"></div>
                 <div class="wc-info">
                   <span class="wc-label">{{ workoutLabel(w) }}</span>
@@ -500,13 +500,13 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
     .bar-shortcut {
       width: 100%; display: flex; align-items: center; gap: 12px;
-      border: 2px solid color-mix(in srgb, var(--wc) 22%, var(--c-border));
-      background: color-mix(in srgb, var(--wc) 10%, var(--c-card));
+      border: 2px solid color-mix(in srgb, var(--wc) 35%, var(--c-border));
+      background: color-mix(in srgb, var(--wc) 14%, var(--c-card));
       border-radius: 22px;
       padding: 14px 16px;
       cursor: pointer; touch-action: manipulation;
       transition: background 0.15s, transform 0.1s;
-      &:hover  { background: color-mix(in srgb, var(--wc) 16%, var(--c-card)); }
+      &:hover  { background: color-mix(in srgb, var(--wc) 22%, var(--c-card)); }
       &:active { transform: scale(0.98); }
     }
     .bar-shortcut-icon {
@@ -533,15 +533,15 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .type-btn {
       display: flex; flex-direction: column; align-items: center; gap: 7px;
       padding: 16px 4px 14px;
-      border: 2px solid color-mix(in srgb, var(--cat-color) 40%, var(--c-border));
+      border: 2px solid color-mix(in srgb, var(--cat-color) 55%, var(--c-border));
       border-radius: 16px;
-      background: color-mix(in srgb, var(--cat-color) 4%, var(--c-card));
+      background: color-mix(in srgb, var(--cat-color) 10%, var(--c-card));
       cursor: pointer;
-      color: color-mix(in srgb, var(--cat-color) 70%, var(--c-text));
+      color: color-mix(in srgb, var(--cat-color) 80%, var(--c-text));
       transition: all 0.18s; touch-action: manipulation;
       &:hover {
         border-color: var(--cat-color);
-        background: color-mix(in srgb, var(--cat-color) 10%, var(--c-card));
+        background: color-mix(in srgb, var(--cat-color) 18%, var(--c-card));
         transform: translateY(-1px);
       }
       &:active { transform: scale(0.97); }
@@ -549,7 +549,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .type-label { font-size: 11px; font-weight: 700; letter-spacing: 0.2px; text-align: center; }
       &.type-btn--done {
         border-color: var(--cat-color);
-        background: color-mix(in srgb, var(--cat-color) 10%, var(--c-card));
+        background: color-mix(in srgb, var(--cat-color) 16%, var(--c-card));
         position: relative;
       }
     }
@@ -620,11 +620,17 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .workout-card {
       display: flex; align-items: center;
       margin-bottom: 8px;
-      border: 1.5px solid var(--c-border-2); border-radius: 14px;
-      background: var(--c-card); overflow: hidden;
-      cursor: pointer; transition: box-shadow 0.15s, border-color 0.15s;
+      border: 1.5px solid color-mix(in srgb, var(--wc, var(--c-border-2)) 30%, var(--c-border-2));
+      border-radius: 14px;
+      background: color-mix(in srgb, var(--wc, var(--c-card)) 8%, var(--c-card));
+      overflow: hidden;
+      cursor: pointer; transition: box-shadow 0.15s, border-color 0.15s, background 0.15s;
       touch-action: manipulation;
-      &:hover { box-shadow: 0 2px 8px var(--c-shadow); border-color: var(--c-border); }
+      &:hover {
+        box-shadow: 0 2px 8px var(--c-shadow);
+        background: color-mix(in srgb, var(--wc, var(--c-card)) 14%, var(--c-card));
+        border-color: color-mix(in srgb, var(--wc, var(--c-border)) 50%, var(--c-border));
+      }
     }
     .wc-bar {
       width: 5px; align-self: stretch; flex-shrink: 0;
@@ -749,23 +755,23 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       position: relative;
       display: flex; flex-direction: column; align-items: center; gap: 7px;
       padding: 16px 4px 14px;
-      border: 1.5px solid color-mix(in srgb, var(--sport-color) 30%, var(--c-border));
+      border: 1.5px solid color-mix(in srgb, var(--sport-color) 45%, var(--c-border));
       border-radius: 16px;
-      background: var(--c-card);
-      color: color-mix(in srgb, var(--sport-color) 65%, var(--c-text));
+      background: color-mix(in srgb, var(--sport-color) 8%, var(--c-card));
+      color: color-mix(in srgb, var(--sport-color) 80%, var(--c-text));
       cursor: pointer; touch-action: manipulation;
       transition: all 0.18s ease;
 
       &:hover:not(:disabled) {
         border-color: var(--sport-color);
-        background: color-mix(in srgb, var(--sport-color) 6%, var(--c-card));
+        background: color-mix(in srgb, var(--sport-color) 14%, var(--c-card));
         transform: translateY(-1px);
       }
       &:active:not(:disabled) { transform: scale(0.97); }
 
       &.active {
         border-color: var(--sport-color);
-        background: color-mix(in srgb, var(--sport-color) 10%, var(--c-card));
+        background: color-mix(in srgb, var(--sport-color) 16%, var(--c-card));
       }
       &:disabled { opacity: 0.65; cursor: default; }
     }
