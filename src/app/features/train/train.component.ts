@@ -448,8 +448,8 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
   `,
   styles: [`
     .page { padding: 0; }
-    .page--with-fab { padding-bottom: 84px; }
-    .page--with-two-fabs { padding-bottom: 152px; }
+    .page--with-fab { padding-bottom: calc(var(--nav-height) + 20px); }
+    .page--with-two-fabs { padding-bottom: calc(var(--nav-height) + 88px); }
 
     /* ── Workout topbar (active mode, sticky) ── */
     .workout-topbar {
@@ -503,7 +503,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     /* ── Bottom bar: last workout shortcut ── */
     .bottom-bar {
       position: fixed;
-      bottom: calc(64px + env(safe-area-inset-bottom) + 10px);
+      bottom: calc(var(--nav-height) + 10px);
       left: 12px; right: 12px;
       z-index: 90;
       border-radius: 18px;
@@ -515,7 +515,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       to   { transform: translateY(0);    opacity: 1; }
     }
     .bottom-bar--stacked {
-      bottom: calc(64px + env(safe-area-inset-bottom) + 10px + 72px);
+      bottom: calc(var(--nav-height) + 10px + 72px);
     }
     .bottom-bar--multi {
       background: var(--c-card);
@@ -611,7 +611,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     /* ── Add-exercise FAB (active workout mode) ── */
     .add-exercise-fab {
       position: fixed;
-      bottom: calc(64px + env(safe-area-inset-bottom) + 16px);
+      bottom: calc(var(--nav-height) + 16px);
       right: 20px;
       z-index: 90;
       width: 52px; height: 52px; border-radius: 50%; border: none;

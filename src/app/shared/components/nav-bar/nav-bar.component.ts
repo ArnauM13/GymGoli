@@ -32,7 +32,7 @@ interface NavItem {
     .bottom-nav {
       display: flex;
       align-items: flex-start;
-      height: calc(64px + env(safe-area-inset-bottom, 0px));
+      height: var(--nav-height);
       padding-bottom: env(safe-area-inset-bottom, 0px);
       background: var(--c-card);
       border-top: 1px solid var(--c-border);
