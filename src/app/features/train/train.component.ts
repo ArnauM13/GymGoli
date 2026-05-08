@@ -676,10 +676,10 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       width: 40px; height: 40px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
       border: none; background: transparent; cursor: pointer;
-      color: var(--c-border); transition: color 0.15s; touch-action: manipulation;
-      margin-right: 4px;
+      color: var(--c-text-3); transition: color 0.15s, background 0.15s; touch-action: manipulation;
+      border-radius: 10px; margin-right: 4px;
       .material-symbols-outlined { font-size: 18px; }
-      &:hover { color: #ef5350; }
+      &:hover { color: #ef5350; background: rgba(239,83,80,0.08); }
     }
 
     /* ── Template picker bottom sheet ── */

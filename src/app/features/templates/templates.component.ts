@@ -334,7 +334,7 @@ const CAT_LABEL: Record<EditorCat, string> = {
       margin-bottom: 4px;
     }
     .ex-drag {
-      font-size: 20px; color: var(--c-border); cursor: grab;
+      font-size: 20px; color: var(--c-text-3); cursor: grab;
       flex-shrink: 0; user-select: none; touch-action: none;
       &:active { cursor: grabbing; }
     }

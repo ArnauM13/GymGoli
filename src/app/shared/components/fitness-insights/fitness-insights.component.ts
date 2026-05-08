@@ -76,7 +76,7 @@ import { UserSettingsService } from '../../../core/services/user-settings.servic
       flex-shrink: 0;
       width: 40px; height: 40px;
       border: none; background: transparent; cursor: pointer;
-      color: var(--c-border); touch-action: manipulation; margin-right: 4px;
+      color: var(--c-text-3); touch-action: manipulation; margin-right: 4px;
       display: flex; align-items: center; justify-content: center;
       transition: color 0.15s;
       .material-symbols-outlined { font-size: 16px; }
