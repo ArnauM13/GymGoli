@@ -297,7 +297,7 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
       width: 36px; height: 36px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
       border: none; background: transparent; cursor: pointer;
-      color: var(--c-border); touch-action: manipulation;
+      color: var(--c-text-3); touch-action: manipulation;
       transition: color 0.15s, background 0.15s;
       .material-symbols-outlined { font-size: 17px; }
       &:hover { color: var(--c-text-2); background: var(--c-hover); }

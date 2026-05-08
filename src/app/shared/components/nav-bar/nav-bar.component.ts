@@ -31,11 +31,13 @@ interface NavItem {
   styles: [`
     .bottom-nav {
       display: flex;
-      height: 64px;
+      align-items: flex-start;
+      height: var(--nav-height);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
       background: var(--c-card);
       border-top: 1px solid var(--c-border);
       box-shadow: 0 -2px 8px var(--c-shadow);
-      padding-bottom: env(safe-area-inset-bottom);
+      flex-shrink: 0;
     }
 
     .nav-item {

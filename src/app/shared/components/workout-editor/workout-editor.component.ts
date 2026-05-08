@@ -332,7 +332,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     }
 
     .we-drag-handle {
-      font-size: 22px; color: var(--c-border); cursor: grab;
+      font-size: 22px; color: var(--c-text-3); cursor: grab;
       padding: 6px 2px; flex-shrink: 0;
       user-select: none; touch-action: none;
       &:active { cursor: grabbing; color: var(--c-text-3); }
@@ -390,7 +390,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     /* ── Botó fatiga (dins del grup) ── */
     .we-fatiga-btn {
       cursor: default;
-      .material-symbols-outlined { color: var(--c-border); }
+      .material-symbols-outlined { color: var(--c-text-3); }
     }
     .we-fatiga-btn--editable {
       cursor: pointer;

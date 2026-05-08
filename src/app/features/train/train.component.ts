@@ -23,6 +23,10 @@ import { ExercisePickerDialogComponent } from './components/exercise-picker-dial
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
 
+type GymSuggestion   = { type: 'gym';   category: ExerciseCategory; label: string; color: string; icon: string };
+type SportSuggestion = { type: 'sport'; sport: Sport;               label: string; color: string; icon: string };
+type TodaySuggestion = GymSuggestion | SportSuggestion;
+
 const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; color: string }[] = [
   { value: 'push', label: CATEGORY_LABELS.push, icon: CATEGORY_ICONS.push, color: CATEGORY_COLORS.push },
   { value: 'pull', label: CATEGORY_LABELS.pull, icon: CATEGORY_ICONS.pull, color: CATEGORY_COLORS.pull },
@@ -34,7 +38,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
   standalone: true,
   imports: [WorkoutEditorComponent, InlineDatePickerComponent, FitnessInsightsComponent],
   template: `
-    <div class="page" [class.page--with-fab]="hasFloatingBar()">
+    <div class="page" [class.page--with-fab]="hasFloatingBar()" [class.page--with-two-fabs]="hasTwoFloatingBars()">
 
       @if (activeWorkout(); as w) {
 
@@ -222,16 +226,16 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
 
     <!-- ── Floating "Avui toca" suggestion ── -->
-    @if (!activeWorkout() && dateWorkouts().length === 0 && todaySuggestion(); as s) {
-      <div class="bottom-bar">
+    @if (!activeWorkout() && todaySuggestion(); as s) {
+      <div class="bottom-bar" [class.bottom-bar--stacked]="dateWorkouts().length > 0">
         <button class="bar-shortcut bar-shortcut--suggestion"
-                [style.--wc]="s!.color"
-                (click)="selectType(s!.category)">
+                [style.--wc]="s.color"
+                (click)="handleSuggestionClick(s)">
           <span class="bar-shortcut-accent"></span>
-          <span class="material-symbols-outlined bar-shortcut-icon">{{ s!.icon }}</span>
+          <span class="material-symbols-outlined bar-shortcut-icon">{{ s.icon }}</span>
           <div class="bar-shortcut-info">
             <span class="bar-shortcut-hint">Avui toca</span>
-            <span class="bar-shortcut-label">{{ s!.label }}</span>
+            <span class="bar-shortcut-label">{{ s.label }}</span>
           </div>
           <span class="material-symbols-outlined bar-shortcut-arrow">chevron_right</span>
         </button>
@@ -444,7 +448,8 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
   `,
   styles: [`
     .page { padding: 0; }
-    .page--with-fab { padding-bottom: 84px; }
+    .page--with-fab { padding-bottom: calc(var(--nav-height) + 20px); }
+    .page--with-two-fabs { padding-bottom: calc(var(--nav-height) + 88px); }
 
     /* ── Workout topbar (active mode, sticky) ── */
     .workout-topbar {
@@ -498,7 +503,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     /* ── Bottom bar: last workout shortcut ── */
     .bottom-bar {
       position: fixed;
-      bottom: calc(64px + env(safe-area-inset-bottom) + 10px);
+      bottom: calc(var(--nav-height) + 10px);
       left: 12px; right: 12px;
       z-index: 90;
       border-radius: 18px;
@@ -508,6 +513,9 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     @keyframes bar-in {
       from { transform: translateY(14px); opacity: 0; }
       to   { transform: translateY(0);    opacity: 1; }
+    }
+    .bottom-bar--stacked {
+      bottom: calc(var(--nav-height) + 10px + 72px);
     }
     .bottom-bar--multi {
       background: var(--c-card);
@@ -603,7 +611,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     /* ── Add-exercise FAB (active workout mode) ── */
     .add-exercise-fab {
       position: fixed;
-      bottom: calc(64px + env(safe-area-inset-bottom) + 16px);
+      bottom: calc(var(--nav-height) + 16px);
       right: 20px;
       z-index: 90;
       width: 52px; height: 52px; border-radius: 50%; border: none;
@@ -668,10 +676,10 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       width: 40px; height: 40px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
       border: none; background: transparent; cursor: pointer;
-      color: var(--c-border); transition: color 0.15s; touch-action: manipulation;
-      margin-right: 4px;
+      color: var(--c-text-3); transition: color 0.15s, background 0.15s; touch-action: manipulation;
+      border-radius: 10px; margin-right: 4px;
       .material-symbols-outlined { font-size: 18px; }
-      &:hover { color: #ef5350; }
+      &:hover { color: #ef5350; background: rgba(239,83,80,0.08); }
     }
 
     /* ── Template picker bottom sheet ── */
@@ -1040,26 +1048,57 @@ export class TrainComponent {
 
   readonly isToday = computed(() => this.selectedDate() === TODAY());
 
-  readonly todaySuggestion = computed(() => {
-    const goal = this.settingsService.fitnessGoal();
-    if (goal === 'sport') return null;
-
+  readonly todaySuggestion = computed((): TodaySuggestion | null => {
     const today = TODAY();
     if (this.selectedDate() !== today) return null;
-    if (this.workoutService.getWorkoutsForDate(today).length > 0) return null;
 
+    const goal = this.settingsService.fitnessGoal();
+
+    const hasGymToday  = this.workoutService.getWorkoutsForDate(today).length > 0;
+    const sportToday   = this.sportService.getSportSessionsForDate(today);
+    const hasSportToday = sportToday.length > 0;
+
+    // Next gym category in weekly rotation (excluding today)
     const monday = mondayOf(today);
     const doneCats = new Set(
       Array.from({ length: 7 }, (_, i) => addDays(monday, i))
         .filter(d => d < today)
         .flatMap(d => this.workoutService.getWorkoutsForDate(d).flatMap(w => workoutCategories(w)))
     );
+    const gymOrder: ExerciseCategory[] = ['push', 'pull', 'legs'];
+    const nextGymCat = gymOrder.find(c => !doneCats.has(c)) ?? null;
 
-    const order: ExerciseCategory[] = ['push', 'pull', 'legs'];
-    const next = order.find(c => !doneCats.has(c));
-    if (!next) return null;
+    const doneSportIds = new Set(sportToday.map(x => x.sport.id));
+    const nextSport = this.sportService.sports().find(s => !doneSportIds.has(s.id)) ?? null;
 
-    return { category: next, label: CATEGORY_LABELS[next], color: CATEGORY_COLORS[next], icon: CATEGORY_ICONS[next] };
+    const mkGym = (cat: ExerciseCategory): GymSuggestion => ({
+      type: 'gym', category: cat,
+      label: CATEGORY_LABELS[cat], color: CATEGORY_COLORS[cat], icon: CATEGORY_ICONS[cat],
+    });
+    const mkSport = (s: Sport): SportSuggestion => ({
+      type: 'sport', sport: s, label: s.name, color: s.color, icon: s.icon,
+    });
+
+    switch (goal) {
+      case 'strength':
+      case null:
+        if (hasGymToday) return null;
+        return nextGymCat ? mkGym(nextGymCat) : null;
+
+      case 'fitness':
+        if (!hasGymToday && nextGymCat) return mkGym(nextGymCat);
+        if (!hasSportToday && nextSport)  return mkSport(nextSport);
+        return null;
+
+      case 'weight':
+        if (!hasSportToday && nextSport)  return mkSport(nextSport);
+        if (!hasGymToday && nextGymCat)   return mkGym(nextGymCat);
+        return null;
+
+      case 'sport':
+        if (hasSportToday) return null;
+        return nextSport ? mkSport(nextSport) : null;
+    }
   });
 
   readonly dateWorkouts = computed(() =>
@@ -1069,6 +1108,12 @@ export class TrainComponent {
   readonly hasFloatingBar = computed(() =>
     this.activeWorkoutId() !== null ||
     this.dateWorkouts().length > 0 ||
+    this.todaySuggestion() !== null
+  );
+
+  readonly hasTwoFloatingBars = computed(() =>
+    !this.activeWorkoutId() &&
+    this.dateWorkouts().length > 0 &&
     this.todaySuggestion() !== null
   );
 
@@ -1262,6 +1307,11 @@ export class TrainComponent {
   }
 
   // ── Workout creation ──────────────────────────────────────────────────────
+
+  handleSuggestionClick(s: TodaySuggestion): void {
+    if (s.type === 'gym') this.selectType(s.category);
+    else this.openSessionLogger(s.sport);
+  }
 
   selectType(category: ExerciseCategory): void {
     this.pickerCat.set(category);
