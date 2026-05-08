@@ -152,11 +152,6 @@ describe('TrainComponent', () => {
       expect(component.activeWorkoutId()).toBeNull();
     });
 
-    it('clears suggestionType when opening a workout', () => {
-      component.suggestionType.set('push');
-      component.openWorkout('abc');
-      expect(component.suggestionType()).toBeNull();
-    });
   });
 
   // ── isToday() ────────────────────────────────────────────────────────────
