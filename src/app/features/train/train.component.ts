@@ -1,4 +1,4 @@
-import { Component, ViewChild, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, ElementRef, ViewChild, computed, effect, inject, signal, untracked } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -20,6 +20,7 @@ import { WorkoutService } from '../../core/services/workout.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
 import { FitnessInsightsComponent } from '../../shared/components/fitness-insights/fitness-insights.component';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
+import { FitImportService } from '../../core/services/fit-import.service';
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
 
@@ -332,6 +333,10 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       </div>
     }
 
+    <!-- Hidden FIT file input -->
+    <input #fitInput type="file" accept=".fit" style="display:none"
+           (change)="onFitFileSelected($event)">
+
     <!-- ── Session logger bottom sheet ── -->
     @if (loggerSport()) {
       <div class="sl-backdrop" (click)="closeSessionLogger()"></div>
@@ -343,6 +348,15 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             </span>
             <span class="sl-sport-name">{{ loggerSport()!.name }}</span>
           </div>
+          <button class="sl-fit-btn" (click)="triggerFitImport()"
+                  [disabled]="fitImporting()" title="Importa fitxer .FIT del rellotge">
+            @if (fitImporting()) {
+              <span class="material-symbols-outlined spin">sync</span>
+            } @else {
+              <span class="material-symbols-outlined">watch</span>
+            }
+            <span>.FIT</span>
+          </button>
           <button class="sl-close" (click)="closeSessionLogger()">
             <span class="material-symbols-outlined">close</span>
           </button>
@@ -935,6 +949,16 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .material-symbols-outlined { font-size: 18px; }
       &:hover { background: var(--c-hover); }
     }
+    .sl-fit-btn {
+      display: flex; align-items: center; gap: 4px;
+      height: 30px; padding: 0 10px; border-radius: 8px; margin-right: 6px;
+      border: 1.5px solid var(--c-border); background: var(--c-subtle);
+      font-size: 11px; font-weight: 700; color: var(--c-text-2);
+      cursor: pointer; transition: all 0.15s; touch-action: manipulation; flex-shrink: 0;
+      .material-symbols-outlined { font-size: 15px; }
+      &:hover:not(:disabled) { border-color: var(--c-brand); color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.06); }
+      &:disabled { opacity: 0.6; cursor: not-allowed; }
+    }
 
     .sl-field { margin-bottom: 16px; }
     .sl-field-label {
@@ -1030,11 +1054,14 @@ export class TrainComponent {
   private router           = inject(Router);
   private dialog           = inject(MatDialog);
   private snackBar         = inject(MatSnackBar);
+  private fitService       = inject(FitImportService);
 
-  @ViewChild('editor') editor?: WorkoutEditorComponent;
+  @ViewChild('editor')   editor?:   WorkoutEditorComponent;
+  @ViewChild('fitInput') fitInputRef!: ElementRef<HTMLInputElement>;
 
   readonly selectedDate    = signal<string>(TODAY());
   readonly sportToggling   = signal(false);
+  readonly fitImporting    = signal(false);
   readonly workoutTypes    = WORKOUT_TYPES;
   readonly activeWorkoutId = signal<string | null>(null);
   readonly loggerSport     = signal<Sport | null>(null);
@@ -1535,6 +1562,57 @@ export class TrainComponent {
       this.snackBar.open('Error en eliminar', '', { duration: 2500 });
     } finally {
       this.sportToggling.set(false);
+    }
+  }
+
+  // ── FIT import ──────────────────────────────────────────────────────────────
+
+  triggerFitImport(): void {
+    this.fitInputRef.nativeElement.value = '';
+    this.fitInputRef.nativeElement.click();
+  }
+
+  async onFitFileSelected(event: Event): Promise<void> {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    this.fitImporting.set(true);
+    try {
+      const fit = await this.fitService.parse(file);
+
+      if (fit.durationSecs !== undefined) {
+        this.loggerDuration.set(Math.max(1, Math.round(fit.durationSecs / 60)));
+      }
+
+      const sport = this.loggerSport();
+      if (sport && fit.distanceMeters !== undefined) {
+        const hasKm = sport.metricDefs.some(d => d.key === 'distance_km');
+        const hasM  = sport.metricDefs.some(d => d.key === 'distance_m');
+        if (hasKm) {
+          this.loggerMetrics.update(m => ({
+            ...m, distance_km: Math.round(fit.distanceMeters! / 100) / 10,
+          }));
+        } else if (hasM) {
+          this.loggerMetrics.update(m => ({
+            ...m, distance_m: Math.round(fit.distanceMeters!),
+          }));
+        }
+      }
+
+      const noteParts: string[] = [];
+      if (fit.avgHeartRate) noteParts.push(`FC avg: ${fit.avgHeartRate}bpm`);
+      if (fit.maxHeartRate) noteParts.push(`màx: ${fit.maxHeartRate}bpm`);
+      if (fit.calories)     noteParts.push(`${fit.calories}kcal`);
+      if (noteParts.length) {
+        const summary = noteParts.join(' · ');
+        this.loggerNotes.update(n => n ? `${n}\n${summary}` : summary);
+      }
+
+      this.snackBar.open('Dades del rellotge importades', '', { duration: 2000 });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error en llegir el fitxer';
+      this.snackBar.open(msg, '', { duration: 3000 });
+    } finally {
+      this.fitImporting.set(false);
     }
   }
 }
