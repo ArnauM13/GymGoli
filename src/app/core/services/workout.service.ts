@@ -9,13 +9,14 @@ import { FeelingLevel, Workout, WorkoutEntry, WorkoutSet } from '../models/worko
 // ── Supabase row → typed Workout ────────────────────────────────────────────
 function toWorkout(row: Record<string, unknown>): Workout {
   return {
-    id:         row['id'] as string,
-    date:       row['date'] as string,
-    category:   (row['category'] as string | undefined) ?? undefined,
-    categories: (row['categories'] as string[] | undefined) ?? [],
-    entries:    (row['entries'] as WorkoutEntry[] | undefined) ?? [],
-    notes:      (row['notes'] as string | undefined) ?? undefined,
-    createdAt:  new Date(row['created_at'] as string),
+    id:               row['id'] as string,
+    date:             row['date'] as string,
+    category:         (row['category'] as string | undefined) ?? undefined,
+    categories:       (row['categories'] as string[] | undefined) ?? [],
+    entries:          (row['entries'] as WorkoutEntry[] | undefined) ?? [],
+    notes:            (row['notes'] as string | undefined) ?? undefined,
+    sourceProposalId: (row['source_proposal_id'] as string | null | undefined) ?? undefined,
+    createdAt:        new Date(row['created_at'] as string),
   };
 }
 
@@ -256,6 +257,25 @@ export class WorkoutService {
 
   async createTodayWorkout(category?: string): Promise<string> {
     return this.createWorkoutForDate(this._todayStr, category);
+  }
+
+  async createWorkoutFromProposal(date: string, proposalId: string, entries: WorkoutEntry[]): Promise<string> {
+    const uid = this._uid();
+    const row: Record<string, unknown> = {
+      user_id:            uid,
+      date,
+      entries:            entries.map(e => ({ exerciseId: e.exerciseId, exerciseName: e.exerciseName, sets: [] })),
+      categories:         [],
+      source_proposal_id: proposalId,
+    };
+    const { data, error } = await this.supabase.from('workouts').insert(row).select().single();
+    if (error) throw error;
+    const newWorkout = toWorkout(data as Record<string, unknown>);
+    const monthKey   = newWorkout.date.substring(0, 7);
+    const existing   = this._monthCache.get(monthKey) ?? [];
+    this._monthCache.set(monthKey, [newWorkout, ...existing]);
+    this._rebuildHistorical();
+    return data['id'] as string;
   }
 
   async createWorkoutFromTemplate(date: string, category: string, templateEntries: WorkoutEntry[]): Promise<string> {

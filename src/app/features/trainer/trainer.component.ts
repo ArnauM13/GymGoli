@@ -242,6 +242,34 @@ type DashboardView = 'clients' | 'detail';
             </div>
           }
 
+          <!-- ── Compliance grid (4 weeks) ────────────────────────── -->
+          @if (complianceDays().length > 0) {
+            <div class="card-section">
+              <div class="section-header">
+                <span class="material-symbols-outlined section-icon">task_alt</span>
+                <h2 class="section-title">Compliment (4 setmanes)</h2>
+              </div>
+              <div class="compliance-legend">
+                <span class="legend-dot legend-dot--followed"></span><span class="legend-label">Proposta seguida</span>
+                <span class="legend-dot legend-dot--own"></span><span class="legend-label">Propi</span>
+                <span class="legend-dot legend-dot--missed"></span><span class="legend-label">Perdut</span>
+                <span class="legend-dot legend-dot--free"></span><span class="legend-label">Lliure</span>
+              </div>
+              <div class="compliance-grid">
+                @for (day of complianceDays(); track day.date) {
+                  <div
+                    class="compliance-dot"
+                    [class.compliance-dot--followed]="day.state === 'followed'"
+                    [class.compliance-dot--own]="day.state === 'own'"
+                    [class.compliance-dot--missed]="day.state === 'missed'"
+                    [class.compliance-dot--free]="day.state === 'free'"
+                    [title]="day.date + ': ' + complianceLabel(day.state)"
+                  ></div>
+                }
+              </div>
+            </div>
+          }
+
           <!-- ── Client workout history ─────────────────────────────── -->
           <div class="card-section">
             <div class="section-header">
@@ -516,6 +544,35 @@ type DashboardView = 'clients' | 'detail';
       }
     }
 
+    /* ── Compliance grid ── */
+    .compliance-legend {
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+      margin-bottom: 10px; font-size: 11px; color: #888;
+    }
+    .legend-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+      &--followed { background: #006874; }
+      &--own      { background: #f59e0b; }
+      &--missed   { background: #ef5350; }
+      &--free     { background: #e0e0e0; }
+    }
+    .legend-label { margin-right: 6px; }
+    .compliance-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+    }
+    .compliance-dot {
+      aspect-ratio: 1; border-radius: 50%;
+      background: #f5f5f5;
+      transition: transform 0.1s;
+      &:hover { transform: scale(1.2); }
+      &--followed { background: #006874; }
+      &--own      { background: #f59e0b; }
+      &--missed   { background: rgba(239,83,80,0.7); }
+      &--free     { background: #c8e6c9; }
+    }
+
     /* ── Danger section ── */
     .section--danger { padding: 0; }
     .danger-row {
@@ -583,6 +640,9 @@ export class TrainerComponent implements OnInit {
   private clientProposalsCache = new Map<string, TrainerProposal[]>();
   readonly clientProposals = signal<TrainerProposal[]>([]);
 
+  // Compliance: date → 'followed' | 'own' | 'missed' | 'free'
+  readonly complianceDays = signal<{ date: string; state: 'followed' | 'own' | 'missed' | 'free' | 'future' }[]>([]);
+
   ngOnInit(): void {
     this.trainerService.loadClients().then(() => {
       const first = this.trainerService.clients()[0];
@@ -615,7 +675,44 @@ export class TrainerComponent implements OnInit {
     this.clientWorkouts.set(workouts);
     this.clientProposalsCache.set(c.clientId, proposals);
     this.clientProposals.set(proposals);
+    this.complianceDays.set(this._computeCompliance(workouts, proposals));
     this.clientWorkoutsLoaded.set(true);
+  }
+
+  private _computeCompliance(
+    workouts: Workout[],
+    proposals: TrainerProposal[],
+  ): { date: string; state: 'followed' | 'own' | 'missed' | 'free' | 'future' }[] {
+    const result: { date: string; state: 'followed' | 'own' | 'missed' | 'free' | 'future' }[] = [];
+    const today  = new Date().toISOString().split('T')[0];
+    const endD   = new Date(today + 'T00:00:00');
+    const startD = new Date(endD);
+    startD.setDate(startD.getDate() - 27); // 4 weeks
+
+    for (const d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
+      const dateStr = d.toISOString().split('T')[0];
+      const weekday = (d.getDay() + 6) % 7;
+      const isFuture = dateStr > today;
+
+      const proposal = proposals.find(p =>
+        (p.proposalType === 'specific' && p.date === dateStr) ||
+        (p.proposalType === 'weekly'   && p.weekday === weekday)
+      );
+      const workout = workouts.find(w => w.date === dateStr);
+
+      let state: 'followed' | 'own' | 'missed' | 'free' | 'future';
+      if (isFuture) {
+        state = 'future';
+      } else if (proposal) {
+        if (workout?.sourceProposalId === proposal.id) state = 'followed';
+        else if (workout)                               state = 'own';
+        else                                            state = 'missed';
+      } else {
+        state = workout ? 'free' : 'future'; // 'future' = empty day, reuse for "nothing"
+      }
+      result.push({ date: dateStr, state });
+    }
+    return result;
   }
 
   weeklyProposal(weekday: number, clientId: string): TrainerProposal | undefined {
@@ -773,6 +870,14 @@ export class TrainerComponent implements OnInit {
 
   async deleteWeeklyProposal(p: TrainerProposal): Promise<void> {
     await this.deleteProposal(p);
+  }
+
+  complianceLabel(state: string): string {
+    const MAP: Record<string, string> = {
+      followed: 'Proposta seguida', own: 'Entrenament propi',
+      missed: 'Perdut', free: 'Lliure', future: '',
+    };
+    return MAP[state] ?? '';
   }
 
   async confirmRemoveClient(c: TrainerClient): Promise<void> {
