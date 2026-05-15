@@ -172,26 +172,51 @@ describe('SettingsComponent', () => {
     });
   });
 
-  // ── setRestTimer() ───────────────────────────────────────────────────────
+  // ── toggleRestTimer() / setRestTimerFromInput() ──────────────────────────
 
-  describe('setRestTimer()', () => {
-    it('sets restTimerSeconds to 90', () => {
-      component.setRestTimer(90);
+  describe('toggleRestTimer()', () => {
+    it('enables timer (sets to 90) when currently disabled', () => {
+      mockRestTimer.set(0);
+      component.toggleRestTimer();
       expect(mockUpdate).toHaveBeenCalledWith({ restTimerSeconds: 90 });
     });
 
-    it('sets restTimerSeconds to 0 (disabled)', () => {
-      component.setRestTimer(0);
+    it('disables timer (sets to 0) when currently enabled', () => {
+      mockRestTimer.set(90);
+      component.toggleRestTimer();
       expect(mockUpdate).toHaveBeenCalledWith({ restTimerSeconds: 0 });
     });
+  });
 
-    it('sets restTimerSeconds to 180', () => {
-      component.setRestTimer(180);
-      expect(mockUpdate).toHaveBeenCalledWith({ restTimerSeconds: 180 });
+  describe('restTimerEnabled()', () => {
+    it('returns false when restTimerSeconds is 0', () => {
+      mockRestTimer.set(0);
+      expect(component.restTimerEnabled()).toBeFalse();
     });
 
-    it('exposes restOptions with expected values', () => {
-      expect(component.restOptions).toEqual([0, 30, 60, 90, 120, 180]);
+    it('returns true when restTimerSeconds is positive', () => {
+      mockRestTimer.set(60);
+      expect(component.restTimerEnabled()).toBeTrue();
+    });
+  });
+
+  describe('setRestTimerFromInput()', () => {
+    it('clamps values below 1 to 1', () => {
+      const event = { target: { value: '0' } } as unknown as Event;
+      component.setRestTimerFromInput(event);
+      expect(mockUpdate).toHaveBeenCalledWith({ restTimerSeconds: 1 });
+    });
+
+    it('clamps values above 3600 to 3600', () => {
+      const event = { target: { value: '9999' } } as unknown as Event;
+      component.setRestTimerFromInput(event);
+      expect(mockUpdate).toHaveBeenCalledWith({ restTimerSeconds: 3600 });
+    });
+
+    it('accepts a valid value in range', () => {
+      const event = { target: { value: '120' } } as unknown as Event;
+      component.setRestTimerFromInput(event);
+      expect(mockUpdate).toHaveBeenCalledWith({ restTimerSeconds: 120 });
     });
   });
 

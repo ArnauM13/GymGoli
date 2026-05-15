@@ -209,18 +209,33 @@ import {
         <div class="setting-row setting-row--top">
           <div class="setting-info">
             <span class="setting-label">Descans entre sèries</span>
-            <span class="setting-desc">Temporitzador automàtic en afegir sèries. Posa 0 per desactivar-lo.</span>
+            <span class="setting-desc">Temporitzador automàtic en afegir una sèrie.</span>
           </div>
-          <div class="unit-toggle rest-toggle">
-            @for (secs of restOptions; track secs) {
-              <button class="unit-btn"
-                [class.unit-btn--active]="settingsService.restTimerSeconds() === secs"
-                (click)="setRestTimer(secs)">
-                {{ secs === 0 ? 'Off' : secs + 's' }}
-              </button>
-            }
-          </div>
+          <mat-slide-toggle
+            [checked]="restTimerEnabled()"
+            (change)="toggleRestTimer()"
+            color="primary"
+          />
         </div>
+
+        @if (restTimerEnabled()) {
+          <div class="setting-row setting-row--top rest-timer-input-row">
+            <div class="setting-info">
+              <span class="setting-label">Durada del descans</span>
+            </div>
+            <div class="rest-input-wrap">
+              <input
+                class="rest-input"
+                type="number"
+                min="1"
+                max="3600"
+                [value]="settingsService.restTimerSeconds()"
+                (change)="setRestTimerFromInput($event)"
+              />
+              <span class="rest-input-unit">s</span>
+            </div>
+          </div>
+        }
 
         <div class="setting-row setting-row--top">
           <div class="setting-info">
@@ -480,7 +495,21 @@ import {
     .unit-toggle {
       display: flex; border: 1.5px solid var(--c-border); border-radius: 10px; overflow: hidden; flex-shrink: 0;
     }
-    .rest-toggle { flex-shrink: 1; flex-wrap: nowrap; }
+    .rest-timer-input-row { align-items: center; }
+    .rest-input-wrap {
+      display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+    }
+    .rest-input {
+      width: 72px; padding: 7px 10px;
+      border: 1.5px solid var(--c-border); border-radius: 10px;
+      background: var(--c-card); color: var(--c-text);
+      font-size: 16px; font-weight: 700; text-align: center;
+      outline: none; transition: border-color 0.15s;
+      -moz-appearance: textfield;
+      &::-webkit-outer-spin-button, &::-webkit-inner-spin-button { -webkit-appearance: none; }
+      &:focus { border-color: var(--c-brand); }
+    }
+    .rest-input-unit { font-size: 13px; font-weight: 600; color: var(--c-text-2); }
     .unit-btn {
       padding: 7px 10px; border: none; background: var(--c-card);
       font-size: 13px; font-weight: 700; color: var(--c-text-3);
@@ -727,7 +756,7 @@ export class SettingsComponent {
   readonly showInviteInput  = signal(false);
   readonly inviteCodeInput  = signal('');
   readonly acceptingInvite  = signal(false);
-  readonly restOptions = [0, 30, 60, 90, 120, 180];
+  readonly restTimerEnabled = computed(() => this.settingsService.restTimerSeconds() > 0);
   readonly fitnessGoalOptions = (Object.keys(FITNESS_GOAL_LABELS) as FitnessGoal[]).map(v => ({
     value: v, emoji: FITNESS_GOAL_EMOJIS[v], label: FITNESS_GOAL_LABELS[v],
   }));
@@ -766,8 +795,16 @@ export class SettingsComponent {
     this.settingsService.update({ weightUnit: unit });
   }
 
-  setRestTimer(seconds: number): void {
-    this.settingsService.update({ restTimerSeconds: seconds });
+  toggleRestTimer(): void {
+    const current = this.settingsService.restTimerSeconds();
+    this.settingsService.update({ restTimerSeconds: current > 0 ? 0 : 90 });
+  }
+
+  setRestTimerFromInput(event: Event): void {
+    const raw = parseInt((event.target as HTMLInputElement).value, 10);
+    const secs = isNaN(raw) || raw < 1 ? 1 : Math.min(raw, 3600);
+    (event.target as HTMLInputElement).value = String(secs);
+    this.settingsService.update({ restTimerSeconds: secs });
   }
 
   toggleDarkMode(): void {
