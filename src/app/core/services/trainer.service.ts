@@ -3,9 +3,10 @@ import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import {
-  ClientStatus, ProposalType, TrainerClient, TrainerInvite,
+  ClientGoals, ClientStatus, ProposalType, TrainerClient, TrainerInvite,
   TrainerProposal, UserProfile, UserRole,
 } from '../models/trainer.model';
+import { FitnessGoal, GoalMode } from '../models/user-settings.model';
 import { Workout } from '../models/workout.model';
 
 @Injectable({ providedIn: 'root' })
@@ -240,6 +241,28 @@ export class TrainerService {
       .eq('trainer_id', uid)
       .eq('client_id', clientId);
     this._clients.update(list => list.filter(c => c.clientId !== clientId));
+  }
+
+  // ── Client settings / goals (trainer view) ───────────────────────────────
+
+  async getClientGoals(clientId: string): Promise<ClientGoals | null> {
+    try {
+      const { data, error } = await this.supabase
+        .from('user_settings')
+        .select('settings')
+        .eq('user_id', clientId)
+        .maybeSingle();
+
+      if (error || !data?.settings) return null;
+      const s = data.settings as Record<string, unknown>;
+      return {
+        fitnessGoal:        (s['fitnessGoal'] as FitnessGoal | null) ?? null,
+        goalMode:           (s['goalMode'] as GoalMode) ?? 'combined',
+        weeklyActivityGoal: (s['weeklyActivityGoal'] as number | null) ?? null,
+        weeklyGymGoal:      (s['weeklyGymGoal'] as number | null) ?? null,
+        weeklySportGoal:    (s['weeklySportGoal'] as number | null) ?? null,
+      };
+    } catch { return null; }
   }
 
   // ── Client workouts (trainer view) ───────────────────────────────────────

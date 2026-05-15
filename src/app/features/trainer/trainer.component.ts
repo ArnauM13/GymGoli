@@ -5,7 +5,12 @@ import { DatePipe } from '@angular/common';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { TrainerService } from '../../core/services/trainer.service';
-import { TrainerClient, TrainerProposal, WEEKDAY_FULL, WEEKDAY_LABELS } from '../../core/models/trainer.model';
+import {
+  ClientGoals, TrainerClient, TrainerProposal, WEEKDAY_FULL, WEEKDAY_LABELS,
+} from '../../core/models/trainer.model';
+import {
+  FITNESS_GOAL_EMOJIS, FITNESS_GOAL_LABELS,
+} from '../../core/models/user-settings.model';
 import { Workout, FEELING_EMOJI } from '../../core/models/workout.model';
 
 type DashboardView = 'clients' | 'detail';
@@ -109,6 +114,56 @@ type DashboardView = 'clients' | 'detail';
         </div>
 
         @if (selectedClient(); as client) {
+
+          <!-- ── Client goals ───────────────────────────────────── -->
+          @if (clientGoals(); as goals) {
+            <div class="card-section goals-section">
+              <div class="section-header">
+                <span class="material-symbols-outlined section-icon">target</span>
+                <h2 class="section-title">Objectiu del client</h2>
+              </div>
+
+              <div class="goals-body">
+                @if (goals.fitnessGoal) {
+                  <div class="goal-pill">
+                    <span class="goal-emoji">{{ goalEmoji(goals.fitnessGoal) }}</span>
+                    <span class="goal-label">{{ goalLabel(goals.fitnessGoal) }}</span>
+                  </div>
+                } @else {
+                  <p class="goal-none">Sense objectiu definit</p>
+                }
+
+                @if (goals.goalMode === 'combined' && goals.weeklyActivityGoal !== null) {
+                  <div class="goal-target">
+                    <span class="material-symbols-outlined goal-target-icon">repeat</span>
+                    <span>{{ goals.weeklyActivityGoal }} activitats / setmana</span>
+                  </div>
+                }
+                @if (goals.goalMode === 'separate') {
+                  @if (goals.weeklyGymGoal !== null) {
+                    <div class="goal-target">
+                      <span class="material-symbols-outlined goal-target-icon">fitness_center</span>
+                      <span>{{ goals.weeklyGymGoal }} gym / setmana</span>
+                    </div>
+                  }
+                  @if (goals.weeklySportGoal !== null) {
+                    <div class="goal-target">
+                      <span class="material-symbols-outlined goal-target-icon">directions_run</span>
+                      <span>{{ goals.weeklySportGoal }} esport / setmana</span>
+                    </div>
+                  }
+                }
+              </div>
+            </div>
+          } @else if (clientWorkoutsLoaded()) {
+            <div class="card-section goals-section goals-section--empty">
+              <div class="section-header">
+                <span class="material-symbols-outlined section-icon">target</span>
+                <h2 class="section-title">Objectiu del client</h2>
+              </div>
+              <p class="goal-none">El client no ha definit cap objectiu.</p>
+            </div>
+          }
 
           <!-- ── Weekly routine ────────────────────────────────────── -->
           <div class="card-section">
@@ -425,6 +480,28 @@ type DashboardView = 'clients' | 'detail';
       &.active { background: #006874; border-color: #006874; color: white; }
     }
 
+    /* ── Client goals ── */
+    .goals-section { }
+    .goals-section--empty { opacity: 0.7; }
+    .goals-body { display: flex; flex-direction: column; gap: 8px; }
+    .goal-pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 14px; border-radius: 12px;
+      background: rgba(0,104,116,0.08); border: 1.5px solid rgba(0,104,116,0.2);
+      align-self: flex-start;
+    }
+    .goal-emoji { font-size: 20px; line-height: 1; }
+    .goal-label { font-size: 14px; font-weight: 700; color: #006874; }
+    .goal-target {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 13px; font-weight: 600; color: #555;
+    }
+    .goal-target-icon {
+      font-size: 16px; color: #006874;
+      font-variation-settings: 'FILL' 0, 'wght' 300;
+    }
+    .goal-none { margin: 0; font-size: 13px; color: #999; font-style: italic; }
+
     /* ── Week grid ── */
     .week-grid {
       display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
@@ -641,7 +718,8 @@ export class TrainerComponent implements OnInit {
   readonly clientProposals = signal<TrainerProposal[]>([]);
 
   // Compliance: date → 'followed' | 'own' | 'missed' | 'free'
-  readonly complianceDays = signal<{ date: string; state: 'followed' | 'own' | 'missed' | 'free' | 'future' }[]>([]);
+  readonly complianceDays  = signal<{ date: string; state: 'followed' | 'own' | 'missed' | 'free' | 'future' }[]>([]);
+  readonly clientGoals     = signal<ClientGoals | null>(null);
 
   ngOnInit(): void {
     this.trainerService.loadClients().then(() => {
@@ -659,23 +737,26 @@ export class TrainerComponent implements OnInit {
 
   private async loadClientData(c: TrainerClient): Promise<void> {
     this.clientWorkoutsLoaded.set(false);
+    this.clientGoals.set(null);
     const to   = new Date();
     const from = new Date(to);
     from.setDate(from.getDate() - 28);
 
-    const [workouts, proposals] = await Promise.all([
+    const [workouts, proposals, goals] = await Promise.all([
       this.trainerService.getClientWorkouts(
         c.clientId,
         from.toISOString().split('T')[0],
         to.toISOString().split('T')[0],
       ),
       this.trainerService.getClientProposals(c.clientId),
+      this.trainerService.getClientGoals(c.clientId),
     ]);
 
     this.clientWorkouts.set(workouts);
     this.clientProposalsCache.set(c.clientId, proposals);
     this.clientProposals.set(proposals);
     this.complianceDays.set(this._computeCompliance(workouts, proposals));
+    this.clientGoals.set(goals);
     this.clientWorkoutsLoaded.set(true);
   }
 
@@ -870,6 +951,14 @@ export class TrainerComponent implements OnInit {
 
   async deleteWeeklyProposal(p: TrainerProposal): Promise<void> {
     await this.deleteProposal(p);
+  }
+
+  goalEmoji(goal: string): string {
+    return FITNESS_GOAL_EMOJIS[goal as keyof typeof FITNESS_GOAL_EMOJIS] ?? '';
+  }
+
+  goalLabel(goal: string): string {
+    return FITNESS_GOAL_LABELS[goal as keyof typeof FITNESS_GOAL_LABELS] ?? goal;
   }
 
   complianceLabel(state: string): string {

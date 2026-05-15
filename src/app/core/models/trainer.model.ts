@@ -1,4 +1,5 @@
 import { WorkoutEntry } from './workout.model';
+import { FitnessGoal, GoalMode } from './user-settings.model';
 
 export type UserRole = 'user' | 'trainer';
 export type ProposalType = 'specific' | 'weekly';
@@ -15,6 +16,14 @@ export interface UserProfile {
   createdAt:   Date;
 }
 
+export interface ClientGoals {
+  fitnessGoal:        FitnessGoal | null;
+  goalMode:           GoalMode;
+  weeklyActivityGoal: number | null;
+  weeklyGymGoal:      number | null;
+  weeklySportGoal:    number | null;
+}
+
 export interface TrainerInvite {
   code:  string;
   token: string;
@@ -27,6 +36,7 @@ export interface TrainerClient {
   status:        ClientStatus;
   createdAt:     Date;
   clientProfile?: UserProfile;
+  goals?:        ClientGoals;
 }
 
 export interface TrainerProposal {
