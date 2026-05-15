@@ -5,6 +5,8 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { InlineDatePickerComponent } from '../../shared/components/inline-date-picker/inline-date-picker.component';
 import { workoutCategories, mondayOf, addDays } from '../../shared/utils/calendar-utils';
 import { UserSettingsService } from '../../core/services/user-settings.service';
+import { TrainerService } from '../../core/services/trainer.service';
+import { AuthService } from '../../core/services/auth.service';
 
 import {
   CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_MUSCLES,
@@ -127,6 +129,46 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         @if ((!workoutService.isLoading() || dateWorkouts().length > 0) && !creating()) {
 
           <app-fitness-insights />
+
+          <!-- ── Trainer proposal card ── -->
+          @if (activeProposal(); as prop) {
+            <div class="proposal-card">
+              <div class="proposal-header">
+                <span class="material-symbols-outlined proposal-icon">sports</span>
+                <div class="proposal-header-info">
+                  <span class="proposal-title">Proposta de l'entrenador</span>
+                  @if (trainerService.myTrainer()?.displayName; as name) {
+                    <span class="proposal-trainer">{{ name }}</span>
+                  }
+                </div>
+              </div>
+              <div class="proposal-exercises">
+                @for (entry of prop.entries.slice(0, 4); track entry.exerciseName) {
+                  <span class="proposal-ex">{{ entry.exerciseName }}</span>
+                }
+                @if (prop.entries.length > 4) {
+                  <span class="proposal-ex proposal-ex--more">+{{ prop.entries.length - 4 }} més</span>
+                }
+              </div>
+              @if (prop.notes) {
+                <p class="proposal-notes">{{ prop.notes }}</p>
+              }
+              <div class="proposal-actions">
+                <button class="proposal-accept" (click)="acceptProposal(prop)" [disabled]="acceptingProposal()">
+                  @if (acceptingProposal()) {
+                    <span class="material-symbols-outlined spin">sync</span>
+                  } @else {
+                    <span class="material-symbols-outlined">check</span>
+                  }
+                  Accepta
+                </button>
+                <button class="proposal-ignore" (click)="ignoreProposal()">
+                  <span class="material-symbols-outlined">close</span>
+                  Ignora
+                </button>
+              </div>
+            </div>
+          }
 
           <!-- Entrenaments section -->
           <div class="workout-section">
@@ -887,6 +929,58 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .sk-btn-grid  { display: flex; gap: 10px; }
     .sk-btn-ph    { flex: 1; height: 74px; border-radius: 16px; }
 
+    /* ── Trainer proposal card ── */
+    .proposal-card {
+      margin: 12px 16px 0;
+      padding: 14px 14px 12px;
+      background: var(--c-card);
+      border-radius: 18px;
+      border: 2px solid rgba(0,104,116,0.25);
+      box-shadow: 0 2px 10px var(--c-shadow);
+      animation: bar-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .proposal-header {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+    }
+    .proposal-icon {
+      font-size: 22px; color: var(--c-brand); flex-shrink: 0;
+      font-variation-settings: 'FILL' 1, 'wght' 400;
+    }
+    .proposal-header-info { display: flex; flex-direction: column; gap: 1px; }
+    .proposal-title  { font-size: 13px; font-weight: 800; color: var(--c-brand); letter-spacing: 0.1px; }
+    .proposal-trainer { font-size: 11px; color: var(--c-text-2); }
+    .proposal-exercises {
+      display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;
+    }
+    .proposal-ex {
+      font-size: 11px; font-weight: 600; color: var(--c-text-2);
+      background: var(--c-subtle); border-radius: 8px; padding: 3px 8px;
+    }
+    .proposal-ex--more { color: var(--c-text-3); font-style: italic; }
+    .proposal-notes {
+      margin: 0 0 10px; font-size: 12px; color: var(--c-text-2); font-style: italic; line-height: 1.4;
+    }
+    .proposal-actions { display: flex; gap: 8px; }
+    .proposal-accept {
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
+      padding: 9px 14px; border: none; border-radius: 10px;
+      background: var(--c-brand); color: white;
+      font-size: 13px; font-weight: 700; cursor: pointer;
+      transition: background 0.15s; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover:not(:disabled) { background: var(--c-brand-dk); }
+      &:disabled { opacity: 0.6; cursor: default; }
+    }
+    .proposal-ignore {
+      display: flex; align-items: center; gap: 5px;
+      padding: 9px 14px; border-radius: 10px;
+      border: 1.5px solid var(--c-border); background: var(--c-card); color: var(--c-text-2);
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: all 0.15s; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 15px; }
+      &:hover { border-color: var(--c-text-3); color: var(--c-text); }
+    }
+
     @keyframes spin {
       from { transform: rotate(0deg); }
       to   { transform: rotate(360deg); }
@@ -1024,6 +1118,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 export class TrainComponent {
   readonly workoutService  = inject(WorkoutService);
   readonly sportService    = inject(SportService);
+  readonly trainerService  = inject(TrainerService);
   private settingsService  = inject(UserSettingsService);
   private exerciseService  = inject(ExerciseService);
   private templateService  = inject(TemplateService);
@@ -1044,7 +1139,28 @@ export class TrainComponent {
   readonly loggerFeeling   = signal<FeelingLevel | null>(null);
   readonly loggerMetrics   = signal<Record<string, string | number>>({});
   readonly loggerNotes     = signal<string>('');
-  readonly creating        = signal(false);
+  readonly creating          = signal(false);
+  readonly acceptingProposal = signal(false);
+
+  private readonly _dismissedKey = computed(() =>
+    `gymgoli_dismissed_proposals_${this.auth?.uid() ?? ''}`
+  );
+  private _dismissedDates = new Set<string>();
+
+  readonly activeProposal = computed(() => {
+    if (!this.trainerService.hasTrainer()) return null;
+    const date = this.selectedDate();
+    const prop = this.trainerService.getProposalForDate(date);
+    if (!prop) return null;
+    if (this._dismissedDates.has(date)) return null;
+    // Hide if already accepted (workout with source_proposal_id for this date)
+    const alreadyAccepted = this.workoutService
+      .getWorkoutsForDate(date)
+      .some(w => w.sourceProposalId === prop.id);
+    return alreadyAccepted ? null : prop;
+  });
+
+  private readonly auth = inject(AuthService);
 
   readonly isToday = computed(() => this.selectedDate() === TODAY());
 
@@ -1231,6 +1347,43 @@ export class TrainComponent {
         this.loggerSport.set(null);
       });
     });
+
+    // Load dismissed proposal dates from localStorage once auth resolves
+    effect(() => {
+      const uid = this.auth.uid();
+      if (!uid) return;
+      try {
+        const key  = `gymgoli_dismissed_proposals_${uid}`;
+        const list = JSON.parse(localStorage.getItem(key) ?? '[]') as string[];
+        this._dismissedDates = new Set(list);
+      } catch { }
+    });
+  }
+
+  // ── Trainer proposal ─────────────────────────────────────────────────────
+
+  async acceptProposal(prop: import('../../core/models/trainer.model').TrainerProposal): Promise<void> {
+    this.acceptingProposal.set(true);
+    try {
+      const id = await this.workoutService.createWorkoutFromProposal(
+        this.selectedDate(), prop.id, prop.entries,
+      );
+      this.openWorkout(id);
+    } catch {
+      this.snackBar.open('Error en acceptar la proposta', '', { duration: 3000 });
+    } finally {
+      this.acceptingProposal.set(false);
+    }
+  }
+
+  ignoreProposal(): void {
+    const date = this.selectedDate();
+    this._dismissedDates.add(date);
+    try {
+      const key  = this._dismissedKey();
+      const list = JSON.parse(localStorage.getItem(key) ?? '[]') as string[];
+      if (!list.includes(date)) { list.push(date); localStorage.setItem(key, JSON.stringify(list)); }
+    } catch { }
   }
 
   // ── Workout navigation ────────────────────────────────────────────────────

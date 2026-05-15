@@ -59,5 +59,16 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/templates/templates.component').then(m => m.TemplatesComponent),
   },
+  {
+    path: 'trainer',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/trainer/trainer.component').then(m => m.TrainerComponent),
+  },
+  {
+    path: 'join/:token',
+    loadComponent: () =>
+      import('./features/trainer/join/join.component').then(m => m.JoinComponent),
+  },
   { path: '**', redirectTo: 'train' },
 ];

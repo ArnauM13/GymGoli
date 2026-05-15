@@ -1,5 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
+
+import { TrainerService } from '../../../core/services/trainer.service';
 
 interface NavItem {
   path: string;
@@ -13,7 +15,7 @@ interface NavItem {
   imports: [RouterLink, RouterLinkActive],
   template: `
     <nav class="bottom-nav">
-      @for (item of navItems; track item.path) {
+      @for (item of navItems(); track item.path) {
         <a
           [routerLink]="item.path"
           routerLinkActive="active"
@@ -92,11 +94,19 @@ interface NavItem {
   `],
 })
 export class NavBarComponent {
-  readonly navItems: NavItem[] = [
-    { path: '/train', icon: 'exercise', label: 'Entrena' },
-    { path: '/history', icon: 'calendar_month', label: 'Historial' },
-    { path: '/library', icon: 'fitness_center', label: 'Exercicis' },
-    { path: '/charts', icon: 'bar_chart', label: 'Progrés' },
-    { path: '/settings', icon: 'account_circle', label: 'Perfil' },
-  ];
+  private trainerService = inject(TrainerService);
+
+  readonly navItems = computed<NavItem[]>(() => {
+    const base: NavItem[] = [
+      { path: '/train',    icon: 'exercise',        label: 'Entrena' },
+      { path: '/history',  icon: 'calendar_month',  label: 'Historial' },
+      { path: '/library',  icon: 'fitness_center',  label: 'Exercicis' },
+      { path: '/charts',   icon: 'bar_chart',       label: 'Progrés' },
+      { path: '/settings', icon: 'account_circle',  label: 'Perfil' },
+    ];
+    if (this.trainerService.isTrainer()) {
+      base.splice(4, 0, { path: '/trainer', icon: 'sports', label: 'Clients' });
+    }
+    return base;
+  });
 }
