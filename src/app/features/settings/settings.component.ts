@@ -10,6 +10,7 @@ import { FitnessMetricsService } from '../../core/services/fitness-metrics.servi
 import { SportService } from '../../core/services/sport.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
+import { TrainerService } from '../../core/services/trainer.service';
 import {
   FitnessGoal, GoalMode, WeightUnit,
   FITNESS_GOAL_EMOJIS, FITNESS_GOAL_LABELS, FITNESS_GOAL_WEEKLY_DEFAULTS,
@@ -234,7 +235,126 @@ import {
         </div>
       </div>
 
-      <!-- ── Bloc 3: Contingut ── -->
+      <!-- ── Bloc 3: Mode entrenador ── -->
+      <div class="section">
+        <h2 class="section-title">Mode entrenador</h2>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Activa el mode entrenador</span>
+            <span class="setting-desc">Gestiona clients, crea rutines i proposa entrenaments.</span>
+          </div>
+          <mat-slide-toggle
+            [checked]="trainerService.isTrainer()"
+            [disabled]="togglingTrainer()"
+            (change)="toggleTrainerMode()"
+            color="primary"
+          />
+        </div>
+
+        @if (trainerService.isTrainer()) {
+          <div class="setting-divider"></div>
+
+          <a class="nav-row" routerLink="/trainer">
+            <div class="setting-info">
+              <span class="setting-label">Dashboard de clients</span>
+              <span class="setting-desc">Gestiona els teus clients i les seves propostes.</span>
+            </div>
+            <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
+          </a>
+
+          <div class="setting-row setting-row--top">
+            <div class="setting-info">
+              <span class="setting-label">Invitació</span>
+              <span class="setting-desc">Comparteix el codi o l'enllaç als teus clients.</span>
+            </div>
+            @if (!trainerService.activeInvite()) {
+              <button class="goal-set-btn" (click)="generateTrainerInvite()" [disabled]="generatingInvite()">
+                @if (generatingInvite()) {
+                  <span class="material-symbols-outlined spin">sync</span>
+                } @else {
+                  <span class="material-symbols-outlined">add</span>
+                  Genera
+                }
+              </button>
+            }
+          </div>
+
+          @if (trainerService.activeInvite(); as inv) {
+            <div class="invite-block">
+              <div class="invite-code-display">{{ inv.code }}</div>
+              <div class="invite-btns">
+                <button class="invite-action-btn" (click)="copyInviteCode(inv.code)">
+                  <span class="material-symbols-outlined">content_copy</span>
+                  Copia codi
+                </button>
+                <button class="invite-action-btn" (click)="copyInviteLink(inv.token)">
+                  <span class="material-symbols-outlined">share</span>
+                  Copia enllaç
+                </button>
+                <button class="invite-action-btn" (click)="generateTrainerInvite()" [disabled]="generatingInvite()">
+                  <span class="material-symbols-outlined">refresh</span>
+                  Nou
+                </button>
+              </div>
+            </div>
+          }
+        }
+      </div>
+
+      <!-- ── Bloc 4: El meu entrenador ── -->
+      <div class="section">
+        <h2 class="section-title">El meu entrenador</h2>
+
+        @if (trainerService.hasTrainer()) {
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">{{ trainerService.myTrainer()?.displayName ?? 'Entrenador' }}</span>
+              <span class="setting-desc">Entrenador personal connectat.</span>
+            </div>
+          </div>
+          <div class="setting-row setting-row--top">
+            <div class="setting-info">
+              <span class="setting-label danger-label">Desconnectar entrenador</span>
+              <span class="setting-desc">Deixaràs de rebre propostes d'entrenament.</span>
+            </div>
+            <button class="danger-btn" (click)="disconnectTrainer()">Desconnecta</button>
+          </div>
+        } @else {
+          <p class="section-desc">Tens un codi d'invitació? Introdueix-lo per connectar-te amb el teu entrenador.</p>
+
+          @if (!showInviteInput()) {
+            <button class="goal-set-btn" (click)="showInviteInput.set(true)">
+              <span class="material-symbols-outlined">key</span>
+              Introduir codi
+            </button>
+          } @else {
+            <div class="invite-input-row">
+              <input
+                class="invite-code-input"
+                type="text"
+                placeholder="Ex: A3B7F2XQ"
+                maxlength="8"
+                [value]="inviteCodeInput()"
+                (input)="inviteCodeInput.set($any($event.target).value.toUpperCase())"
+                (keydown.enter)="acceptInviteCode()"
+              />
+              <button class="btn-primary-sm" (click)="acceptInviteCode()" [disabled]="acceptingInvite() || inviteCodeInput().length < 6">
+                @if (acceptingInvite()) {
+                  <span class="material-symbols-outlined spin">sync</span>
+                } @else {
+                  Unir-me
+                }
+              </button>
+              <button class="icon-btn-sm" (click)="showInviteInput.set(false)">
+                <span class="material-symbols-outlined">close</span>
+              </button>
+            </div>
+          }
+        }
+      </div>
+
+      <!-- ── Bloc 5: Contingut ── -->
       <div class="section">
         <h2 class="section-title">Contingut</h2>
 
@@ -526,6 +646,57 @@ import {
       }
     }
 
+    /* ── Invite block ── */
+    .invite-block {
+      margin-top: 12px; padding: 12px 14px;
+      background: rgba(0,104,116,0.06); border-radius: 12px;
+      border: 1.5px solid rgba(0,104,116,0.15);
+    }
+    .invite-code-display {
+      font-size: 28px; font-weight: 800; letter-spacing: 5px;
+      color: var(--c-brand); font-family: monospace;
+      text-align: center; margin-bottom: 10px;
+    }
+    .invite-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+    .invite-action-btn {
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
+      padding: 8px 10px; border-radius: 10px;
+      border: 1.5px solid var(--c-border); background: var(--c-card);
+      font-size: 12px; font-weight: 600; color: var(--c-text-2);
+      cursor: pointer; transition: all 0.15s; touch-action: manipulation; white-space: nowrap;
+      .material-symbols-outlined { font-size: 15px; }
+      &:hover:not(:disabled) { border-color: var(--c-brand); color: var(--c-brand); }
+      &:disabled { opacity: 0.5; cursor: default; }
+    }
+
+    /* ── Invite code input ── */
+    .invite-input-row { display: flex; gap: 6px; align-items: center; margin-top: 10px; }
+    .invite-code-input {
+      flex: 1; padding: 9px 12px; border: 1.5px solid var(--c-border);
+      border-radius: 10px; font-size: 15px; font-weight: 700;
+      letter-spacing: 3px; text-transform: uppercase; color: var(--c-text);
+      background: var(--c-card); outline: none; font-family: monospace;
+      transition: border-color 0.15s;
+      &:focus { border-color: var(--c-brand); }
+      &::placeholder { font-weight: 500; letter-spacing: 1px; color: var(--c-text-3); }
+    }
+    .btn-primary-sm {
+      padding: 8px 14px; border: none; border-radius: 10px;
+      background: var(--c-brand); color: white;
+      font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
+      transition: background 0.15s; touch-action: manipulation; flex-shrink: 0;
+      &:hover:not(:disabled) { background: #005a63; }
+      &:disabled { opacity: 0.5; cursor: default; }
+    }
+    .icon-btn-sm {
+      width: 34px; height: 34px; border-radius: 8px; border: 1.5px solid var(--c-border);
+      background: var(--c-card); cursor: pointer; color: var(--c-text-3);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover { border-color: var(--c-text-3); color: var(--c-text-2); }
+    }
+
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     .spin { animation: spin 1s linear infinite; font-size: 15px !important; }
   `],
@@ -534,6 +705,7 @@ export class SettingsComponent {
   readonly authService     = inject(AuthService);
   readonly settingsService = inject(UserSettingsService);
   readonly metricsService  = inject(FitnessMetricsService);
+  readonly trainerService  = inject(TrainerService);
   private exerciseService  = inject(ExerciseService);
   private sportService     = inject(SportService);
   private workoutService   = inject(WorkoutService);
@@ -549,7 +721,12 @@ export class SettingsComponent {
     this.authService.user()?.user_metadata?.['avatar_url'] as string | undefined
   );
 
-  readonly deletingAccount = signal(false);
+  readonly deletingAccount  = signal(false);
+  readonly togglingTrainer  = signal(false);
+  readonly generatingInvite = signal(false);
+  readonly showInviteInput  = signal(false);
+  readonly inviteCodeInput  = signal('');
+  readonly acceptingInvite  = signal(false);
   readonly restOptions = [0, 30, 60, 90, 120, 180];
   readonly fitnessGoalOptions = (Object.keys(FITNESS_GOAL_LABELS) as FitnessGoal[]).map(v => ({
     value: v, emoji: FITNESS_GOAL_EMOJIS[v], label: FITNESS_GOAL_LABELS[v],
@@ -651,6 +828,75 @@ export class SettingsComponent {
 
   clearSportGoal(): void {
     this.settingsService.update({ weeklySportGoal: null });
+  }
+
+  // ── Trainer mode ─────────────────────────────────────────────────────────
+
+  async toggleTrainerMode(): Promise<void> {
+    this.togglingTrainer.set(true);
+    try {
+      if (this.trainerService.isTrainer()) {
+        await this.trainerService.deactivateTrainerMode();
+      } else {
+        await this.trainerService.activateTrainerMode();
+        await this.trainerService.loadActiveInvite();
+      }
+    } catch (e) {
+      this.snackBar.open((e as Error).message ?? 'Error', 'OK', { duration: 4000 });
+    } finally {
+      this.togglingTrainer.set(false);
+    }
+  }
+
+  async generateTrainerInvite(): Promise<void> {
+    this.generatingInvite.set(true);
+    try {
+      await this.trainerService.generateInvite();
+    } catch (e) {
+      this.snackBar.open((e as Error).message ?? 'Error', 'OK', { duration: 4000 });
+    } finally {
+      this.generatingInvite.set(false);
+    }
+  }
+
+  copyInviteCode(code: string): void {
+    navigator.clipboard.writeText(code).then(() =>
+      this.snackBar.open('Codi copiat', '', { duration: 1800 })
+    );
+  }
+
+  copyInviteLink(token: string): void {
+    const url = `${window.location.origin}/join/${token}`;
+    navigator.clipboard.writeText(url).then(() =>
+      this.snackBar.open('Enllaç copiat', '', { duration: 1800 })
+    );
+  }
+
+  async acceptInviteCode(): Promise<void> {
+    const code = this.inviteCodeInput().trim();
+    if (!code) return;
+    this.acceptingInvite.set(true);
+    try {
+      await this.trainerService.acceptInviteByCode(code);
+      this.showInviteInput.set(false);
+      this.inviteCodeInput.set('');
+      this.snackBar.open('Entrenador connectat correctament', '', { duration: 2500 });
+    } catch (e) {
+      this.snackBar.open((e as Error).message ?? 'Error', 'OK', { duration: 4000 });
+    } finally {
+      this.acceptingInvite.set(false);
+    }
+  }
+
+  async disconnectTrainer(): Promise<void> {
+    const trainerName = this.trainerService.myTrainer()?.displayName ?? 'l\'entrenador';
+    if (!confirm(`Vols desconnectar-te de ${trainerName}?\n\nDeixaràs de rebre propostes d'entrenament.`)) return;
+    try {
+      await this.trainerService.disconnectFromTrainer();
+      this.snackBar.open('Entrenador desconnectat', '', { duration: 2000 });
+    } catch (e) {
+      this.snackBar.open((e as Error).message ?? 'Error', 'OK', { duration: 4000 });
+    }
   }
 
   // ── Data export ──────────────────────────────────────────────────────────

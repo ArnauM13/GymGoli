@@ -42,5 +42,7 @@ export interface Workout {
    */
   categories?: string[];
   notes?: string;
+  /** Set when this workout was created by accepting a trainer proposal */
+  sourceProposalId?: string | null;
   createdAt: Date;
 }
