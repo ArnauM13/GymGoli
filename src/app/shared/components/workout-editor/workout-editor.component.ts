@@ -88,19 +88,23 @@ const _doneByWorkout      = new Map<string, Set<string>>();
                 <div class="we-entry-row2" (click)="toggleCollapse(entry.exerciseId)">
                   <span class="we-entry-name">{{ entry.exerciseName }}</span>
                   @if (prEntries().has(entry.exerciseId)) {
-                    <span class="we-pr-badge">🏆</span>
+                    <span class="we-pr-badge">PR</span>
                   }
                 </div>
                 <!-- Row 3: collapsed summary (only when folded and has sets) -->
                 @if (isCollapsed(entry.exerciseId) && entry.sets.length > 0) {
                   <div class="we-entry-summary" (click)="toggleCollapse(entry.exerciseId)">
                     @for (set of entry.sets.slice(0, 5); track $index) {
-                      <span class="we-summary-chip">
+                      <span class="we-summary-chip"
+                        [class.we-summary-chip--max]="set.weight > 0 && set.weight === entryMaxWeight(entry)">
                         {{ dispW(set.weight) }}<small>{{ unit() }}</small>×{{ set.reps }}
                       </span>
                     }
                     @if (entry.sets.length > 5) {
                       <span class="we-summary-more">+{{ entry.sets.length - 5 }}</span>
+                    }
+                    @if (prEntries().has(entry.exerciseId)) {
+                      <span class="we-pr-badge">PR</span>
                     }
                   </div>
                 }
@@ -171,7 +175,10 @@ const _doneByWorkout      = new Map<string, Set<string>>();
                          (click)="isEntryEditable(entry.exerciseId) && startEditSet(entry.exerciseId, $index, set)">
                       <span class="we-set-num">{{ $index + 1 }}</span>
                       <div class="we-set-pills">
-                        <span class="we-set-pill weight">{{ dispW(set.weight) }}<small>{{ unit() }}</small></span>
+                        <span class="we-set-pill weight"
+                          [class.we-set-pill--pr]="prEntries().has(entry.exerciseId) && set.weight > 0 && set.weight === entryMaxWeight(entry)">
+                          {{ dispW(set.weight) }}<small>{{ unit() }}</small>
+                        </span>
                         <span class="we-set-pill reps">{{ set.reps }}<small>r</small></span>
                       </div>
                       @if (isEntryEditable(entry.exerciseId)) {
@@ -790,12 +797,26 @@ const _doneByWorkout      = new Map<string, Set<string>>();
 
     /* ── Personal Record badge ── */
     .we-pr-badge {
-      font-size: 14px; line-height: 1; flex-shrink: 0;
+      display: inline-flex; align-items: center;
+      padding: 2px 7px; border-radius: 10px;
+      background: rgba(217,119,6,0.12); color: #d97706;
+      border: 1px solid rgba(217,119,6,0.28);
+      font-size: 11px; font-weight: 800; letter-spacing: 0.04em; line-height: 1.4;
+      flex-shrink: 0;
       animation: pr-pop 0.4s cubic-bezier(0.34, 1.6, 0.64, 1) both;
     }
     @keyframes pr-pop {
       from { opacity: 0; transform: scale(0.3) rotate(-20deg); }
       to   { opacity: 1; transform: scale(1) rotate(0deg); }
+    }
+
+    .we-summary-chip--max {
+      background: rgba(217,119,6,0.12) !important;
+      color: #d97706 !important;
+    }
+    .we-set-pill--pr {
+      background: rgba(217,119,6,0.12) !important;
+      color: #d97706 !important;
     }
 
     /* ── Rest timer ── */
@@ -1035,6 +1056,10 @@ export class WorkoutEditorComponent implements OnDestroy {
     } catch {
       this.snackBar.open('Error en reordenar', '', { duration: 2000 });
     }
+  }
+
+  entryMaxWeight(entry: WorkoutEntry): number {
+    return entry.sets.reduce((m, s) => Math.max(m, s.weight), 0);
   }
 
   dispW(kg: number): number { return kgToDisplay(kg, this.unit()); }

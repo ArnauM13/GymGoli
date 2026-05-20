@@ -366,7 +366,7 @@ interface ChartPoint {
     }
     .pr-bar { width: 5px; min-width: 5px; height: 44px; border-radius: 0 3px 3px 0; }
     .pr-name { flex: 1; font-size: 15px; font-weight: 500; }
-    .pr-weight { font-size: 15px; font-weight: 700; color: var(--c-brand); min-width: 64px; text-align: right; }
+    .pr-weight { font-size: 15px; font-weight: 700; color: #d97706; min-width: 64px; text-align: right; }
     .pr-chevron { font-size: 18px; color: var(--c-text-3); }
 
     /* ── Empty / new-user state ──────────────────────────── */
