@@ -260,12 +260,40 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     </div>
 
-    <!-- ── FAB: add exercise (active workout mode only) ── -->
-    @if (activeWorkout()) {
-      <button class="add-exercise-fab" (click)="openPicker()" title="Afegir exercici">
+    <!-- ── Speed Dial FAB ── -->
+    @if (speedDialOpen()) {
+      <div class="sd-backdrop" (click)="speedDialOpen.set(false)"></div>
+    }
+    <div class="sd-container"
+      [class.sd--one-bar]="!activeWorkoutId() && hasFloatingBar() && !hasTwoFloatingBars()"
+      [class.sd--two-bars]="hasTwoFloatingBars()">
+      @if (speedDialOpen()) {
+        <div class="sd-items">
+          @for (sport of sportService.sports(); track sport.id; let i = $index) {
+            <div class="sd-item" [style.--sd-i]="i">
+              <span class="sd-label">{{ sport.name }}</span>
+              <button class="sd-btn" [style.background]="sport.color"
+                (click)="speedDialPickSport(sport)">
+                <span class="material-symbols-outlined">{{ sport.icon }}</span>
+              </button>
+            </div>
+          }
+          @for (cat of workoutTypes; track cat.value; let i = $index) {
+            <div class="sd-item" [style.--sd-i]="sportService.sports().length + i">
+              <span class="sd-label">{{ cat.label }}</span>
+              <button class="sd-btn" [style.background]="cat.color"
+                (click)="speedDialPickCategory(cat.value)">
+                <span class="material-symbols-outlined">{{ cat.icon }}</span>
+              </button>
+            </div>
+          }
+        </div>
+      }
+      <button class="sd-fab" [class.sd-fab--open]="speedDialOpen()"
+        (click)="toggleSpeedDial()">
         <span class="material-symbols-outlined">add</span>
       </button>
-    }
+    </div>
 
     <!-- ── Floating "Avui toca" suggestion ── -->
     @if (!activeWorkout() && todaySuggestion(); as s) {
@@ -650,21 +678,58 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       font-variation-settings: 'FILL' 1;
     }
 
-    /* ── Add-exercise FAB (active workout mode) ── */
-    .add-exercise-fab {
-      position: fixed;
-      bottom: calc(var(--nav-height) + 16px);
-      right: 20px;
-      z-index: 90;
-      width: 52px; height: 52px; border-radius: 50%; border: none;
-      background: var(--c-brand); color: var(--c-card);
+    /* ── Speed Dial FAB ── */
+    .sd-backdrop { position: fixed; inset: 0; z-index: 88; }
+    .sd-container {
+      position: fixed; bottom: calc(var(--nav-height) + 16px); right: 20px; z-index: 89;
+      display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+      &.sd--one-bar  { bottom: calc(var(--nav-height) + 80px); }
+      &.sd--two-bars { bottom: calc(var(--nav-height) + 148px); }
+    }
+    .sd-items {
+      display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+      padding-bottom: 4px;
+      animation: sd-items-in 0.2s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+    }
+    @keyframes sd-items-in {
+      from { opacity: 0; transform: scale(0.88) translateY(12px); }
+      to   { opacity: 1; transform: none; }
+    }
+    .sd-item {
+      display: flex; align-items: center; gap: 10px;
+      animation: sd-item-in 0.18s calc(var(--sd-i, 0) * 28ms) both;
+    }
+    @keyframes sd-item-in {
+      from { opacity: 0; transform: translateX(10px); }
+      to   { opacity: 1; transform: none; }
+    }
+    .sd-label {
+      background: var(--c-card); color: var(--c-text);
+      padding: 6px 12px; border-radius: 20px;
+      font-size: 13px; font-weight: 600;
+      box-shadow: 0 2px 8px var(--c-shadow); white-space: nowrap;
+    }
+    .sd-btn {
+      width: 46px; height: 46px; border-radius: 50%; border: none; color: white;
+      cursor: pointer; touch-action: manipulation;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.22);
+      transition: transform 0.15s;
+      .material-symbols-outlined { font-size: 22px; font-variation-settings: 'FILL' 1; }
+      &:hover  { transform: scale(1.08); }
+      &:active { transform: scale(0.93); }
+    }
+    .sd-fab {
+      width: 56px; height: 56px; border-radius: 50%; border: none;
+      background: var(--c-brand); color: white;
       display: flex; align-items: center; justify-content: center;
       cursor: pointer; touch-action: manipulation;
       box-shadow: 0 4px 16px rgba(var(--c-brand-rgb), 0.4), 0 1px 4px var(--c-shadow);
       transition: background 0.15s, transform 0.15s;
-      .material-symbols-outlined { font-size: 26px; }
+      .material-symbols-outlined { font-size: 28px; transition: transform 0.22s ease; }
       &:hover { background: var(--c-brand-dk); transform: scale(1.06); }
-      &:active { transform: scale(0.96); }
+      &:active { transform: scale(0.94); }
+      &.sd-fab--open .material-symbols-outlined { transform: rotate(45deg); }
     }
 
     /* ── Loading ── */
@@ -1131,6 +1196,7 @@ export class TrainComponent {
   readonly selectedDate    = signal<string>(TODAY());
   readonly sportToggling   = signal(false);
   readonly workoutTypes    = WORKOUT_TYPES;
+  readonly speedDialOpen   = signal(false);
   readonly activeWorkoutId = signal<string | null>(null);
   readonly loggerSport     = signal<Sport | null>(null);
   readonly loggerSessionId = signal<string | null>(null);
@@ -1464,6 +1530,19 @@ export class TrainComponent {
   handleSuggestionClick(s: TodaySuggestion): void {
     if (s.type === 'gym') this.selectType(s.category);
     else this.openSessionLogger(s.sport);
+  }
+
+  toggleSpeedDial(): void { this.speedDialOpen.set(!this.speedDialOpen()); }
+
+  speedDialPickCategory(cat: ExerciseCategory): void {
+    this.speedDialOpen.set(false);
+    if (this.activeWorkout()) this.openPicker(cat);
+    else this.selectType(cat);
+  }
+
+  speedDialPickSport(sport: Sport): void {
+    this.speedDialOpen.set(false);
+    this.openSessionLogger(sport);
   }
 
   selectType(category: ExerciseCategory): void {

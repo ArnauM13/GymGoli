@@ -84,6 +84,8 @@ interface ChartPoint { date: string; value: number; }
             <span class="epi-stat-lbl">Tendència</span>
           </div>
         </div>
+      } @else {
+        <div class="epi-bottom-pad"></div>
       }
     }
   `,
@@ -136,6 +138,7 @@ interface ChartPoint { date: string; value: number; }
     .epi-stat-lbl { font-size: 10px; color: var(--c-text-3); }
     .positive { color: #4caf50; }
     .negative { color: #ef5350; }
+    .epi-bottom-pad { height: 14px; }
   `],
 })
 export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy {
