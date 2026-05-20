@@ -40,7 +40,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
   standalone: true,
   imports: [WorkoutEditorComponent, InlineDatePickerComponent, FitnessInsightsComponent],
   template: `
-    <div class="page" [class.page--with-fab]="hasFloatingBar()" [class.page--with-two-fabs]="hasTwoFloatingBars()">
+    <div class="page" [style.padding-bottom]="pagePaddingBottom()">
 
       @if (activeWorkout(); as w) {
 
@@ -260,13 +260,12 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     </div>
 
-    <!-- ── Speed Dial FAB ── -->
+    <!-- ── Speed Dial FAB (dashboard only) ── -->
+    @if (!activeWorkout()) {
     @if (speedDialOpen()) {
       <div class="sd-backdrop" (click)="speedDialOpen.set(false)"></div>
     }
-    <div class="sd-container"
-      [class.sd--one-bar]="!activeWorkoutId() && hasFloatingBar() && !hasTwoFloatingBars()"
-      [class.sd--two-bars]="hasTwoFloatingBars()">
+    <div class="sd-container">
       @if (speedDialOpen()) {
         <div class="sd-items">
           @for (sport of sportService.sports(); track sport.id; let i = $index) {
@@ -295,44 +294,35 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       </button>
     </div>
 
-    <!-- ── Floating "Avui toca" suggestion ── -->
-    @if (!activeWorkout() && todaySuggestion(); as s) {
-      <div class="bottom-bar" [class.bottom-bar--stacked]="dateWorkouts().length > 0">
-        <button class="bar-shortcut bar-shortcut--suggestion"
-                [style.--wc]="s.color"
-                (click)="handleSuggestionClick(s)">
-          <span class="bar-shortcut-accent"></span>
-          <span class="material-symbols-outlined bar-shortcut-icon">{{ s.icon }}</span>
-          <div class="bar-shortcut-info">
-            <span class="bar-shortcut-hint">Avui toca</span>
-            <span class="bar-shortcut-label">{{ s.label }}</span>
-          </div>
-          <span class="material-symbols-outlined bar-shortcut-arrow">chevron_right</span>
-        </button>
-      </div>
+    <!-- ── Compact workout shortcut pills ── -->
+    @for (w of dateWorkouts().slice(0, 2); track w.id; let i = $index) {
+      <button class="bottom-pill" [style.--pill-i]="i"
+              [style.--wc]="workoutPrimaryColor(w)"
+              (click)="openWorkout(w.id)">
+        <div class="pill-icon-wrap">
+          <span class="material-symbols-outlined pill-icon">fitness_center</span>
+        </div>
+        <span class="pill-text">{{ workoutLabel(w) }}</span>
+        @if (i === 1 && dateWorkouts().length > 2) {
+          <span class="pill-more">+{{ dateWorkouts().length - 2 }}</span>
+        }
+      </button>
     }
 
-    <!-- ── Bottom bar: quick-open workouts (dashboard) ── -->
-    @if (!activeWorkout() && dateWorkouts().length > 0) {
-      <div class="bottom-bar" [class.bottom-bar--multi]="dateWorkouts().length > 1">
-        @for (w of dateWorkouts(); track w.id) {
-          <button class="bar-shortcut"
-                  [style.--wc]="workoutPrimaryColor(w)"
-                  (click)="openWorkout(w.id)">
-            <span class="bar-shortcut-accent"></span>
-            <span class="material-symbols-outlined bar-shortcut-icon">fitness_center</span>
-            <div class="bar-shortcut-info">
-              <span class="bar-shortcut-label">{{ workoutLabel(w) }}</span>
-              <span class="bar-shortcut-detail">
-                {{ w.entries.length }} exerc
-                @if (workoutSetsCount(w); as n) { · {{ n }} sèr }
-              </span>
-            </div>
-            <span class="material-symbols-outlined bar-shortcut-arrow">arrow_forward_ios</span>
-          </button>
-        }
-      </div>
+    <!-- ── Compact "Avui toca" suggestion pill ── -->
+    @if (todaySuggestion(); as s) {
+      <button class="bottom-pill bottom-pill--suggestion"
+              [style.--pill-i]="workoutPillCount()"
+              [style.--wc]="s.color"
+              (click)="handleSuggestionClick(s)">
+        <div class="pill-icon-wrap">
+          <span class="material-symbols-outlined pill-icon">{{ s.icon }}</span>
+        </div>
+        <span class="pill-text">{{ s.label }}</span>
+        <span class="pill-hint">Avui toca</span>
+      </button>
     }
+    } <!-- /!activeWorkout() -->
 
     <!-- ── Template picker bottom sheet ── -->
     @if (pickerCat()) {
@@ -518,8 +508,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
   `,
   styles: [`
     .page { padding: 0; }
-    .page--with-fab { padding-bottom: calc(var(--nav-height) + 20px); }
-    .page--with-two-fabs { padding-bottom: calc(var(--nav-height) + 88px); }
 
     /* ── Workout topbar (active mode, sticky) ── */
     .workout-topbar {
@@ -570,77 +558,56 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       color: var(--c-card); letter-spacing: 0.3px;
     }
 
-    /* ── Bottom bar: last workout shortcut ── */
-    .bottom-bar {
+    /* ── Bottom pill shortcuts ── */
+    .bottom-pill {
       position: fixed;
-      bottom: calc(var(--nav-height) + 10px);
-      left: 12px; right: 12px;
+      left: 16px;
+      bottom: calc(var(--nav-height) + 12px + var(--pill-i, 0) * 56px);
       z-index: 90;
-      border-radius: 18px;
-      box-shadow: 0 8px 28px var(--c-shadow-md), 0 2px 6px var(--c-shadow);
-      animation: bar-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
-    }
-    @keyframes bar-in {
-      from { transform: translateY(14px); opacity: 0; }
-      to   { transform: translateY(0);    opacity: 1; }
-    }
-    .bottom-bar--stacked {
-      bottom: calc(var(--nav-height) + 10px + 72px);
-    }
-    .bottom-bar--multi {
+      display: flex; align-items: center; gap: 0;
+      height: 46px; border-radius: 23px; padding: 0;
       background: var(--c-card);
-      overflow: hidden;
-      .bar-shortcut {
-        border-radius: 0; border: none;
-        border-bottom: 1px solid var(--c-border-2);
-        &:last-child { border-bottom: none; }
-      }
-    }
-    .bar-shortcut {
-      position: relative;
-      width: 100%; display: flex; align-items: center; gap: 0;
-      border: 1px solid var(--c-border-2);
-      background: var(--c-card);
-      border-radius: 18px; overflow: hidden;
-      padding: 0;
+      border: 1.5px solid var(--c-border-2);
+      box-shadow: 0 3px 14px var(--c-shadow-md);
       cursor: pointer; touch-action: manipulation;
-      transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
-      &:hover  { background: color-mix(in srgb, var(--wc) 6%, var(--c-card)); }
-      &:active { transform: scale(0.98); }
+      overflow: hidden;
+      max-width: min(230px, calc(100vw - 92px));
+      animation: pill-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+      transition: box-shadow 0.15s, transform 0.1s;
+      &:hover  { box-shadow: 0 4px 20px var(--c-shadow-md); }
+      &:active { transform: scale(0.97); }
     }
-    .bar-shortcut--suggestion {
-      background: color-mix(in srgb, var(--wc) 18%, var(--c-card));
-      border-color: color-mix(in srgb, var(--wc) 55%, var(--c-border-2));
-      &:hover { background: color-mix(in srgb, var(--wc) 28%, var(--c-card)); border-color: var(--wc); }
+    @keyframes pill-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: none; }
     }
-    .bar-shortcut-accent {
-      width: 5px; align-self: stretch; flex-shrink: 0;
+    .bottom-pill--suggestion {
+      background: color-mix(in srgb, var(--wc) 10%, var(--c-card));
+      border-color: color-mix(in srgb, var(--wc) 40%, var(--c-border-2));
+      &:hover { border-color: color-mix(in srgb, var(--wc) 70%, var(--c-border-2)); }
+    }
+    .pill-icon-wrap {
+      width: 46px; height: 46px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
       background: var(--wc);
     }
-    .bar-shortcut-icon {
-      font-size: 24px; flex-shrink: 0;
-      color: var(--wc);
-      padding: 13px 10px 13px 12px;
-      font-variation-settings: 'FILL' 1, 'wght' 400;
+    .pill-icon {
+      font-size: 22px; color: white;
+      font-variation-settings: 'FILL' 1;
     }
-    .bar-shortcut-info {
-      flex: 1; min-width: 0;
-      display: flex; flex-direction: column; gap: 2px;
-      padding: 12px 4px 12px 0;
-    }
-    .bar-shortcut-hint {
-      font-size: 11px; font-weight: 700; line-height: 1.2;
-      color: color-mix(in srgb, var(--wc) 60%, var(--c-text));
-      text-transform: uppercase; letter-spacing: 0.4px;
-    }
-    .bar-shortcut-label {
-      font-size: 15px; font-weight: 800; color: var(--c-text);
+    .pill-text {
+      flex: 1; padding: 0 10px;
+      font-size: 13px; font-weight: 700; color: var(--c-text);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .bar-shortcut-detail { font-size: 12px; font-weight: 500; color: var(--c-text-2); }
-    .bar-shortcut-arrow {
-      font-size: 18px; flex-shrink: 0; color: var(--wc); opacity: 0.7;
-      margin-right: 12px;
+    .pill-hint {
+      font-size: 11px; font-weight: 700;
+      color: color-mix(in srgb, var(--wc) 70%, var(--c-text-2));
+      padding-right: 12px; white-space: nowrap;
+    }
+    .pill-more {
+      font-size: 12px; font-weight: 700; color: var(--c-text-3);
+      padding-right: 12px; white-space: nowrap;
     }
 
     /* ── Type grid (inside workout-section) ── */
@@ -683,8 +650,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .sd-container {
       position: fixed; bottom: calc(var(--nav-height) + 16px); right: 20px; z-index: 89;
       display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
-      &.sd--one-bar  { bottom: calc(var(--nav-height) + 80px); }
-      &.sd--two-bars { bottom: calc(var(--nav-height) + 148px); }
     }
     .sd-items {
       display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
@@ -1287,17 +1252,19 @@ export class TrainComponent {
     this.workoutService.getWorkoutsForDate(this.selectedDate())
   );
 
-  readonly hasFloatingBar = computed(() =>
-    this.activeWorkoutId() !== null ||
-    this.dateWorkouts().length > 0 ||
-    this.todaySuggestion() !== null
-  );
+  readonly workoutPillCount = computed(() => Math.min(this.dateWorkouts().length, 2));
 
-  readonly hasTwoFloatingBars = computed(() =>
-    !this.activeWorkoutId() &&
-    this.dateWorkouts().length > 0 &&
-    this.todaySuggestion() !== null
-  );
+  readonly pillCount = computed(() => {
+    if (this.activeWorkoutId()) return 0;
+    return this.workoutPillCount() + (this.todaySuggestion() ? 1 : 0);
+  });
+
+  readonly pagePaddingBottom = computed(() => {
+    if (this.activeWorkoutId()) return `calc(var(--nav-height) + 12px)`;
+    const n = this.pillCount();
+    if (n <= 1) return `calc(var(--nav-height) + 80px)`;
+    return `calc(var(--nav-height) + ${12 + n * 56 + 12}px)`;
+  });
 
   readonly dateSportSessions = computed(() =>
     this.sportService.getSportSessionsForDate(this.selectedDate())
