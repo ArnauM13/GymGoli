@@ -6,11 +6,19 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { CATEGORY_COLORS, CATEGORY_LABELS, SUBCATEGORY_LABELS } from '../../../core/models/exercise.model';
 import { FEELING_EMOJI, FEELING_LABEL, FeelingLevel, Workout, WorkoutEntry, WorkoutSet } from '../../../core/models/workout.model';
+import { FitnessGoal, FITNESS_GOAL_LABELS } from '../../../core/models/user-settings.model';
 import { ExerciseService } from '../../../core/services/exercise.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component';
 import { kgToDisplay, displayToKg, weightStep } from '../../utils/weight.utils';
+
+const GOAL_REC: Record<FitnessGoal, { sets: number; reps: number }> = {
+  strength: { sets: 4, reps: 5 },
+  fitness:  { sets: 3, reps: 10 },
+  weight:   { sets: 4, reps: 12 },
+  sport:    { sets: 3, reps: 12 },
+};
 
 // Module-level: persists collapsed/done state per workout for the entire browser session
 const _collapsedByWorkout = new Map<string, Set<string>>();
@@ -112,6 +120,28 @@ const _doneByWorkout      = new Map<string, Set<string>>();
             <!-- ── Col·lapsable body ── -->
             <div class="we-entry-body" [class.collapsed]="isCollapsed(entry.exerciseId)">
             <div class="we-entry-body-inner">
+
+            <!-- ── Goal recommendation banner ── -->
+            @if (recData()?.exerciseId === entry.exerciseId && addingFor() === entry.exerciseId) {
+              <div class="we-rec-banner">
+                <div class="we-rec-body">
+                  <span class="material-symbols-outlined we-rec-icon">auto_awesome</span>
+                  <div class="we-rec-info">
+                    <span class="we-rec-label">{{ recData()!.goalLabel }}</span>
+                    <span class="we-rec-desc">{{ recData()!.sets }} sèries · {{ recData()!.reps }} repeticions</span>
+                  </div>
+                  <button type="button" class="we-rec-dismiss" (click)="recData.set(null)" title="Tancar">
+                    <span class="material-symbols-outlined">close</span>
+                  </button>
+                </div>
+                <div class="we-rec-actions">
+                  <button type="button" class="we-rec-customize-btn" (click)="applyRecCustomize()">Personalitzar</button>
+                  <button type="button" class="we-rec-apply-btn" (click)="applyRecDirect(entry.exerciseId)">
+                    Afegir ×{{ recData()!.sets }}
+                  </button>
+                </div>
+              </div>
+            }
 
             <!-- ── Last session info banner ── -->
             @if (lastSessionData()?.exerciseId === entry.exerciseId && entry.sets.length === 0 && addingFor() === entry.exerciseId) {
@@ -604,6 +634,42 @@ const _doneByWorkout      = new Map<string, Set<string>>();
     .we-lsb-weight { font-size: 16px; font-weight: 700; color: var(--c-brand); }
     .we-lsb-feeling { font-size: 20px; line-height: 1; }
 
+    /* ── Goal recommendation banner ── */
+    .we-rec-banner {
+      margin: 4px 14px 6px; padding: 10px 12px;
+      background: rgba(217,119,6,0.07); border: 1px solid rgba(217,119,6,0.22);
+      border-radius: 10px; display: flex; flex-direction: column; gap: 8px;
+    }
+    .we-rec-body { display: flex; align-items: center; gap: 10px; }
+    .we-rec-icon { font-size: 20px; color: #d97706; flex-shrink: 0; }
+    .we-rec-info { display: flex; flex-direction: column; gap: 1px; flex: 1; }
+    .we-rec-label { font-size: 10px; font-weight: 700; color: #d97706; text-transform: uppercase; letter-spacing: 0.4px; }
+    .we-rec-desc  { font-size: 14px; font-weight: 700; color: var(--c-text); }
+    .we-rec-dismiss {
+      display: flex; align-items: center; justify-content: center;
+      width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+      border: none; background: transparent; cursor: pointer; color: var(--c-text-3);
+      touch-action: manipulation; transition: background 0.12s;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover { background: var(--c-hover); }
+    }
+    .we-rec-actions { display: flex; gap: 8px; }
+    .we-rec-customize-btn {
+      flex: 1; padding: 8px 12px; border-radius: 8px;
+      border: 1.5px solid rgba(217,119,6,0.3); background: transparent;
+      color: #d97706; font-size: 13px; font-weight: 600;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      &:hover { background: rgba(217,119,6,0.08); }
+    }
+    .we-rec-apply-btn {
+      flex: 2; padding: 8px 12px; border-radius: 8px;
+      border: none; background: rgba(217,119,6,0.85);
+      color: white; font-size: 13px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      &:hover { background: #d97706; }
+      &:active { transform: scale(0.96); }
+    }
+
     .we-no-sets-hint {
       margin: 0; padding: 4px 14px 12px;
       font-size: 13px; color: var(--c-text-3); font-style: italic;
@@ -887,6 +953,7 @@ export class WorkoutEditorComponent implements OnDestroy {
   readonly editingSet       = signal<{ exerciseId: string; index: number } | null>(null);
   readonly editingEntry     = signal<string | null>(null);
   readonly lastSessionData  = signal<{ exerciseId: string; date: string; maxWeight: number; feeling?: FeelingLevel } | null>(null);
+  readonly recData          = signal<{ exerciseId: string; sets: number; reps: number; goalLabel: string } | null>(null);
   readonly feelingPickerFor = signal<string | null>(null);
   readonly collapsedEntries = signal<Set<string>>(new Set());
   readonly menuFor    = signal<string | null>(null);
@@ -996,6 +1063,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     this._resetForm();
     this.editingEntry.set(null);
     this.lastSessionData.set(null);
+    this.recData.set(null);
   }
 
   private _resetForm(): void {
@@ -1113,21 +1181,48 @@ export class WorkoutEditorComponent implements OnDestroy {
       const info = this.workoutService.getLastSessionInfo(entry.exerciseId, w.id);
       if (info) {
         this.lastSessionData.set({ exerciseId: entry.exerciseId, ...info });
+        this.recData.set(null);
         this.setForm.patchValue({ weight: kgToDisplay(info.maxWeight, u), reps: 8 });
       } else {
         this.lastSessionData.set(null);
-        this.setForm.reset({ weight: 0, reps: 8 });
+        const goal = this.settingsService.fitnessGoal();
+        if (goal) {
+          const rec = GOAL_REC[goal];
+          const goalLabel = FITNESS_GOAL_LABELS[goal];
+          this.recData.set({ exerciseId: entry.exerciseId, sets: rec.sets, reps: rec.reps, goalLabel });
+          this.setForm.reset({ weight: 0, reps: rec.reps });
+        } else {
+          this.recData.set(null);
+          this.setForm.reset({ weight: 0, reps: 8 });
+        }
       }
     } else {
       this.lastSessionData.set(null);
+      this.recData.set(null);
       const last = entry.sets.at(-1);
       if (last) this.setForm.patchValue({ weight: kgToDisplay(last.weight, u), reps: last.reps });
     }
   }
 
+  applyRecCustomize(): void {
+    const rec = this.recData();
+    if (!rec) return;
+    this.setForm.patchValue({ reps: rec.reps });
+    this.recData.set(null);
+  }
+
+  applyRecDirect(exerciseId: string): void {
+    const rec = this.recData();
+    if (!rec) return;
+    this.setForm.patchValue({ reps: rec.reps });
+    this.recData.set(null);
+    this.submitSets(exerciseId, rec.sets);
+  }
+
   cancelSet(): void {
     this._resetForm();
     this.lastSessionData.set(null);
+    this.recData.set(null);
   }
 
   async repeatLastSet(entry: WorkoutEntry): Promise<void> {
