@@ -72,10 +72,7 @@ const _doneByWorkout      = new Map<string, Set<string>>();
                         [class.we-done-btn--active]="doneEntries().has(entry.exerciseId)"
                         title="Marcar com a fet"
                         (click)="markDone(entry.exerciseId)">
-                        <span class="material-symbols-outlined"
-                          [style.font-variation-settings]="doneEntries().has(entry.exerciseId) ? '\'FILL\' 1' : '\'FILL\' 0'">
-                          check_circle
-                        </span>
+                        <span class="material-symbols-outlined">check_circle</span>
                       </button>
                     }
                     <button type="button" class="we-icon-btn-sm"
@@ -504,6 +501,7 @@ const _doneByWorkout      = new Map<string, Set<string>>();
       color: #4caf50 !important;
       background: rgba(76,175,80,0.1) !important;
       border-color: rgba(76,175,80,0.25) !important;
+      .material-symbols-outlined { font-variation-settings: 'FILL' 1; }
     }
 
     /* ── Done card state ── */
