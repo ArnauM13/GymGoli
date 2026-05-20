@@ -91,6 +91,19 @@ const _doneByWorkout      = new Map<string, Set<string>>();
                     <span class="we-pr-badge">🏆</span>
                   }
                 </div>
+                <!-- Row 3: collapsed summary (only when folded and has sets) -->
+                @if (isCollapsed(entry.exerciseId) && entry.sets.length > 0) {
+                  <div class="we-entry-summary" (click)="toggleCollapse(entry.exerciseId)">
+                    @for (set of entry.sets.slice(0, 5); track $index) {
+                      <span class="we-summary-chip">
+                        {{ dispW(set.weight) }}<small>{{ unit() }}</small>×{{ set.reps }}
+                      </span>
+                    }
+                    @if (entry.sets.length > 5) {
+                      <span class="we-summary-more">+{{ entry.sets.length - 5 }}</span>
+                    }
+                  </div>
+                }
               </div>
             </div>
 
@@ -387,10 +400,28 @@ const _doneByWorkout      = new Map<string, Set<string>>();
     .we-entry-row1 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .we-entry-row2 {
       display: flex; align-items: center; gap: 4px;
-      padding: 2px 0 4px;
+      padding: 2px 0 2px;
       cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
     }
     .we-entry-name { font-size: 16px; font-weight: 600; color: var(--c-text); line-height: 1.3; }
+
+    /* ── Collapsed summary row ── */
+    .we-entry-summary {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 5px;
+      padding: 4px 0 6px;
+      cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+    }
+    .we-summary-chip {
+      display: inline-flex; align-items: baseline; gap: 1px;
+      padding: 3px 8px; border-radius: 16px;
+      background: rgba(var(--c-brand-rgb), 0.09); color: var(--c-brand);
+      font-size: 13px; font-weight: 700;
+      small { font-size: 10px; font-weight: 500; opacity: 0.75; }
+    }
+    .we-summary-more {
+      font-size: 12px; font-weight: 600; color: var(--c-text-3);
+      padding: 3px 4px;
+    }
 
     .we-collapse-chevron {
       font-size: 18px; color: var(--c-text-3);
