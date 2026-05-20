@@ -788,14 +788,20 @@ export class WorkoutEditorComponent implements OnDestroy {
   });
 
   constructor() {
-    // Restore persisted collapsed state when the workout changes
+    // Restore collapsed state; collapse all entries when first opening a template-loaded workout.
     effect(() => {
-      const id = this.workout()?.id;
-      if (id) {
-        untracked(() => this.collapsedEntries.set(
-          new Set(_collapsedByWorkout.get(id) ?? [])
-        ));
-      }
+      const w = this.workout();
+      if (!w?.id) return;
+      untracked(() => {
+        const saved = _collapsedByWorkout.get(w.id);
+        if (saved !== undefined) {
+          this.collapsedEntries.set(new Set(saved));
+        } else {
+          const initial = new Set(w.entries.map(e => e.exerciseId));
+          this.collapsedEntries.set(initial);
+          _collapsedByWorkout.set(w.id, new Set(initial));
+        }
+      });
     }, { allowSignalWrites: true });
   }
 
