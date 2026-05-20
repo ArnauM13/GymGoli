@@ -171,88 +171,99 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           }
 
           <!-- Entrenaments section -->
+          <!-- ── Entrenaments section ── -->
           <div class="workout-section">
-            <div class="sports-header">
+            <div class="sports-header" (click)="gymCollapsed.set(!gymCollapsed())">
               <span class="material-symbols-outlined sports-header-icon">fitness_center</span>
               <h2 class="sports-title">Entrenaments</h2>
-            </div>
-
-            <!-- Existing workout cards -->
-            @for (w of dateWorkouts(); track w.id) {
-              <div class="workout-card" [style.--wc]="workoutPrimaryColor(w)" (click)="openWorkout(w.id)">
-                <div class="wc-bar" [style.background]="workoutCardColor(w)"></div>
-                <div class="wc-info">
-                  <span class="wc-label">{{ workoutLabel(w) }}</span>
-                  <span class="wc-detail">
-                    {{ w.entries.length }} exerc
-                    @if (workoutSetsCount(w); as n) { · {{ n }} sèr }
-                  </span>
-                </div>
-                <button class="wc-delete" (click)="$event.stopPropagation(); confirmDeleteWorkout(w)" title="Eliminar">
-                  <span class="material-symbols-outlined">delete</span>
-                </button>
-              </div>
-            }
-
-            <!-- Type buttons -->
-            <div class="type-grid" [class.type-grid--mt]="dateWorkouts().length > 0"
-                 [style.grid-template-columns]="gridCols(workoutTypes.length)">
-              @for (cat of workoutTypes; track cat.value) {
-                <button class="type-btn"
-                  [style.--cat-color]="cat.color"
-                  [class.type-btn--done]="doneCategories().has(cat.value)"
-                  (click)="selectType(cat.value)">
-                  @if (doneCategories().has(cat.value)) {
-                    <span class="type-done-check material-symbols-outlined">check_circle</span>
-                  }
-                  <span class="material-symbols-outlined type-icon">{{ cat.icon }}</span>
-                  <span class="type-label">{{ cat.label }}</span>
-                </button>
+              @if (dateWorkouts().length > 0) {
+                <span class="section-count-badge">{{ dateWorkouts().length }}</span>
               }
+              <span class="material-symbols-outlined section-chevron"
+                    [class.rotated]="gymCollapsed()">expand_more</span>
+            </div>
+            <div class="section-body" [class.collapsed]="gymCollapsed()">
+              <div class="section-body-inner">
+                @for (w of dateWorkouts(); track w.id) {
+                  <div class="workout-card" [style.--wc]="workoutPrimaryColor(w)" (click)="openWorkout(w.id)">
+                    <div class="wc-bar" [style.background]="workoutCardColor(w)"></div>
+                    <div class="wc-info">
+                      <span class="wc-label">{{ workoutLabel(w) }}</span>
+                      <span class="wc-detail">
+                        {{ w.entries.length }} exerc
+                        @if (workoutSetsCount(w); as n) { · {{ n }} sèr }
+                      </span>
+                    </div>
+                    <button class="wc-delete" (click)="$event.stopPropagation(); confirmDeleteWorkout(w)" title="Eliminar">
+                      <span class="material-symbols-outlined">delete</span>
+                    </button>
+                  </div>
+                }
+                <div class="type-grid" [class.type-grid--mt]="dateWorkouts().length > 0"
+                     [style.grid-template-columns]="gridCols(workoutTypes.length)">
+                  @for (cat of workoutTypes; track cat.value) {
+                    <button class="type-btn"
+                      [style.--cat-color]="cat.color"
+                      [class.type-btn--done]="doneCategories().has(cat.value)"
+                      (click)="selectType(cat.value)">
+                      @if (doneCategories().has(cat.value)) {
+                        <span class="type-done-check material-symbols-outlined">check_circle</span>
+                      }
+                      <span class="material-symbols-outlined type-icon">{{ cat.icon }}</span>
+                      <span class="type-label">{{ cat.label }}</span>
+                    </button>
+                  }
+                </div>
+              </div>
             </div>
           </div>
 
-          <!-- Sports section -->
+          <!-- ── Esports section ── -->
           <div class="sports-section">
-            <div class="sports-header">
+            <div class="sports-header" (click)="sportsCollapsed.set(!sportsCollapsed())">
               <span class="material-symbols-outlined sports-header-icon">sports_soccer</span>
               <h2 class="sports-title">Esports</h2>
+              @if (dateSportSessions().length > 0) {
+                <span class="section-count-badge">{{ dateSportSessions().length }}</span>
+              }
+              <span class="material-symbols-outlined section-chevron"
+                    [class.rotated]="sportsCollapsed()">expand_more</span>
             </div>
-
-            <!-- Existing sport session cards -->
-            @for (item of dateSportSessions(); track item.session.id) {
-              <div class="workout-card" [style.--wc]="item.sport.color" (click)="openSessionLogger(item.sport)">
-                <div class="wc-bar" [style.background]="item.sport.color"></div>
-                <div class="wc-info">
-                  <span class="wc-label">
-                    <span class="material-symbols-outlined wc-icon" [style.color]="item.sport.color">{{ item.sport.icon }}</span>
-                    {{ item.sport.name }}
-                  </span>
-                  @if (sportSummary(item.session, item.sport); as sum) {
-                    <span class="wc-detail">{{ sum }}</span>
-                  }
-                </div>
-                <button class="wc-delete" (click)="deleteSportSession(item.session.id, $event)" [disabled]="sportToggling()" title="Eliminar">
-                  <span class="material-symbols-outlined">delete</span>
-                </button>
-              </div>
-            }
-
-            <!-- Add-sport grid (only pending sports) -->
-            @if (pendingSports().length > 0) {
-              <div class="type-grid" [class.type-grid--mt]="dateSportSessions().length > 0"
-                   [style.grid-template-columns]="gridCols(pendingSports().length)">
-                @for (sport of pendingSports(); track sport.id) {
-                  <button class="type-btn"
-                    [style.--cat-color]="sport.color"
-                    (click)="openSessionLogger(sport)"
-                    [disabled]="sportToggling()">
-                    <span class="material-symbols-outlined type-icon">{{ sport.icon }}</span>
-                    <span class="type-label">{{ sport.name }}</span>
-                  </button>
+            <div class="section-body" [class.collapsed]="sportsCollapsed()">
+              <div class="section-body-inner">
+                @for (item of dateSportSessions(); track item.session.id) {
+                  <div class="workout-card" [style.--wc]="item.sport.color" (click)="openSessionLogger(item.sport)">
+                    <div class="wc-bar" [style.background]="item.sport.color"></div>
+                    <div class="wc-info">
+                      <span class="wc-label">
+                        <span class="material-symbols-outlined wc-icon" [style.color]="item.sport.color">{{ item.sport.icon }}</span>
+                        {{ item.sport.name }}
+                      </span>
+                      @if (sportSummary(item.session, item.sport); as sum) {
+                        <span class="wc-detail">{{ sum }}</span>
+                      }
+                    </div>
+                    <button class="wc-delete" (click)="deleteSportSession(item.session.id, $event)" [disabled]="sportToggling()" title="Eliminar">
+                      <span class="material-symbols-outlined">delete</span>
+                    </button>
+                  </div>
+                }
+                @if (pendingSports().length > 0) {
+                  <div class="type-grid" [class.type-grid--mt]="dateSportSessions().length > 0"
+                       [style.grid-template-columns]="gridCols(pendingSports().length)">
+                    @for (sport of pendingSports(); track sport.id) {
+                      <button class="type-btn"
+                        [style.--cat-color]="sport.color"
+                        (click)="openSessionLogger(sport)"
+                        [disabled]="sportToggling()">
+                        <span class="material-symbols-outlined type-icon">{{ sport.icon }}</span>
+                        <span class="type-label">{{ sport.name }}</span>
+                      </button>
+                    }
+                  </div>
                 }
               </div>
-            }
+            </div>
           </div>
 
         }
@@ -834,16 +845,37 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     .sports-header {
       display: flex; align-items: center; gap: 7px;
-      margin-bottom: 14px;
+      margin: -4px -4px 0; padding: 4px 4px;
+      border-radius: 10px;
+      cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+      transition: background 0.12s;
+      &:hover  { background: var(--c-hover); }
+      &:active { background: var(--c-border-2); }
     }
     .sports-header-icon {
       font-size: 18px; color: var(--c-text-2);
       font-variation-settings: 'FILL' 0, 'wght' 300;
     }
     .sports-title {
-      margin: 0; font-size: 14px; font-weight: 700;
+      margin: 0; flex: 1; font-size: 14px; font-weight: 700;
       color: var(--c-text-2); letter-spacing: 0.2px;
     }
+    .section-count-badge {
+      font-size: 11px; font-weight: 700; color: var(--c-brand);
+      background: rgba(var(--c-brand-rgb), 0.1);
+      border-radius: 10px; padding: 2px 8px; flex-shrink: 0;
+    }
+    .section-chevron {
+      font-size: 18px; color: var(--c-text-3); flex-shrink: 0;
+      transition: transform 0.22s ease;
+      &.rotated { transform: rotate(-90deg); }
+    }
+    .section-body {
+      display: grid; grid-template-rows: 1fr;
+      transition: grid-template-rows 0.22s ease;
+    }
+    .section-body.collapsed { grid-template-rows: 0fr; }
+    .section-body-inner { overflow: hidden; padding-top: 12px; }
 
     .sports-grid {
       display: grid; gap: 10px;
@@ -1163,6 +1195,8 @@ export class TrainComponent {
   readonly workoutTypes    = WORKOUT_TYPES;
   readonly speedDialOpen   = signal(false);
   readonly activeWorkoutId = signal<string | null>(null);
+  readonly gymCollapsed    = signal(true);
+  readonly sportsCollapsed = signal(true);
   readonly loggerSport     = signal<Sport | null>(null);
   readonly loggerSessionId = signal<string | null>(null);
   readonly loggerDuration  = signal<number>(60);
