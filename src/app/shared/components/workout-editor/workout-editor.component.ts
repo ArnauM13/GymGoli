@@ -12,8 +12,9 @@ import { WorkoutService } from '../../../core/services/workout.service';
 import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component';
 import { kgToDisplay, displayToKg, weightStep } from '../../utils/weight.utils';
 
-// Module-level: persists collapsed state per workout for the entire browser session
+// Module-level: persists collapsed/done state per workout for the entire browser session
 const _collapsedByWorkout = new Map<string, Set<string>>();
+const _doneByWorkout      = new Map<string, Set<string>>();
 
 @Component({
   selector: 'app-workout-editor',
@@ -28,41 +29,33 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
           <div class="we-entry-card"
                cdkDrag [cdkDragDisabled]="!editMode() && !alwaysEditable()"
                [style.--we-cat-color]="getCatColor(entry)"
-               [class.we-entry-solo-edit]="!editMode() && !alwaysEditable() && editingEntry() === entry.exerciseId">
+               [class.we-entry-solo-edit]="!editMode() && !alwaysEditable() && editingEntry() === entry.exerciseId"
+               [class.we-entry-done]="doneEntries().has(entry.exerciseId)">
 
             <div class="we-drag-placeholder" *cdkDragPlaceholder></div>
 
             <!-- ── Entry header ── -->
             <div class="we-entry-header">
-              <!-- Drag handle: always on the left in train mode, restricts drag to handle only -->
               @if (editMode() || alwaysEditable()) {
                 <span class="we-drag-handle material-symbols-outlined" cdkDragHandle>drag_indicator</span>
               }
-              <div class="we-entry-title" (click)="toggleCollapse(entry.exerciseId)">
-                <div class="we-entry-badges">
-                  <span class="we-category-badge" [style.background]="getCatColor(entry)">
-                    {{ getCatLabel(entry) }}
-                  </span>
-                  @if (getSubLabel(entry)) {
-                    <span class="we-subcategory-badge">{{ getSubLabel(entry) }}</span>
-                  }
-                </div>
-                <div class="we-entry-name-row">
-                  <span class="we-entry-name">{{ entry.exerciseName }}</span>
-                  @if (prEntries().has(entry.exerciseId)) {
-                    <span class="we-pr-badge">🏆</span>
-                  }
-                  <span class="we-collapse-chevron material-symbols-outlined"
-                        [class.rotated]="isCollapsed(entry.exerciseId)">
-                    expand_more
-                  </span>
-                </div>
-              </div>
-
-              <!-- Grup: sentiment + estadístiques (only when expanded) -->
-              @if (!isCollapsed(entry.exerciseId)) {
-                <div class="we-entry-actions-group">
-                  @if (entry.feeling || isEntryEditable(entry.exerciseId)) {
+              <div class="we-entry-content">
+                <!-- Row 1: badges + actions -->
+                <div class="we-entry-row1">
+                  <div class="we-entry-badges">
+                    <span class="we-category-badge" [style.background]="getCatColor(entry)">
+                      {{ getCatLabel(entry) }}
+                    </span>
+                    @if (getSubLabel(entry)) {
+                      <span class="we-subcategory-badge">{{ getSubLabel(entry) }}</span>
+                    }
+                  </div>
+                  <div class="we-entry-actions-group">
+                    <button type="button" class="we-icon-btn-sm"
+                      (click)="toggleCollapse(entry.exerciseId)">
+                      <span class="we-collapse-chevron material-symbols-outlined"
+                            [class.rotated]="isCollapsed(entry.exerciseId)">expand_more</span>
+                    </button>
                     <button type="button" class="we-icon-btn-sm we-fatiga-btn"
                       [class.we-fatiga-btn--set]="!!entry.feeling"
                       [class.we-fatiga-btn--editable]="isEntryEditable(entry.exerciseId)"
@@ -74,29 +67,31 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                         <span class="material-symbols-outlined">sentiment_neutral</span>
                       }
                     </button>
-                  }
-                  <button class="we-icon-btn-sm" (click)="openStats(entry)" title="Estadístiques">
-                    <span class="material-symbols-outlined">bar_chart</span>
-                  </button>
+                    @if (alwaysEditable()) {
+                      <button type="button" class="we-icon-btn-sm we-done-btn"
+                        [class.we-done-btn--active]="doneEntries().has(entry.exerciseId)"
+                        title="Marcar com a fet"
+                        (click)="markDone(entry.exerciseId)">
+                        <span class="material-symbols-outlined"
+                          [style.font-variation-settings]="doneEntries().has(entry.exerciseId) ? '\'FILL\' 1' : '\'FILL\' 0'">
+                          check_circle
+                        </span>
+                      </button>
+                    }
+                    <button type="button" class="we-icon-btn-sm"
+                      (click)="toggleEntryMenu(entry.exerciseId)" title="Més opcions">
+                      <span class="material-symbols-outlined">more_vert</span>
+                    </button>
+                  </div>
                 </div>
-              }
-
-              @if (editMode() || alwaysEditable()) {
-                <button class="we-remove-btn" (click)="removeEntry(entry.exerciseId)" title="Eliminar exercici">
-                  <span class="material-symbols-outlined">delete</span>
-                </button>
-              } @else if (!alwaysEditable()) {
-                <!-- Per-entry edit toggle (only in history mode) -->
-                @if (editingEntry() === entry.exerciseId) {
-                  <button class="we-icon-btn-sm we-entry-done-btn" (click)="editingEntry.set(null)" title="Tancar edició">
-                    <span class="material-symbols-outlined">check</span>
-                  </button>
-                } @else {
-                  <button class="we-icon-btn-sm" (click)="startEntryEdit(entry.exerciseId)" title="Editar exercici">
-                    <span class="material-symbols-outlined">edit</span>
-                  </button>
-                }
-              }
+                <!-- Row 2: exercise title -->
+                <div class="we-entry-row2" (click)="toggleCollapse(entry.exerciseId)">
+                  <span class="we-entry-name">{{ entry.exerciseName }}</span>
+                  @if (prEntries().has(entry.exerciseId)) {
+                    <span class="we-pr-badge">🏆</span>
+                  }
+                </div>
+              </div>
             </div>
 
 
@@ -273,6 +268,47 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
         </div>
       }
 
+      <!-- ── Entry menu ── -->
+      @if (menuFor()) {
+        <div class="we-entry-menu-backdrop" (click)="menuFor.set(null)"></div>
+        <div class="we-entry-menu-sheet">
+          @if (menuEntry(); as e) {
+            <p class="we-menu-title">{{ e.exerciseName }}</p>
+            <div class="we-menu-items">
+              <button class="we-menu-item" (click)="openStats(e); menuFor.set(null)">
+                <span class="material-symbols-outlined">bar_chart</span>
+                Estadístiques
+              </button>
+              @if (doneEntries().has(e.exerciseId)) {
+                <button class="we-menu-item" (click)="undoDone(e.exerciseId); menuFor.set(null)">
+                  <span class="material-symbols-outlined">edit</span>
+                  Editar exercici
+                </button>
+              } @else if (!editMode() && !alwaysEditable()) {
+                @if (editingEntry() === e.exerciseId) {
+                  <button class="we-menu-item" (click)="editingEntry.set(null); menuFor.set(null)">
+                    <span class="material-symbols-outlined">check</span>
+                    Tancar edició
+                  </button>
+                } @else {
+                  <button class="we-menu-item" (click)="startEntryEdit(e.exerciseId); menuFor.set(null)">
+                    <span class="material-symbols-outlined">edit</span>
+                    Editar exercici
+                  </button>
+                }
+              }
+              @if (editMode() || alwaysEditable()) {
+                <button class="we-menu-item we-menu-item--danger"
+                  (click)="removeEntry(e.exerciseId); menuFor.set(null)">
+                  <span class="material-symbols-outlined">delete</span>
+                  Eliminar exercici
+                </button>
+              }
+            </div>
+          }
+        </div>
+      }
+
       <!-- ── Fatiga popup ── -->
       @if (feelingPickerFor()) {
         <div class="we-fatiga-backdrop" (click)="closeFatigaPicker()"></div>
@@ -325,9 +361,8 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
     .we-entry-header {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 14px 10px 14px 8px;
+      align-items: flex-start;
+      padding: 10px 10px 10px 8px;
       gap: 8px;
     }
 
@@ -348,20 +383,19 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     }
     .cdk-drag-animating .we-entry-card { transition: transform 200ms ease; }
 
-    .we-entry-title { display: flex; flex-direction: column; gap: 4px; flex: 1; }
-    .we-entry-name  { font-size: 16px; font-weight: 600; color: var(--c-text); }
-    .we-entry-name-row { display: flex; align-items: center; gap: 2px; }
+    .we-entry-content { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0; }
+    .we-entry-row1 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .we-entry-row2 {
+      display: flex; align-items: center; gap: 4px;
+      padding: 2px 0 4px;
+      cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+    }
+    .we-entry-name { font-size: 16px; font-weight: 600; color: var(--c-text); line-height: 1.3; }
 
     .we-collapse-chevron {
-      font-size: 18px; color: var(--c-text-3); flex-shrink: 0;
+      font-size: 18px; color: var(--c-text-3);
       transition: transform 0.22s ease;
       &.rotated { transform: rotate(-90deg); }
-    }
-
-    .we-entry-title {
-      cursor: pointer;
-      user-select: none;
-      -webkit-tap-highlight-color: transparent;
     }
 
     /* ── Col·lapsable body ── */
@@ -400,7 +434,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     .we-fatiga-btn--set .material-symbols-outlined { color: var(--c-text-3); }
     .we-fatiga-btn-emoji { font-size: 18px; line-height: 1; }
 
-    .we-entry-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .we-entry-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; }
 
     .we-category-badge {
       display: inline-block; padding: 2px 8px; border-radius: 10px;
@@ -424,6 +458,20 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       background: rgba(var(--c-brand-rgb), 0.1) !important;
       border-color: rgba(var(--c-brand-rgb), 0.3) !important;
       color: var(--c-brand) !important;
+    }
+
+    /* ── Done button ── */
+    .we-done-btn { color: var(--c-text-3); }
+    .we-done-btn--active {
+      color: #4caf50 !important;
+      background: rgba(76,175,80,0.1) !important;
+      border-color: rgba(76,175,80,0.25) !important;
+    }
+
+    /* ── Done card state ── */
+    .we-entry-done {
+      border-left-color: #4caf50 !important;
+      .we-entry-name { color: var(--c-text-2); }
     }
 
     /* ── Fatiga popup ── */
@@ -470,6 +518,40 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     }
     .we-fatiga-option-emoji { font-size: 28px; line-height: 1; }
     .we-fatiga-option-label { font-size: 10px; font-weight: 600; color: var(--c-text-2); text-align: center; }
+
+    /* ── Entry menu ── */
+    .we-entry-menu-backdrop {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.35);
+    }
+    .we-entry-menu-sheet {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 201;
+      background: var(--c-card); border-radius: 20px 20px 0 0;
+      padding: 20px 20px 32px;
+      box-shadow: 0 -4px 24px var(--c-shadow-md);
+    }
+    .we-menu-title {
+      margin: 0 0 12px; padding-bottom: 12px;
+      border-bottom: 1px solid var(--c-border-2);
+      font-size: 14px; font-weight: 700; color: var(--c-text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .we-menu-items { display: flex; flex-direction: column; gap: 2px; }
+    .we-menu-item {
+      display: flex; align-items: center; gap: 14px;
+      padding: 13px 12px; border-radius: 12px;
+      border: none; background: transparent; width: 100%;
+      font-size: 15px; font-weight: 600; color: var(--c-text); text-align: left;
+      cursor: pointer; touch-action: manipulation; transition: background 0.12s;
+      .material-symbols-outlined { font-size: 20px; color: var(--c-text-2); }
+      &:hover { background: var(--c-subtle); }
+      &:active { background: var(--c-hover); }
+    }
+    .we-menu-item--danger {
+      color: #ef5350;
+      .material-symbols-outlined { color: #ef5350; }
+      &:hover { background: rgba(239,83,80,0.07); }
+    }
 
     /* ── Last session banner ── */
     .we-last-session-banner {
@@ -757,6 +839,14 @@ export class WorkoutEditorComponent implements OnDestroy {
   readonly lastSessionData  = signal<{ exerciseId: string; date: string; maxWeight: number; feeling?: FeelingLevel } | null>(null);
   readonly feelingPickerFor = signal<string | null>(null);
   readonly collapsedEntries = signal<Set<string>>(new Set());
+  readonly menuFor    = signal<string | null>(null);
+  readonly menuEntry  = computed(() => {
+    const id = this.menuFor();
+    const w  = this.workout();
+    if (!id || !w) return null;
+    return w.entries.find(e => e.exerciseId === id) ?? null;
+  });
+  readonly doneEntries = signal<Set<string>>(new Set());
 
   // ── Rest timer ─────────────────────────────────────────────────────────────
   readonly timerActive    = signal(false);
@@ -788,28 +878,52 @@ export class WorkoutEditorComponent implements OnDestroy {
   });
 
   constructor() {
-    // Restore collapsed state; collapse all entries when first opening a template-loaded workout.
+    // Restore collapsed/done state; collapse all entries when first opening a template-loaded workout.
     effect(() => {
       const w = this.workout();
       if (!w?.id) return;
       untracked(() => {
-        const saved = _collapsedByWorkout.get(w.id);
-        if (saved !== undefined) {
-          this.collapsedEntries.set(new Set(saved));
+        const savedCollapsed = _collapsedByWorkout.get(w.id);
+        if (savedCollapsed !== undefined) {
+          this.collapsedEntries.set(new Set(savedCollapsed));
         } else {
           const initial = new Set(w.entries.map(e => e.exerciseId));
           this.collapsedEntries.set(initial);
           _collapsedByWorkout.set(w.id, new Set(initial));
         }
+        this.doneEntries.set(new Set(_doneByWorkout.get(w.id) ?? []));
       });
     }, { allowSignalWrites: true });
   }
 
   isEntryEditable(exerciseId: string): boolean {
+    if (this.doneEntries().has(exerciseId)) return false;
     return this.editMode() || this.alwaysEditable() || this.editingEntry() === exerciseId;
   }
 
+  markDone(id: string): void {
+    const done = new Set(this.doneEntries()); done.add(id);
+    this.doneEntries.set(done);
+    const collapsed = new Set(this.collapsedEntries()); collapsed.add(id);
+    this.collapsedEntries.set(collapsed);
+    const wid = this.workout()?.id;
+    if (wid) { _doneByWorkout.set(wid, new Set(done)); _collapsedByWorkout.set(wid, new Set(collapsed)); }
+    this.addingFor.set(null); this.editingSet.set(null);
+  }
+
+  undoDone(id: string): void {
+    const done = new Set(this.doneEntries()); done.delete(id);
+    this.doneEntries.set(done);
+    const wid = this.workout()?.id;
+    if (wid) _doneByWorkout.set(wid, new Set(done));
+    this._expandEntry(id);
+  }
+
   isCollapsed(id: string): boolean { return this.collapsedEntries().has(id); }
+
+  toggleEntryMenu(id: string): void {
+    this.menuFor.set(this.menuFor() === id ? null : id);
+  }
 
   toggleCollapse(id: string): void {
     const s = new Set(this.collapsedEntries());
