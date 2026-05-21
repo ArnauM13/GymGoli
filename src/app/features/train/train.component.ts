@@ -324,19 +324,16 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       </button>
     }
 
-    <!-- ── Compact "Avui toca" suggestion pill ── -->
+    <!-- ── "Avui toca" suggestion pill ── -->
     @if (todaySuggestion(); as s) {
-      <button class="bottom-pill"
+      <button class="bottom-pill bottom-pill--suggestion"
               [style.--pill-i]="workoutPillCount()"
               [style.--wc]="s.color"
               (click)="handleSuggestionClick(s)">
         <div class="pill-icon-wrap">
           <span class="material-symbols-outlined pill-icon">{{ s.icon }}</span>
         </div>
-        <div class="pill-text-stack">
-          <span class="pill-eyebrow">Avui toca</span>
-          <span class="pill-text">{{ s.label }}</span>
-        </div>
+        <span class="pill-text">Avui · {{ s.label }}</span>
       </button>
     }
     } <!-- /!activeWorkout() -->
@@ -608,27 +605,25 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       font-variation-settings: 'FILL' 1;
     }
     .pill-text {
+      flex: 1; padding: 0 14px 0 12px;
       font-size: 13px; font-weight: 700; color: var(--c-text);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       line-height: 1.15;
     }
-    .pill-text-stack {
-      flex: 1; min-width: 0; padding: 0 12px 0 10px;
-      display: flex; flex-direction: column; justify-content: center; gap: 1px;
-    }
-    .pill-eyebrow {
-      font-size: 9px; font-weight: 700;
-      color: color-mix(in srgb, var(--wc) 65%, var(--c-text-3));
-      text-transform: uppercase; letter-spacing: 0.6px; line-height: 1;
-      white-space: nowrap;
-    }
-    /* Workout shortcut pills use single-line label */
-    .bottom-pill > .pill-text {
-      flex: 1; padding: 0 10px;
-    }
     .pill-more {
       font-size: 12px; font-weight: 700; color: var(--c-text-3);
       padding-right: 12px; white-space: nowrap;
+    }
+
+    /* ── Suggestion variant (slightly larger, accent border) ── */
+    .bottom-pill--suggestion {
+      height: 54px; border-radius: 27px;
+      max-width: min(280px, calc(100vw - 92px));
+      border-color: color-mix(in srgb, var(--wc) 40%, var(--c-border-2));
+      box-shadow: 0 4px 18px color-mix(in srgb, var(--wc) 22%, var(--c-shadow-md));
+      .pill-icon-wrap { width: 54px; height: 54px; }
+      .pill-icon { font-size: 26px; }
+      .pill-text { font-size: 14px; padding: 0 16px 0 14px; }
     }
 
     /* ── Type grid (inside workout-section) ── */

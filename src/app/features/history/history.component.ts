@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
+import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
 import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry, WorkoutSet } from '../../core/models/workout.model';
 import { Sport, SportSubtype } from '../../core/models/sport.model';
 import { UserSettingsService } from '../../core/services/user-settings.service';
@@ -226,16 +226,18 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
         <div class="filter-bar">
           <button class="sort-btn" (click)="sortDesc.set(!sortDesc())" aria-label="Canviar ordre">
             <span class="material-symbols-outlined">{{ sortDesc() ? 'arrow_downward' : 'arrow_upward' }}</span>
-            {{ sortDesc() ? 'Recents' : 'Antics' }}
           </button>
           <div class="filter-divider"></div>
-          <button class="filter-pill" [class.active]="filterCat() === null"
-                  (click)="filterCat.set(null)">Tots</button>
+          <button class="filter-icon" [class.active]="filterCat() === null"
+                  (click)="filterCat.set(null)" aria-label="Tots" title="Tots">
+            <span class="material-symbols-outlined">apps</span>
+          </button>
           @for (cat of ['push','pull','legs']; track cat) {
-            <button class="filter-pill" [class.active]="filterCat() === cat"
+            <button class="filter-icon" [class.active]="filterCat() === cat"
                     [style.--cat]="getCatColor(cat)"
+                    [attr.aria-label]="getCatLabel(cat)" [attr.title]="getCatLabel(cat)"
                     (click)="filterCat.set(filterCat() === cat ? null : cat)">
-              {{ getCatLabel(cat) }}
+              <span class="material-symbols-outlined">{{ getCatIcon(cat) }}</span>
             </button>
           }
         </div>
@@ -269,13 +271,13 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
                     <span class="wh-exercises">{{ getExerciseNames(workout) }}</span>
                     <div class="wh-stats">
                       <span class="wh-stat">
-                        <span class="material-symbols-outlined">repeat</span>
-                        <strong>{{ totalSets(workout) }}</strong> sèr
+                        <span class="material-symbols-outlined">fitness_center</span>
+                        <strong>{{ workout.entries.length }}</strong> exerc
                       </span>
                       <span class="wh-stat-sep">·</span>
                       <span class="wh-stat">
-                        <span class="material-symbols-outlined">monitoring</span>
-                        <strong>{{ dispW(totalVolume(workout)) }}</strong> {{ unit() }}
+                        <span class="material-symbols-outlined">repeat</span>
+                        <strong>{{ totalSets(workout) }}</strong> sèr
                       </span>
                     </div>
                   </div>
@@ -297,36 +299,16 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
                           }
                         </div>
                         @if (entry.sets.length > 0) {
-                          <div class="entry-body">
-                            <div class="entry-sets-col">
-                              @for (set of entry.sets; track $index) {
-                                <div class="entry-set-line" [class.entry-set-line--max]="isMaxSet(entry, set)">
-                                  <span class="esl-num">{{ $index + 1 }}</span>
-                                  <span class="esl-weight">{{ dispW(set.weight) }}<small>{{ unit() }}</small></span>
-                                  <span class="esl-x">×</span>
-                                  <span class="esl-reps">{{ set.reps }}</span>
-                                  @if (isMaxSet(entry, set)) { <span class="esl-pr">PR</span> }
-                                </div>
-                              }
-                            </div>
-                            <div class="entry-stats-col">
-                              <div class="entry-stat">
-                                <span class="es-label">Màx</span>
-                                <span class="es-value">{{ dispW(getMaxWeight(entry)) }}<small>{{ unit() }}</small></span>
+                          <div class="entry-sets-col">
+                            @for (set of entry.sets; track $index) {
+                              <div class="entry-set-line" [class.entry-set-line--max]="isMaxSet(entry, set)">
+                                <span class="esl-num">{{ $index + 1 }}</span>
+                                <span class="esl-weight">{{ dispW(set.weight) }}<small>{{ unit() }}</small></span>
+                                <span class="esl-x">×</span>
+                                <span class="esl-reps">{{ set.reps }}</span>
+                                @if (isMaxSet(entry, set)) { <span class="esl-pr">PR</span> }
                               </div>
-                              <div class="entry-stat">
-                                <span class="es-label">Sèries</span>
-                                <span class="es-value">{{ entry.sets.length }}</span>
-                              </div>
-                              <div class="entry-stat">
-                                <span class="es-label">Reps</span>
-                                <span class="es-value">{{ totalReps(entry) }}</span>
-                              </div>
-                              <div class="entry-stat">
-                                <span class="es-label">Volum</span>
-                                <span class="es-value">{{ dispW(entryVolume(entry)) }}<small>{{ unit() }}</small></span>
-                              </div>
-                            </div>
+                            }
                           </div>
                         } @else {
                           <span class="no-sets">Cap sèrie registrada</span>
@@ -590,24 +572,35 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
       scrollbar-width: none; &::-webkit-scrollbar { display: none; }
     }
     .sort-btn {
-      display: flex; align-items: center; gap: 3px; flex-shrink: 0;
-      padding: 7px 11px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      width: 34px; height: 34px; border-radius: 10px;
       border: 1.5px solid var(--c-border); background: var(--c-subtle);
-      font-size: 12px; font-weight: 600; color: var(--c-text-2);
+      color: var(--c-text-2);
       cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 14px; }
-      &:hover { background: var(--c-border-2); }
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { background: var(--c-border-2); color: var(--c-text); }
     }
     .filter-divider {
       width: 1px; height: 20px; background: var(--c-border); flex-shrink: 0; margin: 0 2px;
     }
-    .filter-pill {
-      flex-shrink: 0; padding: 7px 13px; border-radius: 20px;
-      border: 1.5px solid var(--c-border); background: transparent;
-      font-size: 12px; font-weight: 600; color: var(--c-text-2);
+    .filter-icon {
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      width: 34px; height: 34px; border-radius: 50%;
+      border: 1.5px solid color-mix(in srgb, var(--cat, var(--c-border)) 35%, var(--c-border));
+      background: color-mix(in srgb, var(--cat, var(--c-card)) 8%, var(--c-card));
+      color: var(--cat, var(--c-text-2));
       cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      &.active { background: var(--cat, var(--c-brand)); color: white; border-color: var(--cat, var(--c-brand)); }
-      &:not(.active):hover { background: var(--c-hover); color: var(--c-text); }
+      .material-symbols-outlined { font-size: 18px; }
+      &.active {
+        background: var(--cat, var(--c-brand));
+        color: white;
+        border-color: var(--cat, var(--c-brand));
+        box-shadow: 0 2px 6px color-mix(in srgb, var(--cat, var(--c-brand)) 35%, transparent);
+      }
+      &:not(.active):hover {
+        background: color-mix(in srgb, var(--cat, var(--c-card)) 18%, var(--c-card));
+        border-color: var(--cat, var(--c-border));
+      }
     }
     .filter-empty {
       display: flex; align-items: center; justify-content: center; flex-direction: column;
@@ -721,17 +714,14 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
     }
     .entry-name { font-size: 13px; font-weight: 700; color: var(--c-text); flex: 1; line-height: 1.25; }
     .entry-feeling { font-size: 16px; line-height: 1; }
-    .entry-body {
-      display: grid; grid-template-columns: 1fr auto; gap: 14px;
-      padding-left: 11px;
-    }
     .entry-sets-col {
       display: flex; flex-direction: column; gap: 2px;
-      min-width: 0;
+      padding-left: 11px;
     }
     .entry-set-line {
       display: grid;
-      grid-template-columns: 16px 1fr auto auto auto;
+      grid-template-columns: 16px auto auto auto auto;
+      justify-content: start;
       align-items: baseline; gap: 5px;
       padding: 3px 6px; border-radius: 6px;
       transition: background 0.15s;
@@ -753,23 +743,6 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
     }
     .entry-set-line--max .esl-weight {
       color: color-mix(in srgb, var(--ec, var(--c-brand)) 75%, var(--c-text));
-    }
-    .entry-stats-col {
-      display: flex; flex-direction: column; gap: 4px;
-      min-width: 96px; flex-shrink: 0;
-    }
-    .entry-stat {
-      display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
-      padding: 4px 8px; border-radius: 6px;
-      background: var(--c-subtle);
-    }
-    .es-label {
-      font-size: 9px; font-weight: 700; color: var(--c-text-3);
-      text-transform: uppercase; letter-spacing: 0.4px;
-    }
-    .es-value {
-      font-size: 12px; font-weight: 800; color: var(--c-text);
-      small { font-size: 9px; font-weight: 400; color: var(--c-text-3); margin-left: 1px; }
     }
     .no-sets { font-size: 12px; color: var(--c-text-3); font-style: italic; padding-left: 12px; }
     .workout-notes {
@@ -941,6 +914,7 @@ export class HistoryComponent {
   getFeelingEmoji(level: FeelingLevel): string { return FEELING_EMOJI[level]; }
   getCatColor(cat: string): string { return CATEGORY_COLORS[cat as ExerciseCategory] ?? '#bbb'; }
   getCatLabel(cat: string): string { return CATEGORY_LABELS[cat as ExerciseCategory] ?? cat; }
+  getCatIcon(cat: string): string { return CATEGORY_ICONS[cat as ExerciseCategory] ?? 'fitness_center'; }
 
   getSubtypeName(sport: Sport, subtypeId: string): string | null {
     return sport.subtypes.find((s: SportSubtype) => s.id === subtypeId)?.name ?? null;
