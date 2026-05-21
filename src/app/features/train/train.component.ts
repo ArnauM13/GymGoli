@@ -46,31 +46,23 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
         <!-- ══ ACTIVE WORKOUT MODE ══ -->
 
-        <!-- Floating card header -->
-        <div class="aw-header" [style.--wc]="workoutPrimaryColor(w)">
-          <button class="aw-back" (click)="closeWorkout()" title="Tornar">
-            <span class="material-symbols-outlined">arrow_back_ios</span>
-          </button>
-          <div class="aw-bar" [style.background]="workoutCardColor(w)"></div>
-          <div class="aw-info">
-            <div class="aw-badges">
-              @for (cat of activeWorkoutCategoryItems(); track cat.value) {
-                <span class="aw-badge" [style.background]="cat.color">{{ cat.label }}</span>
-              }
-              @if (activeWorkoutCategoryItems().length > 1) {
-                <span class="aw-badge aw-badge--hybrid">Híbrid</span>
-              }
-            </div>
-            <div class="aw-stats">
-              <span class="aw-stat">
+        <!-- Floating card header (same style as dashboard workout-card) -->
+        <div class="workout-card aw-header-sticky" [style.--wc]="workoutPrimaryColor(w)">
+          <div class="wc-bar" [style.background]="workoutCardColor(w)"></div>
+          <div class="wc-info">
+            <span class="wc-label">{{ workoutLabel(w) }}</span>
+            <div class="wc-stats">
+              <span class="wc-stat">
                 <span class="material-symbols-outlined">fitness_center</span>
                 <strong>{{ w.entries.length }}</strong> exerc
               </span>
-              <span class="aw-stat-sep">·</span>
-              <span class="aw-stat">
-                <span class="material-symbols-outlined">repeat</span>
-                <strong>{{ topbarTotalSets(w) }}</strong> sèr
-              </span>
+              @if (topbarTotalSets(w); as n) {
+                <span class="wc-stat-sep">·</span>
+                <span class="wc-stat">
+                  <span class="material-symbols-outlined">repeat</span>
+                  <strong>{{ n }}</strong> sèr
+                </span>
+              }
             </div>
           </div>
           <span class="aw-date">{{ topbarDateLabel(w) }}</span>
@@ -100,6 +92,9 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             <span class="material-symbols-outlined">more_vert</span>
           </button>
         </div>
+        <button class="aw-back-fab" (click)="closeWorkout()">
+          <span class="material-symbols-outlined">arrow_back</span>
+        </button>
 
       } @else {
 
@@ -548,49 +543,13 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
   styles: [`
     .page { padding: 0; }
 
-    /* ── Active workout floating header ── */
-    .aw-header {
+    /* ── Active workout floating header (reuses .workout-card) ── */
+    .aw-header-sticky {
       position: sticky; top: 12px; z-index: 10;
       margin: 12px 16px 0;
-      display: flex; align-items: stretch;
-      border-radius: 14px; overflow: hidden;
-      background: var(--c-card);
-      border: 1.5px solid color-mix(in srgb, var(--wc, var(--c-border-2)) 30%, var(--c-border-2));
-      box-shadow: 0 4px 16px var(--c-shadow-md);
+      cursor: default;
+      &:hover { box-shadow: none; background: color-mix(in srgb, var(--wc, var(--c-card)) 8%, var(--c-card)); border-color: color-mix(in srgb, var(--wc, var(--c-border-2)) 30%, var(--c-border-2)); }
     }
-    .aw-back {
-      width: 44px; flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center;
-      border: none; background: transparent; cursor: pointer;
-      color: var(--c-text-2); touch-action: manipulation;
-      transition: background 0.15s;
-      .material-symbols-outlined { font-size: 20px; }
-      &:hover { background: var(--c-hover); }
-    }
-    .aw-bar { width: 5px; align-self: stretch; flex-shrink: 0; }
-    .aw-info {
-      flex: 1; min-width: 0;
-      display: flex; flex-direction: column; gap: 3px;
-      padding: 10px 10px;
-    }
-    .aw-badges { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
-    .aw-badge {
-      padding: 2px 8px; border-radius: 10px;
-      font-size: 11px; font-weight: 600; color: white;
-    }
-    .aw-badge--hybrid {
-      background: linear-gradient(90deg, #ef5350 0%, #9c27b0 50%, #2196f3 100%);
-    }
-    .aw-stats {
-      display: flex; align-items: center; gap: 4px;
-      font-size: 11px; color: var(--c-text-3);
-    }
-    .aw-stat {
-      display: flex; align-items: center; gap: 2px;
-      .material-symbols-outlined { font-size: 11px; }
-      strong { color: var(--c-text-2); font-weight: 700; }
-    }
-    .aw-stat-sep { color: var(--c-border); }
     .aw-date {
       font-size: 11px; font-weight: 600; color: var(--c-text-2);
       align-self: center; padding: 0 14px; flex-shrink: 0;
@@ -598,6 +557,20 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     /* ── Active workout FAB + menu ── */
     .aw-backdrop { position: fixed; inset: 0; z-index: 88; }
+    .aw-back-fab {
+      position: fixed; left: 20px;
+      bottom: calc(var(--nav-height) + 16px);
+      z-index: 89;
+      width: 56px; height: 56px; border-radius: 50%; border: 1.5px solid var(--c-border);
+      background: var(--c-card); color: var(--c-text-2);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation;
+      box-shadow: 0 4px 16px var(--c-shadow-md);
+      transition: background 0.15s, color 0.15s, transform 0.15s;
+      .material-symbols-outlined { font-size: 24px; }
+      &:hover { background: var(--c-hover); color: var(--c-text); transform: scale(1.06); }
+      &:active { transform: scale(0.94); }
+    }
     .aw-fab-wrap {
       position: fixed; right: 20px;
       bottom: calc(var(--nav-height) + 16px);
