@@ -61,9 +61,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               </div>
               <span class="topbar-date">{{ topbarDateLabel(w) }}</span>
             </div>
-            @if (w.entries.length > 0) {
-              <span class="topbar-exercises">{{ topbarExerciseNames(w) }}</span>
-            }
             <div class="topbar-stats">
               <span class="topbar-stat">
                 <span class="material-symbols-outlined">fitness_center</span>
@@ -204,10 +201,19 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
                       <div class="wc-bar" [style.background]="workoutCardColor(w)"></div>
                       <div class="wc-info">
                         <span class="wc-label">{{ workoutLabel(w) }}</span>
-                        <span class="wc-detail">
-                          {{ w.entries.length }} exerc
-                          @if (workoutSetsCount(w); as n) { · {{ n }} sèr }
-                        </span>
+                        <div class="wc-stats">
+                          <span class="wc-stat">
+                            <span class="material-symbols-outlined">fitness_center</span>
+                            <strong>{{ w.entries.length }}</strong> exerc
+                          </span>
+                          @if (workoutSetsCount(w); as n) {
+                            <span class="wc-stat-sep">·</span>
+                            <span class="wc-stat">
+                              <span class="material-symbols-outlined">repeat</span>
+                              <strong>{{ n }}</strong> sèr
+                            </span>
+                          }
+                        </div>
                       </div>
                       <button class="wc-delete" (click)="$event.stopPropagation(); confirmDeleteWorkout(w)" title="Eliminar">
                         <span class="material-symbols-outlined">delete</span>
@@ -562,10 +568,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .topbar-date {
       font-size: 11px; font-weight: 600; color: var(--c-text-2); flex-shrink: 0;
     }
-    .topbar-exercises {
-      font-size: 12px; color: var(--c-text-2); font-weight: 500;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
     .topbar-stats {
       display: flex; align-items: center; gap: 4px;
       font-size: 11px; color: var(--c-text-3);
@@ -792,9 +794,16 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       display: inline-flex; align-items: center; gap: 5px;
     }
     .wc-icon { font-size: 15px; font-variation-settings: 'FILL' 1, 'wght' 400; }
-    .wc-detail {
-      font-size: 11px; color: var(--c-text-2);
+    .wc-stats {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 11px; color: var(--c-text-3);
     }
+    .wc-stat {
+      display: flex; align-items: center; gap: 2px;
+      .material-symbols-outlined { font-size: 11px; }
+      strong { color: var(--c-text-2); font-weight: 700; }
+    }
+    .wc-stat-sep { color: var(--c-border); }
     .wc-delete {
       width: 40px; height: 40px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
@@ -1494,12 +1503,6 @@ export class TrainComponent {
     const d = new Date(w.date + 'T12:00:00');
     if (w.date === this.selectedDate() && this.isToday()) return 'Avui';
     return d.toLocaleDateString('ca-ES', { weekday: 'short', day: 'numeric', month: 'short' });
-  }
-
-  topbarExerciseNames(w: Workout): string {
-    const names = w.entries.map(e => e.exerciseName);
-    const preview = names.slice(0, 3).join(', ');
-    return names.length > 3 ? preview + ` +${names.length - 3}` : preview;
   }
 
   topbarTotalSets(w: Workout): number {
