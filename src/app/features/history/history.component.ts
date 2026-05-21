@@ -11,11 +11,12 @@ import { SportService } from '../../core/services/sport.service';
 import { kgToDisplay } from '../../shared/utils/weight.utils';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
 import { ExerciseProgressInlineComponent } from '../../shared/components/exercise-progress-inline.component';
+import { ExerciseEntryCardComponent } from '../../shared/components/exercise-entry-card/exercise-entry-card.component';
 
 @Component({
   selector: 'app-history',
   standalone: true,
-  imports: [CalendarComponent, ExerciseProgressInlineComponent, FormsModule],
+  imports: [CalendarComponent, ExerciseProgressInlineComponent, ExerciseEntryCardComponent, FormsModule],
   template: `
     <div class="page">
 
@@ -104,59 +105,38 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
               <!-- Llista d'exercicis (compactes, verticals) -->
               <div class="ex-grid">
                 @for (entry of selectedWorkout()!.entries; track entry.exerciseId) {
-                  <button class="ex-card"
-                    [class.active]="selectedExerciseId() === entry.exerciseId"
-                    [style.--cat]="getEntryCatColor(entry)"
-                    (click)="selectExercise(entry.exerciseId)">
-                    <div class="ex-card-bar"></div>
-                    <div class="ex-card-body">
-                      <span class="ex-card-name">{{ entry.exerciseName }}</span>
-                      @if (entry.feeling) {
-                        <span class="ex-card-feeling">{{ getFeelingEmoji(entry.feeling) }}</span>
-                      }
-                      @if (entry.sets.length > 0) {
-                        <span class="ex-card-max">{{ dispW(getMaxWeight(entry)) }}<small>{{ unit() }}</small></span>
-                        <span class="ex-card-sets-badge">{{ entry.sets.length }} sèr</span>
-                      }
+                  <app-exercise-entry-card
+                    [entry]="entry"
+                    [catColor]="getEntryCatColor(entry)"
+                    [collapsed]="selectedExerciseId() !== entry.exerciseId"
+                    [maxWeight]="getMaxWeight(entry)"
+                    [unit]="unit()"
+                    [feelingLevel]="entry.feeling"
+                    (headerClick)="selectExercise(entry.exerciseId)">
+
+                    <!-- Projected detail (sets + chart) -->
+                    @if (entry.sets.length > 0) {
+                      <div class="ex-sets-col" [style.--ec]="getEntryCatColor(entry)">
+                        @for (set of entry.sets; track $index) {
+                          <div class="ex-set-line" [class.ex-set-line--max]="isMaxSet(entry, set)">
+                            <span class="exs-num">{{ $index + 1 }}</span>
+                            <span class="exs-weight">{{ dispW(set.weight) }}<small>{{ unit() }}</small></span>
+                            <span class="exs-x">×</span>
+                            <span class="exs-reps">{{ set.reps }}</span>
+                            @if (isMaxSet(entry, set)) { <span class="exs-pr">PR</span> }
+                          </div>
+                        }
+                      </div>
+                    }
+                    <div class="ex-card-analysis">
+                      <app-exercise-progress-inline
+                        [exerciseId]="entry.exerciseId"
+                        [exerciseName]="entry.exerciseName" />
                     </div>
-                    <span class="material-symbols-outlined ex-card-chevron">
-                      {{ selectedExerciseId() === entry.exerciseId ? 'expand_less' : 'expand_more' }}
-                    </span>
-                  </button>
+
+                  </app-exercise-entry-card>
                 }
               </div>
-
-              <!-- Hint quan cap exercici seleccionat -->
-              @if (!selectedExerciseId()) {
-                <div class="ex-hint-panel">
-                  <span class="material-symbols-outlined ex-hint-icon">touch_app</span>
-                  <p class="ex-hint-text">Clica un exercici per veure les gràfiques</p>
-                </div>
-              }
-
-              <!-- Detall de l'exercici seleccionat (mateix format que la llista) -->
-              @if (selectedExerciseId() && selectedEntry(); as e) {
-                <div class="ex-detail-panel" [style.--ec]="getEntryCatColor(e)">
-                  @if (e.sets.length > 0) {
-                    <div class="ex-sets-col">
-                      @for (set of e.sets; track $index) {
-                        <div class="ex-set-line" [class.ex-set-line--max]="isMaxSet(e, set)">
-                          <span class="exs-num">{{ $index + 1 }}</span>
-                          <span class="exs-weight">{{ dispW(set.weight) }}<small>{{ unit() }}</small></span>
-                          <span class="exs-x">×</span>
-                          <span class="exs-reps">{{ set.reps }}</span>
-                          @if (isMaxSet(e, set)) { <span class="exs-pr">PR</span> }
-                        </div>
-                      }
-                    </div>
-                  }
-                  <div class="ex-card-analysis">
-                    <app-exercise-progress-inline
-                      [exerciseId]="selectedExerciseId()"
-                      [exerciseName]="e.exerciseName" />
-                  </div>
-                </div>
-              }
 
             }
           </div>
@@ -424,91 +404,16 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
       p { margin: 0; font-size: 14px; color: var(--c-text-2); }
     }
 
-    /* Exercise list (compact vertical rows) */
+    /* Exercise list — uses app-exercise-entry-card */
     .ex-grid {
       display: flex; flex-direction: column; gap: 8px;
       padding: 12px 14px;
     }
 
-    .ex-card {
-      display: flex; align-items: stretch;
-      border-radius: 12px; padding: 0;
-      border: 1.5px solid color-mix(in srgb, var(--cat) 25%, var(--c-border-2));
-      background: color-mix(in srgb, var(--cat) 5%, var(--c-card));
-      cursor: pointer; text-align: left;
-      transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.1s;
-      overflow: hidden; touch-action: manipulation;
-      &:hover {
-        border-color: color-mix(in srgb, var(--cat) 45%, var(--c-border));
-        background: color-mix(in srgb, var(--cat) 9%, var(--c-card));
-      }
-      &:active { transform: scale(0.98); }
-      &.active {
-        border-color: var(--cat);
-        background: color-mix(in srgb, var(--cat) 13%, var(--c-card));
-        box-shadow: 0 2px 10px color-mix(in srgb, var(--cat) 20%, transparent);
-      }
-    }
-    .ex-card-bar {
-      width: 4px; align-self: stretch; flex-shrink: 0;
-      background: var(--cat);
-    }
-    .ex-card-body {
-      flex: 1; min-width: 0;
-      display: flex; align-items: center; gap: 8px;
-      padding: 13px 10px 13px 12px;
-    }
-    .ex-card-name {
-      flex: 1; min-width: 0;
-      font-size: 14px; font-weight: 700; color: var(--c-text);
-      line-height: 1.3;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .ex-card-feeling { font-size: 16px; line-height: 1; flex-shrink: 0; }
-    .ex-card-max {
-      font-size: 15px; font-weight: 800; color: var(--cat); line-height: 1;
-      flex-shrink: 0;
-      small { font-size: 10px; font-weight: 500; color: var(--c-text-2); margin-left: 1px; }
-    }
-    .ex-card-sets-badge {
-      font-size: 11px; font-weight: 700; color: var(--c-text-2);
-      padding: 3px 8px; border-radius: 10px;
-      background: color-mix(in srgb, var(--cat) 10%, var(--c-card));
-      border: 1px solid color-mix(in srgb, var(--cat) 22%, var(--c-border-2));
-      line-height: 1.3; flex-shrink: 0;
-    }
-    .ex-card-chevron {
-      font-size: 20px; color: var(--c-text-3); flex-shrink: 0;
-      align-self: center; padding-right: 10px;
-      transition: color 0.15s;
-    }
-
-    /* Hint panel (no exercise selected yet) */
-    .ex-hint-panel {
-      display: flex; flex-direction: column; align-items: center;
-      gap: 8px; padding: 20px 16px 24px;
-      text-align: center;
-    }
-    .ex-hint-icon {
-      font-size: 32px; color: var(--c-text-3);
-      font-variation-settings: 'FILL' 0;
-    }
-    .ex-hint-text {
-      margin: 0; font-size: 13px; color: var(--c-text-2); line-height: 1.4;
-    }
-    .ex-card.active .ex-card-chevron {
-      color: var(--cat);
-    }
-
-    /* Exercise detail panel (same format as list mode: vertical sets only) */
-    .ex-detail-panel {
-      margin: 0 14px 14px;
-      background: var(--c-subtle); border-radius: 12px; overflow: hidden;
-      border-left: 3px solid color-mix(in srgb, var(--ec, var(--c-brand)) 70%, transparent);
-    }
+    /* Sets + chart detail projected inside the card */
     .ex-sets-col {
       display: flex; flex-direction: column; gap: 3px;
-      padding: 12px 14px;
+      padding: 12px 14px 8px;
     }
     .ex-set-line {
       display: grid;
@@ -518,7 +423,6 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
       padding: 5px 8px; border-radius: 8px;
       background: var(--c-card);
       box-shadow: 0 1px 2px var(--c-shadow);
-      transition: background 0.15s, transform 0.15s;
     }
     .ex-set-line--max {
       background: color-mix(in srgb, var(--ec, var(--c-brand)) 10%, var(--c-card));

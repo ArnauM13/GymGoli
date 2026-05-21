@@ -12,6 +12,7 @@ import { UserSettingsService } from '../../../core/services/user-settings.servic
 import { WorkoutService } from '../../../core/services/workout.service';
 import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component';
 import { kgToDisplay, displayToKg, weightStep } from '../../utils/weight.utils';
+import { ExerciseEntryCardComponent } from '../exercise-entry-card/exercise-entry-card.component';
 
 const GOAL_REC: Record<FitnessGoal, { sets: number; reps: number }> = {
   strength: { sets: 4, reps: 5 },
@@ -26,89 +27,30 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 @Component({
   selector: 'app-workout-editor',
   standalone: true,
-  imports: [ReactiveFormsModule, DragDropModule],
+  imports: [ReactiveFormsModule, DragDropModule, ExerciseEntryCardComponent],
   encapsulation: ViewEncapsulation.None,
   template: `
     @if (workout(); as w) {
       <div class="we-entries" cdkDropList (cdkDropListDropped)="onDrop($event)">
 
         @for (entry of w.entries; track entry.exerciseId) {
-          <div class="we-entry-card"
-               cdkDrag [cdkDragDisabled]="!editMode() && !alwaysEditable()"
-               [style.--we-cat-color]="getCatColor(entry)">
+          <app-exercise-entry-card
+            cdkDrag [cdkDragDisabled]="!editMode() && !alwaysEditable()"
+            [entry]="entry"
+            [catColor]="getCatColor(entry)"
+            [collapsed]="isCollapsed(entry.exerciseId)"
+            [draggable]="editMode() || alwaysEditable()"
+            [showMenu]="true"
+            [prBadge]="prEntries().has(entry.exerciseId)"
+            [maxWeight]="entryMaxWeight(entry)"
+            [unit]="unit()"
+            [feelingLevel]="entry.feeling"
+            [feelingEditable]="isEntryEditable(entry.exerciseId)"
+            (headerClick)="toggleCollapse(entry.exerciseId)"
+            (menuClick)="toggleEntryMenu(entry.exerciseId)"
+            (feelingClick)="openFatigaPicker(entry.exerciseId)">
 
-            <div class="we-drag-placeholder" *cdkDragPlaceholder></div>
-            <div class="we-bar"></div>
-
-            <!-- ── Entry header ── -->
-            <div class="we-entry-header">
-              @if (editMode() || alwaysEditable()) {
-                <span class="we-drag-handle material-symbols-outlined" cdkDragHandle>drag_indicator</span>
-              }
-              <div class="we-entry-content">
-                <!-- Row 1: badges + actions -->
-                <div class="we-entry-row1">
-                  <div class="we-entry-badges">
-                    <span class="we-category-badge" [style.background]="getCatColor(entry)">
-                      {{ getCatLabel(entry) }}
-                    </span>
-                    @if (getSubLabel(entry)) {
-                      <span class="we-subcategory-badge">{{ getSubLabel(entry) }}</span>
-                    }
-                  </div>
-                  <div class="we-entry-actions-group">
-                    <button type="button" class="we-icon-btn-sm"
-                      (click)="toggleCollapse(entry.exerciseId)">
-                      <span class="we-collapse-chevron material-symbols-outlined"
-                            [class.rotated]="isCollapsed(entry.exerciseId)">expand_more</span>
-                    </button>
-
-                    <button type="button" class="we-icon-btn-sm"
-                      (click)="toggleEntryMenu(entry.exerciseId)" title="Més opcions">
-                      <span class="material-symbols-outlined">more_vert</span>
-                    </button>
-                  </div>
-                </div>
-                <!-- Row 2: title + feeling + PR -->
-                <div class="we-entry-row2" (click)="toggleCollapse(entry.exerciseId)">
-                  <span class="we-entry-name">{{ entry.exerciseName }}</span>
-                  @if (entry.feeling) {
-                    <span class="we-feeling-chip"
-                          [class.we-feeling-chip--editable]="isEntryEditable(entry.exerciseId)"
-                          (click)="$event.stopPropagation(); isEntryEditable(entry.exerciseId) && openFatigaPicker(entry.exerciseId)">
-                      {{ getFeelingEmoji(entry.feeling) }}
-                    </span>
-                  } @else if (isEntryEditable(entry.exerciseId)) {
-                    <span class="material-symbols-outlined we-feeling-add"
-                          (click)="$event.stopPropagation(); openFatigaPicker(entry.exerciseId)">
-                      sentiment_neutral
-                    </span>
-                  }
-                  @if (prEntries().has(entry.exerciseId)) {
-                    <span class="we-pr-badge">PR</span>
-                  }
-                </div>
-                <!-- Row 3: collapsed summary (only when folded and has sets) -->
-                @if (isCollapsed(entry.exerciseId) && entry.sets.length > 0) {
-                  <div class="we-entry-summary" (click)="toggleCollapse(entry.exerciseId)">
-                    @for (set of entry.sets.slice(0, 5); track $index) {
-                      <span class="we-summary-chip"
-                        [class.we-summary-chip--max]="set.weight > 0 && set.weight === entryMaxWeight(entry)">
-                        {{ dispW(set.weight) }}<small>{{ unit() }}</small>×{{ set.reps }}
-                      </span>
-                    }
-                    @if (entry.sets.length > 5) {
-                      <span class="we-summary-more">+{{ entry.sets.length - 5 }}</span>
-                    }
-                  </div>
-                }
-              </div>
-            </div>
-
-
-            <!-- ── Col·lapsable body ── -->
-            <div class="we-entry-body" [class.collapsed]="isCollapsed(entry.exerciseId)">
-            <div class="we-entry-body-inner">
+            <!-- ── Projected body content ──
 
             <!-- ── Goal recommendation banner ── -->
             @if (recData()?.exerciseId === entry.exerciseId && addingFor() === entry.exerciseId) {
@@ -269,10 +211,8 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
               }
             }
 
-            </div><!-- /we-entry-body-inner -->
-            </div><!-- /we-entry-body -->
-
-          </div>
+            <!-- end projected body -->
+          </app-exercise-entry-card>
         }
 
         @if (alwaysEditable() || editMode()) {
@@ -362,134 +302,8 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       gap: 12px;
     }
 
-    /* ── Entry card ── */
-    .we-entry-card {
-      position: relative;
-      background: color-mix(in srgb, var(--we-cat-color, #ccc) 5%, var(--c-card));
-      border-radius: 14px;
-      box-shadow: 0 2px 8px var(--c-shadow);
-      overflow: hidden;
-      border: 1.5px solid color-mix(in srgb, var(--we-cat-color, #ccc) 25%, var(--c-border-2));
-      transition: box-shadow 0.2s, border-color 0.2s, background 0.2s;
-    }
-
-    .we-bar {
-      position: absolute; left: 0; top: 0; bottom: 0; width: 5px;
-      background: var(--we-cat-color, #ccc);
-    }
-
-    .we-entry-header {
-      display: flex;
-      align-items: flex-start;
-      padding: 10px 10px 10px 16px;
-      gap: 8px;
-    }
-
-    .we-drag-handle {
-      font-size: 22px; color: var(--c-text-3); cursor: grab;
-      padding: 6px 2px; flex-shrink: 0;
-      user-select: none; touch-action: none;
-      &:active { cursor: grabbing; color: var(--c-text-3); }
-    }
-
-    .we-entry-card.cdk-drag-preview {
-      box-shadow: 0 8px 24px var(--c-shadow-md);
-      border-radius: 14px; opacity: 0.95;
-    }
-    .we-drag-placeholder {
-      height: 60px; border: 2px dashed rgba(var(--c-brand-rgb), 0.2);
-      border-radius: 14px; background: rgba(var(--c-brand-rgb), 0.04);
-    }
-    .cdk-drag-animating .we-entry-card { transition: transform 200ms ease; }
-
-    .we-entry-content { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
-    .we-entry-row1 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .we-entry-row2 {
-      display: flex; align-items: center; gap: 6px;
-      padding: 1px 0 2px;
-      cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
-    }
-    .we-entry-name { font-size: 16px; font-weight: 700; color: var(--c-text); line-height: 1.3; flex: 1; min-width: 0; }
-
-    /* ── Inline feeling indicator ── */
-    .we-feeling-chip {
-      font-size: 17px; line-height: 1; flex-shrink: 0;
-      opacity: 0.85;
-      &.we-feeling-chip--editable { cursor: pointer; touch-action: manipulation; &:hover { opacity: 1; } }
-    }
-    .we-feeling-add {
-      font-size: 16px; color: var(--c-border); flex-shrink: 0;
-      cursor: pointer; touch-action: manipulation;
-      transition: color 0.15s;
-      &:hover { color: var(--c-text-3); }
-    }
-
-    /* ── Collapsed summary row ── */
-    .we-entry-summary {
-      display: flex; flex-wrap: wrap; align-items: center; gap: 5px;
-      padding: 4px 0 6px;
-      cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
-    }
-    .we-summary-chip {
-      display: inline-flex; align-items: baseline; gap: 1px;
-      padding: 3px 8px; border-radius: 16px;
-      background: rgba(var(--c-brand-rgb), 0.09); color: var(--c-brand);
-      font-size: 13px; font-weight: 700;
-      small { font-size: 10px; font-weight: 500; opacity: 0.75; }
-    }
-    .we-summary-more {
-      font-size: 12px; font-weight: 600; color: var(--c-text-3);
-      padding: 3px 4px;
-    }
-
-    .we-collapse-chevron {
-      font-size: 18px; color: var(--c-text-3);
-      transition: transform 0.22s ease;
-      &.rotated { transform: rotate(-90deg); }
-    }
-
-    /* ── Col·lapsable body ── */
-    .we-entry-body {
-      display: grid;
-      grid-template-rows: 1fr;
-      transition: grid-template-rows 0.22s ease;
-    }
-    .we-entry-body.collapsed {
-      grid-template-rows: 0fr;
-    }
-    .we-entry-body-inner { overflow: hidden; }
-
-    /* ── Grup accions ── */
-    .we-entry-actions-group {
-      display: flex; align-items: center; gap: 0;
-      background: var(--c-subtle); border: 1px solid var(--c-border-2); border-radius: 10px;
-      overflow: hidden; flex-shrink: 0;
-      .we-icon-btn-sm {
-        border: none; border-radius: 0; background: transparent;
-        &:hover { background: var(--c-hover); }
-        & + .we-icon-btn-sm { border-left: 1px solid var(--c-border-2); }
-      }
-    }
-
-    .we-entry-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; }
-
-    .we-category-badge {
-      display: inline-block; padding: 2px 8px; border-radius: 10px;
-      font-size: 11px; font-weight: 600; color: white; width: fit-content;
-    }
-    .we-subcategory-badge {
-      display: inline-block; padding: 2px 8px; border-radius: 10px;
-      font-size: 11px; font-weight: 500; color: var(--c-text-2); background: var(--c-border-2); width: fit-content;
-    }
-
-    .we-remove-btn {
-      width: 36px; height: 36px; border-radius: 50%;
-      border: none; background: transparent; cursor: pointer;
-      color: var(--c-text-3); display: flex; align-items: center; justify-content: center;
-      touch-action: manipulation; transition: background 0.15s, color 0.15s; flex-shrink: 0;
-      .material-symbols-outlined { font-size: 20px; }
-      &:hover { background: rgba(239,83,80,0.1); color: #ef5350; }
-    }
+    /* ── Entry drag animation ── */
+    .cdk-drag-animating app-exercise-entry-card { transition: transform 200ms ease; }
 
 
 
@@ -812,20 +626,6 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
     .we-set-actions { display: flex; gap: 2px; align-items: center; }
 
-    /* ── Personal Record badge ── */
-    .we-pr-badge {
-      display: inline-flex; align-items: center;
-      padding: 2px 7px; border-radius: 10px;
-      background: rgba(217,119,6,0.12); color: #d97706;
-      border: 1px solid rgba(217,119,6,0.28);
-      font-size: 11px; font-weight: 800; letter-spacing: 0.04em; line-height: 1.4;
-      flex-shrink: 0;
-      animation: pr-pop 0.4s cubic-bezier(0.34, 1.6, 0.64, 1) both;
-    }
-    @keyframes pr-pop {
-      from { opacity: 0; transform: scale(0.3) rotate(-20deg); }
-      to   { opacity: 1; transform: scale(1) rotate(0deg); }
-    }
 
     .we-summary-chip--max {
       background: rgba(217,119,6,0.12) !important;
