@@ -723,7 +723,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     /* ── Workout section (dashboard) ── */
     .workout-section {
       margin: 12px 16px 0;
-      padding: 14px 14px 16px;
+      padding: 14px;
       background: var(--c-card);
       border-radius: 18px;
       box-shadow: 0 2px 10px var(--c-shadow);
@@ -843,7 +843,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     /* ── Sports section ── */
     .sports-section {
       margin: 12px 16px 0;
-      padding: 14px 14px 16px;
+      padding: 14px;
       background: var(--c-card);
       border-radius: 18px;
       box-shadow: 0 2px 10px var(--c-shadow);
@@ -971,7 +971,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
     .sk-workout-section, .sk-sports-section {
       margin: 12px 16px 0;
-      padding: 14px 14px 16px;
+      padding: 14px;
       background: var(--c-card);
       border-radius: 18px;
       box-shadow: 0 2px 10px var(--c-shadow);
