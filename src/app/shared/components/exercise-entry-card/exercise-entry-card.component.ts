@@ -38,7 +38,7 @@ import { kgToDisplay } from '../../utils/weight.utils';
               @if (maxWeight() > 0) {
                 <span class="eec-max">{{ dispW(maxWeight()) }}<small>{{ unit() }}</small></span>
               }
-              @if (entry().sets.length > 0) {
+              @if (entry().sets.length > 0 && showSetsBadge()) {
                 <span class="eec-sets-badge">{{ entry().sets.length }} sèr</span>
               }
               @if (prBadge()) {
@@ -210,7 +210,8 @@ export class ExerciseEntryCardComponent {
   readonly maxWeight            = input<number>(0);
   readonly unit                 = input<string>('kg');
   readonly feelingLevel         = input<FeelingLevel | undefined>(undefined);
-  readonly feelingEditable      = input<boolean>(false);
+  readonly feelingEditable       = input<boolean>(false);
+  readonly showSetsBadge         = input<boolean>(true);
   readonly hideMetaWhenCollapsed = input<boolean>(false);
 
   readonly headerClick  = output<void>();
