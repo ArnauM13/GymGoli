@@ -101,7 +101,7 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
               </div>
             } @else {
 
-              <!-- Grid de targetes d'exercicis (preview gran) -->
+              <!-- Llista d'exercicis (compactes, verticals) -->
               <div class="ex-grid">
                 @for (entry of selectedWorkout()!.entries; track entry.exerciseId) {
                   <button class="ex-card"
@@ -110,25 +110,18 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
                     (click)="selectExercise(entry.exerciseId)">
                     <div class="ex-card-bar"></div>
                     <div class="ex-card-body">
-                      <div class="ex-card-name-row">
-                        <span class="ex-card-name">{{ entry.exerciseName }}</span>
-                        @if (entry.feeling) {
-                          <span class="ex-card-feeling">{{ getFeelingEmoji(entry.feeling) }}</span>
-                        }
-                      </div>
+                      <span class="ex-card-name">{{ entry.exerciseName }}</span>
+                      @if (entry.feeling) {
+                        <span class="ex-card-feeling">{{ getFeelingEmoji(entry.feeling) }}</span>
+                      }
                       @if (entry.sets.length > 0) {
-                        <div class="ex-card-stats-row">
-                          <span class="ex-card-max">{{ dispW(getMaxWeight(entry)) }}<small>{{ unit() }}</small></span>
-                          <span class="ex-card-sets-badge">{{ entry.sets.length }} sèr</span>
-                        </div>
-                        <div class="ex-card-progress">
-                          @for (set of entry.sets; track $index; let last = $last) {
-                            <span class="ex-cp-w" [class.ex-cp-max]="isMaxSet(entry, set)">{{ dispW(set.weight) }}</span>
-                            @if (!last) { <span class="ex-cp-sep">›</span> }
-                          }
-                        </div>
+                        <span class="ex-card-max">{{ dispW(getMaxWeight(entry)) }}<small>{{ unit() }}</small></span>
+                        <span class="ex-card-sets-badge">{{ entry.sets.length }} sèr</span>
                       }
                     </div>
+                    <span class="material-symbols-outlined ex-card-chevron">
+                      {{ selectedExerciseId() === entry.exerciseId ? 'expand_less' : 'expand_more' }}
+                    </span>
                   </button>
                 }
               </div>
@@ -419,72 +412,67 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
       p { margin: 0; font-size: 14px; color: var(--c-text-2); }
     }
 
-    /* Exercise grid (preview tiles) */
+    /* Exercise list (compact vertical rows) */
     .ex-grid {
-      display: grid; grid-template-columns: repeat(2, 1fr);
-      gap: 10px; padding: 12px 14px;
+      display: flex; flex-direction: column; gap: 6px;
+      padding: 10px 14px;
     }
 
     .ex-card {
-      position: relative;
       display: flex; align-items: stretch;
-      border-radius: 14px; padding: 0;
-      border: 1.5px solid color-mix(in srgb, var(--cat) 28%, var(--c-border-2));
-      background: color-mix(in srgb, var(--cat) 6%, var(--c-card));
+      border-radius: 12px; padding: 0;
+      border: 1.5px solid color-mix(in srgb, var(--cat) 25%, var(--c-border-2));
+      background: color-mix(in srgb, var(--cat) 5%, var(--c-card));
       cursor: pointer; text-align: left;
       transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.1s;
-      min-height: 124px; overflow: hidden; touch-action: manipulation;
+      overflow: hidden; touch-action: manipulation;
       &:hover {
-        border-color: color-mix(in srgb, var(--cat) 50%, var(--c-border));
-        background: color-mix(in srgb, var(--cat) 11%, var(--c-card));
-        box-shadow: 0 3px 12px var(--c-shadow);
+        border-color: color-mix(in srgb, var(--cat) 45%, var(--c-border));
+        background: color-mix(in srgb, var(--cat) 9%, var(--c-card));
       }
-      &:active { transform: scale(0.97); }
+      &:active { transform: scale(0.98); }
       &.active {
         border-color: var(--cat);
-        background: color-mix(in srgb, var(--cat) 15%, var(--c-card));
-        box-shadow: 0 4px 16px color-mix(in srgb, var(--cat) 24%, transparent);
+        background: color-mix(in srgb, var(--cat) 13%, var(--c-card));
+        box-shadow: 0 2px 10px color-mix(in srgb, var(--cat) 20%, transparent);
       }
     }
     .ex-card-bar {
-      width: 5px; align-self: stretch; flex-shrink: 0;
+      width: 4px; align-self: stretch; flex-shrink: 0;
       background: var(--cat);
     }
     .ex-card-body {
       flex: 1; min-width: 0;
-      display: flex; flex-direction: column; gap: 6px;
-      padding: 13px 12px 12px 12px;
-    }
-    .ex-card-name-row {
-      display: flex; align-items: flex-start; gap: 6px;
+      display: flex; align-items: center; gap: 8px;
+      padding: 9px 10px 9px 11px;
     }
     .ex-card-name {
       flex: 1; min-width: 0;
-      font-size: 14px; font-weight: 700; color: var(--c-text);
-      line-height: 1.3; word-break: break-word;
+      font-size: 13px; font-weight: 700; color: var(--c-text);
+      line-height: 1.3;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .ex-card-feeling { font-size: 18px; line-height: 1; flex-shrink: 0; }
-    .ex-card-stats-row {
-      display: flex; align-items: baseline; gap: 8px;
-      margin-top: 2px;
-    }
+    .ex-card-feeling { font-size: 15px; line-height: 1; flex-shrink: 0; }
     .ex-card-max {
-      font-size: 26px; font-weight: 800; color: var(--cat); line-height: 1;
-      small { font-size: 13px; font-weight: 500; color: var(--c-text-2); margin-left: 2px; }
+      font-size: 14px; font-weight: 800; color: var(--cat); line-height: 1;
+      flex-shrink: 0;
+      small { font-size: 10px; font-weight: 500; color: var(--c-text-2); margin-left: 1px; }
     }
     .ex-card-sets-badge {
       font-size: 10px; font-weight: 700; color: var(--c-text-2);
-      padding: 2px 8px; border-radius: 10px;
-      background: color-mix(in srgb, var(--cat) 12%, var(--c-card));
-      border: 1px solid color-mix(in srgb, var(--cat) 25%, var(--c-border-2));
-      line-height: 1.3;
+      padding: 2px 7px; border-radius: 10px;
+      background: color-mix(in srgb, var(--cat) 10%, var(--c-card));
+      border: 1px solid color-mix(in srgb, var(--cat) 22%, var(--c-border-2));
+      line-height: 1.3; flex-shrink: 0;
     }
-    .ex-card-progress {
-      display: flex; flex-wrap: wrap; align-items: center; gap: 3px;
+    .ex-card-chevron {
+      font-size: 18px; color: var(--c-text-3); flex-shrink: 0;
+      align-self: center; padding-right: 8px;
+      transition: color 0.15s;
     }
-    .ex-cp-w { font-size: 12px; font-weight: 600; color: var(--c-text-2); }
-    .ex-cp-max { font-weight: 800; color: var(--cat); }
-    .ex-cp-sep { font-size: 11px; color: var(--c-border); }
+    .ex-card.active .ex-card-chevron {
+      color: var(--cat);
+    }
 
     /* Exercise detail panel (same format as list mode: vertical sets only) */
     .ex-detail-panel {
@@ -688,8 +676,8 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
     .workout-detail {
       border-top: 1px solid color-mix(in srgb, var(--wc, var(--c-border-2)) 18%, var(--c-border-2));
       background: var(--c-card);
-      padding: 12px 14px 12px 17px;
-      display: flex; flex-direction: column; gap: 14px;
+      padding: 12px 14px 10px 17px;
+      display: flex; flex-direction: column; gap: 8px;
     }
 
     .entry-row {
@@ -742,8 +730,9 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
       .material-symbols-outlined { font-size: 15px; color: var(--c-text-3); flex-shrink: 0; margin-top: 1px; }
     }
     .workout-volume-footer {
-      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-      padding-top: 8px;
+      display: flex; align-items: center; justify-content: flex-end;
+      gap: 6px; flex-wrap: wrap;
+      padding-top: 2px;
       font-size: 11px; font-weight: 600; color: var(--c-text-3);
       .wvf-sep { color: var(--c-border-2); }
     }
