@@ -37,7 +37,6 @@ const _doneByWorkout      = new Map<string, Set<string>>();
           <div class="we-entry-card"
                cdkDrag [cdkDragDisabled]="!editMode() && !alwaysEditable()"
                [style.--we-cat-color]="getCatColor(entry)"
-               [class.we-entry-solo-edit]="!editMode() && !alwaysEditable() && editingEntry() === entry.exerciseId"
                [class.we-entry-done]="doneEntries().has(entry.exerciseId)">
 
             <div class="we-drag-placeholder" *cdkDragPlaceholder></div>
@@ -64,22 +63,11 @@ const _doneByWorkout      = new Map<string, Set<string>>();
                       <span class="we-collapse-chevron material-symbols-outlined"
                             [class.rotated]="isCollapsed(entry.exerciseId)">expand_more</span>
                     </button>
-                    <button type="button" class="we-icon-btn-sm we-fatiga-btn"
-                      [class.we-fatiga-btn--set]="!!entry.feeling"
-                      [class.we-fatiga-btn--editable]="isEntryEditable(entry.exerciseId)"
-                      [title]="entry.feeling ? getFeelingLabel(entry.feeling) : 'Afegir fatiga'"
-                      (click)="isEntryEditable(entry.exerciseId) && openFatigaPicker(entry.exerciseId)">
-                      @if (entry.feeling) {
-                        <span class="we-fatiga-btn-emoji">{{ getFeelingEmoji(entry.feeling) }}</span>
-                      } @else {
-                        <span class="material-symbols-outlined">sentiment_neutral</span>
-                      }
-                    </button>
                     @if (alwaysEditable()) {
                       <button type="button" class="we-icon-btn-sm we-done-btn"
                         [class.we-done-btn--active]="doneEntries().has(entry.exerciseId)"
-                        title="Marcar com a fet"
-                        (click)="markDone(entry.exerciseId)">
+                        [title]="doneEntries().has(entry.exerciseId) ? 'Desfer fet' : 'Marcar com a fet'"
+                        (click)="toggleDone(entry.exerciseId)">
                         <span class="material-symbols-outlined">check_circle</span>
                       </button>
                     }
@@ -89,9 +77,21 @@ const _doneByWorkout      = new Map<string, Set<string>>();
                     </button>
                   </div>
                 </div>
-                <!-- Row 2: exercise title -->
+                <!-- Row 2: title + feeling + PR -->
                 <div class="we-entry-row2" (click)="toggleCollapse(entry.exerciseId)">
                   <span class="we-entry-name">{{ entry.exerciseName }}</span>
+                  @if (entry.feeling) {
+                    <span class="we-feeling-chip"
+                          [class.we-feeling-chip--editable]="isEntryEditable(entry.exerciseId)"
+                          (click)="$event.stopPropagation(); isEntryEditable(entry.exerciseId) && openFatigaPicker(entry.exerciseId)">
+                      {{ getFeelingEmoji(entry.feeling) }}
+                    </span>
+                  } @else if (isEntryEditable(entry.exerciseId)) {
+                    <span class="material-symbols-outlined we-feeling-add"
+                          (click)="$event.stopPropagation(); openFatigaPicker(entry.exerciseId)">
+                      sentiment_neutral
+                    </span>
+                  }
                   @if (prEntries().has(entry.exerciseId)) {
                     <span class="we-pr-badge">PR</span>
                   }
@@ -107,9 +107,6 @@ const _doneByWorkout      = new Map<string, Set<string>>();
                     }
                     @if (entry.sets.length > 5) {
                       <span class="we-summary-more">+{{ entry.sets.length - 5 }}</span>
-                    }
-                    @if (prEntries().has(entry.exerciseId)) {
-                      <span class="we-pr-badge">PR</span>
                     }
                   </div>
                 }
@@ -326,24 +323,6 @@ const _doneByWorkout      = new Map<string, Set<string>>();
                 <span class="material-symbols-outlined">bar_chart</span>
                 Estadístiques
               </button>
-              @if (doneEntries().has(e.exerciseId)) {
-                <button class="we-menu-item" (click)="undoDone(e.exerciseId); menuFor.set(null)">
-                  <span class="material-symbols-outlined">edit</span>
-                  Editar exercici
-                </button>
-              } @else if (!editMode() && !alwaysEditable()) {
-                @if (editingEntry() === e.exerciseId) {
-                  <button class="we-menu-item" (click)="editingEntry.set(null); menuFor.set(null)">
-                    <span class="material-symbols-outlined">check</span>
-                    Tancar edició
-                  </button>
-                } @else {
-                  <button class="we-menu-item" (click)="startEntryEdit(e.exerciseId); menuFor.set(null)">
-                    <span class="material-symbols-outlined">edit</span>
-                    Editar exercici
-                  </button>
-                }
-              }
               @if (editMode() || alwaysEditable()) {
                 <button class="we-menu-item we-menu-item--danger"
                   (click)="removeEntry(e.exerciseId); menuFor.set(null)">
@@ -401,11 +380,6 @@ const _doneByWorkout      = new Map<string, Set<string>>();
       transition: box-shadow 0.2s, border-left-width 0.2s;
     }
 
-    .we-entry-solo-edit {
-      box-shadow: 0 3px 14px rgba(var(--c-brand-rgb), 0.18);
-      border-left-width: 5px;
-    }
-
     .we-entry-header {
       display: flex;
       align-items: flex-start;
@@ -430,14 +404,27 @@ const _doneByWorkout      = new Map<string, Set<string>>();
     }
     .cdk-drag-animating .we-entry-card { transition: transform 200ms ease; }
 
-    .we-entry-content { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0; }
+    .we-entry-content { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
     .we-entry-row1 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .we-entry-row2 {
-      display: flex; align-items: center; gap: 4px;
-      padding: 2px 0 2px;
+      display: flex; align-items: center; gap: 6px;
+      padding: 1px 0 2px;
       cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
     }
-    .we-entry-name { font-size: 16px; font-weight: 600; color: var(--c-text); line-height: 1.3; }
+    .we-entry-name { font-size: 16px; font-weight: 700; color: var(--c-text); line-height: 1.3; flex: 1; min-width: 0; }
+
+    /* ── Inline feeling indicator ── */
+    .we-feeling-chip {
+      font-size: 17px; line-height: 1; flex-shrink: 0;
+      opacity: 0.85;
+      &.we-feeling-chip--editable { cursor: pointer; touch-action: manipulation; &:hover { opacity: 1; } }
+    }
+    .we-feeling-add {
+      font-size: 16px; color: var(--c-border); flex-shrink: 0;
+      cursor: pointer; touch-action: manipulation;
+      transition: color 0.15s;
+      &:hover { color: var(--c-text-3); }
+    }
 
     /* ── Collapsed summary row ── */
     .we-entry-summary {
@@ -474,10 +461,10 @@ const _doneByWorkout      = new Map<string, Set<string>>();
     }
     .we-entry-body-inner { overflow: hidden; }
 
-    /* ── Grup accions (sentiment + estadístiques) ── */
+    /* ── Grup accions ── */
     .we-entry-actions-group {
       display: flex; align-items: center; gap: 0;
-      background: var(--c-subtle); border: 1px solid var(--c-border-2); border-radius: 8px;
+      background: var(--c-subtle); border: 1px solid var(--c-border-2); border-radius: 10px;
       overflow: hidden; flex-shrink: 0;
       .we-icon-btn-sm {
         border: none; border-radius: 0; background: transparent;
@@ -485,19 +472,6 @@ const _doneByWorkout      = new Map<string, Set<string>>();
         & + .we-icon-btn-sm { border-left: 1px solid var(--c-border-2); }
       }
     }
-
-    /* ── Botó fatiga (dins del grup) ── */
-    .we-fatiga-btn {
-      cursor: default;
-      .material-symbols-outlined { color: var(--c-text-3); }
-    }
-    .we-fatiga-btn--editable {
-      cursor: pointer;
-      &:hover { background: var(--c-hover) !important; }
-      &:active { transform: scale(0.94); }
-    }
-    .we-fatiga-btn--set .material-symbols-outlined { color: var(--c-text-3); }
-    .we-fatiga-btn-emoji { font-size: 18px; line-height: 1; }
 
     .we-entry-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; }
 
@@ -537,7 +511,12 @@ const _doneByWorkout      = new Map<string, Set<string>>();
     /* ── Done card state ── */
     .we-entry-done {
       border-left-color: #4caf50 !important;
-      .we-entry-name { color: var(--c-text-2); }
+      background: color-mix(in srgb, #4caf50 4%, var(--c-card)) !important;
+      .we-entry-name {
+        color: var(--c-text-2);
+        text-decoration: line-through;
+        text-decoration-color: rgba(76,175,80,0.4);
+      }
     }
 
     /* ── Fatiga popup ── */
@@ -951,7 +930,6 @@ export class WorkoutEditorComponent implements OnDestroy {
 
   readonly addingFor        = signal<string | null>(null);
   readonly editingSet       = signal<{ exerciseId: string; index: number } | null>(null);
-  readonly editingEntry     = signal<string | null>(null);
   readonly lastSessionData  = signal<{ exerciseId: string; date: string; maxWeight: number; feeling?: FeelingLevel } | null>(null);
   readonly recData          = signal<{ exerciseId: string; sets: number; reps: number; goalLabel: string } | null>(null);
   readonly feelingPickerFor = signal<string | null>(null);
@@ -1015,7 +993,11 @@ export class WorkoutEditorComponent implements OnDestroy {
 
   isEntryEditable(exerciseId: string): boolean {
     if (this.doneEntries().has(exerciseId)) return false;
-    return this.editMode() || this.alwaysEditable() || this.editingEntry() === exerciseId;
+    return this.editMode() || this.alwaysEditable();
+  }
+
+  toggleDone(id: string): void {
+    if (this.doneEntries().has(id)) { this.undoDone(id); } else { this.markDone(id); }
   }
 
   markDone(id: string): void {
@@ -1061,7 +1043,6 @@ export class WorkoutEditorComponent implements OnDestroy {
 
   reset(): void {
     this._resetForm();
-    this.editingEntry.set(null);
     this.lastSessionData.set(null);
     this.recData.set(null);
   }
@@ -1095,13 +1076,6 @@ export class WorkoutEditorComponent implements OnDestroy {
     if (days === 1) return 'ahir';
     if (days < 7)  return `fa ${days} dies`;
     return d.toLocaleDateString('ca-ES', { day: 'numeric', month: 'short' });
-  }
-
-  startEntryEdit(exerciseId: string): void {
-    this._expandEntry(exerciseId);
-    this.editingEntry.set(exerciseId);
-    this.addingFor.set(null);
-    this.editingSet.set(null);
   }
 
   openStats(entry: WorkoutEntry): void {

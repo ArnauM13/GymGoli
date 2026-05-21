@@ -27,9 +27,6 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
     <div class="page">
       <header class="page-header">
         <h1>Exercicis</h1>
-        <button class="header-add" (click)="openForm()" aria-label="Nou exercici">
-          <span class="material-symbols-outlined">add</span>
-        </button>
       </header>
 
       <!-- Category filter -->
@@ -113,9 +110,6 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
       <!-- ══ Secció Esports ══ -->
       <header class="page-header page-header--mt">
         <h1>Esports</h1>
-        <button class="header-add" (click)="openSportForm()" aria-label="Nou esport">
-          <span class="material-symbols-outlined">add</span>
-        </button>
       </header>
 
       @if (sports().length === 0) {
@@ -162,26 +156,95 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
           }
         </div>
       }
+
+      <!-- ── Speed dial FAB ── -->
+      @if (speedDialOpen()) {
+        <div class="sd-backdrop" (click)="speedDialOpen.set(false)"></div>
+      }
+      <div class="sd-container">
+        @if (speedDialOpen()) {
+          <div class="sd-items">
+            <div class="sd-item" [style.--sd-i]="0">
+              <span class="sd-label">Esport nou</span>
+              <button class="sd-btn" style="background:#26a69a" (click)="sdAddSport()">
+                <span class="material-symbols-outlined">sports_soccer</span>
+              </button>
+            </div>
+            <div class="sd-item" [style.--sd-i]="1">
+              <span class="sd-label">Exercici nou</span>
+              <button class="sd-btn" style="background:var(--c-brand)" (click)="sdAddExercise()">
+                <span class="material-symbols-outlined">fitness_center</span>
+              </button>
+            </div>
+          </div>
+        }
+        <button class="sd-fab" [class.sd-fab--open]="speedDialOpen()" (click)="toggleSpeedDial()">
+          <span class="material-symbols-outlined">add</span>
+        </button>
+      </div>
     </div>
   `,
   styles: [`
-    .page { padding: 0 0 16px; }
+    .page { padding: 0 0 84px; }
 
     /* ── Page header ── */
     .page-header {
-      display: flex; align-items: center; justify-content: space-between;
+      display: flex; align-items: center;
       padding: 16px 16px 8px;
       &.page-header--mt { padding-top: 24px; }
       h1 { margin: 0; font-size: 20px; font-weight: 700; color: var(--c-text); letter-spacing: -0.2px; }
     }
-    .header-add {
-      width: 36px; height: 36px; border-radius: 50%; border: none;
-      background: var(--c-brand); color: white; cursor: pointer;
+
+    /* ── Speed dial FAB ── */
+    .sd-backdrop { position: fixed; inset: 0; z-index: 88; }
+    .sd-container {
+      position: fixed; bottom: calc(var(--nav-height) + 16px); right: 20px; z-index: 89;
+      display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+    }
+    .sd-items {
+      display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+      padding-bottom: 4px;
+      animation: sd-items-in 0.2s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+    }
+    @keyframes sd-items-in {
+      from { opacity: 0; transform: scale(0.88) translateY(12px); }
+      to   { opacity: 1; transform: none; }
+    }
+    .sd-item {
+      display: flex; align-items: center; gap: 10px;
+      animation: sd-item-in 0.18s calc(var(--sd-i, 0) * 28ms) both;
+    }
+    @keyframes sd-item-in {
+      from { opacity: 0; transform: translateX(10px); }
+      to   { opacity: 1; transform: none; }
+    }
+    .sd-label {
+      background: var(--c-card); color: var(--c-text);
+      padding: 6px 12px; border-radius: 20px;
+      font-size: 13px; font-weight: 600;
+      box-shadow: 0 2px 8px var(--c-shadow); white-space: nowrap;
+    }
+    .sd-btn {
+      width: 46px; height: 46px; border-radius: 50%; border: none; color: white;
+      cursor: pointer; touch-action: manipulation;
       display: flex; align-items: center; justify-content: center;
-      transition: background 0.15s, transform 0.1s; touch-action: manipulation;
-      .material-symbols-outlined { font-size: 20px; }
-      &:hover  { background: var(--c-brand-dk); }
+      box-shadow: 0 3px 12px rgba(0,0,0,0.22);
+      transition: transform 0.15s;
+      .material-symbols-outlined { font-size: 22px; font-variation-settings: 'FILL' 1; }
+      &:hover  { transform: scale(1.08); }
+      &:active { transform: scale(0.93); }
+    }
+    .sd-fab {
+      width: 56px; height: 56px; border-radius: 50%; border: none;
+      background: var(--c-brand); color: white;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation;
+      box-shadow: 0 4px 16px rgba(var(--c-brand-rgb), 0.4), 0 1px 4px var(--c-shadow);
+      transition: background 0.15s, transform 0.15s;
+      .material-symbols-outlined { font-size: 28px; transition: transform 0.22s ease; }
+      &:hover { background: var(--c-brand-dk); transform: scale(1.06); }
       &:active { transform: scale(0.94); }
+      &.sd-fab--open .material-symbols-outlined { transform: rotate(45deg); }
     }
 
     /* ── Filter chips ── */
@@ -342,6 +405,8 @@ export class LibraryComponent {
 
   readonly sports = this.sportService.sports;
 
+  readonly speedDialOpen = signal(false);
+
   readonly activeFilter = signal<ExerciseCategory | null>(null);
   readonly muscleFilter = signal<string | null>(null);
   readonly exercises = this.exerciseService.exercises;
@@ -379,6 +444,10 @@ export class LibraryComponent {
   getCategoryColor(cat: ExerciseCategory): string { return CATEGORY_COLORS[cat]; }
   getSubcategoryLabel(sub: string): string { return SUBCATEGORY_LABELS[sub as keyof typeof SUBCATEGORY_LABELS] ?? sub; }
   getMuscleLabel(m: string): string { return MUSCLE_LABELS[m] ?? m; }
+
+  toggleSpeedDial(): void { this.speedDialOpen.set(!this.speedDialOpen()); }
+  sdAddExercise(): void { this.speedDialOpen.set(false); this.openForm(); }
+  sdAddSport(): void { this.speedDialOpen.set(false); this.openSportForm(); }
 
   openForm(exercise?: Exercise): void {
     const ref = this.dialog.open(ExerciseFormDialogComponent, {
