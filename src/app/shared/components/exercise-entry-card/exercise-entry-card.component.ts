@@ -20,38 +20,41 @@ import { kgToDisplay } from '../../utils/weight.utils';
       <div class="eec-card" [class.eec-card--open]="!collapsed()">
 
         <!-- ── Header (always visible, same look as history ex-card) ── -->
-        <div class="eec-header" (click)="headerClick.emit()">
+        <div class="eec-header" [class.eec-header--minimal]="collapsed() && hideMetaWhenCollapsed()" (click)="headerClick.emit()">
           <div class="eec-bar"></div>
           <div class="eec-body">
             <span class="eec-name">{{ entry().exerciseName }}</span>
-            @if (feelingLevel()) {
-              <span class="eec-feeling"
-                [class.eec-feeling--editable]="feelingEditable()"
-                (click)="onFeelingClick($event)">
-                {{ emoji(feelingLevel()!) }}
-              </span>
-            } @else if (feelingEditable()) {
-              <span class="material-symbols-outlined eec-feeling-add"
-                (click)="onFeelingClick($event)">sentiment_neutral</span>
-            }
-            @if (maxWeight() > 0) {
-              <span class="eec-max">{{ dispW(maxWeight()) }}<small>{{ unit() }}</small></span>
-            }
-            @if (entry().sets.length > 0) {
-              <span class="eec-sets-badge">{{ entry().sets.length }} sèr</span>
-            }
-            @if (prBadge()) {
-              <span class="eec-pr">PR</span>
+            @if (!collapsed() || !hideMetaWhenCollapsed()) {
+              @if (feelingLevel()) {
+                <span class="eec-feeling"
+                  [class.eec-feeling--editable]="feelingEditable()"
+                  (click)="onFeelingClick($event)">
+                  {{ emoji(feelingLevel()!) }}
+                </span>
+              } @else if (feelingEditable()) {
+                <span class="material-symbols-outlined eec-feeling-add"
+                  (click)="onFeelingClick($event)">sentiment_neutral</span>
+              }
+              @if (maxWeight() > 0) {
+                <span class="eec-max">{{ dispW(maxWeight()) }}<small>{{ unit() }}</small></span>
+              }
+              @if (entry().sets.length > 0) {
+                <span class="eec-sets-badge">{{ entry().sets.length }} sèr</span>
+              }
+              @if (prBadge()) {
+                <span class="eec-pr">PR</span>
+              }
             }
           </div>
           <div class="eec-actions">
-            @if (showMenu()) {
+            @if (showMenu() && (!collapsed() || !hideMetaWhenCollapsed())) {
               <button type="button" class="eec-menu-btn"
                 (click)="$event.stopPropagation(); menuClick.emit()">
                 <span class="material-symbols-outlined">more_vert</span>
               </button>
             }
-            <span class="material-symbols-outlined eec-chevron">
+            <span class="material-symbols-outlined eec-chevron"
+              [class.eec-chevron--big]="collapsed() && hideMetaWhenCollapsed()">
               {{ collapsed() ? 'expand_more' : 'expand_less' }}
             </span>
           </div>
@@ -179,9 +182,14 @@ import { kgToDisplay } from '../../utils/weight.utils';
 
     .eec-chevron {
       font-size: 20px; color: var(--c-text-3);
-      align-self: center; transition: color 0.15s;
+      align-self: center; transition: color 0.15s, font-size 0.15s;
     }
+    .eec-chevron--big { font-size: 28px; }
     .eec-card--open .eec-chevron { color: var(--cat); }
+
+    .eec-header--minimal {
+      min-height: 54px; padding: 4px 0;
+    }
 
     /* Grid-rows collapse animation */
     .eec-expanded {
@@ -193,16 +201,17 @@ import { kgToDisplay } from '../../utils/weight.utils';
   `],
 })
 export class ExerciseEntryCardComponent {
-  readonly entry           = input.required<WorkoutEntry>();
-  readonly catColor        = input<string>('#ccc');
-  readonly collapsed       = input<boolean>(true);
-  readonly draggable       = input<boolean>(false);
-  readonly showMenu        = input<boolean>(false);
-  readonly prBadge         = input<boolean>(false);
-  readonly maxWeight       = input<number>(0);
-  readonly unit            = input<string>('kg');
-  readonly feelingLevel    = input<FeelingLevel | undefined>(undefined);
-  readonly feelingEditable = input<boolean>(false);
+  readonly entry                = input.required<WorkoutEntry>();
+  readonly catColor             = input<string>('#ccc');
+  readonly collapsed            = input<boolean>(true);
+  readonly draggable            = input<boolean>(false);
+  readonly showMenu             = input<boolean>(false);
+  readonly prBadge              = input<boolean>(false);
+  readonly maxWeight            = input<number>(0);
+  readonly unit                 = input<string>('kg');
+  readonly feelingLevel         = input<FeelingLevel | undefined>(undefined);
+  readonly feelingEditable      = input<boolean>(false);
+  readonly hideMetaWhenCollapsed = input<boolean>(false);
 
   readonly headerClick  = output<void>();
   readonly menuClick    = output<void>();

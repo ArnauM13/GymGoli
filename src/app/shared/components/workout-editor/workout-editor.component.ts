@@ -40,14 +40,13 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
             [catColor]="getCatColor(entry)"
             [collapsed]="isCollapsed(entry.exerciseId)"
             [draggable]="editMode() || alwaysEditable()"
-            [showMenu]="true"
+            [hideMetaWhenCollapsed]="true"
             [prBadge]="prEntries().has(entry.exerciseId)"
             [maxWeight]="entryMaxWeight(entry)"
             [unit]="unit()"
             [feelingLevel]="entry.feeling"
             [feelingEditable]="isEntryEditable(entry.exerciseId)"
             (headerClick)="toggleCollapse(entry.exerciseId)"
-            (menuClick)="toggleEntryMenu(entry.exerciseId)"
             (feelingClick)="openFatigaPicker(entry.exerciseId)">
 
             <!-- ── Projected body content ──
@@ -211,6 +210,20 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
               }
             }
 
+            <!-- ── Entry footer: stats + delete ── -->
+            <div class="we-entry-footer">
+              <button class="we-footer-stats-btn" (click)="openStats(entry)">
+                <span class="material-symbols-outlined">bar_chart</span>
+                Estadístiques
+              </button>
+              @if (alwaysEditable() || editMode()) {
+                <button class="we-footer-delete-btn" (click)="removeEntry(entry.exerciseId)">
+                  <span class="material-symbols-outlined">delete</span>
+                  Eliminar
+                </button>
+              }
+            </div>
+
             <!-- end projected body -->
           </app-exercise-entry-card>
         }
@@ -241,29 +254,6 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
             <button class="we-rt-adj" (click)="adjustTimer(-30)">−30s</button>
             <button class="we-rt-adj" (click)="adjustTimer(30)">+30s</button>
           </div>
-        </div>
-      }
-
-      <!-- ── Entry menu ── -->
-      @if (menuFor()) {
-        <div class="we-entry-menu-backdrop" (click)="menuFor.set(null)"></div>
-        <div class="we-entry-menu-sheet">
-          @if (menuEntry(); as e) {
-            <p class="we-menu-title">{{ e.exerciseName }}</p>
-            <div class="we-menu-items">
-              <button class="we-menu-item" (click)="openStats(e); menuFor.set(null)">
-                <span class="material-symbols-outlined">bar_chart</span>
-                Estadístiques
-              </button>
-              @if (editMode() || alwaysEditable()) {
-                <button class="we-menu-item we-menu-item--danger"
-                  (click)="removeEntry(e.exerciseId); menuFor.set(null)">
-                  <span class="material-symbols-outlined">delete</span>
-                  Eliminar exercici
-                </button>
-              }
-            </div>
-          }
         </div>
       }
 
@@ -352,38 +342,28 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     .we-fatiga-option-emoji { font-size: 28px; line-height: 1; }
     .we-fatiga-option-label { font-size: 10px; font-weight: 600; color: var(--c-text-2); text-align: center; }
 
-    /* ── Entry menu ── */
-    .we-entry-menu-backdrop {
-      position: fixed; inset: 0; z-index: 200;
-      background: rgba(0,0,0,0.35);
+    /* ── Entry footer: stats + delete ── */
+    .we-entry-footer {
+      display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+      padding: 10px 14px 14px; border-top: 1px solid var(--c-border-2);
     }
-    .we-entry-menu-sheet {
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 201;
-      background: var(--c-card); border-radius: 20px 20px 0 0;
-      padding: 20px 20px 32px;
-      box-shadow: 0 -4px 24px var(--c-shadow-md);
+    .we-footer-stats-btn {
+      display: flex; align-items: center; gap: 5px;
+      padding: 7px 14px; border-radius: 8px;
+      border: 1.5px solid var(--c-border); background: transparent;
+      color: var(--c-text-2); font-size: 13px; font-weight: 600;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover { background: var(--c-subtle); color: var(--c-text); }
     }
-    .we-menu-title {
-      margin: 0 0 12px; padding-bottom: 12px;
-      border-bottom: 1px solid var(--c-border-2);
-      font-size: 14px; font-weight: 700; color: var(--c-text);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .we-menu-items { display: flex; flex-direction: column; gap: 2px; }
-    .we-menu-item {
-      display: flex; align-items: center; gap: 14px;
-      padding: 13px 12px; border-radius: 12px;
-      border: none; background: transparent; width: 100%;
-      font-size: 15px; font-weight: 600; color: var(--c-text); text-align: left;
-      cursor: pointer; touch-action: manipulation; transition: background 0.12s;
-      .material-symbols-outlined { font-size: 20px; color: var(--c-text-2); }
-      &:hover { background: var(--c-subtle); }
-      &:active { background: var(--c-hover); }
-    }
-    .we-menu-item--danger {
-      color: #ef5350;
-      .material-symbols-outlined { color: #ef5350; }
-      &:hover { background: rgba(239,83,80,0.07); }
+    .we-footer-delete-btn {
+      display: flex; align-items: center; gap: 5px;
+      padding: 7px 14px; border-radius: 8px;
+      border: 1.5px solid rgba(239,83,80,0.3); background: transparent;
+      color: #ef5350; font-size: 13px; font-weight: 600;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover { background: rgba(239,83,80,0.08); border-color: #ef5350; }
     }
 
     /* ── Last session banner ── */
@@ -708,13 +688,6 @@ export class WorkoutEditorComponent implements OnDestroy {
   readonly recData          = signal<{ exerciseId: string; sets: number; reps: number; goalLabel: string } | null>(null);
   readonly feelingPickerFor = signal<string | null>(null);
   readonly collapsedEntries = signal<Set<string>>(new Set());
-  readonly menuFor    = signal<string | null>(null);
-  readonly menuEntry  = computed(() => {
-    const id = this.menuFor();
-    const w  = this.workout();
-    if (!id || !w) return null;
-    return w.entries.find(e => e.exerciseId === id) ?? null;
-  });
   // ── Rest timer ─────────────────────────────────────────────────────────────
   readonly timerActive    = signal(false);
   readonly timerRemaining = signal(0);
@@ -767,10 +740,6 @@ export class WorkoutEditorComponent implements OnDestroy {
   }
 
   isCollapsed(id: string): boolean { return this.collapsedEntries().has(id); }
-
-  toggleEntryMenu(id: string): void {
-    this.menuFor.set(this.menuFor() === id ? null : id);
-  }
 
   toggleCollapse(id: string): void {
     const s = new Set(this.collapsedEntries());
