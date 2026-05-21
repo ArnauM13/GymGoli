@@ -54,7 +54,7 @@ import { kgToDisplay } from '../../utils/weight.utils';
               </button>
             }
             <span class="material-symbols-outlined eec-chevron"
-              [class.eec-chevron--big]="collapsed() && hideMetaWhenCollapsed()">
+              [class.eec-chevron--big]="hideMetaWhenCollapsed()">
               {{ collapsed() ? 'expand_more' : 'expand_less' }}
             </span>
           </div>
