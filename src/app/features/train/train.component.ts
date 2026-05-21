@@ -76,22 +76,9 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           (requestAddExercise)="openPicker()"
         />
 
-        <!-- More FAB + menu -->
-        @if (awMenuOpen()) {
-          <div class="aw-backdrop" (click)="awMenuOpen.set(false)"></div>
-          <div class="aw-menu">
-            <button class="aw-menu-item aw-menu-item--danger" (click)="deleteActiveWorkout()">
-              <span class="material-symbols-outlined">delete</span>
-              Eliminar entrenament
-            </button>
-          </div>
-        }
-        <div class="aw-fab-wrap">
-          <button class="aw-fab" [class.aw-fab--open]="awMenuOpen()"
-                  (click)="awMenuOpen.set(!awMenuOpen())">
-            <span class="material-symbols-outlined">more_vert</span>
-          </button>
-        </div>
+        <button class="aw-delete-fab" (click)="deleteActiveWorkout()">
+          <span class="material-symbols-outlined">delete</span>
+        </button>
         <button class="aw-back-fab" (click)="closeWorkout()">
           <span class="material-symbols-outlined">arrow_back</span>
         </button>
@@ -555,8 +542,21 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       align-self: center; padding: 0 14px; flex-shrink: 0;
     }
 
-    /* ── Active workout FAB + menu ── */
-    .aw-backdrop { position: fixed; inset: 0; z-index: 88; }
+    /* ── Active workout action FABs ── */
+    .aw-delete-fab {
+      position: fixed; right: 20px;
+      bottom: calc(var(--nav-height) + 16px);
+      z-index: 89;
+      width: 56px; height: 56px; border-radius: 50%;
+      border: 1.5px solid rgba(239,83,80,0.35); background: var(--c-card); color: #ef5350;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation;
+      box-shadow: 0 4px 16px var(--c-shadow-md);
+      transition: background 0.15s, color 0.15s, transform 0.15s;
+      .material-symbols-outlined { font-size: 24px; }
+      &:hover { background: rgba(239,83,80,0.08); transform: scale(1.06); }
+      &:active { transform: scale(0.94); }
+    }
     .aw-back-fab {
       position: fixed; left: 20px;
       bottom: calc(var(--nav-height) + 16px);
@@ -571,47 +571,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       &:hover { background: var(--c-hover); color: var(--c-text); transform: scale(1.06); }
       &:active { transform: scale(0.94); }
     }
-    .aw-fab-wrap {
-      position: fixed; right: 20px;
-      bottom: calc(var(--nav-height) + 16px);
-      z-index: 89;
-    }
-    .aw-fab {
-      width: 56px; height: 56px; border-radius: 50%; border: none;
-      background: var(--c-brand); color: white;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; touch-action: manipulation;
-      box-shadow: 0 4px 16px rgba(var(--c-brand-rgb), 0.4), 0 1px 4px var(--c-shadow);
-      transition: background 0.15s, transform 0.15s;
-      .material-symbols-outlined { font-size: 26px; transition: transform 0.2s ease; }
-      &:hover { background: var(--c-brand-dk); transform: scale(1.06); }
-      &:active { transform: scale(0.94); }
-      &.aw-fab--open .material-symbols-outlined { transform: rotate(90deg); }
-    }
-    .aw-menu {
-      position: fixed; right: 20px;
-      bottom: calc(var(--nav-height) + 82px);
-      z-index: 89; min-width: 210px;
-      background: var(--c-card); border-radius: 14px; overflow: hidden;
-      border: 1px solid var(--c-border-2);
-      box-shadow: 0 6px 24px var(--c-shadow-md);
-      animation: aw-menu-in 0.18s cubic-bezier(0.34, 1.4, 0.64, 1) both;
-    }
-    @keyframes aw-menu-in {
-      from { opacity: 0; transform: scale(0.88) translateY(8px); transform-origin: bottom right; }
-      to   { opacity: 1; transform: none; }
-    }
-    .aw-menu-item {
-      display: flex; align-items: center; gap: 10px;
-      width: 100%; padding: 14px 16px;
-      border: none; background: transparent; cursor: pointer;
-      font-size: 14px; font-weight: 500; text-align: left;
-      touch-action: manipulation; transition: background 0.1s;
-      .material-symbols-outlined { font-size: 18px; }
-      &:hover { background: var(--c-hover); }
-    }
-    .aw-menu-item--danger { color: #ef5350; }
-
     @keyframes pill-in {
       from { opacity: 0; transform: translateY(10px); }
       to   { opacity: 1; transform: none; }
@@ -1257,7 +1216,6 @@ export class TrainComponent {
   readonly sportToggling   = signal(false);
   readonly workoutTypes    = WORKOUT_TYPES;
   readonly speedDialOpen   = signal(false);
-  readonly awMenuOpen      = signal(false);
   readonly activeWorkoutId = signal<string | null>(null);
   readonly gymCollapsed    = signal(false);
   readonly sportsCollapsed = signal(false);
@@ -1558,7 +1516,6 @@ export class TrainComponent {
   }
 
   async deleteActiveWorkout(): Promise<void> {
-    this.awMenuOpen.set(false);
     if (!confirm('Eliminar l\'entrenament?')) return;
     const w = this.activeWorkout();
     if (!w) return;
