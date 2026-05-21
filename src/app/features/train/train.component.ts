@@ -280,33 +280,51 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     @if (speedDialOpen()) {
       <div class="sd-backdrop" (click)="speedDialOpen.set(false)"></div>
     }
-    <div class="sd-container">
-      @if (speedDialOpen()) {
-        <div class="sd-items">
-          @for (sport of sportService.sports(); track sport.id; let i = $index) {
-            <div class="sd-item" [style.--sd-i]="i">
-              <span class="sd-label">{{ sport.name }}</span>
-              <button class="sd-btn" [style.background]="sport.color"
-                (click)="speedDialPickSport(sport)">
-                <span class="material-symbols-outlined">{{ sport.icon }}</span>
-              </button>
-            </div>
-          }
-          @for (cat of workoutTypes; track cat.value; let i = $index) {
-            <div class="sd-item" [style.--sd-i]="sportService.sports().length + i">
-              <span class="sd-label">{{ cat.label }}</span>
-              <button class="sd-btn" [style.background]="cat.color"
-                (click)="speedDialPickCategory(cat.value)">
-                <span class="material-symbols-outlined">{{ cat.icon }}</span>
-              </button>
-            </div>
-          }
-        </div>
+
+    <!-- Bottom action row: suggestion card (when no activity) + FAB -->
+    <div class="bottom-bar">
+      @if (todaySuggestion(); as s) {
+        <button class="suggestion-card" [style.--sc]="s.color" (click)="handleSuggestionClick(s)">
+          <div class="sc-bar"></div>
+          <div class="sc-icon-wrap">
+            <span class="material-symbols-outlined sc-icon">{{ s.icon }}</span>
+          </div>
+          <div class="sc-info">
+            <span class="sc-eyebrow">Avui toca</span>
+            <span class="sc-label">{{ s.label }}</span>
+          </div>
+          <span class="material-symbols-outlined sc-chevron">chevron_right</span>
+        </button>
       }
-      <button class="sd-fab" [class.sd-fab--open]="speedDialOpen()"
-        (click)="toggleSpeedDial()">
-        <span class="material-symbols-outlined">add</span>
-      </button>
+
+      <div class="sd-container">
+        @if (speedDialOpen()) {
+          <div class="sd-items">
+            @for (sport of sportService.sports(); track sport.id; let i = $index) {
+              <div class="sd-item" [style.--sd-i]="i">
+                <span class="sd-label">{{ sport.name }}</span>
+                <button class="sd-btn" [style.background]="sport.color"
+                  (click)="speedDialPickSport(sport)">
+                  <span class="material-symbols-outlined">{{ sport.icon }}</span>
+                </button>
+              </div>
+            }
+            @for (cat of workoutTypes; track cat.value; let i = $index) {
+              <div class="sd-item" [style.--sd-i]="sportService.sports().length + i">
+                <span class="sd-label">{{ cat.label }}</span>
+                <button class="sd-btn" [style.background]="cat.color"
+                  (click)="speedDialPickCategory(cat.value)">
+                  <span class="material-symbols-outlined">{{ cat.icon }}</span>
+                </button>
+              </div>
+            }
+          </div>
+        }
+        <button class="sd-fab" [class.sd-fab--open]="speedDialOpen()"
+          (click)="toggleSpeedDial()">
+          <span class="material-symbols-outlined">add</span>
+        </button>
+      </div>
     </div>
 
     <!-- ── Compact workout shortcut pills ── -->
@@ -321,21 +339,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         @if (i === 1 && dateWorkouts().length > 2) {
           <span class="pill-more">+{{ dateWorkouts().length - 2 }}</span>
         }
-      </button>
-    }
-
-    <!-- ── "Avui toca" suggestion card (inline with FAB, only when no activity today) ── -->
-    @if (todaySuggestion(); as s) {
-      <button class="suggestion-card" [style.--sc]="s.color" (click)="handleSuggestionClick(s)">
-        <div class="sc-bar"></div>
-        <div class="sc-icon-wrap">
-          <span class="material-symbols-outlined sc-icon">{{ s.icon }}</span>
-        </div>
-        <div class="sc-info">
-          <span class="sc-eyebrow">Avui toca</span>
-          <span class="sc-label">{{ s.label }}</span>
-        </div>
-        <span class="material-symbols-outlined sc-chevron">chevron_right</span>
       </button>
     }
     } <!-- /!activeWorkout() -->
@@ -617,13 +620,9 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       padding-right: 12px; white-space: nowrap;
     }
 
-    /* ── "Avui toca" suggestion card (inline with FAB) ── */
+    /* ── "Avui toca" suggestion card (flex child in .bottom-bar, aligned with FAB) ── */
     .suggestion-card {
-      position: fixed;
-      bottom: calc(var(--nav-height) + 12px);
-      left: 16px;
-      right: 88px;
-      z-index: 89;
+      flex: 1; min-width: 0;
       display: flex; align-items: center; gap: 0;
       height: 56px; border-radius: 14px; padding: 0;
       border: 1.5px solid color-mix(in srgb, var(--sc) 35%, var(--c-border-2));
@@ -705,8 +704,20 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     /* ── Speed Dial FAB ── */
     .sd-backdrop { position: fixed; inset: 0; z-index: 88; }
+
+    /* ── Bottom action bar: holds the suggestion card + speed dial FAB ── */
+    .bottom-bar {
+      position: fixed;
+      left: 16px; right: 20px;
+      bottom: calc(var(--nav-height) + 16px);
+      z-index: 89;
+      display: flex; align-items: flex-end; gap: 12px;
+      pointer-events: none;
+    }
+    .bottom-bar > * { pointer-events: auto; }
+
     .sd-container {
-      position: fixed; bottom: calc(var(--nav-height) + 16px); right: 20px; z-index: 89;
+      flex-shrink: 0; margin-left: auto;
       display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
     }
     .sd-items {

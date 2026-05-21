@@ -753,7 +753,7 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
     }
     .workout-volume-footer {
       display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-      padding-top: 8px; border-top: 1px solid var(--c-border-2);
+      padding-top: 8px;
       font-size: 11px; font-weight: 600; color: var(--c-text-3);
       .wvf-sep { color: var(--c-border-2); }
     }
