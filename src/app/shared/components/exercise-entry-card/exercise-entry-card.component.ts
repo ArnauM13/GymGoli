@@ -27,12 +27,12 @@ import { kgToDisplay } from '../../utils/weight.utils';
             @if (feelingLevel()) {
               <span class="eec-feeling"
                 [class.eec-feeling--editable]="feelingEditable()"
-                (click)="feelingEditable() && ($event.stopPropagation(), feelingClick.emit())">
+                (click)="onFeelingClick($event)">
                 {{ emoji(feelingLevel()!) }}
               </span>
             } @else if (feelingEditable()) {
               <span class="material-symbols-outlined eec-feeling-add"
-                (click)="$event.stopPropagation(); feelingClick.emit()">sentiment_neutral</span>
+                (click)="onFeelingClick($event)">sentiment_neutral</span>
             }
             @if (maxWeight() > 0) {
               <span class="eec-max">{{ dispW(maxWeight()) }}<small>{{ unit() }}</small></span>
@@ -210,4 +210,9 @@ export class ExerciseEntryCardComponent {
 
   emoji(l: FeelingLevel): string { return FEELING_EMOJI[l]; }
   dispW(v: number): number { return kgToDisplay(v, this.unit() as 'kg' | 'lb'); }
+
+  onFeelingClick(e: Event): void {
+    e.stopPropagation();
+    if (this.feelingEditable()) this.feelingClick.emit();
+  }
 }
