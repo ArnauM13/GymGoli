@@ -126,23 +126,45 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
               </div>
 
               <!-- Detall de l'exercici seleccionat -->
-              @if (selectedExerciseId()) {
-                <div class="ex-detail-panel">
-                  @if ((selectedEntry()?.sets ?? []).length > 0) {
-                    <div class="ex-sets-row">
-                      @for (set of selectedEntry()!.sets; track $index) {
-                        <div class="ex-set-pill" [class.ex-set-pill--max]="isMaxSet(selectedEntry()!, set)">
-                          <span class="ex-set-num">{{ $index + 1 }}</span>
-                          <span class="ex-set-weight">{{ dispW(set.weight) }}<small>{{ unit() }}</small></span>
-                          <span class="ex-set-reps">×{{ set.reps }}</span>
+              @if (selectedExerciseId() && selectedEntry(); as e) {
+                <div class="ex-detail-panel" [style.--ec]="getEntryCatColor(e)">
+                  @if (e.sets.length > 0) {
+                    <div class="ex-detail-body">
+                      <div class="ex-sets-col">
+                        @for (set of e.sets; track $index) {
+                          <div class="ex-set-line" [class.ex-set-line--max]="isMaxSet(e, set)">
+                            <span class="exs-num">{{ $index + 1 }}</span>
+                            <span class="exs-weight">{{ dispW(set.weight) }}<small>{{ unit() }}</small></span>
+                            <span class="exs-x">×</span>
+                            <span class="exs-reps">{{ set.reps }}</span>
+                            @if (isMaxSet(e, set)) { <span class="exs-pr">PR</span> }
+                          </div>
+                        }
+                      </div>
+                      <div class="ex-stats-col">
+                        <div class="ex-stat">
+                          <span class="exs-label">Màx</span>
+                          <span class="exs-value">{{ dispW(getMaxWeight(e)) }}<small>{{ unit() }}</small></span>
                         </div>
-                      }
+                        <div class="ex-stat">
+                          <span class="exs-label">Sèries</span>
+                          <span class="exs-value">{{ e.sets.length }}</span>
+                        </div>
+                        <div class="ex-stat">
+                          <span class="exs-label">Reps</span>
+                          <span class="exs-value">{{ totalReps(e) }}</span>
+                        </div>
+                        <div class="ex-stat">
+                          <span class="exs-label">Volum</span>
+                          <span class="exs-value">{{ dispW(entryVolume(e)) }}<small>{{ unit() }}</small></span>
+                        </div>
+                      </div>
                     </div>
                   }
                   <div class="ex-card-analysis">
                     <app-exercise-progress-inline
                       [exerciseId]="selectedExerciseId()"
-                      [exerciseName]="selectedEntry()?.exerciseName ?? null" />
+                      [exerciseName]="e.exerciseName" />
                   </div>
                 </div>
               }
@@ -221,32 +243,44 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
         @if (filteredWorkouts().length > 0) {
           <div class="workout-list-wrap">
             @for (workout of filteredWorkouts(); track workout.id) {
-              <div class="workout-card" [class.expanded]="expandedId() === workout.id">
+              <div class="workout-card" [class.expanded]="expandedId() === workout.id"
+                   [style.--wc]="getWorkoutPrimaryColor(workout)">
 
-                <!-- Color stripe lateral -->
-                <div class="workout-card-stripe" [style.background]="getWorkoutStripe(workout)"></div>
+                <div class="wc-bar" [style.background]="getWorkoutStripe(workout)"></div>
 
                 <button class="workout-header" (click)="toggleExpanded(workout.id)">
-                  <div class="workout-date-block">
-                    <span class="weekday">{{ getWeekday(workout.date) }}</span>
-                    <span class="day">{{ getDay(workout.date) }}</span>
-                    <span class="month-year">{{ getMonthYear(workout.date) }}</span>
+                  <div class="wh-date-block">
+                    <span class="wh-weekday">{{ getWeekday(workout.date) }}</span>
+                    <span class="wh-day">{{ getDay(workout.date) }}</span>
+                    <span class="wh-month">{{ getMonthYear(workout.date) }}</span>
                   </div>
-                  <div class="workout-summary">
+
+                  <div class="wh-content">
                     @if ((workout.categories ?? (workout.category ? [workout.category] : [])).length > 0) {
-                      <div class="workout-badges-row">
+                      <div class="wh-badges">
                         @for (cat of (workout.categories ?? (workout.category ? [workout.category] : [])); track cat) {
-                          <span class="workout-type-badge" [style.background]="getCatColor(cat)">{{ getCatLabel(cat) }}</span>
+                          <span class="wh-badge" [style.background]="getCatColor(cat)">{{ getCatLabel(cat) }}</span>
                         }
                         @if ((workout.categories ?? []).length > 1) {
-                          <span class="workout-type-badge workout-hybrid-badge">Híbrid</span>
+                          <span class="wh-badge wh-badge--hybrid">Híbrid</span>
                         }
                       </div>
                     }
-                    <span class="exercise-names">{{ getExerciseNames(workout) }}</span>
-                    <span class="workout-stats">{{ totalSets(workout) }} sèries · {{ dispW(totalVolume(workout)) }} {{ unit() }}</span>
+                    <span class="wh-exercises">{{ getExerciseNames(workout) }}</span>
+                    <div class="wh-stats">
+                      <span class="wh-stat">
+                        <span class="material-symbols-outlined">repeat</span>
+                        <strong>{{ totalSets(workout) }}</strong> sèr
+                      </span>
+                      <span class="wh-stat-sep">·</span>
+                      <span class="wh-stat">
+                        <span class="material-symbols-outlined">monitoring</span>
+                        <strong>{{ dispW(totalVolume(workout)) }}</strong> {{ unit() }}
+                      </span>
+                    </div>
                   </div>
-                  <span class="material-symbols-outlined chevron">
+
+                  <span class="material-symbols-outlined wh-chevron">
                     {{ expandedId() === workout.id ? 'expand_less' : 'expand_more' }}
                   </span>
                 </button>
@@ -254,26 +288,45 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
                 @if (expandedId() === workout.id) {
                   <div class="workout-detail">
                     @for (entry of workout.entries; track entry.exerciseId) {
-                      <div class="entry-row">
+                      <div class="entry-row" [style.--ec]="getEntryCatColor(entry)">
                         <div class="entry-name-row">
-                          <span class="entry-cat-dot" [style.background]="getEntryCatColor(entry)"></span>
+                          <span class="entry-cat-dot"></span>
                           <span class="entry-name">{{ entry.exerciseName }}</span>
                           @if (entry.feeling) {
                             <span class="entry-feeling">{{ getFeelingEmoji(entry.feeling) }}</span>
                           }
-                          @if (getMaxWeight(entry) > 0) {
-                            <span class="entry-max-weight">{{ dispW(getMaxWeight(entry)) }}<small> {{ unit() }}</small></span>
-                          }
                         </div>
                         @if (entry.sets.length > 0) {
-                          <div class="sets-list">
-                            @for (set of entry.sets; track $index) {
-                              <div class="set-row" [class.set-row--max]="isMaxSet(entry, set)">
-                                <span class="set-row-num">{{ $index + 1 }}</span>
-                                <span class="set-row-weight">{{ dispW(set.weight) }}<small> {{ unit() }}</small></span>
-                                <span class="set-row-reps">×{{ set.reps }}</span>
+                          <div class="entry-body">
+                            <div class="entry-sets-col">
+                              @for (set of entry.sets; track $index) {
+                                <div class="entry-set-line" [class.entry-set-line--max]="isMaxSet(entry, set)">
+                                  <span class="esl-num">{{ $index + 1 }}</span>
+                                  <span class="esl-weight">{{ dispW(set.weight) }}<small>{{ unit() }}</small></span>
+                                  <span class="esl-x">×</span>
+                                  <span class="esl-reps">{{ set.reps }}</span>
+                                  @if (isMaxSet(entry, set)) { <span class="esl-pr">PR</span> }
+                                </div>
+                              }
+                            </div>
+                            <div class="entry-stats-col">
+                              <div class="entry-stat">
+                                <span class="es-label">Màx</span>
+                                <span class="es-value">{{ dispW(getMaxWeight(entry)) }}<small>{{ unit() }}</small></span>
                               </div>
-                            }
+                              <div class="entry-stat">
+                                <span class="es-label">Sèries</span>
+                                <span class="es-value">{{ entry.sets.length }}</span>
+                              </div>
+                              <div class="entry-stat">
+                                <span class="es-label">Reps</span>
+                                <span class="es-value">{{ totalReps(entry) }}</span>
+                              </div>
+                              <div class="entry-stat">
+                                <span class="es-label">Volum</span>
+                                <span class="es-value">{{ dispW(entryVolume(entry)) }}<small>{{ unit() }}</small></span>
+                              </div>
+                            </div>
                           </div>
                         } @else {
                           <span class="no-sets">Cap sèrie registrada</span>
@@ -445,21 +498,61 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
     .ex-detail-panel {
       margin: 0 14px 14px;
       background: var(--c-subtle); border-radius: 12px; overflow: hidden;
+      border-left: 3px solid color-mix(in srgb, var(--ec, var(--c-brand)) 70%, transparent);
     }
-    .ex-sets-row {
-      display: flex; flex-wrap: wrap; gap: 6px;
-      padding: 12px 14px 10px;
+    .ex-detail-body {
+      display: grid; grid-template-columns: 1fr auto; gap: 14px;
+      padding: 12px 14px;
     }
-    .ex-set-pill {
-      display: flex; align-items: center; gap: 4px;
-      padding: 5px 10px; background: var(--c-card); border-radius: 20px;
-      box-shadow: 0 1px 4px var(--c-shadow);
+    .ex-sets-col {
+      display: flex; flex-direction: column; gap: 3px; min-width: 0;
     }
-    .ex-set-num { font-size: 10px; font-weight: 600; color: var(--c-text-3); min-width: 12px; }
-    .ex-set-weight { font-size: 13px; font-weight: 700; color: var(--c-text); }
-    .ex-set-weight small { font-size: 9px; font-weight: 400; color: var(--c-text-2); }
-    .ex-set-reps { font-size: 12px; color: var(--c-text-2); }
-    .ex-set-pill--max .ex-set-weight { font-weight: 800; color: var(--c-brand); }
+    .ex-set-line {
+      display: grid;
+      grid-template-columns: 18px 1fr auto auto auto;
+      align-items: baseline; gap: 6px;
+      padding: 5px 8px; border-radius: 8px;
+      background: var(--c-card);
+      box-shadow: 0 1px 2px var(--c-shadow);
+      transition: background 0.15s, transform 0.15s;
+    }
+    .ex-set-line--max {
+      background: color-mix(in srgb, var(--ec, var(--c-brand)) 10%, var(--c-card));
+      box-shadow: 0 1px 4px color-mix(in srgb, var(--ec, var(--c-brand)) 18%, transparent);
+    }
+    .exs-num { font-size: 10px; font-weight: 700; color: var(--c-text-3); text-align: right; }
+    .exs-weight {
+      font-size: 14px; font-weight: 800; color: var(--c-text);
+      small { font-size: 9px; font-weight: 400; color: var(--c-text-3); margin-left: 1px; }
+    }
+    .ex-set-line--max .exs-weight {
+      color: color-mix(in srgb, var(--ec, var(--c-brand)) 80%, var(--c-text));
+    }
+    .exs-x { font-size: 11px; color: var(--c-text-3); }
+    .exs-reps { font-size: 13px; font-weight: 600; color: var(--c-text-2); }
+    .exs-pr {
+      font-size: 9px; font-weight: 800; letter-spacing: 0.3px;
+      color: #b88500; background: rgba(255, 193, 7, 0.2);
+      padding: 1px 6px; border-radius: 6px; line-height: 1.3;
+    }
+    .ex-stats-col {
+      display: flex; flex-direction: column; gap: 5px;
+      min-width: 110px; flex-shrink: 0;
+    }
+    .ex-stat {
+      display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+      padding: 6px 10px; border-radius: 8px;
+      background: var(--c-card);
+      border: 1px solid var(--c-border-2);
+    }
+    .exs-label {
+      font-size: 9px; font-weight: 700; color: var(--c-text-3);
+      text-transform: uppercase; letter-spacing: 0.4px;
+    }
+    .exs-value {
+      font-size: 13px; font-weight: 800; color: var(--c-text);
+      small { font-size: 9px; font-weight: 400; color: var(--c-text-3); margin-left: 1px; }
+    }
     .ex-card-analysis { border-top: 1px solid var(--c-hover); }
 
     /* ════════════════════════════════
@@ -530,76 +623,155 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
 
     .workout-card {
       position: relative;
-      background: var(--c-card); border-radius: 14px;
+      border: 1.5px solid color-mix(in srgb, var(--wc, var(--c-border-2)) 30%, var(--c-border-2));
+      border-radius: 14px;
+      background: color-mix(in srgb, var(--wc, var(--c-card)) 6%, var(--c-card));
       box-shadow: 0 2px 8px var(--c-shadow); overflow: hidden;
-      transition: box-shadow 0.2s; margin-bottom: 8px;
-      &.expanded { box-shadow: 0 4px 16px var(--c-shadow-md); }
+      transition: box-shadow 0.2s, border-color 0.2s, background 0.2s; margin-bottom: 8px;
+      &:hover {
+        box-shadow: 0 3px 12px var(--c-shadow-md);
+        background: color-mix(in srgb, var(--wc, var(--c-card)) 10%, var(--c-card));
+        border-color: color-mix(in srgb, var(--wc, var(--c-border)) 45%, var(--c-border));
+      }
+      &.expanded {
+        box-shadow: 0 4px 16px var(--c-shadow-md);
+        border-color: color-mix(in srgb, var(--wc, var(--c-border)) 55%, var(--c-border));
+      }
     }
 
-    .workout-card-stripe {
-      position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+    .wc-bar {
+      position: absolute; left: 0; top: 0; bottom: 0; width: 5px;
     }
 
     .workout-header {
       display: flex; align-items: center; gap: 12px; width: 100%;
-      padding: 13px 12px 13px 18px; border: none; background: transparent;
-      cursor: pointer; text-align: left;
-      &:hover { background: var(--c-hover); }
+      padding: 11px 10px 11px 17px; border: none; background: transparent;
+      cursor: pointer; text-align: left; touch-action: manipulation;
     }
 
-    .workout-date-block {
-      display: flex; flex-direction: column; align-items: center;
-      min-width: 38px; flex-shrink: 0;
-      .weekday { font-size: 9px; font-weight: 700; color: var(--c-brand); text-transform: uppercase; letter-spacing: 0.04em; line-height: 1; }
-      .day { font-size: 22px; font-weight: 800; color: var(--c-text); line-height: 1.1; }
-      .month-year { font-size: 9px; color: var(--c-text-3); text-transform: uppercase; margin-top: 1px; }
+    .wh-date-block {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-width: 42px; flex-shrink: 0;
+      padding: 4px 8px 4px 0;
+      border-right: 1px solid color-mix(in srgb, var(--wc, var(--c-border-2)) 22%, var(--c-border-2));
+      .wh-weekday {
+        font-size: 9px; font-weight: 700;
+        color: color-mix(in srgb, var(--wc, var(--c-brand)) 80%, var(--c-text-2));
+        text-transform: uppercase; letter-spacing: 0.06em; line-height: 1;
+      }
+      .wh-day { font-size: 22px; font-weight: 800; color: var(--c-text); line-height: 1.1; }
+      .wh-month {
+        font-size: 9px; color: var(--c-text-3);
+        text-transform: uppercase; letter-spacing: 0.04em; margin-top: 1px;
+      }
     }
 
-    .workout-summary { flex: 1; display: flex; flex-direction: column; gap: 4px; }
-    .exercise-names { font-size: 13px; font-weight: 600; color: var(--c-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .workout-stats { font-size: 11px; color: var(--c-text-3); }
-
-    .workout-badges-row { display: flex; flex-wrap: wrap; gap: 4px; }
-    .workout-type-badge {
+    .wh-content {
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .wh-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+    .wh-badge {
       display: inline-block; padding: 2px 8px; border-radius: 8px;
-      font-size: 11px; font-weight: 600; color: white;
+      font-size: 10px; font-weight: 700; color: white; letter-spacing: 0.2px;
+      line-height: 1.4;
     }
-    .workout-hybrid-badge {
+    .wh-badge--hybrid {
       background: linear-gradient(90deg, #ef5350 0%, #9c27b0 50%, #2196f3 100%) !important;
     }
+    .wh-exercises {
+      font-size: 13px; font-weight: 700; color: var(--c-text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      line-height: 1.3;
+    }
+    .wh-stats {
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+      font-size: 11px; color: var(--c-text-3); font-weight: 500;
+      margin-top: 1px;
+    }
+    .wh-stat {
+      display: inline-flex; align-items: center; gap: 3px;
+      .material-symbols-outlined { font-size: 13px; color: color-mix(in srgb, var(--wc, var(--c-text-3)) 60%, var(--c-text-3)); }
+      strong { font-weight: 700; color: var(--c-text-2); }
+    }
+    .wh-stat-sep { color: var(--c-border); }
 
-    .chevron { color: var(--c-text-3); font-size: 20px; flex-shrink: 0; }
+    .wh-chevron {
+      color: var(--c-text-3); font-size: 22px; flex-shrink: 0;
+      transition: transform 0.2s ease, color 0.2s;
+      .workout-card.expanded & { color: color-mix(in srgb, var(--wc, var(--c-brand)) 70%, var(--c-text-2)); }
+    }
 
     .workout-detail {
-      border-top: 1px solid var(--c-border-2); padding: 12px 14px 12px 18px;
+      border-top: 1px solid color-mix(in srgb, var(--wc, var(--c-border-2)) 18%, var(--c-border-2));
+      background: var(--c-card);
+      padding: 12px 14px 12px 17px;
       display: flex; flex-direction: column; gap: 14px;
     }
 
     .entry-row {
-      display: flex; flex-direction: column; gap: 6px;
+      display: flex; flex-direction: column; gap: 8px;
       padding-bottom: 12px; border-bottom: 1px solid var(--c-border-2);
       &:last-child { border-bottom: none; padding-bottom: 0; }
     }
     .entry-name-row { display: flex; align-items: center; gap: 7px; }
-    .entry-cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-    .entry-name { font-size: 13px; font-weight: 600; color: var(--c-text); flex: 1; }
+    .entry-cat-dot {
+      width: 4px; height: 16px; border-radius: 2px; flex-shrink: 0;
+      background: var(--ec, var(--c-border));
+    }
+    .entry-name { font-size: 13px; font-weight: 700; color: var(--c-text); flex: 1; line-height: 1.25; }
     .entry-feeling { font-size: 16px; line-height: 1; }
-    .entry-max-weight {
-      font-size: 12px; font-weight: 700; color: var(--c-brand);
-      small { font-weight: 400; color: var(--c-text-3); }
+    .entry-body {
+      display: grid; grid-template-columns: 1fr auto; gap: 14px;
+      padding-left: 11px;
     }
-    .sets-list { display: flex; flex-direction: column; gap: 3px; padding-left: 15px; }
-    .set-row {
-      display: flex; align-items: baseline; gap: 8px;
+    .entry-sets-col {
+      display: flex; flex-direction: column; gap: 2px;
+      min-width: 0;
     }
-    .set-row-num { font-size: 10px; font-weight: 600; color: var(--c-text-3); min-width: 14px; }
-    .set-row-weight {
-      font-size: 13px; font-weight: 600; color: var(--c-text);
-      small { font-size: 10px; font-weight: 400; color: var(--c-text-3); }
+    .entry-set-line {
+      display: grid;
+      grid-template-columns: 16px 1fr auto auto auto;
+      align-items: baseline; gap: 5px;
+      padding: 3px 6px; border-radius: 6px;
+      transition: background 0.15s;
     }
-    .set-row-reps { font-size: 12px; color: var(--c-text-2); }
-    .set-row--max .set-row-weight { font-weight: 800; color: var(--c-brand); }
-    .no-sets { font-size: 12px; color: var(--c-text-3); font-style: italic; padding-left: 15px; }
+    .entry-set-line--max {
+      background: color-mix(in srgb, var(--ec, var(--c-brand)) 8%, transparent);
+    }
+    .esl-num { font-size: 10px; font-weight: 700; color: var(--c-text-3); text-align: right; }
+    .esl-weight {
+      font-size: 13px; font-weight: 700; color: var(--c-text);
+      small { font-size: 9px; font-weight: 400; color: var(--c-text-3); margin-left: 1px; }
+    }
+    .esl-x { font-size: 11px; color: var(--c-text-3); }
+    .esl-reps { font-size: 12px; font-weight: 600; color: var(--c-text-2); }
+    .esl-pr {
+      font-size: 9px; font-weight: 800; letter-spacing: 0.3px;
+      color: #b88500; background: rgba(255, 193, 7, 0.18);
+      padding: 1px 6px; border-radius: 6px; line-height: 1.3;
+    }
+    .entry-set-line--max .esl-weight {
+      color: color-mix(in srgb, var(--ec, var(--c-brand)) 75%, var(--c-text));
+    }
+    .entry-stats-col {
+      display: flex; flex-direction: column; gap: 4px;
+      min-width: 96px; flex-shrink: 0;
+    }
+    .entry-stat {
+      display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+      padding: 4px 8px; border-radius: 6px;
+      background: var(--c-subtle);
+    }
+    .es-label {
+      font-size: 9px; font-weight: 700; color: var(--c-text-3);
+      text-transform: uppercase; letter-spacing: 0.4px;
+    }
+    .es-value {
+      font-size: 12px; font-weight: 800; color: var(--c-text);
+      small { font-size: 9px; font-weight: 400; color: var(--c-text-3); margin-left: 1px; }
+    }
+    .no-sets { font-size: 12px; color: var(--c-text-3); font-style: italic; padding-left: 12px; }
     .workout-notes {
       display: flex; align-items: flex-start; gap: 6px;
       font-size: 12px; color: var(--c-text-2); font-style: italic;
@@ -645,21 +817,22 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
     .sk-list { margin: 0 16px; display: flex; flex-direction: column; gap: 8px; }
     .sk-workout-card {
       position: relative;
-      background: white; border-radius: 14px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.07); overflow: hidden;
+      background: var(--c-card); border-radius: 14px;
+      border: 1.5px solid var(--c-border-2);
+      box-shadow: 0 2px 8px var(--c-shadow); overflow: hidden;
     }
-    .sk-stripe { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; border-radius: 0; }
+    .sk-stripe { position: absolute; left: 0; top: 0; bottom: 0; width: 5px; border-radius: 0; }
     .sk-card-row {
       display: flex; align-items: center; gap: 12px;
-      padding: 13px 12px 13px 18px;
+      padding: 11px 10px 11px 17px;
     }
-    .sk-date { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 36px; flex-shrink: 0; }
+    .sk-date { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 42px; flex-shrink: 0; }
     .sk-day   { width: 24px; height: 22px; }
     .sk-month { width: 32px; height: 9px; }
     .sk-summary { flex: 1; display: flex; flex-direction: column; gap: 6px; }
-    .sk-badge { width: 52px; height: 18px; border-radius: 8px; }
-    .sk-text  { width: 40%; height: 12px; }
-    .sk-chevron-ph { width: 20px; height: 20px; border-radius: 4px; flex-shrink: 0; }
+    .sk-badge { width: 52px; height: 16px; border-radius: 8px; }
+    .sk-text  { width: 60%; height: 12px; }
+    .sk-chevron-ph { width: 22px; height: 22px; border-radius: 4px; flex-shrink: 0; }
   `],
 })
 export class HistoryComponent {
@@ -760,6 +933,11 @@ export class HistoryComponent {
     return `linear-gradient(180deg, ${stops})`;
   }
 
+  getWorkoutPrimaryColor(workout: Workout): string {
+    const cats = workout.categories?.length ? workout.categories : (workout.category ? [workout.category] : []);
+    return cats.length > 0 ? this.getCatColor(cats[0]) : 'var(--c-border-2)';
+  }
+
   getFeelingEmoji(level: FeelingLevel): string { return FEELING_EMOJI[level]; }
   getCatColor(cat: string): string { return CATEGORY_COLORS[cat as ExerciseCategory] ?? '#bbb'; }
   getCatLabel(cat: string): string { return CATEGORY_LABELS[cat as ExerciseCategory] ?? cat; }
@@ -777,6 +955,12 @@ export class HistoryComponent {
   getMaxWeight(entry: WorkoutEntry): number {
     if (!entry.sets.length) return 0;
     return Math.max(...entry.sets.map(s => s.weight));
+  }
+  totalReps(entry: WorkoutEntry): number {
+    return entry.sets.reduce((s, set) => s + set.reps, 0);
+  }
+  entryVolume(entry: WorkoutEntry): number {
+    return Math.round(entry.sets.reduce((s, set) => s + set.weight * set.reps, 0));
   }
 
   getDay(date: string): string {
