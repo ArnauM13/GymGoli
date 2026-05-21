@@ -178,6 +178,52 @@ describe('HistoryComponent', () => {
     });
   });
 
+  // ── selectExercise() ────────────────────────────────────────────────────
+
+  describe('selectExercise()', () => {
+    it('sets selectedExerciseId', () => {
+      component.selectExercise('ex1');
+      expect(component.selectedExerciseId()).toBe('ex1');
+    });
+
+    it('collapses when the same id is selected again', () => {
+      component.selectExercise('ex1');
+      component.selectExercise('ex1');
+      expect(component.selectedExerciseId()).toBeNull();
+    });
+
+    it('switches to a different exercise', () => {
+      component.selectExercise('ex1');
+      component.selectExercise('ex2');
+      expect(component.selectedExerciseId()).toBe('ex2');
+    });
+  });
+
+  // ── getEntrySubLabel() ──────────────────────────────────────────────────
+
+  describe('getEntrySubLabel()', () => {
+    it('returns empty string when exercise is not found', () => {
+      const entry: WorkoutEntry = { exerciseId: 'unknown', exerciseName: 'X', sets: [] };
+      expect(component.getEntrySubLabel(entry)).toBe('');
+    });
+
+    it('returns the subcategory label when exercise has a subcategory', () => {
+      const mockExercise = { category: 'push', subcategory: 'chest' };
+      const exSvc = TestBed.inject(ExerciseService) as any;
+      exSvc.getById.and.returnValue(mockExercise);
+      const entry: WorkoutEntry = { exerciseId: 'chest1', exerciseName: 'Press banca', sets: [] };
+      expect(component.getEntrySubLabel(entry)).toBe('Pit');
+    });
+
+    it('returns empty string when exercise has no subcategory', () => {
+      const mockExercise = { category: 'push' };
+      const exSvc = TestBed.inject(ExerciseService) as any;
+      exSvc.getById.and.returnValue(mockExercise);
+      const entry: WorkoutEntry = { exerciseId: 'push1', exerciseName: 'Custom', sets: [] };
+      expect(component.getEntrySubLabel(entry)).toBe('');
+    });
+  });
+
   // ── selectDate() ─────────────────────────────────────────────────────────
 
   describe('selectDate()', () => {
