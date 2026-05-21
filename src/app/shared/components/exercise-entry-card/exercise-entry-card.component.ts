@@ -20,7 +20,7 @@ import { kgToDisplay } from '../../utils/weight.utils';
       <div class="eec-card" [class.eec-card--open]="!collapsed()">
 
         <!-- ── Header (always visible, same look as history ex-card) ── -->
-        <div class="eec-header" [class.eec-header--minimal]="collapsed() && hideMetaWhenCollapsed()" (click)="headerClick.emit()">
+        <div class="eec-header" [class.eec-header--minimal]="hideMetaWhenCollapsed()" (click)="headerClick.emit()">
           <div class="eec-bar"></div>
           <div class="eec-body">
             <span class="eec-name">{{ entry().exerciseName }}</span>
@@ -187,9 +187,7 @@ import { kgToDisplay } from '../../utils/weight.utils';
     .eec-chevron--big { font-size: 28px; }
     .eec-card--open .eec-chevron { color: var(--cat); }
 
-    .eec-header--minimal {
-      min-height: 54px; padding: 4px 0;
-    }
+    .eec-header--minimal { min-height: 54px; }
 
     /* Grid-rows collapse animation */
     .eec-expanded {
