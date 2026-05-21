@@ -126,6 +126,14 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
                 }
               </div>
 
+              <!-- Hint quan cap exercici seleccionat -->
+              @if (!selectedExerciseId()) {
+                <div class="ex-hint-panel">
+                  <span class="material-symbols-outlined ex-hint-icon">touch_app</span>
+                  <p class="ex-hint-text">Clica un exercici per veure les gràfiques</p>
+                </div>
+              }
+
               <!-- Detall de l'exercici seleccionat (mateix format que la llista) -->
               @if (selectedExerciseId() && selectedEntry(); as e) {
                 <div class="ex-detail-panel" [style.--ec]="getEntryCatColor(e)">
@@ -414,8 +422,8 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
 
     /* Exercise list (compact vertical rows) */
     .ex-grid {
-      display: flex; flex-direction: column; gap: 6px;
-      padding: 10px 14px;
+      display: flex; flex-direction: column; gap: 8px;
+      padding: 12px 14px;
     }
 
     .ex-card {
@@ -444,31 +452,45 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
     .ex-card-body {
       flex: 1; min-width: 0;
       display: flex; align-items: center; gap: 8px;
-      padding: 9px 10px 9px 11px;
+      padding: 13px 10px 13px 12px;
     }
     .ex-card-name {
       flex: 1; min-width: 0;
-      font-size: 13px; font-weight: 700; color: var(--c-text);
+      font-size: 14px; font-weight: 700; color: var(--c-text);
       line-height: 1.3;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .ex-card-feeling { font-size: 15px; line-height: 1; flex-shrink: 0; }
+    .ex-card-feeling { font-size: 16px; line-height: 1; flex-shrink: 0; }
     .ex-card-max {
-      font-size: 14px; font-weight: 800; color: var(--cat); line-height: 1;
+      font-size: 15px; font-weight: 800; color: var(--cat); line-height: 1;
       flex-shrink: 0;
       small { font-size: 10px; font-weight: 500; color: var(--c-text-2); margin-left: 1px; }
     }
     .ex-card-sets-badge {
-      font-size: 10px; font-weight: 700; color: var(--c-text-2);
-      padding: 2px 7px; border-radius: 10px;
+      font-size: 11px; font-weight: 700; color: var(--c-text-2);
+      padding: 3px 8px; border-radius: 10px;
       background: color-mix(in srgb, var(--cat) 10%, var(--c-card));
       border: 1px solid color-mix(in srgb, var(--cat) 22%, var(--c-border-2));
       line-height: 1.3; flex-shrink: 0;
     }
     .ex-card-chevron {
-      font-size: 18px; color: var(--c-text-3); flex-shrink: 0;
-      align-self: center; padding-right: 8px;
+      font-size: 20px; color: var(--c-text-3); flex-shrink: 0;
+      align-self: center; padding-right: 10px;
       transition: color 0.15s;
+    }
+
+    /* Hint panel (no exercise selected yet) */
+    .ex-hint-panel {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 8px; padding: 20px 16px 24px;
+      text-align: center;
+    }
+    .ex-hint-icon {
+      font-size: 32px; color: var(--c-text-3);
+      font-variation-settings: 'FILL' 0;
+    }
+    .ex-hint-text {
+      margin: 0; font-size: 13px; color: var(--c-text-2); line-height: 1.4;
     }
     .ex-card.active .ex-card-chevron {
       color: var(--cat);
