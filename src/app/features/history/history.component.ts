@@ -221,32 +221,44 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
         @if (filteredWorkouts().length > 0) {
           <div class="workout-list-wrap">
             @for (workout of filteredWorkouts(); track workout.id) {
-              <div class="workout-card" [class.expanded]="expandedId() === workout.id">
+              <div class="workout-card" [class.expanded]="expandedId() === workout.id"
+                   [style.--wc]="getWorkoutPrimaryColor(workout)">
 
-                <!-- Color stripe lateral -->
-                <div class="workout-card-stripe" [style.background]="getWorkoutStripe(workout)"></div>
+                <div class="wc-bar" [style.background]="getWorkoutStripe(workout)"></div>
 
                 <button class="workout-header" (click)="toggleExpanded(workout.id)">
-                  <div class="workout-date-block">
-                    <span class="weekday">{{ getWeekday(workout.date) }}</span>
-                    <span class="day">{{ getDay(workout.date) }}</span>
-                    <span class="month-year">{{ getMonthYear(workout.date) }}</span>
+                  <div class="wh-date-block">
+                    <span class="wh-weekday">{{ getWeekday(workout.date) }}</span>
+                    <span class="wh-day">{{ getDay(workout.date) }}</span>
+                    <span class="wh-month">{{ getMonthYear(workout.date) }}</span>
                   </div>
-                  <div class="workout-summary">
+
+                  <div class="wh-content">
                     @if ((workout.categories ?? (workout.category ? [workout.category] : [])).length > 0) {
-                      <div class="workout-badges-row">
+                      <div class="wh-badges">
                         @for (cat of (workout.categories ?? (workout.category ? [workout.category] : [])); track cat) {
-                          <span class="workout-type-badge" [style.background]="getCatColor(cat)">{{ getCatLabel(cat) }}</span>
+                          <span class="wh-badge" [style.background]="getCatColor(cat)">{{ getCatLabel(cat) }}</span>
                         }
                         @if ((workout.categories ?? []).length > 1) {
-                          <span class="workout-type-badge workout-hybrid-badge">Híbrid</span>
+                          <span class="wh-badge wh-badge--hybrid">Híbrid</span>
                         }
                       </div>
                     }
-                    <span class="exercise-names">{{ getExerciseNames(workout) }}</span>
-                    <span class="workout-stats">{{ totalSets(workout) }} sèries · {{ dispW(totalVolume(workout)) }} {{ unit() }}</span>
+                    <span class="wh-exercises">{{ getExerciseNames(workout) }}</span>
+                    <div class="wh-stats">
+                      <span class="wh-stat">
+                        <span class="material-symbols-outlined">repeat</span>
+                        <strong>{{ totalSets(workout) }}</strong> sèr
+                      </span>
+                      <span class="wh-stat-sep">·</span>
+                      <span class="wh-stat">
+                        <span class="material-symbols-outlined">monitoring</span>
+                        <strong>{{ dispW(totalVolume(workout)) }}</strong> {{ unit() }}
+                      </span>
+                    </div>
                   </div>
-                  <span class="material-symbols-outlined chevron">
+
+                  <span class="material-symbols-outlined wh-chevron">
                     {{ expandedId() === workout.id ? 'expand_less' : 'expand_more' }}
                   </span>
                 </button>
@@ -530,48 +542,89 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
 
     .workout-card {
       position: relative;
-      background: var(--c-card); border-radius: 14px;
+      border: 1.5px solid color-mix(in srgb, var(--wc, var(--c-border-2)) 30%, var(--c-border-2));
+      border-radius: 14px;
+      background: color-mix(in srgb, var(--wc, var(--c-card)) 6%, var(--c-card));
       box-shadow: 0 2px 8px var(--c-shadow); overflow: hidden;
-      transition: box-shadow 0.2s; margin-bottom: 8px;
-      &.expanded { box-shadow: 0 4px 16px var(--c-shadow-md); }
+      transition: box-shadow 0.2s, border-color 0.2s, background 0.2s; margin-bottom: 8px;
+      &:hover {
+        box-shadow: 0 3px 12px var(--c-shadow-md);
+        background: color-mix(in srgb, var(--wc, var(--c-card)) 10%, var(--c-card));
+        border-color: color-mix(in srgb, var(--wc, var(--c-border)) 45%, var(--c-border));
+      }
+      &.expanded {
+        box-shadow: 0 4px 16px var(--c-shadow-md);
+        border-color: color-mix(in srgb, var(--wc, var(--c-border)) 55%, var(--c-border));
+      }
     }
 
-    .workout-card-stripe {
-      position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+    .wc-bar {
+      position: absolute; left: 0; top: 0; bottom: 0; width: 5px;
     }
 
     .workout-header {
       display: flex; align-items: center; gap: 12px; width: 100%;
-      padding: 13px 12px 13px 18px; border: none; background: transparent;
-      cursor: pointer; text-align: left;
-      &:hover { background: var(--c-hover); }
+      padding: 11px 10px 11px 17px; border: none; background: transparent;
+      cursor: pointer; text-align: left; touch-action: manipulation;
     }
 
-    .workout-date-block {
-      display: flex; flex-direction: column; align-items: center;
-      min-width: 38px; flex-shrink: 0;
-      .weekday { font-size: 9px; font-weight: 700; color: var(--c-brand); text-transform: uppercase; letter-spacing: 0.04em; line-height: 1; }
-      .day { font-size: 22px; font-weight: 800; color: var(--c-text); line-height: 1.1; }
-      .month-year { font-size: 9px; color: var(--c-text-3); text-transform: uppercase; margin-top: 1px; }
+    .wh-date-block {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-width: 42px; flex-shrink: 0;
+      padding: 4px 8px 4px 0;
+      border-right: 1px solid color-mix(in srgb, var(--wc, var(--c-border-2)) 22%, var(--c-border-2));
+      .wh-weekday {
+        font-size: 9px; font-weight: 700;
+        color: color-mix(in srgb, var(--wc, var(--c-brand)) 80%, var(--c-text-2));
+        text-transform: uppercase; letter-spacing: 0.06em; line-height: 1;
+      }
+      .wh-day { font-size: 22px; font-weight: 800; color: var(--c-text); line-height: 1.1; }
+      .wh-month {
+        font-size: 9px; color: var(--c-text-3);
+        text-transform: uppercase; letter-spacing: 0.04em; margin-top: 1px;
+      }
     }
 
-    .workout-summary { flex: 1; display: flex; flex-direction: column; gap: 4px; }
-    .exercise-names { font-size: 13px; font-weight: 600; color: var(--c-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .workout-stats { font-size: 11px; color: var(--c-text-3); }
-
-    .workout-badges-row { display: flex; flex-wrap: wrap; gap: 4px; }
-    .workout-type-badge {
+    .wh-content {
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .wh-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+    .wh-badge {
       display: inline-block; padding: 2px 8px; border-radius: 8px;
-      font-size: 11px; font-weight: 600; color: white;
+      font-size: 10px; font-weight: 700; color: white; letter-spacing: 0.2px;
+      line-height: 1.4;
     }
-    .workout-hybrid-badge {
+    .wh-badge--hybrid {
       background: linear-gradient(90deg, #ef5350 0%, #9c27b0 50%, #2196f3 100%) !important;
     }
+    .wh-exercises {
+      font-size: 13px; font-weight: 700; color: var(--c-text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      line-height: 1.3;
+    }
+    .wh-stats {
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+      font-size: 11px; color: var(--c-text-3); font-weight: 500;
+      margin-top: 1px;
+    }
+    .wh-stat {
+      display: inline-flex; align-items: center; gap: 3px;
+      .material-symbols-outlined { font-size: 13px; color: color-mix(in srgb, var(--wc, var(--c-text-3)) 60%, var(--c-text-3)); }
+      strong { font-weight: 700; color: var(--c-text-2); }
+    }
+    .wh-stat-sep { color: var(--c-border); }
 
-    .chevron { color: var(--c-text-3); font-size: 20px; flex-shrink: 0; }
+    .wh-chevron {
+      color: var(--c-text-3); font-size: 22px; flex-shrink: 0;
+      transition: transform 0.2s ease, color 0.2s;
+      .workout-card.expanded & { color: color-mix(in srgb, var(--wc, var(--c-brand)) 70%, var(--c-text-2)); }
+    }
 
     .workout-detail {
-      border-top: 1px solid var(--c-border-2); padding: 12px 14px 12px 18px;
+      border-top: 1px solid color-mix(in srgb, var(--wc, var(--c-border-2)) 18%, var(--c-border-2));
+      background: var(--c-card);
+      padding: 12px 14px 12px 17px;
       display: flex; flex-direction: column; gap: 14px;
     }
 
@@ -645,21 +698,22 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
     .sk-list { margin: 0 16px; display: flex; flex-direction: column; gap: 8px; }
     .sk-workout-card {
       position: relative;
-      background: white; border-radius: 14px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.07); overflow: hidden;
+      background: var(--c-card); border-radius: 14px;
+      border: 1.5px solid var(--c-border-2);
+      box-shadow: 0 2px 8px var(--c-shadow); overflow: hidden;
     }
-    .sk-stripe { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; border-radius: 0; }
+    .sk-stripe { position: absolute; left: 0; top: 0; bottom: 0; width: 5px; border-radius: 0; }
     .sk-card-row {
       display: flex; align-items: center; gap: 12px;
-      padding: 13px 12px 13px 18px;
+      padding: 11px 10px 11px 17px;
     }
-    .sk-date { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 36px; flex-shrink: 0; }
+    .sk-date { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 42px; flex-shrink: 0; }
     .sk-day   { width: 24px; height: 22px; }
     .sk-month { width: 32px; height: 9px; }
     .sk-summary { flex: 1; display: flex; flex-direction: column; gap: 6px; }
-    .sk-badge { width: 52px; height: 18px; border-radius: 8px; }
-    .sk-text  { width: 40%; height: 12px; }
-    .sk-chevron-ph { width: 20px; height: 20px; border-radius: 4px; flex-shrink: 0; }
+    .sk-badge { width: 52px; height: 16px; border-radius: 8px; }
+    .sk-text  { width: 60%; height: 12px; }
+    .sk-chevron-ph { width: 22px; height: 22px; border-radius: 4px; flex-shrink: 0; }
   `],
 })
 export class HistoryComponent {
@@ -758,6 +812,11 @@ export class HistoryComponent {
       return `${this.getCatColor(c)} ${p1}% ${p2}%`;
     }).join(', ');
     return `linear-gradient(180deg, ${stops})`;
+  }
+
+  getWorkoutPrimaryColor(workout: Workout): string {
+    const cats = workout.categories?.length ? workout.categories : (workout.category ? [workout.category] : []);
+    return cats.length > 0 ? this.getCatColor(cats[0]) : 'var(--c-border-2)';
   }
 
   getFeelingEmoji(level: FeelingLevel): string { return FEELING_EMOJI[level]; }
