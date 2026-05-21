@@ -22,7 +22,6 @@ const GOAL_REC: Record<FitnessGoal, { sets: number; reps: number }> = {
 
 // Module-level: persists collapsed/done state per workout for the entire browser session
 const _collapsedByWorkout = new Map<string, Set<string>>();
-const _doneByWorkout      = new Map<string, Set<string>>();
 
 @Component({
   selector: 'app-workout-editor',
@@ -37,7 +36,7 @@ const _doneByWorkout      = new Map<string, Set<string>>();
           <div class="we-entry-card"
                cdkDrag [cdkDragDisabled]="!editMode() && !alwaysEditable()"
                [style.--we-cat-color]="getCatColor(entry)"
-               [class.we-entry-done]="doneEntries().has(entry.exerciseId)">
+>
 
             <div class="we-drag-placeholder" *cdkDragPlaceholder></div>
 
@@ -63,14 +62,7 @@ const _doneByWorkout      = new Map<string, Set<string>>();
                       <span class="we-collapse-chevron material-symbols-outlined"
                             [class.rotated]="isCollapsed(entry.exerciseId)">expand_more</span>
                     </button>
-                    @if (alwaysEditable()) {
-                      <button type="button" class="we-icon-btn-sm we-done-btn"
-                        [class.we-done-btn--active]="doneEntries().has(entry.exerciseId)"
-                        [title]="doneEntries().has(entry.exerciseId) ? 'Desfer fet' : 'Marcar com a fet'"
-                        (click)="toggleDone(entry.exerciseId)">
-                        <span class="material-symbols-outlined">check_circle</span>
-                      </button>
-                    }
+
                     <button type="button" class="we-icon-btn-sm"
                       (click)="toggleEntryMenu(entry.exerciseId)" title="Més opcions">
                       <span class="material-symbols-outlined">more_vert</span>
@@ -493,31 +485,7 @@ const _doneByWorkout      = new Map<string, Set<string>>();
       &:hover { background: rgba(239,83,80,0.1); color: #ef5350; }
     }
 
-    .we-entry-done-btn {
-      background: rgba(var(--c-brand-rgb), 0.1) !important;
-      border-color: rgba(var(--c-brand-rgb), 0.3) !important;
-      color: var(--c-brand) !important;
-    }
 
-    /* ── Done button ── */
-    .we-done-btn { color: var(--c-text-3); }
-    .we-done-btn--active {
-      color: #4caf50 !important;
-      background: rgba(76,175,80,0.1) !important;
-      border-color: rgba(76,175,80,0.25) !important;
-      .material-symbols-outlined { font-variation-settings: 'FILL' 1; }
-    }
-
-    /* ── Done card state ── */
-    .we-entry-done {
-      border-left-color: #4caf50 !important;
-      background: color-mix(in srgb, #4caf50 4%, var(--c-card)) !important;
-      .we-entry-name {
-        color: var(--c-text-2);
-        text-decoration: line-through;
-        text-decoration-color: rgba(76,175,80,0.4);
-      }
-    }
 
     /* ── Fatiga popup ── */
     .we-fatiga-backdrop {
@@ -941,8 +909,6 @@ export class WorkoutEditorComponent implements OnDestroy {
     if (!id || !w) return null;
     return w.entries.find(e => e.exerciseId === id) ?? null;
   });
-  readonly doneEntries = signal<Set<string>>(new Set());
-
   // ── Rest timer ─────────────────────────────────────────────────────────────
   readonly timerActive    = signal(false);
   readonly timerRemaining = signal(0);
@@ -986,36 +952,12 @@ export class WorkoutEditorComponent implements OnDestroy {
           this.collapsedEntries.set(initial);
           _collapsedByWorkout.set(w.id, new Set(initial));
         }
-        this.doneEntries.set(new Set(_doneByWorkout.get(w.id) ?? []));
       });
     }, { allowSignalWrites: true });
   }
 
   isEntryEditable(exerciseId: string): boolean {
-    if (this.doneEntries().has(exerciseId)) return false;
     return this.editMode() || this.alwaysEditable();
-  }
-
-  toggleDone(id: string): void {
-    if (this.doneEntries().has(id)) { this.undoDone(id); } else { this.markDone(id); }
-  }
-
-  markDone(id: string): void {
-    const done = new Set(this.doneEntries()); done.add(id);
-    this.doneEntries.set(done);
-    const collapsed = new Set(this.collapsedEntries()); collapsed.add(id);
-    this.collapsedEntries.set(collapsed);
-    const wid = this.workout()?.id;
-    if (wid) { _doneByWorkout.set(wid, new Set(done)); _collapsedByWorkout.set(wid, new Set(collapsed)); }
-    this.addingFor.set(null); this.editingSet.set(null);
-  }
-
-  undoDone(id: string): void {
-    const done = new Set(this.doneEntries()); done.delete(id);
-    this.doneEntries.set(done);
-    const wid = this.workout()?.id;
-    if (wid) _doneByWorkout.set(wid, new Set(done));
-    this._expandEntry(id);
   }
 
   isCollapsed(id: string): boolean { return this.collapsedEntries().has(id); }
