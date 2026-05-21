@@ -35,10 +35,10 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
         @for (entry of w.entries; track entry.exerciseId) {
           <div class="we-entry-card"
                cdkDrag [cdkDragDisabled]="!editMode() && !alwaysEditable()"
-               [style.--we-cat-color]="getCatColor(entry)"
->
+               [style.--we-cat-color]="getCatColor(entry)">
 
             <div class="we-drag-placeholder" *cdkDragPlaceholder></div>
+            <div class="we-bar"></div>
 
             <!-- ── Entry header ── -->
             <div class="we-entry-header">
@@ -364,18 +364,24 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
     /* ── Entry card ── */
     .we-entry-card {
-      background: var(--c-card);
+      position: relative;
+      background: color-mix(in srgb, var(--we-cat-color, #ccc) 5%, var(--c-card));
       border-radius: 14px;
       box-shadow: 0 2px 8px var(--c-shadow);
       overflow: hidden;
-      border-left: 4px solid var(--we-cat-color, #ccc);
-      transition: box-shadow 0.2s, border-left-width 0.2s;
+      border: 1.5px solid color-mix(in srgb, var(--we-cat-color, #ccc) 25%, var(--c-border-2));
+      transition: box-shadow 0.2s, border-color 0.2s, background 0.2s;
+    }
+
+    .we-bar {
+      position: absolute; left: 0; top: 0; bottom: 0; width: 5px;
+      background: var(--we-cat-color, #ccc);
     }
 
     .we-entry-header {
       display: flex;
       align-items: flex-start;
-      padding: 10px 10px 10px 8px;
+      padding: 10px 10px 10px 16px;
       gap: 8px;
     }
 

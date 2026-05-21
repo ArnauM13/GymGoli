@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
+import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, SUBCATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
 import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry, WorkoutSet } from '../../core/models/workout.model';
 import { Sport, SportSubtype } from '../../core/models/sport.model';
 import { UserSettingsService } from '../../core/services/user-settings.service';
@@ -283,6 +283,10 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
                         <div class="entry-name-row">
                           <span class="entry-cat-dot"></span>
                           <span class="entry-name">{{ entry.exerciseName }}</span>
+                          @if (getEntrySubLabel(entry); as sub) {
+                            <span class="entry-sub-badge" [style.color]="getEntryCatColor(entry)"
+                                  [style.background]="'color-mix(in srgb, ' + getEntryCatColor(entry) + ' 12%, var(--c-card))'">{{ sub }}</span>
+                          }
                           @if (entry.feeling) {
                             <span class="entry-feeling">{{ getFeelingEmoji(entry.feeling) }}</span>
                           }
@@ -707,12 +711,17 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
       padding-bottom: 12px; border-bottom: 1px solid var(--c-border-2);
       &:last-child { border-bottom: none; padding-bottom: 0; }
     }
-    .entry-name-row { display: flex; align-items: center; gap: 7px; }
+    .entry-name-row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
     .entry-cat-dot {
       width: 4px; height: 16px; border-radius: 2px; flex-shrink: 0;
       background: var(--ec, var(--c-border));
     }
-    .entry-name { font-size: 13px; font-weight: 700; color: var(--c-text); flex: 1; line-height: 1.25; }
+    .entry-name { font-size: 13px; font-weight: 700; color: var(--c-text); flex: 1; min-width: 0; line-height: 1.25; }
+    .entry-sub-badge {
+      font-size: 10px; font-weight: 600;
+      padding: 1px 6px; border-radius: 8px; flex-shrink: 0;
+      line-height: 1.4;
+    }
     .entry-feeling { font-size: 16px; line-height: 1; }
     .entry-sets-col {
       display: flex; flex-direction: column; gap: 2px;
@@ -926,6 +935,10 @@ export class HistoryComponent {
   }
   getEntryCatColor(entry: WorkoutEntry): string {
     return CATEGORY_COLORS[this.getEntryCategory(entry)] ?? '#bbb';
+  }
+  getEntrySubLabel(entry: WorkoutEntry): string {
+    const sub = this.exerciseService.getById(entry.exerciseId)?.subcategory;
+    return sub ? (SUBCATEGORY_LABELS[sub] ?? sub) : '';
   }
   getMaxWeight(entry: WorkoutEntry): number {
     if (!entry.sets.length) return 0;

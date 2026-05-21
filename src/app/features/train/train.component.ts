@@ -45,27 +45,41 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       @if (activeWorkout(); as w) {
 
         <!-- ══ ACTIVE WORKOUT MODE ══ -->
-        <div class="workout-topbar">
+        <div class="workout-topbar" [style.--topbar-color]="workoutPrimaryColor(w)">
           <button class="topbar-back" (click)="closeWorkout()" title="Tornar">
             <span class="material-symbols-outlined">arrow_back_ios</span>
           </button>
           <div class="topbar-center">
-            <div class="topbar-badges">
-              @for (cat of activeWorkoutCategoryItems(); track cat.value) {
-                <span class="type-badge" [style.background]="cat.color">{{ cat.label }}</span>
-              }
-              @if (activeWorkoutCategoryItems().length > 1) {
-                <span class="hybrid-badge">Híbrid</span>
-              }
+            <div class="topbar-row1">
+              <div class="topbar-badges">
+                @for (cat of activeWorkoutCategoryItems(); track cat.value) {
+                  <span class="type-badge" [style.background]="cat.color">{{ cat.label }}</span>
+                }
+                @if (activeWorkoutCategoryItems().length > 1) {
+                  <span class="hybrid-badge">Híbrid</span>
+                }
+              </div>
+              <span class="topbar-date">{{ topbarDateLabel(w) }}</span>
             </div>
-            <span class="topbar-meta">
-              {{ topbarDateLabel(w) }}
-              @if (w.entries.length > 0) { · {{ w.entries.length }} exerc }
-            </span>
+            @if (w.entries.length > 0) {
+              <span class="topbar-exercises">{{ topbarExerciseNames(w) }}</span>
+            }
+            <div class="topbar-stats">
+              <span class="topbar-stat">
+                <span class="material-symbols-outlined">fitness_center</span>
+                <strong>{{ w.entries.length }}</strong> exerc
+              </span>
+              <span class="topbar-stat-sep">·</span>
+              <span class="topbar-stat">
+                <span class="material-symbols-outlined">repeat</span>
+                <strong>{{ topbarTotalSets(w) }}</strong> sèr
+              </span>
+            </div>
           </div>
           <button class="topbar-delete" (click)="deleteActiveWorkout()" title="Eliminar entrenament">
             <span class="material-symbols-outlined">delete</span>
           </button>
+          <div class="topbar-accent-bar"></div>
         </div>
 
         <app-workout-editor
@@ -516,13 +530,16 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     /* ── Workout topbar (active mode, sticky) ── */
     .workout-topbar {
-      position: sticky;
-      top: 0;
-      z-index: 10;
+      position: sticky; top: 0; z-index: 10;
       display: flex; align-items: center; gap: 8px;
-      padding: 10px 12px 12px;
+      padding: 10px 12px 14px;
       background: var(--c-card);
       box-shadow: 0 2px 8px var(--c-shadow);
+      position: relative;
+    }
+    .topbar-accent-bar {
+      position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
+      background: var(--topbar-color, var(--c-brand));
     }
     .topbar-back {
       width: 36px; height: 36px; border-radius: 50%; border: none;
@@ -534,14 +551,31 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
     .topbar-center {
       flex: 1; min-width: 0;
-      display: flex; flex-direction: column; gap: 2px;
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    .topbar-row1 {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
     }
     .topbar-badges {
       display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
     }
-    .topbar-meta {
-      font-size: 11px; color: var(--c-text-2); font-weight: 500;
+    .topbar-date {
+      font-size: 11px; font-weight: 600; color: var(--c-text-2); flex-shrink: 0;
     }
+    .topbar-exercises {
+      font-size: 12px; color: var(--c-text-2); font-weight: 500;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .topbar-stats {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 11px; color: var(--c-text-3);
+    }
+    .topbar-stat {
+      display: flex; align-items: center; gap: 2px;
+      .material-symbols-outlined { font-size: 11px; }
+      strong { color: var(--c-text-2); font-weight: 700; }
+    }
+    .topbar-stat-sep { color: var(--c-border); }
     .topbar-delete {
       width: 36px; height: 36px; border-radius: 50%; border: none;
       background: transparent; cursor: pointer; color: var(--c-text-3);
@@ -1460,6 +1494,16 @@ export class TrainComponent {
     const d = new Date(w.date + 'T12:00:00');
     if (w.date === this.selectedDate() && this.isToday()) return 'Avui';
     return d.toLocaleDateString('ca-ES', { weekday: 'short', day: 'numeric', month: 'short' });
+  }
+
+  topbarExerciseNames(w: Workout): string {
+    const names = w.entries.map(e => e.exerciseName);
+    const preview = names.slice(0, 3).join(', ');
+    return names.length > 3 ? preview + ` +${names.length - 3}` : preview;
+  }
+
+  topbarTotalSets(w: Workout): number {
+    return w.entries.reduce((acc, e) => acc + e.sets.length, 0);
   }
 
   workoutLabel(w: Workout): string {
