@@ -5,7 +5,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { CATEGORY_COLORS, CATEGORY_LABELS, SUBCATEGORY_LABELS } from '../../../core/models/exercise.model';
-import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry, WorkoutSet } from '../../../core/models/workout.model';
+import { FEELING_EMOJI, FEELING_LABEL, FeelingLevel, Workout, WorkoutEntry, WorkoutSet } from '../../../core/models/workout.model';
 import { FitnessGoal, FITNESS_GOAL_LABELS } from '../../../core/models/user-settings.model';
 import { ExerciseService } from '../../../core/services/exercise.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
@@ -42,8 +42,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
             [draggable]="editMode() || alwaysEditable()"
             [hideMetaWhenCollapsed]="true"
             [showSetsBadge]="false"
-            [maxWeight]="entryMaxWeight(entry)"
-            [unit]="unit()"
+            [prBadge]="prEntries().has(entry.exerciseId)"
             (headerClick)="toggleCollapse(entry.exerciseId)">
 
             <!-- ── Projected body content ──
@@ -210,15 +209,15 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
             <!-- ── Entry footer: feeling + stats + delete ── -->
             <div class="we-entry-footer">
               @if (alwaysEditable() || editMode()) {
-                <div class="we-footer-feeling">
-                  @for (level of feelingLevels3; track level) {
-                    <button type="button" class="we-footer-feeling-btn"
-                      [class.we-footer-feeling-btn--active]="entry.feeling === level"
-                      (click)="pickFeelingForEntry(entry, level)">
-                      {{ getFeelingEmoji(level) }}
-                    </button>
+                <button type="button" class="we-footer-feeling-btn"
+                  [class.we-footer-feeling-btn--set]="entry.feeling"
+                  (click)="openFatigaPicker(entry.exerciseId)">
+                  @if (entry.feeling) {
+                    {{ getFeelingEmoji(entry.feeling) }}
+                  } @else {
+                    <span class="material-symbols-outlined">sentiment_neutral</span>
                   }
-                </div>
+                </button>
               }
               <div class="we-footer-actions">
                 <button class="we-footer-stats-btn" (click)="openStats(entry)">
@@ -265,6 +264,31 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
         </div>
       }
 
+      <!-- ── Fatiga popup ── -->
+      @if (feelingPickerFor()) {
+        <div class="we-fatiga-backdrop" (click)="closeFatigaPicker()"></div>
+        <div class="we-fatiga-popup">
+          <div class="we-fatiga-popup-header">
+            <span class="we-fatiga-popup-title">Fatiga</span>
+            @if (fatigaEntry()?.feeling) {
+              <button class="we-fatiga-clear-btn" (click)="clearFeeling()">
+                <span class="material-symbols-outlined">close</span>
+              </button>
+            }
+          </div>
+          <div class="we-fatiga-options">
+            @for (level of feelingLevels; track level) {
+              <button type="button" class="we-fatiga-option"
+                [class.selected]="fatigaEntry()?.feeling === level"
+                (click)="pickFeeling(level)">
+                <span class="we-fatiga-option-emoji">{{ getFeelingEmoji(level) }}</span>
+                <span class="we-fatiga-option-label">{{ getFeelingLabel(level) }}</span>
+              </button>
+            }
+          </div>
+        </div>
+      }
+
     }
   `,
   styles: [`
@@ -280,22 +304,57 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
 
 
+    /* ── Fatiga popup ── */
+    .we-fatiga-backdrop {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.35);
+    }
+    .we-fatiga-popup {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 201;
+      background: var(--c-card); border-radius: 20px 20px 0 0;
+      padding: 20px 20px 32px;
+      box-shadow: 0 -4px 24px var(--c-shadow-md);
+    }
+    .we-fatiga-popup-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .we-fatiga-popup-title { font-size: 17px; font-weight: 700; color: var(--c-text); }
+    .we-fatiga-clear-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 1.5px solid rgba(239,83,80,0.3); background: rgba(239,83,80,0.07);
+      color: #ef5350; cursor: pointer; touch-action: manipulation; transition: background 0.15s;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { background: rgba(239,83,80,0.16); }
+    }
+    .we-fatiga-options { display: flex; gap: 8px; justify-content: space-between; }
+    .we-fatiga-option {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px;
+      padding: 12px 4px; border-radius: 14px;
+      border: 2px solid transparent; background: var(--c-subtle);
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      &:hover { background: var(--c-hover); transform: translateY(-2px); }
+      &:active { transform: scale(0.94); }
+      &.selected { border-color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.1); transform: translateY(-2px); }
+    }
+    .we-fatiga-option-emoji { font-size: 28px; line-height: 1; }
+    .we-fatiga-option-label { font-size: 10px; font-weight: 600; color: var(--c-text-2); text-align: center; }
+
     /* ── Entry footer: feeling + stats + delete ── */
     .we-entry-footer {
       display: flex; align-items: center; justify-content: space-between; gap: 8px;
       padding: 10px 14px 14px; border-top: 1px solid var(--c-border-2);
     }
-    .we-footer-feeling { display: flex; gap: 4px; }
     .we-footer-feeling-btn {
       width: 36px; height: 36px; border-radius: 10px; border: 1.5px solid transparent;
       background: var(--c-subtle); font-size: 18px; line-height: 1;
       cursor: pointer; touch-action: manipulation; transition: all 0.15s;
       display: flex; align-items: center; justify-content: center;
-      &:hover { background: var(--c-hover); transform: scale(1.1); }
+      .material-symbols-outlined { font-size: 20px; color: var(--c-text-3); }
+      &:hover { background: var(--c-hover); }
       &:active { transform: scale(0.92); }
-      &.we-footer-feeling-btn--active {
-        border-color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.1); transform: scale(1.1);
-      }
+      &.we-footer-feeling-btn--set { border-color: rgba(var(--c-brand-rgb), 0.3); background: rgba(var(--c-brand-rgb), 0.07); }
     }
     .we-footer-actions { display: flex; align-items: center; gap: 6px; }
 
@@ -643,6 +702,7 @@ export class WorkoutEditorComponent implements OnDestroy {
   readonly editingSet       = signal<{ exerciseId: string; index: number } | null>(null);
   readonly lastSessionData  = signal<{ exerciseId: string; date: string; maxWeight: number; feeling?: FeelingLevel } | null>(null);
   readonly recData          = signal<{ exerciseId: string; sets: number; reps: number; goalLabel: string } | null>(null);
+  readonly feelingPickerFor = signal<string | null>(null);
   readonly collapsedEntries = signal<Set<string>>(new Set());
   // ── Rest timer ─────────────────────────────────────────────────────────────
   readonly timerActive    = signal(false);
@@ -655,6 +715,14 @@ export class WorkoutEditorComponent implements OnDestroy {
   readonly prEntries = signal<Set<string>>(new Set());
 
   readonly feelingLevels3: FeelingLevel[] = [1, 3, 5];
+  readonly feelingLevels: FeelingLevel[]  = [1, 2, 3, 4, 5];
+
+  readonly fatigaEntry = computed(() => {
+    const id = this.feelingPickerFor();
+    const w  = this.workout();
+    if (!id || !w) return null;
+    return w.entries.find(e => e.exerciseId === id) ?? null;
+  });
 
   readonly setForm = this.fb.group({
     weight: [0, [Validators.required, Validators.min(0)]],
@@ -720,9 +788,29 @@ export class WorkoutEditorComponent implements OnDestroy {
   }
 
   getFeelingEmoji(level: FeelingLevel): string { return FEELING_EMOJI[level]; }
+  getFeelingLabel(level: FeelingLevel): string { return FEELING_LABEL[level]; }
 
-  async pickFeelingForEntry(entry: WorkoutEntry, level: FeelingLevel): Promise<void> {
+  openFatigaPicker(exerciseId: string): void { this.feelingPickerFor.set(exerciseId); }
+  closeFatigaPicker(): void { this.feelingPickerFor.set(null); }
+
+  async pickFeeling(level: FeelingLevel): Promise<void> {
+    const entry = this.fatigaEntry();
+    if (!entry) return;
     await this.setEntryFeeling(entry, level);
+    this.closeFatigaPicker();
+  }
+
+  async clearFeeling(): Promise<void> {
+    const entry = this.fatigaEntry();
+    if (!entry) return;
+    const w = this.workout();
+    if (!w) return;
+    try {
+      await this.workoutService.updateEntryFeeling(w.id, entry.exerciseId, undefined);
+    } catch {
+      this.snackBar.open('Error en eliminar la fatiga', '', { duration: 2000 });
+    }
+    this.closeFatigaPicker();
   }
 
   getCatColor(entry: WorkoutEntry): string {
