@@ -324,16 +324,18 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       </button>
     }
 
-    <!-- ── "Avui toca" suggestion pill ── -->
+    <!-- ── "Avui toca" suggestion card (inline with FAB, only when no activity today) ── -->
     @if (todaySuggestion(); as s) {
-      <button class="bottom-pill bottom-pill--suggestion"
-              [style.--pill-i]="workoutPillCount()"
-              [style.--wc]="s.color"
-              (click)="handleSuggestionClick(s)">
-        <div class="pill-icon-wrap">
-          <span class="material-symbols-outlined pill-icon">{{ s.icon }}</span>
+      <button class="suggestion-card" [style.--sc]="s.color" (click)="handleSuggestionClick(s)">
+        <div class="sc-bar"></div>
+        <div class="sc-icon-wrap">
+          <span class="material-symbols-outlined sc-icon">{{ s.icon }}</span>
         </div>
-        <span class="pill-text">Avui · {{ s.label }}</span>
+        <div class="sc-info">
+          <span class="sc-eyebrow">Avui toca</span>
+          <span class="sc-label">{{ s.label }}</span>
+        </div>
+        <span class="material-symbols-outlined sc-chevron">chevron_right</span>
       </button>
     }
     } <!-- /!activeWorkout() -->
@@ -615,15 +617,55 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       padding-right: 12px; white-space: nowrap;
     }
 
-    /* ── Suggestion variant (slightly larger, accent border) ── */
-    .bottom-pill--suggestion {
-      height: 54px; border-radius: 27px;
-      max-width: min(280px, calc(100vw - 92px));
-      border-color: color-mix(in srgb, var(--wc) 40%, var(--c-border-2));
-      box-shadow: 0 4px 18px color-mix(in srgb, var(--wc) 22%, var(--c-shadow-md));
-      .pill-icon-wrap { width: 54px; height: 54px; }
-      .pill-icon { font-size: 26px; }
-      .pill-text { font-size: 14px; padding: 0 16px 0 14px; }
+    /* ── "Avui toca" suggestion card (inline with FAB) ── */
+    .suggestion-card {
+      position: fixed;
+      bottom: calc(var(--nav-height) + 12px);
+      left: 16px;
+      right: 88px;
+      z-index: 89;
+      display: flex; align-items: center; gap: 0;
+      height: 56px; border-radius: 14px; padding: 0;
+      border: 1.5px solid color-mix(in srgb, var(--sc) 35%, var(--c-border-2));
+      background: color-mix(in srgb, var(--sc) 8%, var(--c-card));
+      box-shadow: 0 3px 14px var(--c-shadow-md);
+      cursor: pointer; touch-action: manipulation; overflow: hidden;
+      animation: pill-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+      transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s;
+      &:hover {
+        box-shadow: 0 4px 18px var(--c-shadow-md);
+        border-color: color-mix(in srgb, var(--sc) 55%, var(--c-border));
+        background: color-mix(in srgb, var(--sc) 13%, var(--c-card));
+      }
+      &:active { transform: scale(0.98); }
+    }
+    .sc-bar {
+      width: 5px; align-self: stretch; flex-shrink: 0;
+      background: var(--sc);
+    }
+    .sc-icon-wrap {
+      width: 46px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .sc-icon {
+      font-size: 22px; color: var(--sc);
+      font-variation-settings: 'FILL' 1;
+    }
+    .sc-info {
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .sc-eyebrow {
+      font-size: 9px; font-weight: 700; line-height: 1;
+      color: color-mix(in srgb, var(--sc) 70%, var(--c-text-3));
+      text-transform: uppercase; letter-spacing: 0.6px;
+    }
+    .sc-label {
+      font-size: 13px; font-weight: 700; color: var(--c-text); line-height: 1.2;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .sc-chevron {
+      font-size: 18px; color: var(--c-text-3); margin-right: 10px; flex-shrink: 0;
     }
 
     /* ── Type grid (inside workout-section) ── */
@@ -1290,7 +1332,7 @@ export class TrainComponent {
 
   readonly pillCount = computed(() => {
     if (this.activeWorkoutId()) return 0;
-    return this.workoutPillCount() + (this.todaySuggestion() ? 1 : 0);
+    return this.workoutPillCount();
   });
 
   readonly pagePaddingBottom = computed(() => {
