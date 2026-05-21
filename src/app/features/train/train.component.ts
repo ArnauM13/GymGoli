@@ -1294,10 +1294,10 @@ export class TrainComponent {
   });
 
   readonly pagePaddingBottom = computed(() => {
-    if (this.activeWorkoutId()) return `calc(var(--nav-height) + 12px)`;
+    if (this.activeWorkoutId()) return '16px';
     const n = this.pillCount();
-    if (n <= 1) return `calc(var(--nav-height) + 80px)`;
-    return `calc(var(--nav-height) + ${12 + n * 56 + 12}px)`;
+    if (n === 0) return '88px'; // clear the FAB (56px) + offset (16px) + buffer
+    return `${Math.max(88, 58 + (n - 1) * 56 + 16)}px`;
   });
 
   readonly dateSportSessions = computed(() =>
