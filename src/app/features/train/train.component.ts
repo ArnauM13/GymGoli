@@ -327,20 +327,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       </div>
     </div>
 
-    <!-- ── Compact workout shortcut pills ── -->
-    @for (w of dateWorkouts().slice(0, 2); track w.id; let i = $index) {
-      <button class="bottom-pill" [style.--pill-i]="i"
-              [style.--wc]="workoutPrimaryColor(w)"
-              (click)="openWorkout(w.id)">
-        <div class="pill-icon-wrap">
-          <span class="material-symbols-outlined pill-icon">fitness_center</span>
-        </div>
-        <span class="pill-text">{{ workoutLabel(w) }}</span>
-        @if (i === 1 && dateWorkouts().length > 2) {
-          <span class="pill-more">+{{ dateWorkouts().length - 2 }}</span>
-        }
-      </button>
-    }
     } <!-- /!activeWorkout() -->
 
     <!-- ── Template picker bottom sheet ── -->
@@ -577,47 +563,9 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       color: var(--c-card); letter-spacing: 0.3px;
     }
 
-    /* ── Bottom pill shortcuts ── */
-    .bottom-pill {
-      position: fixed;
-      left: 16px;
-      bottom: calc(var(--nav-height) + 12px + var(--pill-i, 0) * 56px);
-      z-index: 90;
-      display: flex; align-items: center; gap: 0;
-      height: 46px; border-radius: 23px; padding: 0;
-      background: var(--c-card);
-      border: 1.5px solid var(--c-border-2);
-      box-shadow: 0 3px 14px var(--c-shadow-md);
-      cursor: pointer; touch-action: manipulation;
-      overflow: hidden;
-      max-width: min(230px, calc(100vw - 92px));
-      animation: pill-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-      transition: box-shadow 0.15s, transform 0.1s;
-      &:hover  { box-shadow: 0 4px 20px var(--c-shadow-md); }
-      &:active { transform: scale(0.97); }
-    }
     @keyframes pill-in {
       from { opacity: 0; transform: translateY(10px); }
       to   { opacity: 1; transform: none; }
-    }
-    .pill-icon-wrap {
-      width: 46px; height: 46px; flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center;
-      background: var(--wc);
-    }
-    .pill-icon {
-      font-size: 22px; color: white;
-      font-variation-settings: 'FILL' 1;
-    }
-    .pill-text {
-      flex: 1; padding: 0 14px 0 12px;
-      font-size: 13px; font-weight: 700; color: var(--c-text);
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      line-height: 1.15;
-    }
-    .pill-more {
-      font-size: 12px; font-weight: 700; color: var(--c-text-3);
-      padding-right: 12px; white-space: nowrap;
     }
 
     /* ── "Avui toca" suggestion card (flex child in .bottom-bar, aligned with FAB) ── */
@@ -1339,19 +1287,9 @@ export class TrainComponent {
     this.workoutService.getWorkoutsForDate(this.selectedDate())
   );
 
-  readonly workoutPillCount = computed(() => Math.min(this.dateWorkouts().length, 2));
-
-  readonly pillCount = computed(() => {
-    if (this.activeWorkoutId()) return 0;
-    return this.workoutPillCount();
-  });
-
-  readonly pagePaddingBottom = computed(() => {
-    if (this.activeWorkoutId()) return '16px';
-    const n = this.pillCount();
-    if (n === 0) return '88px'; // clear the FAB (56px) + offset (16px) + buffer
-    return `${Math.max(88, 58 + (n - 1) * 56 + 16)}px`;
-  });
+  readonly pagePaddingBottom = computed(() =>
+    this.activeWorkoutId() ? '16px' : '88px' // clear the FAB + bottom-bar (~56px + offsets)
+  );
 
   readonly dateSportSessions = computed(() =>
     this.sportService.getSportSessionsForDate(this.selectedDate())
