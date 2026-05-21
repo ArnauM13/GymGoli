@@ -45,38 +45,35 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       @if (activeWorkout(); as w) {
 
         <!-- ══ ACTIVE WORKOUT MODE ══ -->
-        <div class="workout-topbar" [style.--topbar-color]="workoutPrimaryColor(w)">
-          <button class="topbar-back" (click)="closeWorkout()" title="Tornar">
+
+        <!-- Floating card header -->
+        <div class="aw-header" [style.--wc]="workoutPrimaryColor(w)">
+          <button class="aw-back" (click)="closeWorkout()" title="Tornar">
             <span class="material-symbols-outlined">arrow_back_ios</span>
           </button>
-          <div class="topbar-center">
-            <div class="topbar-row1">
-              <div class="topbar-badges">
-                @for (cat of activeWorkoutCategoryItems(); track cat.value) {
-                  <span class="type-badge" [style.background]="cat.color">{{ cat.label }}</span>
-                }
-                @if (activeWorkoutCategoryItems().length > 1) {
-                  <span class="hybrid-badge">Híbrid</span>
-                }
-              </div>
-              <span class="topbar-date">{{ topbarDateLabel(w) }}</span>
+          <div class="aw-bar" [style.background]="workoutCardColor(w)"></div>
+          <div class="aw-info">
+            <div class="aw-badges">
+              @for (cat of activeWorkoutCategoryItems(); track cat.value) {
+                <span class="aw-badge" [style.background]="cat.color">{{ cat.label }}</span>
+              }
+              @if (activeWorkoutCategoryItems().length > 1) {
+                <span class="aw-badge aw-badge--hybrid">Híbrid</span>
+              }
             </div>
-            <div class="topbar-stats">
-              <span class="topbar-stat">
+            <div class="aw-stats">
+              <span class="aw-stat">
                 <span class="material-symbols-outlined">fitness_center</span>
                 <strong>{{ w.entries.length }}</strong> exerc
               </span>
-              <span class="topbar-stat-sep">·</span>
-              <span class="topbar-stat">
+              <span class="aw-stat-sep">·</span>
+              <span class="aw-stat">
                 <span class="material-symbols-outlined">repeat</span>
                 <strong>{{ topbarTotalSets(w) }}</strong> sèr
               </span>
             </div>
           </div>
-          <button class="topbar-delete" (click)="deleteActiveWorkout()" title="Eliminar entrenament">
-            <span class="material-symbols-outlined">delete</span>
-          </button>
-          <div class="topbar-accent-bar"></div>
+          <span class="aw-date">{{ topbarDateLabel(w) }}</span>
         </div>
 
         <app-workout-editor
@@ -86,6 +83,23 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           [alwaysEditable]="true"
           (requestAddExercise)="openPicker()"
         />
+
+        <!-- More FAB + menu -->
+        @if (awMenuOpen()) {
+          <div class="aw-backdrop" (click)="awMenuOpen.set(false)"></div>
+          <div class="aw-menu">
+            <button class="aw-menu-item aw-menu-item--danger" (click)="deleteActiveWorkout()">
+              <span class="material-symbols-outlined">delete</span>
+              Eliminar entrenament
+            </button>
+          </div>
+        }
+        <div class="aw-fab-wrap">
+          <button class="aw-fab" [class.aw-fab--open]="awMenuOpen()"
+                  (click)="awMenuOpen.set(!awMenuOpen())">
+            <span class="material-symbols-outlined">more_vert</span>
+          </button>
+        </div>
 
       } @else {
 
@@ -534,70 +548,96 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
   styles: [`
     .page { padding: 0; }
 
-    /* ── Workout topbar (active mode, sticky) ── */
-    .workout-topbar {
-      position: sticky; top: 0; z-index: 10;
-      display: flex; align-items: center; gap: 8px;
-      padding: 10px 12px 14px;
+    /* ── Active workout floating header ── */
+    .aw-header {
+      position: sticky; top: 12px; z-index: 10;
+      margin: 12px 16px 0;
+      display: flex; align-items: stretch;
+      border-radius: 14px; overflow: hidden;
       background: var(--c-card);
-      box-shadow: 0 2px 8px var(--c-shadow);
-      position: relative;
+      border: 1.5px solid color-mix(in srgb, var(--wc, var(--c-border-2)) 30%, var(--c-border-2));
+      box-shadow: 0 4px 16px var(--c-shadow-md);
     }
-    .topbar-accent-bar {
-      position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
-      background: var(--topbar-color, var(--c-brand));
-    }
-    .topbar-back {
-      width: 36px; height: 36px; border-radius: 50%; border: none;
-      background: transparent; cursor: pointer; color: var(--c-text-2);
+    .aw-back {
+      width: 44px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
-      transition: background 0.15s; flex-shrink: 0; touch-action: manipulation;
+      border: none; background: transparent; cursor: pointer;
+      color: var(--c-text-2); touch-action: manipulation;
+      transition: background 0.15s;
       .material-symbols-outlined { font-size: 20px; }
       &:hover { background: var(--c-hover); }
     }
-    .topbar-center {
+    .aw-bar { width: 5px; align-self: stretch; flex-shrink: 0; }
+    .aw-info {
       flex: 1; min-width: 0;
       display: flex; flex-direction: column; gap: 3px;
+      padding: 10px 10px;
     }
-    .topbar-row1 {
-      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    .aw-badges { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+    .aw-badge {
+      padding: 2px 8px; border-radius: 10px;
+      font-size: 11px; font-weight: 600; color: white;
     }
-    .topbar-badges {
-      display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
+    .aw-badge--hybrid {
+      background: linear-gradient(90deg, #ef5350 0%, #9c27b0 50%, #2196f3 100%);
     }
-    .topbar-date {
-      font-size: 11px; font-weight: 600; color: var(--c-text-2); flex-shrink: 0;
-    }
-    .topbar-stats {
+    .aw-stats {
       display: flex; align-items: center; gap: 4px;
       font-size: 11px; color: var(--c-text-3);
     }
-    .topbar-stat {
+    .aw-stat {
       display: flex; align-items: center; gap: 2px;
       .material-symbols-outlined { font-size: 11px; }
       strong { color: var(--c-text-2); font-weight: 700; }
     }
-    .topbar-stat-sep { color: var(--c-border); }
-    .topbar-delete {
-      width: 36px; height: 36px; border-radius: 50%; border: none;
-      background: transparent; cursor: pointer; color: var(--c-text-3);
-      display: flex; align-items: center; justify-content: center;
-      transition: all 0.15s; flex-shrink: 0; touch-action: manipulation;
-      .material-symbols-outlined { font-size: 20px; }
-      &:hover { background: rgba(239,83,80,0.1); color: #ef5350; }
+    .aw-stat-sep { color: var(--c-border); }
+    .aw-date {
+      font-size: 11px; font-weight: 600; color: var(--c-text-2);
+      align-self: center; padding: 0 14px; flex-shrink: 0;
     }
 
-    /* ── Type badges (topbar) ── */
-    .type-badge {
-      padding: 3px 10px; border-radius: 10px;
-      font-size: 12px; font-weight: 600; color: var(--c-card);
+    /* ── Active workout FAB + menu ── */
+    .aw-backdrop { position: fixed; inset: 0; z-index: 88; }
+    .aw-fab-wrap {
+      position: fixed; right: 20px;
+      bottom: calc(var(--nav-height) + 16px);
+      z-index: 89;
     }
-    .hybrid-badge {
-      padding: 3px 10px; border-radius: 10px;
-      font-size: 11px; font-weight: 700;
-      background: linear-gradient(90deg, #ef5350 0%, #9c27b0 50%, #2196f3 100%);
-      color: var(--c-card); letter-spacing: 0.3px;
+    .aw-fab {
+      width: 56px; height: 56px; border-radius: 50%; border: none;
+      background: var(--c-brand); color: white;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation;
+      box-shadow: 0 4px 16px rgba(var(--c-brand-rgb), 0.4), 0 1px 4px var(--c-shadow);
+      transition: background 0.15s, transform 0.15s;
+      .material-symbols-outlined { font-size: 26px; transition: transform 0.2s ease; }
+      &:hover { background: var(--c-brand-dk); transform: scale(1.06); }
+      &:active { transform: scale(0.94); }
+      &.aw-fab--open .material-symbols-outlined { transform: rotate(90deg); }
     }
+    .aw-menu {
+      position: fixed; right: 20px;
+      bottom: calc(var(--nav-height) + 82px);
+      z-index: 89; min-width: 210px;
+      background: var(--c-card); border-radius: 14px; overflow: hidden;
+      border: 1px solid var(--c-border-2);
+      box-shadow: 0 6px 24px var(--c-shadow-md);
+      animation: aw-menu-in 0.18s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+    }
+    @keyframes aw-menu-in {
+      from { opacity: 0; transform: scale(0.88) translateY(8px); transform-origin: bottom right; }
+      to   { opacity: 1; transform: none; }
+    }
+    .aw-menu-item {
+      display: flex; align-items: center; gap: 10px;
+      width: 100%; padding: 14px 16px;
+      border: none; background: transparent; cursor: pointer;
+      font-size: 14px; font-weight: 500; text-align: left;
+      touch-action: manipulation; transition: background 0.1s;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { background: var(--c-hover); }
+    }
+    .aw-menu-item--danger { color: #ef5350; }
 
     @keyframes pill-in {
       from { opacity: 0; transform: translateY(10px); }
@@ -1244,6 +1284,7 @@ export class TrainComponent {
   readonly sportToggling   = signal(false);
   readonly workoutTypes    = WORKOUT_TYPES;
   readonly speedDialOpen   = signal(false);
+  readonly awMenuOpen      = signal(false);
   readonly activeWorkoutId = signal<string | null>(null);
   readonly gymCollapsed    = signal(false);
   readonly sportsCollapsed = signal(false);
@@ -1331,7 +1372,7 @@ export class TrainComponent {
   );
 
   readonly pagePaddingBottom = computed(() =>
-    this.activeWorkoutId() ? '16px' : '88px' // clear the FAB + bottom-bar (~56px + offsets)
+    '88px' // clear the FAB / bottom-bar in both modes
   );
 
   readonly dateSportSessions = computed(() =>
@@ -1544,6 +1585,7 @@ export class TrainComponent {
   }
 
   async deleteActiveWorkout(): Promise<void> {
+    this.awMenuOpen.set(false);
     if (!confirm('Eliminar l\'entrenament?')) return;
     const w = this.activeWorkout();
     if (!w) return;
