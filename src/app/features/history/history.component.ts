@@ -126,23 +126,45 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
               </div>
 
               <!-- Detall de l'exercici seleccionat -->
-              @if (selectedExerciseId()) {
-                <div class="ex-detail-panel">
-                  @if ((selectedEntry()?.sets ?? []).length > 0) {
-                    <div class="ex-sets-row">
-                      @for (set of selectedEntry()!.sets; track $index) {
-                        <div class="ex-set-pill" [class.ex-set-pill--max]="isMaxSet(selectedEntry()!, set)">
-                          <span class="ex-set-num">{{ $index + 1 }}</span>
-                          <span class="ex-set-weight">{{ dispW(set.weight) }}<small>{{ unit() }}</small></span>
-                          <span class="ex-set-reps">×{{ set.reps }}</span>
+              @if (selectedExerciseId() && selectedEntry(); as e) {
+                <div class="ex-detail-panel" [style.--ec]="getEntryCatColor(e)">
+                  @if (e.sets.length > 0) {
+                    <div class="ex-detail-body">
+                      <div class="ex-sets-col">
+                        @for (set of e.sets; track $index) {
+                          <div class="ex-set-line" [class.ex-set-line--max]="isMaxSet(e, set)">
+                            <span class="exs-num">{{ $index + 1 }}</span>
+                            <span class="exs-weight">{{ dispW(set.weight) }}<small>{{ unit() }}</small></span>
+                            <span class="exs-x">×</span>
+                            <span class="exs-reps">{{ set.reps }}</span>
+                            @if (isMaxSet(e, set)) { <span class="exs-pr">PR</span> }
+                          </div>
+                        }
+                      </div>
+                      <div class="ex-stats-col">
+                        <div class="ex-stat">
+                          <span class="exs-label">Màx</span>
+                          <span class="exs-value">{{ dispW(getMaxWeight(e)) }}<small>{{ unit() }}</small></span>
                         </div>
-                      }
+                        <div class="ex-stat">
+                          <span class="exs-label">Sèries</span>
+                          <span class="exs-value">{{ e.sets.length }}</span>
+                        </div>
+                        <div class="ex-stat">
+                          <span class="exs-label">Reps</span>
+                          <span class="exs-value">{{ totalReps(e) }}</span>
+                        </div>
+                        <div class="ex-stat">
+                          <span class="exs-label">Volum</span>
+                          <span class="exs-value">{{ dispW(entryVolume(e)) }}<small>{{ unit() }}</small></span>
+                        </div>
+                      </div>
                     </div>
                   }
                   <div class="ex-card-analysis">
                     <app-exercise-progress-inline
                       [exerciseId]="selectedExerciseId()"
-                      [exerciseName]="selectedEntry()?.exerciseName ?? null" />
+                      [exerciseName]="e.exerciseName" />
                   </div>
                 </div>
               }
@@ -266,26 +288,45 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
                 @if (expandedId() === workout.id) {
                   <div class="workout-detail">
                     @for (entry of workout.entries; track entry.exerciseId) {
-                      <div class="entry-row">
+                      <div class="entry-row" [style.--ec]="getEntryCatColor(entry)">
                         <div class="entry-name-row">
-                          <span class="entry-cat-dot" [style.background]="getEntryCatColor(entry)"></span>
+                          <span class="entry-cat-dot"></span>
                           <span class="entry-name">{{ entry.exerciseName }}</span>
                           @if (entry.feeling) {
                             <span class="entry-feeling">{{ getFeelingEmoji(entry.feeling) }}</span>
                           }
-                          @if (getMaxWeight(entry) > 0) {
-                            <span class="entry-max-weight">{{ dispW(getMaxWeight(entry)) }}<small> {{ unit() }}</small></span>
-                          }
                         </div>
                         @if (entry.sets.length > 0) {
-                          <div class="sets-list">
-                            @for (set of entry.sets; track $index) {
-                              <div class="set-row" [class.set-row--max]="isMaxSet(entry, set)">
-                                <span class="set-row-num">{{ $index + 1 }}</span>
-                                <span class="set-row-weight">{{ dispW(set.weight) }}<small> {{ unit() }}</small></span>
-                                <span class="set-row-reps">×{{ set.reps }}</span>
+                          <div class="entry-body">
+                            <div class="entry-sets-col">
+                              @for (set of entry.sets; track $index) {
+                                <div class="entry-set-line" [class.entry-set-line--max]="isMaxSet(entry, set)">
+                                  <span class="esl-num">{{ $index + 1 }}</span>
+                                  <span class="esl-weight">{{ dispW(set.weight) }}<small>{{ unit() }}</small></span>
+                                  <span class="esl-x">×</span>
+                                  <span class="esl-reps">{{ set.reps }}</span>
+                                  @if (isMaxSet(entry, set)) { <span class="esl-pr">PR</span> }
+                                </div>
+                              }
+                            </div>
+                            <div class="entry-stats-col">
+                              <div class="entry-stat">
+                                <span class="es-label">Màx</span>
+                                <span class="es-value">{{ dispW(getMaxWeight(entry)) }}<small>{{ unit() }}</small></span>
                               </div>
-                            }
+                              <div class="entry-stat">
+                                <span class="es-label">Sèries</span>
+                                <span class="es-value">{{ entry.sets.length }}</span>
+                              </div>
+                              <div class="entry-stat">
+                                <span class="es-label">Reps</span>
+                                <span class="es-value">{{ totalReps(entry) }}</span>
+                              </div>
+                              <div class="entry-stat">
+                                <span class="es-label">Volum</span>
+                                <span class="es-value">{{ dispW(entryVolume(entry)) }}<small>{{ unit() }}</small></span>
+                              </div>
+                            </div>
                           </div>
                         } @else {
                           <span class="no-sets">Cap sèrie registrada</span>
@@ -457,21 +498,61 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
     .ex-detail-panel {
       margin: 0 14px 14px;
       background: var(--c-subtle); border-radius: 12px; overflow: hidden;
+      border-left: 3px solid color-mix(in srgb, var(--ec, var(--c-brand)) 70%, transparent);
     }
-    .ex-sets-row {
-      display: flex; flex-wrap: wrap; gap: 6px;
-      padding: 12px 14px 10px;
+    .ex-detail-body {
+      display: grid; grid-template-columns: 1fr auto; gap: 14px;
+      padding: 12px 14px;
     }
-    .ex-set-pill {
-      display: flex; align-items: center; gap: 4px;
-      padding: 5px 10px; background: var(--c-card); border-radius: 20px;
-      box-shadow: 0 1px 4px var(--c-shadow);
+    .ex-sets-col {
+      display: flex; flex-direction: column; gap: 3px; min-width: 0;
     }
-    .ex-set-num { font-size: 10px; font-weight: 600; color: var(--c-text-3); min-width: 12px; }
-    .ex-set-weight { font-size: 13px; font-weight: 700; color: var(--c-text); }
-    .ex-set-weight small { font-size: 9px; font-weight: 400; color: var(--c-text-2); }
-    .ex-set-reps { font-size: 12px; color: var(--c-text-2); }
-    .ex-set-pill--max .ex-set-weight { font-weight: 800; color: var(--c-brand); }
+    .ex-set-line {
+      display: grid;
+      grid-template-columns: 18px 1fr auto auto auto;
+      align-items: baseline; gap: 6px;
+      padding: 5px 8px; border-radius: 8px;
+      background: var(--c-card);
+      box-shadow: 0 1px 2px var(--c-shadow);
+      transition: background 0.15s, transform 0.15s;
+    }
+    .ex-set-line--max {
+      background: color-mix(in srgb, var(--ec, var(--c-brand)) 10%, var(--c-card));
+      box-shadow: 0 1px 4px color-mix(in srgb, var(--ec, var(--c-brand)) 18%, transparent);
+    }
+    .exs-num { font-size: 10px; font-weight: 700; color: var(--c-text-3); text-align: right; }
+    .exs-weight {
+      font-size: 14px; font-weight: 800; color: var(--c-text);
+      small { font-size: 9px; font-weight: 400; color: var(--c-text-3); margin-left: 1px; }
+    }
+    .ex-set-line--max .exs-weight {
+      color: color-mix(in srgb, var(--ec, var(--c-brand)) 80%, var(--c-text));
+    }
+    .exs-x { font-size: 11px; color: var(--c-text-3); }
+    .exs-reps { font-size: 13px; font-weight: 600; color: var(--c-text-2); }
+    .exs-pr {
+      font-size: 9px; font-weight: 800; letter-spacing: 0.3px;
+      color: #b88500; background: rgba(255, 193, 7, 0.2);
+      padding: 1px 6px; border-radius: 6px; line-height: 1.3;
+    }
+    .ex-stats-col {
+      display: flex; flex-direction: column; gap: 5px;
+      min-width: 110px; flex-shrink: 0;
+    }
+    .ex-stat {
+      display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+      padding: 6px 10px; border-radius: 8px;
+      background: var(--c-card);
+      border: 1px solid var(--c-border-2);
+    }
+    .exs-label {
+      font-size: 9px; font-weight: 700; color: var(--c-text-3);
+      text-transform: uppercase; letter-spacing: 0.4px;
+    }
+    .exs-value {
+      font-size: 13px; font-weight: 800; color: var(--c-text);
+      small { font-size: 9px; font-weight: 400; color: var(--c-text-3); margin-left: 1px; }
+    }
     .ex-card-analysis { border-top: 1px solid var(--c-hover); }
 
     /* ════════════════════════════════
@@ -629,30 +710,68 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
     }
 
     .entry-row {
-      display: flex; flex-direction: column; gap: 6px;
+      display: flex; flex-direction: column; gap: 8px;
       padding-bottom: 12px; border-bottom: 1px solid var(--c-border-2);
       &:last-child { border-bottom: none; padding-bottom: 0; }
     }
     .entry-name-row { display: flex; align-items: center; gap: 7px; }
-    .entry-cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-    .entry-name { font-size: 13px; font-weight: 600; color: var(--c-text); flex: 1; }
+    .entry-cat-dot {
+      width: 4px; height: 16px; border-radius: 2px; flex-shrink: 0;
+      background: var(--ec, var(--c-border));
+    }
+    .entry-name { font-size: 13px; font-weight: 700; color: var(--c-text); flex: 1; line-height: 1.25; }
     .entry-feeling { font-size: 16px; line-height: 1; }
-    .entry-max-weight {
-      font-size: 12px; font-weight: 700; color: var(--c-brand);
-      small { font-weight: 400; color: var(--c-text-3); }
+    .entry-body {
+      display: grid; grid-template-columns: 1fr auto; gap: 14px;
+      padding-left: 11px;
     }
-    .sets-list { display: flex; flex-direction: column; gap: 3px; padding-left: 15px; }
-    .set-row {
-      display: flex; align-items: baseline; gap: 8px;
+    .entry-sets-col {
+      display: flex; flex-direction: column; gap: 2px;
+      min-width: 0;
     }
-    .set-row-num { font-size: 10px; font-weight: 600; color: var(--c-text-3); min-width: 14px; }
-    .set-row-weight {
-      font-size: 13px; font-weight: 600; color: var(--c-text);
-      small { font-size: 10px; font-weight: 400; color: var(--c-text-3); }
+    .entry-set-line {
+      display: grid;
+      grid-template-columns: 16px 1fr auto auto auto;
+      align-items: baseline; gap: 5px;
+      padding: 3px 6px; border-radius: 6px;
+      transition: background 0.15s;
     }
-    .set-row-reps { font-size: 12px; color: var(--c-text-2); }
-    .set-row--max .set-row-weight { font-weight: 800; color: var(--c-brand); }
-    .no-sets { font-size: 12px; color: var(--c-text-3); font-style: italic; padding-left: 15px; }
+    .entry-set-line--max {
+      background: color-mix(in srgb, var(--ec, var(--c-brand)) 8%, transparent);
+    }
+    .esl-num { font-size: 10px; font-weight: 700; color: var(--c-text-3); text-align: right; }
+    .esl-weight {
+      font-size: 13px; font-weight: 700; color: var(--c-text);
+      small { font-size: 9px; font-weight: 400; color: var(--c-text-3); margin-left: 1px; }
+    }
+    .esl-x { font-size: 11px; color: var(--c-text-3); }
+    .esl-reps { font-size: 12px; font-weight: 600; color: var(--c-text-2); }
+    .esl-pr {
+      font-size: 9px; font-weight: 800; letter-spacing: 0.3px;
+      color: #b88500; background: rgba(255, 193, 7, 0.18);
+      padding: 1px 6px; border-radius: 6px; line-height: 1.3;
+    }
+    .entry-set-line--max .esl-weight {
+      color: color-mix(in srgb, var(--ec, var(--c-brand)) 75%, var(--c-text));
+    }
+    .entry-stats-col {
+      display: flex; flex-direction: column; gap: 4px;
+      min-width: 96px; flex-shrink: 0;
+    }
+    .entry-stat {
+      display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+      padding: 4px 8px; border-radius: 6px;
+      background: var(--c-subtle);
+    }
+    .es-label {
+      font-size: 9px; font-weight: 700; color: var(--c-text-3);
+      text-transform: uppercase; letter-spacing: 0.4px;
+    }
+    .es-value {
+      font-size: 12px; font-weight: 800; color: var(--c-text);
+      small { font-size: 9px; font-weight: 400; color: var(--c-text-3); margin-left: 1px; }
+    }
+    .no-sets { font-size: 12px; color: var(--c-text-3); font-style: italic; padding-left: 12px; }
     .workout-notes {
       display: flex; align-items: flex-start; gap: 6px;
       font-size: 12px; color: var(--c-text-2); font-style: italic;
@@ -836,6 +955,12 @@ export class HistoryComponent {
   getMaxWeight(entry: WorkoutEntry): number {
     if (!entry.sets.length) return 0;
     return Math.max(...entry.sets.map(s => s.weight));
+  }
+  totalReps(entry: WorkoutEntry): number {
+    return entry.sets.reduce((s, set) => s + set.reps, 0);
+  }
+  entryVolume(entry: WorkoutEntry): number {
+    return Math.round(entry.sets.reduce((s, set) => s + set.weight * set.reps, 0));
   }
 
   getDay(date: string): string {
