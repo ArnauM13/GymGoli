@@ -27,12 +27,14 @@ import { ExerciseEntryCardComponent } from '../../shared/components/exercise-ent
           <!-- View mode toggle -->
           <div class="view-seg">
             <button class="view-seg-btn" [class.active]="viewMode() === 'calendar'"
-                    (click)="viewMode.set('calendar')" aria-label="Vista calendari">
+                    (click)="viewMode.set('calendar')">
               <span class="material-symbols-outlined">calendar_month</span>
+              Calendari
             </button>
             <button class="view-seg-btn" [class.active]="viewMode() === 'list'"
-                    (click)="viewMode.set('list')" aria-label="Vista llista">
+                    (click)="viewMode.set('list')">
               <span class="material-symbols-outlined">format_list_bulleted</span>
+              Historial
             </button>
           </div>
         </div>
@@ -347,10 +349,11 @@ import { ExerciseEntryCardComponent } from '../../shared/components/exercise-ent
       flex-shrink: 0;
     }
     .view-seg-btn {
-      width: 38px; height: 34px; border: none; background: transparent;
-      display: flex; align-items: center; justify-content: center;
+      height: 34px; padding: 0 12px; border: none; background: transparent;
+      display: flex; align-items: center; justify-content: center; gap: 5px;
       cursor: pointer; color: var(--c-text-2); transition: all 0.15s; touch-action: manipulation;
-      .material-symbols-outlined { font-size: 18px; }
+      font-size: 12px; font-weight: 600; white-space: nowrap;
+      .material-symbols-outlined { font-size: 16px; }
       &.active { background: var(--c-brand); color: white; }
       &:not(.active):hover { background: rgba(var(--c-brand-rgb), 0.08); color: var(--c-brand); }
     }
