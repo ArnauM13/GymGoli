@@ -12,7 +12,7 @@ import {
   CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_MUSCLES,
   Exercise, ExerciseCategory,
 } from '../../core/models/exercise.model';
-import { FITNESS_GOAL_WEEKLY_DEFAULTS } from '../../core/models/user-settings.model';
+import { FITNESS_GOAL_EMOJIS } from '../../core/models/user-settings.model';
 import { Sport, SportMetricDef } from '../../core/models/sport.model';
 import { BUILT_IN_TEMPLATES, BuiltInTemplate, WorkoutTemplate } from '../../core/models/template.model';
 import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry } from '../../core/models/workout.model';
@@ -145,20 +145,21 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         </div>
 
         <!-- ── Weekly objective progress ── -->
-        <div class="week-obj">
-          @for (bar of weekBars(); track bar.kind + bar.label) {
-            <div class="week-obj-bar">
-              <div class="week-obj-row">
-                <span class="week-obj-label">{{ bar.label }}</span>
-                <span class="week-obj-frac">{{ bar.done }}/{{ bar.target }}</span>
+        @if (weekBars().length > 0) {
+          <div class="week-obj">
+            @for (bar of weekBars(); track bar.label) {
+              <div class="week-obj-bar">
+                <div class="week-obj-row">
+                  <span class="week-obj-label">{{ bar.emoji }} {{ bar.label }}</span>
+                  <span class="week-obj-frac">{{ bar.done }}/{{ bar.target }}</span>
+                </div>
+                <div class="week-obj-track">
+                  <div class="week-obj-fill" [style.width.%]="bar.pct"></div>
+                </div>
               </div>
-              <div class="week-obj-track">
-                <div class="week-obj-fill" [style.width.%]="bar.pct"
-                     [style.background]="bar.color"></div>
-              </div>
-            </div>
-          }
-        </div>
+            }
+          </div>
+        }
 
         <!-- ── Skeleton (initial data load) ── -->
         @if (workoutService.isLoading() && dateWorkouts().length === 0 && !creating()) {
@@ -1571,38 +1572,35 @@ export class TrainComponent {
   }
 
   readonly weekBars = computed(() => {
-    const goal      = this.settingsService.fitnessGoal() ?? 'strength';
+    const mode      = this.settingsService.goalMode();
     const gymGoal   = this.settingsService.weeklyGymGoal();
     const sportGoal = this.settingsService.weeklySportGoal();
     const actGoal   = this.settingsService.weeklyActivityGoal();
-    const monday    = mondayOf(this.selectedDate());
-    const days      = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+    const fitnessGoal = this.settingsService.fitnessGoal();
 
-    const gymSessions   = days.reduce((s, d) => s + this.workoutService.getWorkoutsForDate(d).length, 0);
-    const sportSessions = days.reduce((s, d) => s + this.sportService.getSportSessionsForDate(d).length, 0);
-    const activeDays    = days.filter(d =>
-      this.workoutService.getWorkoutsForDate(d).length > 0 ||
-      this.sportService.getSportSessionsForDate(d).length > 0
-    ).length;
+    const monday = mondayOf(this.selectedDate());
+    const days   = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
 
-    const bar = (label: string, color: string, done: number, target: number) => {
+    const mk = (emoji: string, label: string, done: number, target: number) => {
       const t = Math.max(1, target);
-      return { label, color, done, target: t, pct: Math.min(100, Math.round(done / t * 100)) };
+      return { emoji, label, done, target: t, pct: Math.min(100, Math.round(done / t * 100)) };
     };
-    const brand = 'var(--c-brand)';
 
-    switch (goal) {
-      case 'strength':
-        return [bar('Gimnàs', brand, gymSessions, gymGoal ?? FITNESS_GOAL_WEEKLY_DEFAULTS.strength)];
-      case 'sport':
-        return [bar('Esport', brand, sportSessions, sportGoal ?? FITNESS_GOAL_WEEKLY_DEFAULTS.sport)];
-      case 'fitness':
-        return [bar('Activitat', brand, activeDays, actGoal ?? FITNESS_GOAL_WEEKLY_DEFAULTS.fitness)];
-      case 'weight':
-        return [
-          bar('Esport', brand, sportSessions, sportGoal ?? Math.ceil(FITNESS_GOAL_WEEKLY_DEFAULTS.weight / 2)),
-          bar('Gimnàs', 'var(--c-text-2)', gymSessions, gymGoal ?? Math.floor(FITNESS_GOAL_WEEKLY_DEFAULTS.weight / 2)),
-        ];
+    if (mode === 'combined') {
+      if (!actGoal) return [];
+      const activeDays = days.filter(d =>
+        this.workoutService.getWorkoutsForDate(d).length > 0 ||
+        this.sportService.getSportSessionsForDate(d).length > 0
+      ).length;
+      const emoji = fitnessGoal ? FITNESS_GOAL_EMOJIS[fitnessGoal] : '🏃';
+      return [mk(emoji, 'Activitat', activeDays, actGoal)];
+    } else {
+      const gymSessions   = days.reduce((s, d) => s + this.workoutService.getWorkoutsForDate(d).length, 0);
+      const sportSessions = days.reduce((s, d) => s + this.sportService.getSportSessionsForDate(d).length, 0);
+      const bars = [];
+      if (gymGoal)   bars.push(mk('💪', 'Entrenos', gymSessions, gymGoal));
+      if (sportGoal) bars.push(mk('⚽', 'Esports', sportSessions, sportGoal));
+      return bars;
     }
   });
 
