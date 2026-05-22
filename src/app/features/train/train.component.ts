@@ -29,6 +29,17 @@ type GymSuggestion   = { type: 'gym';   category: ExerciseCategory; label: strin
 type SportSuggestion = { type: 'sport'; sport: Sport;               label: string; color: string; icon: string };
 type TodaySuggestion = GymSuggestion | SportSuggestion;
 
+type BottomCard = {
+  kind: 'workout' | 'sport' | 'suggestion';
+  color: string;
+  icon: string;
+  label: string;
+  meta: string;
+  workoutId?: string;
+  sport?: Sport;
+  suggestion?: TodaySuggestion;
+};
+
 const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; color: string }[] = [
   { value: 'push', label: CATEGORY_LABELS.push, icon: CATEGORY_ICONS.push, color: CATEGORY_COLORS.push },
   { value: 'pull', label: CATEGORY_LABELS.pull, icon: CATEGORY_ICONS.pull, color: CATEGORY_COLORS.pull },
@@ -63,10 +74,44 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
                   <strong>{{ n }}</strong> sèr
                 </span>
               }
+              @if (workoutVolumeFmt(w); as vol) {
+                <span class="wc-stat-sep">·</span>
+                <span class="wc-stat wc-stat--vol">
+                  <span class="material-symbols-outlined">weight</span>
+                  <strong>{{ vol }}</strong>
+                </span>
+              }
             </div>
           </div>
-          <span class="aw-date">{{ topbarDateLabel(w) }}</span>
+          <div class="aw-header-right">
+            <button class="aw-feeling-btn" (click)="$event.stopPropagation(); awFeelingOpen.set(!awFeelingOpen())"
+                    [class.aw-feeling-btn--set]="w.feeling">
+              @if (w.feeling) {
+                <span class="aw-feeling-emoji">{{ emojiOf(w.feeling) }}</span>
+              } @else {
+                <span class="material-symbols-outlined">sentiment_neutral</span>
+              }
+            </button>
+            <span class="aw-date">{{ topbarDateLabel(w) }}</span>
+          </div>
         </div>
+
+        <!-- Feeling picker (slides in below header) -->
+        @if (awFeelingOpen()) {
+          <div class="aw-feeling-row">
+            @for (level of feelingLevels5; track level) {
+              <button class="aw-feeling-opt" [class.active]="w.feeling === level"
+                      (click)="pickWorkoutFeeling(w.id, level)">
+                {{ emojiOf(level) }}
+              </button>
+            }
+            @if (w.feeling) {
+              <button class="aw-feeling-clear" (click)="pickWorkoutFeeling(w.id, undefined)">
+                <span class="material-symbols-outlined">close</span>
+              </button>
+            }
+          </div>
+        }
 
         <app-workout-editor
           #editor
@@ -222,7 +267,12 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
                     <div class="workout-card" [style.--wc]="workoutPrimaryColor(w)" (click)="openWorkout(w.id)">
                       <div class="wc-bar" [style.background]="workoutCardColor(w)"></div>
                       <div class="wc-info">
-                        <span class="wc-label">{{ workoutLabel(w) }}</span>
+                        <span class="wc-label">
+                          {{ workoutLabel(w) }}
+                          @if (w.feeling) {
+                            <span class="wc-feeling">{{ emojiOf(w.feeling) }}</span>
+                          }
+                        </span>
                         <div class="wc-stats">
                           <span class="wc-stat">
                             <span class="material-symbols-outlined">fitness_center</span>
@@ -233,6 +283,13 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
                             <span class="wc-stat">
                               <span class="material-symbols-outlined">repeat</span>
                               <strong>{{ n }}</strong> sèr
+                            </span>
+                          }
+                          @if (workoutVolumeFmt(w); as vol) {
+                            <span class="wc-stat-sep">·</span>
+                            <span class="wc-stat wc-stat--vol">
+                              <span class="material-symbols-outlined">weight</span>
+                              <strong>{{ vol }}</strong>
                             </span>
                           }
                         </div>
@@ -323,19 +380,25 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       <div class="sd-backdrop" (click)="speedDialOpen.set(false)"></div>
     }
 
-    <!-- Bottom action row: suggestion card (when no activity) + FAB -->
+    <!-- Bottom action row: activity/suggestion card + FAB -->
     <div class="bottom-bar">
-      @if (todaySuggestion(); as s) {
-        <button class="suggestion-card" [style.--sc]="s.color" (click)="handleSuggestionClick(s)">
+      @if (bottomCard(); as bc) {
+        <button class="suggestion-card" [class.sc--done]="bc.kind !== 'suggestion'"
+                [style.--sc]="bc.color" (click)="handleBottomCardClick(bc)">
           <div class="sc-bar"></div>
           <div class="sc-icon-wrap">
-            <span class="material-symbols-outlined sc-icon">{{ s.icon }}</span>
+            <span class="material-symbols-outlined sc-icon"
+                  [class.sc-icon--fill]="bc.kind !== 'suggestion'">{{ bc.icon }}</span>
           </div>
           <div class="sc-info">
-            <span class="sc-eyebrow">Avui toca</span>
-            <span class="sc-label">{{ s.label }}</span>
+            <span class="sc-eyebrow">{{ bc.kind === 'suggestion' ? 'Avui toca' : 'Fet avui' }}</span>
+            <span class="sc-label">{{ bc.label }}</span>
           </div>
-          <span class="material-symbols-outlined sc-chevron">chevron_right</span>
+          @if (bc.kind === 'suggestion') {
+            <span class="material-symbols-outlined sc-chevron">chevron_right</span>
+          } @else if (bc.meta) {
+            <span class="sc-stats">{{ bc.meta }}</span>
+          }
         </button>
       }
 
@@ -613,10 +676,56 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       cursor: default;
       &:hover { box-shadow: none; background: color-mix(in srgb, var(--wc, var(--c-card)) 8%, var(--c-card)); border-color: color-mix(in srgb, var(--wc, var(--c-border-2)) 30%, var(--c-border-2)); }
     }
+    .aw-header-right {
+      display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+    }
     .aw-date {
       font-size: 11px; font-weight: 600; color: var(--c-text-2);
-      align-self: center; padding: 0 14px; flex-shrink: 0;
+      padding: 0 14px 0 0; flex-shrink: 0;
     }
+    .aw-feeling-btn {
+      width: 34px; height: 34px; border-radius: 50%;
+      border: none; background: transparent; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      touch-action: manipulation; transition: background 0.15s;
+      color: var(--c-text-3);
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { background: var(--c-hover); }
+      &.aw-feeling-btn--set { color: var(--c-text-2); }
+    }
+    .aw-feeling-emoji { font-size: 18px; line-height: 1; }
+    .aw-feeling-row {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      margin: 4px 16px 0;
+      padding: 10px 14px;
+      background: var(--c-card);
+      border-radius: 14px;
+      box-shadow: 0 2px 10px var(--c-shadow);
+      border: 1.5px solid var(--c-border-2);
+      animation: feel-in 0.18s cubic-bezier(0.34, 1.4, 0.64, 1);
+    }
+    @keyframes feel-in {
+      from { opacity: 0; transform: translateY(-6px) scale(0.95); }
+      to   { opacity: 1; transform: none; }
+    }
+    .aw-feeling-opt {
+      flex: 1; height: 44px; border-radius: 10px;
+      border: 1.5px solid var(--c-border-2); background: var(--c-subtle);
+      font-size: 20px; cursor: pointer; transition: all 0.12s; touch-action: manipulation;
+      display: flex; align-items: center; justify-content: center;
+      &.active { border-color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.08); transform: scale(1.1); }
+      &:hover:not(.active) { border-color: var(--c-border); background: var(--c-hover); }
+    }
+    .aw-feeling-clear {
+      width: 38px; height: 44px; border-radius: 10px; flex-shrink: 0;
+      border: 1.5px solid var(--c-border-2); background: transparent;
+      color: var(--c-text-3); cursor: pointer; touch-action: manipulation;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.12s;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover { color: #ef5350; border-color: rgba(239,83,80,0.3); background: rgba(239,83,80,0.06); }
+    }
+    .wc-feeling { font-size: 14px; line-height: 1; }
 
     /* ── Active workout action FABs ── */
     .aw-delete-fab {
@@ -698,6 +807,14 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .sc-chevron {
       font-size: 18px; color: var(--c-text-3); margin-right: 10px; flex-shrink: 0;
     }
+    .sc-stats {
+      font-size: 11px; font-weight: 700; color: var(--sc);
+      background: color-mix(in srgb, var(--sc) 10%, var(--c-card));
+      padding: 3px 8px; border-radius: 8px; line-height: 1.3;
+      margin-right: 12px; flex-shrink: 0;
+    }
+    .sc-icon--fill { font-variation-settings: 'FILL' 1; }
+    .sc--done .sc-eyebrow { color: color-mix(in srgb, var(--sc) 80%, var(--c-text-3)); }
 
     /* ── Type grid (inside workout-section) ── */
     .type-grid {
@@ -852,6 +969,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       strong { color: var(--c-text-2); font-weight: 700; }
     }
     .wc-stat-sep { color: var(--c-border); }
+    .wc-stat--vol strong { color: var(--wc, var(--c-brand)); }
     .wc-delete {
       width: 40px; height: 40px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
@@ -1303,6 +1421,8 @@ export class TrainComponent {
   readonly loggerMetrics   = signal<Record<string, string | number>>({});
   readonly loggerNotes     = signal<string>('');
   readonly creating          = signal(false);
+  readonly awFeelingOpen     = signal(false);
+  readonly feelingLevels5: FeelingLevel[] = [1, 2, 3, 4, 5];
   readonly acceptingProposal = signal(false);
 
   private readonly _dismissedKey = computed(() =>
@@ -1434,6 +1554,46 @@ export class TrainComponent {
   readonly doneCategories = computed((): Set<string> =>
     new Set(this.dateWorkouts().flatMap(w => workoutCategories(w)))
   );
+
+  readonly bottomCard = computed((): BottomCard | null => {
+    const workouts = this.dateWorkouts();
+    if (workouts.length > 0) {
+      const w = workouts[0];
+      const cats = workoutCategories(w);
+      const vol  = this.workoutVolumeFmt(w);
+      return {
+        kind: 'workout',
+        color: this.workoutPrimaryColor(w),
+        icon: cats.length ? (CATEGORY_ICONS[cats[0] as ExerciseCategory] ?? 'fitness_center') : 'fitness_center',
+        label: this.workoutLabel(w),
+        meta: vol ? `${this.workoutSetsCount(w)} sèr · ${vol}` : `${w.entries.length} ex · ${this.workoutSetsCount(w)} sèr`,
+        workoutId: w.id,
+      };
+    }
+    const sports = this.dateSportSessions();
+    if (sports.length > 0) {
+      const { session, sport } = sports[0];
+      return {
+        kind: 'sport',
+        color: sport.color,
+        icon: sport.icon,
+        label: sport.name,
+        meta: session.duration ? `${session.duration} min` : '',
+        sport,
+      };
+    }
+    const s = this.todaySuggestion();
+    if (s) {
+      return { kind: 'suggestion', color: s.color, icon: s.icon, label: s.label, meta: '', suggestion: s };
+    }
+    return null;
+  });
+
+  handleBottomCardClick(bc: BottomCard): void {
+    if (bc.kind === 'workout' && bc.workoutId) this.openWorkout(bc.workoutId);
+    else if (bc.kind === 'sport' && bc.sport) this.openSessionLogger(bc.sport);
+    else if (bc.kind === 'suggestion' && bc.suggestion) this.handleSuggestionClick(bc.suggestion);
+  }
 
   readonly weekDoneCategories = computed((): Set<string> => {
     const monday = mondayOf(this.selectedDate());
@@ -1607,6 +1767,29 @@ export class TrainComponent {
 
   workoutSetsCount(w: Workout): number {
     return w.entries.reduce((sum, e) => sum + e.sets.length, 0);
+  }
+
+  workoutVolume(w: Workout): number {
+    return w.entries.reduce((sum, e) =>
+      sum + e.sets.reduce((s2, set) => s2 + set.weight * set.reps, 0), 0);
+  }
+
+  workoutVolumeFmt(w: Workout): string {
+    const vol = this.workoutVolume(w);
+    if (vol <= 0) return '';
+    if (vol >= 1000) return `${(vol / 1000).toFixed(1)}t`;
+    return `${Math.round(vol)}kg`;
+  }
+
+  emojiOf(level: FeelingLevel): string { return FEELING_EMOJI[level]; }
+
+  async pickWorkoutFeeling(workoutId: string, level: FeelingLevel | undefined): Promise<void> {
+    this.awFeelingOpen.set(false);
+    try {
+      await this.workoutService.updateWorkoutFeeling(workoutId, level);
+    } catch {
+      this.snackBar.open('Error en guardar la sensació', '', { duration: 2000 });
+    }
   }
 
   async deleteActiveWorkout(): Promise<void> {

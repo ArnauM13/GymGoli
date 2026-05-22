@@ -245,6 +245,17 @@ import { ExerciseEntryCardComponent } from '../../shared/components/exercise-ent
                         <span class="material-symbols-outlined">repeat</span>
                         <strong>{{ totalSets(workout) }}</strong> sèr
                       </span>
+                      @if (volumeFmt(workout); as vol) {
+                        <span class="wh-stat-sep">·</span>
+                        <span class="wh-stat wh-stat--vol">
+                          <span class="material-symbols-outlined">weight</span>
+                          <strong>{{ vol }}</strong>
+                        </span>
+                      }
+                      @if (workout.feeling) {
+                        <span class="wh-stat-sep">·</span>
+                        <span class="wh-stat">{{ getFeelingEmoji(workout.feeling) }}</span>
+                      }
                     </div>
                   </div>
 
@@ -593,6 +604,7 @@ import { ExerciseEntryCardComponent } from '../../shared/components/exercise-ent
       strong { font-weight: 700; color: var(--c-text-2); }
     }
     .wh-stat-sep { color: var(--c-border); }
+    .wh-stat--vol strong { color: var(--wc, var(--c-brand)); }
 
     .wh-chevron {
       color: var(--c-text-3); font-size: 22px; flex-shrink: 0;
@@ -864,6 +876,14 @@ export class HistoryComponent {
     return Math.round(workout.entries.reduce((t, e) =>
       t + e.sets.reduce((s, set) => s + set.weight * set.reps, 0), 0
     ));
+  }
+
+  volumeFmt(workout: Workout): string {
+    const vol = this.dispW(this.totalVolume(workout));
+    if (vol <= 0) return '';
+    const u = this.unit();
+    if (u === 'kg' && vol >= 1000) return `${(vol / 1000).toFixed(1)}t`;
+    return `${Math.round(vol)}${u}`;
   }
   getExerciseNames(workout: Workout): string {
     const names = workout.entries.map(e => e.exerciseName);

@@ -15,6 +15,7 @@ function toWorkout(row: Record<string, unknown>): Workout {
     categories:       (row['categories'] as string[] | undefined) ?? [],
     entries:          (row['entries'] as WorkoutEntry[] | undefined) ?? [],
     notes:            (row['notes'] as string | undefined) ?? undefined,
+    feeling:          (row['feeling'] as FeelingLevel | undefined) ?? undefined,
     sourceProposalId: (row['source_proposal_id'] as string | null | undefined) ?? undefined,
     createdAt:        new Date(row['created_at'] as string),
   };
@@ -351,6 +352,10 @@ export class WorkoutService {
     await this._updateWorkout(workoutId, { entries });
   }
 
+  async updateWorkoutFeeling(workoutId: string, feeling: FeelingLevel | undefined): Promise<void> {
+    await this._updateWorkout(workoutId, { feeling });
+  }
+
   async reorderEntries(workoutId: string, entries: WorkoutEntry[]): Promise<void> {
     await this._updateWorkout(workoutId, { entries });
   }
@@ -379,6 +384,7 @@ export class WorkoutService {
     if (changes.categories !== undefined) patch['categories'] = changes.categories;
     if (changes.category   !== undefined) patch['category']   = changes.category;
     if (changes.notes      !== undefined) patch['notes']      = changes.notes;
+    if ('feeling' in changes) patch['feeling'] = changes.feeling ?? null;
 
     const { error } = await this.supabase
       .from('workouts')
