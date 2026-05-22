@@ -99,31 +99,25 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           />
         </div>
 
-        <!-- ── Objectives row ── -->
-        @if (workoutTypes.length > 0 || sportService.sports().length > 0) {
-          <div class="objectives-row">
+        <!-- ── Weekly objective progress ── -->
+        <div class="week-obj">
+          <span class="week-obj-label">Setmana</span>
+          <div class="week-obj-cats">
             @for (cat of workoutTypes; track cat.value) {
-              <button class="obj-chip" [class.obj-chip--done]="doneCategories().has(cat.value)"
-                [style.--obj-color]="cat.color" (click)="selectType(cat.value)">
-                <span class="material-symbols-outlined obj-chip-icon">{{ cat.icon }}</span>
-                <span class="obj-chip-label">{{ cat.label }}</span>
-                @if (doneCategories().has(cat.value)) {
-                  <span class="material-symbols-outlined obj-chip-check">check_circle</span>
-                }
-              </button>
-            }
-            @for (sport of sportService.sports(); track sport.id) {
-              <button class="obj-chip" [class.obj-chip--done]="isSportDone(sport.id)"
-                [style.--obj-color]="sport.color" (click)="openSessionLogger(sport)">
-                <span class="material-symbols-outlined obj-chip-icon">{{ sport.icon }}</span>
-                <span class="obj-chip-label">{{ sport.name }}</span>
-                @if (isSportDone(sport.id)) {
-                  <span class="material-symbols-outlined obj-chip-check">check_circle</span>
-                }
-              </button>
+              <div class="week-obj-cat" [class.done]="weekDoneCategories().has(cat.value)"
+                   [style.--woc]="cat.color">
+                <span class="woc-dot"></span>
+                <span class="woc-label">{{ cat.label }}</span>
+              </div>
             }
           </div>
-        }
+          @if (sportService.sports().length > 0 && weekSportCount() > 0) {
+            <div class="week-obj-sport">
+              <span class="material-symbols-outlined">sports_soccer</span>
+              {{ weekSportCount() }}
+            </div>
+          }
+        </div>
 
         <!-- ── Skeleton (initial data load) ── -->
         @if (workoutService.isLoading() && dateWorkouts().length === 0 && !creating()) {
@@ -576,39 +570,40 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       border-radius: 16px; overflow: hidden;
     }
 
-    /* ── Objectives row ── */
-    .objectives-row {
-      display: flex; flex-wrap: wrap; gap: 8px;
-      margin: 0 16px 12px; padding: 0;
+    /* ── Weekly objective progress ── */
+    .week-obj {
+      display: flex; align-items: center; gap: 10px;
+      margin: 0 16px 12px;
+      padding: 10px 14px;
+      background: var(--c-card);
+      border-radius: 14px;
+      box-shadow: 0 2px 10px var(--c-shadow);
+      border: 1.5px solid var(--c-border-2);
     }
-    .obj-chip {
+    .week-obj-label {
+      font-size: 10px; font-weight: 700; color: var(--c-text-3);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      flex-shrink: 0;
+    }
+    .week-obj-cats { display: flex; align-items: center; gap: 8px; flex: 1; }
+    .week-obj-cat {
       display: flex; align-items: center; gap: 5px;
-      padding: 7px 12px 7px 9px;
-      border: 1.5px solid color-mix(in srgb, var(--obj-color) 28%, var(--c-border-2));
-      border-radius: 20px;
-      background: color-mix(in srgb, var(--obj-color) 5%, var(--c-card));
-      color: var(--c-text-2);
-      box-shadow: 0 2px 8px var(--c-shadow);
-      cursor: pointer; touch-action: manipulation;
-      transition: background 0.15s, border-color 0.15s, transform 0.1s;
-      &:hover { background: color-mix(in srgb, var(--obj-color) 12%, var(--c-card)); border-color: color-mix(in srgb, var(--obj-color) 55%, var(--c-border)); }
-      &:active { transform: scale(0.95); }
-      &.obj-chip--done {
-        border-color: color-mix(in srgb, var(--obj-color) 65%, var(--c-border));
-        background: color-mix(in srgb, var(--obj-color) 12%, var(--c-card));
-        color: var(--c-text);
-      }
+      color: var(--c-text-3);
+      transition: color 0.15s;
+      &.done { color: var(--woc); }
     }
-    .obj-chip-icon {
-      font-size: 15px; color: var(--obj-color);
-      font-variation-settings: 'FILL' 0, 'wght' 300;
-      .obj-chip--done & { font-variation-settings: 'FILL' 1, 'wght' 400; }
+    .woc-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--c-border);
+      flex-shrink: 0; transition: background 0.15s;
+      .week-obj-cat.done & { background: var(--woc); }
     }
-    .obj-chip-label { font-size: 12px; font-weight: 700; letter-spacing: 0.1px; }
-    .obj-chip-check {
-      font-size: 14px; color: var(--obj-color);
-      font-variation-settings: 'FILL' 1, 'wght' 500;
-      margin-left: 1px;
+    .woc-label { font-size: 12px; font-weight: 600; }
+    .week-obj-sport {
+      display: flex; align-items: center; gap: 3px;
+      font-size: 11px; font-weight: 700; color: var(--c-text-2);
+      flex-shrink: 0;
+      .material-symbols-outlined { font-size: 13px; }
     }
 
     /* ── Active workout floating header (reuses .workout-card) ── */
@@ -1439,6 +1434,24 @@ export class TrainComponent {
   readonly doneCategories = computed((): Set<string> =>
     new Set(this.dateWorkouts().flatMap(w => workoutCategories(w)))
   );
+
+  readonly weekDoneCategories = computed((): Set<string> => {
+    const monday = mondayOf(this.selectedDate());
+    const done = new Set<string>();
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(monday, i);
+      for (const w of this.workoutService.getWorkoutsForDate(d)) {
+        for (const cat of workoutCategories(w)) done.add(cat);
+      }
+    }
+    return done;
+  });
+
+  readonly weekSportCount = computed((): number => {
+    const monday = mondayOf(this.selectedDate());
+    return Array.from({ length: 7 }, (_, i) => addDays(monday, i))
+      .reduce((sum, d) => sum + this.sportService.getSportSessionsForDate(d).length, 0);
+  });
 
   readonly pickerCat = signal<ExerciseCategory | null>(null);
 

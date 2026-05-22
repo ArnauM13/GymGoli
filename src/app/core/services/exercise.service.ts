@@ -66,7 +66,7 @@ export class ExerciseService {
   readonly byCategory = (category: ExerciseCategory) =>
     this._exercises().filter(e => e.category === category);
 
-  async create(data: Omit<Exercise, 'id' | 'createdAt'>): Promise<void> {
+  async create(data: Omit<Exercise, 'id' | 'createdAt'>): Promise<Exercise> {
     const uid = this.auth.uid();
     if (!uid) throw new Error('Not authenticated');
 
@@ -83,6 +83,7 @@ export class ExerciseService {
     this._exercises.set(
       [...this._exercises(), newEx].sort((a, b) => a.name.localeCompare(b.name))
     );
+    return newEx;
   }
 
   async update(id: string, data: Partial<Omit<Exercise, 'id' | 'createdAt'>>): Promise<void> {
