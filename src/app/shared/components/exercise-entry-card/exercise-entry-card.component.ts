@@ -34,7 +34,7 @@ import { kgToDisplay } from '../../utils/weight.utils';
               <span class="material-symbols-outlined eec-feeling-add"
                 (click)="onFeelingClick($event)">sentiment_neutral</span>
             }
-            @if (maxWeight() > 0 && (!collapsed() || !hideMetaWhenCollapsed())) {
+            @if (maxWeight() > 0) {
               <span class="eec-max">{{ dispW(maxWeight()) }}<small>{{ unit() }}</small></span>
             }
             @if (entry().sets.length > 0 && showSetsBadge()) {
