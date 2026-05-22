@@ -99,7 +99,31 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           />
         </div>
 
-        <!-- ── Fitness insights ── -->
+        <!-- ── Objectives row ── -->
+        @if (workoutTypes.length > 0 || sportService.sports().length > 0) {
+          <div class="objectives-row">
+            @for (cat of workoutTypes; track cat.value) {
+              <button class="obj-chip" [class.obj-chip--done]="doneCategories().has(cat.value)"
+                [style.--obj-color]="cat.color" (click)="selectType(cat.value)">
+                <span class="material-symbols-outlined obj-chip-icon">{{ cat.icon }}</span>
+                <span class="obj-chip-label">{{ cat.label }}</span>
+                @if (doneCategories().has(cat.value)) {
+                  <span class="material-symbols-outlined obj-chip-check">check_circle</span>
+                }
+              </button>
+            }
+            @for (sport of sportService.sports(); track sport.id) {
+              <button class="obj-chip" [class.obj-chip--done]="isSportDone(sport.id)"
+                [style.--obj-color]="sport.color" (click)="openSessionLogger(sport)">
+                <span class="material-symbols-outlined obj-chip-icon">{{ sport.icon }}</span>
+                <span class="obj-chip-label">{{ sport.name }}</span>
+                @if (isSportDone(sport.id)) {
+                  <span class="material-symbols-outlined obj-chip-check">check_circle</span>
+                }
+              </button>
+            }
+          </div>
+        }
 
         <!-- ── Skeleton (initial data load) ── -->
         @if (workoutService.isLoading() && dateWorkouts().length === 0 && !creating()) {
@@ -550,6 +574,41 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       margin: 0 16px 12px;
       box-shadow: 0 2px 12px rgba(0,0,0,0.08);
       border-radius: 16px; overflow: hidden;
+    }
+
+    /* ── Objectives row ── */
+    .objectives-row {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      margin: 0 16px 12px; padding: 0;
+    }
+    .obj-chip {
+      display: flex; align-items: center; gap: 5px;
+      padding: 7px 12px 7px 9px;
+      border: 1.5px solid color-mix(in srgb, var(--obj-color) 28%, var(--c-border-2));
+      border-radius: 20px;
+      background: color-mix(in srgb, var(--obj-color) 5%, var(--c-card));
+      color: var(--c-text-2);
+      box-shadow: 0 2px 8px var(--c-shadow);
+      cursor: pointer; touch-action: manipulation;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+      &:hover { background: color-mix(in srgb, var(--obj-color) 12%, var(--c-card)); border-color: color-mix(in srgb, var(--obj-color) 55%, var(--c-border)); }
+      &:active { transform: scale(0.95); }
+      &.obj-chip--done {
+        border-color: color-mix(in srgb, var(--obj-color) 65%, var(--c-border));
+        background: color-mix(in srgb, var(--obj-color) 12%, var(--c-card));
+        color: var(--c-text);
+      }
+    }
+    .obj-chip-icon {
+      font-size: 15px; color: var(--obj-color);
+      font-variation-settings: 'FILL' 0, 'wght' 300;
+      .obj-chip--done & { font-variation-settings: 'FILL' 1, 'wght' 400; }
+    }
+    .obj-chip-label { font-size: 12px; font-weight: 700; letter-spacing: 0.1px; }
+    .obj-chip-check {
+      font-size: 14px; color: var(--obj-color);
+      font-variation-settings: 'FILL' 1, 'wght' 500;
+      margin-left: 1px;
     }
 
     /* ── Active workout floating header (reuses .workout-card) ── */
