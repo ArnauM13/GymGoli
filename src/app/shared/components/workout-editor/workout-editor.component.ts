@@ -41,8 +41,8 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
             [collapsed]="isCollapsed(entry.exerciseId)"
             [draggable]="editMode() || alwaysEditable()"
             [hideMetaWhenCollapsed]="true"
-            [showSetsBadge]="false"
             [prBadge]="prEntries().has(entry.exerciseId)"
+            [feelingLevel]="entry.feeling"
             (headerClick)="toggleCollapse(entry.exerciseId)">
 
             <!-- ── Projected body content ──

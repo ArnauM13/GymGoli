@@ -24,26 +24,24 @@ import { kgToDisplay } from '../../utils/weight.utils';
           <div class="eec-bar"></div>
           <div class="eec-body">
             <span class="eec-name">{{ entry().exerciseName }}</span>
-            @if (!collapsed() || !hideMetaWhenCollapsed()) {
-              @if (feelingLevel()) {
-                <span class="eec-feeling"
-                  [class.eec-feeling--editable]="feelingEditable()"
-                  (click)="onFeelingClick($event)">
-                  {{ emoji(feelingLevel()!) }}
-                </span>
-              } @else if (feelingEditable()) {
-                <span class="material-symbols-outlined eec-feeling-add"
-                  (click)="onFeelingClick($event)">sentiment_neutral</span>
-              }
-              @if (maxWeight() > 0) {
-                <span class="eec-max">{{ dispW(maxWeight()) }}<small>{{ unit() }}</small></span>
-              }
-              @if (entry().sets.length > 0 && showSetsBadge()) {
-                <span class="eec-sets-badge">{{ entry().sets.length }} sèr</span>
-              }
-              @if (prBadge()) {
-                <span class="eec-pr">PR</span>
-              }
+            @if (feelingLevel()) {
+              <span class="eec-feeling"
+                [class.eec-feeling--editable]="feelingEditable()"
+                (click)="onFeelingClick($event)">
+                {{ emoji(feelingLevel()!) }}
+              </span>
+            } @else if (feelingEditable() && (!collapsed() || !hideMetaWhenCollapsed())) {
+              <span class="material-symbols-outlined eec-feeling-add"
+                (click)="onFeelingClick($event)">sentiment_neutral</span>
+            }
+            @if (maxWeight() > 0 && (!collapsed() || !hideMetaWhenCollapsed())) {
+              <span class="eec-max">{{ dispW(maxWeight()) }}<small>{{ unit() }}</small></span>
+            }
+            @if (entry().sets.length > 0 && showSetsBadge()) {
+              <span class="eec-sets-badge">{{ entry().sets.length }} sèr</span>
+            }
+            @if (prBadge()) {
+              <span class="eec-pr">PR</span>
             }
           </div>
           <div class="eec-actions">
