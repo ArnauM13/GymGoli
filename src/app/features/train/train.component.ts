@@ -142,24 +142,20 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             [selectedDate]="selectedDate()"
             (dateSelected)="selectedDate.set($event)"
           />
-        </div>
-
-        <!-- ── Weekly objective progress ── -->
-        @if (weekBars().length > 0) {
-          <div class="week-obj">
-            @for (bar of weekBars(); track bar.label) {
-              <div class="week-obj-bar">
-                <div class="week-obj-row">
-                  <span class="week-obj-label">{{ bar.emoji }} {{ bar.label }}</span>
+          @if (weekBars().length > 0) {
+            <div class="week-obj">
+              @for (bar of weekBars(); track bar.label) {
+                <div class="week-obj-bar">
+                  <span class="week-obj-emoji">{{ bar.emoji }}</span>
+                  <div class="week-obj-track">
+                    <div class="week-obj-fill" [style.width.%]="bar.pct"></div>
+                  </div>
                   <span class="week-obj-frac">{{ bar.done }}/{{ bar.target }}</span>
                 </div>
-                <div class="week-obj-track">
-                  <div class="week-obj-fill" [style.width.%]="bar.pct"></div>
-                </div>
-              </div>
-            }
-          </div>
-        }
+              }
+            </div>
+          }
+        </div>
 
         <!-- ── Skeleton (initial data load) ── -->
         @if (workoutService.isLoading() && dateWorkouts().length === 0 && !creating()) {
@@ -623,39 +619,33 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       h1 { margin: 0; font-size: 22px; font-weight: 700; }
     }
 
-    /* ── Calendar wrapper ── */
+    /* ── Calendar wrapper (also contains week-obj) ── */
     .calendar-wrap {
       margin: 0 16px 12px;
       box-shadow: 0 2px 12px rgba(0,0,0,0.08);
       border-radius: 16px; overflow: hidden;
+      background: var(--c-card);
     }
 
-    /* ── Weekly objective progress ── */
+    /* ── Weekly objective progress (inside calendar-wrap) ── */
     .week-obj {
-      margin: 0 16px 12px;
-      padding: 10px 14px;
-      background: var(--c-card);
-      border-radius: 14px;
-      box-shadow: 0 2px 10px var(--c-shadow);
-      border: 1.5px solid var(--c-border-2);
-      display: flex; flex-direction: column; gap: 10px;
+      padding: 9px 14px 10px;
+      border-top: 1px solid var(--c-border-2);
+      display: flex; flex-direction: column; gap: 7px;
     }
-    .week-obj-bar { display: flex; flex-direction: column; gap: 6px; }
-    .week-obj-row {
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .week-obj-label {
-      font-size: 10px; font-weight: 700; color: var(--c-text-3);
-      text-transform: uppercase; letter-spacing: 0.5px;
-    }
-    .week-obj-frac { font-size: 11px; font-weight: 700; color: var(--c-text-2); }
+    .week-obj-bar { display: flex; align-items: center; gap: 10px; }
+    .week-obj-emoji { font-size: 15px; flex-shrink: 0; width: 18px; text-align: center; line-height: 1; }
     .week-obj-track {
-      height: 6px; border-radius: 3px;
+      flex: 1; height: 5px; border-radius: 3px;
       background: var(--c-border-2); overflow: hidden;
     }
     .week-obj-fill {
-      height: 100%; border-radius: 3px;
+      height: 100%; border-radius: 3px; background: var(--c-brand);
       transition: width 0.4s cubic-bezier(0.34, 1.2, 0.64, 1);
+    }
+    .week-obj-frac {
+      font-size: 11px; font-weight: 700; color: var(--c-text-2);
+      flex-shrink: 0; min-width: 26px; text-align: right;
     }
 
     /* ── Active workout floating header (reuses .workout-card) ── */
