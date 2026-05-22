@@ -12,7 +12,6 @@ import {
   CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_MUSCLES,
   Exercise, ExerciseCategory,
 } from '../../core/models/exercise.model';
-import { FITNESS_GOAL_EMOJIS } from '../../core/models/user-settings.model';
 import { Sport, SportMetricDef } from '../../core/models/sport.model';
 import { BUILT_IN_TEMPLATES, BuiltInTemplate, WorkoutTemplate } from '../../core/models/template.model';
 import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry } from '../../core/models/workout.model';
@@ -144,13 +143,19 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           />
           @if (weekBars().length > 0) {
             <div class="week-obj">
-              @for (bar of weekBars(); track bar.label) {
-                <div class="week-obj-bar">
-                  <span class="week-obj-emoji">{{ bar.emoji }}</span>
+              @for (bar of weekBars(); track bar.icon) {
+                <div class="week-obj-bar"
+                     [class.wob--progress]="bar.pct > 0 && bar.pct < 100"
+                     [class.wob--done]="bar.pct >= 100">
+                  <span class="material-symbols-outlined week-obj-icon">{{ bar.icon }}</span>
                   <div class="week-obj-track">
                     <div class="week-obj-fill" [style.width.%]="bar.pct"></div>
                   </div>
-                  <span class="week-obj-frac">{{ bar.done }}/{{ bar.target }}</span>
+                  @if (bar.pct >= 100) {
+                    <span class="material-symbols-outlined week-obj-check">check_circle</span>
+                  } @else {
+                    <span class="week-obj-frac">{{ bar.done }}/{{ bar.target }}</span>
+                  }
                 </div>
               }
             </div>
@@ -634,18 +639,34 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       display: flex; flex-direction: column; gap: 7px;
     }
     .week-obj-bar { display: flex; align-items: center; gap: 10px; }
-    .week-obj-emoji { font-size: 15px; flex-shrink: 0; width: 18px; text-align: center; line-height: 1; }
+    .week-obj-icon {
+      font-size: 16px; flex-shrink: 0;
+      color: var(--c-border);
+      font-variation-settings: 'FILL' 0, 'wght' 300;
+      transition: color 0.2s, font-variation-settings 0.2s;
+      .wob--progress & { color: var(--c-brand); }
+      .wob--done & { color: #43a047; font-variation-settings: 'FILL' 1, 'wght' 400; }
+    }
     .week-obj-track {
       flex: 1; height: 5px; border-radius: 3px;
       background: var(--c-border-2); overflow: hidden;
     }
     .week-obj-fill {
-      height: 100%; border-radius: 3px; background: var(--c-brand);
-      transition: width 0.4s cubic-bezier(0.34, 1.2, 0.64, 1);
+      height: 100%; border-radius: 3px;
+      background: var(--c-border);
+      transition: width 0.4s cubic-bezier(0.34, 1.2, 0.64, 1), background 0.2s;
+      .wob--progress & { background: var(--c-brand); }
+      .wob--done & { background: #43a047; }
     }
     .week-obj-frac {
-      font-size: 11px; font-weight: 700; color: var(--c-text-2);
-      flex-shrink: 0; min-width: 26px; text-align: right;
+      font-size: 11px; font-weight: 700;
+      color: var(--c-text-3); flex-shrink: 0; min-width: 26px; text-align: right;
+      transition: color 0.2s;
+      .wob--progress & { color: var(--c-text-2); }
+    }
+    .week-obj-check {
+      font-size: 16px; flex-shrink: 0; color: #43a047;
+      font-variation-settings: 'FILL' 1, 'wght' 400;
     }
 
     /* ── Active workout floating header (reuses .workout-card) ── */
@@ -1561,19 +1582,26 @@ export class TrainComponent {
     else if (bc.kind === 'suggestion' && bc.suggestion) this.handleSuggestionClick(bc.suggestion);
   }
 
+  private readonly _goalIcons: Record<string, string> = {
+    strength: 'fitness_center',
+    fitness:  'directions_run',
+    weight:   'monitor_weight',
+    sport:    'sports_soccer',
+  };
+
   readonly weekBars = computed(() => {
-    const mode      = this.settingsService.goalMode();
-    const gymGoal   = this.settingsService.weeklyGymGoal();
-    const sportGoal = this.settingsService.weeklySportGoal();
-    const actGoal   = this.settingsService.weeklyActivityGoal();
+    const mode        = this.settingsService.goalMode();
+    const gymGoal     = this.settingsService.weeklyGymGoal();
+    const sportGoal   = this.settingsService.weeklySportGoal();
+    const actGoal     = this.settingsService.weeklyActivityGoal();
     const fitnessGoal = this.settingsService.fitnessGoal();
 
     const monday = mondayOf(this.selectedDate());
     const days   = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
 
-    const mk = (emoji: string, label: string, done: number, target: number) => {
+    const mk = (icon: string, done: number, target: number) => {
       const t = Math.max(1, target);
-      return { emoji, label, done, target: t, pct: Math.min(100, Math.round(done / t * 100)) };
+      return { icon, done, target: t, pct: Math.min(100, Math.round(done / t * 100)) };
     };
 
     if (mode === 'combined') {
@@ -1582,14 +1610,14 @@ export class TrainComponent {
         this.workoutService.getWorkoutsForDate(d).length > 0 ||
         this.sportService.getSportSessionsForDate(d).length > 0
       ).length;
-      const emoji = fitnessGoal ? FITNESS_GOAL_EMOJIS[fitnessGoal] : '🏃';
-      return [mk(emoji, 'Activitat', activeDays, actGoal)];
+      const icon = fitnessGoal ? (this._goalIcons[fitnessGoal] ?? 'directions_run') : 'directions_run';
+      return [mk(icon, activeDays, actGoal)];
     } else {
       const gymSessions   = days.reduce((s, d) => s + this.workoutService.getWorkoutsForDate(d).length, 0);
       const sportSessions = days.reduce((s, d) => s + this.sportService.getSportSessionsForDate(d).length, 0);
       const bars = [];
-      if (gymGoal)   bars.push(mk('💪', 'Entrenos', gymSessions, gymGoal));
-      if (sportGoal) bars.push(mk('⚽', 'Esports', sportSessions, sportGoal));
+      if (gymGoal)   bars.push(mk('fitness_center', gymSessions, gymGoal));
+      if (sportGoal) bars.push(mk('sports_soccer', sportSessions, sportGoal));
       return bars;
     }
   });
