@@ -331,33 +331,23 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             <div class="section-body" [class.collapsed]="sportsCollapsed()">
               <div class="section-body-inner">
                 <div class="sbi-content">
-                  @for (item of dateSportSessions(); track item.session.id) {
-                    <div class="workout-card" [style.--wc]="item.sport.color" (click)="openSessionLogger(item.sport)">
-                      <div class="wc-bar" [style.background]="item.sport.color"></div>
-                      <div class="wc-info">
-                        <span class="wc-label">
-                          <span class="material-symbols-outlined wc-icon" [style.color]="item.sport.color">{{ item.sport.icon }}</span>
-                          {{ item.sport.name }}
-                        </span>
-                        @if (sportSummary(item.session, item.sport); as sum) {
-                          <span class="wc-detail">{{ sum }}</span>
-                        }
-                      </div>
-                      <button class="wc-delete" (click)="deleteSportSession(item.session.id, $event)" [disabled]="sportToggling()" title="Eliminar">
-                        <span class="material-symbols-outlined">delete</span>
-                      </button>
-                    </div>
-                  }
-                  @if (pendingSports().length > 0) {
-                    <div class="type-grid" [class.type-grid--mt]="dateSportSessions().length > 0"
-                         [style.grid-template-columns]="gridCols(pendingSports().length)">
-                      @for (sport of pendingSports(); track sport.id) {
+                  @if (sportService.sports().length > 0) {
+                    <div class="type-grid"
+                         [style.grid-template-columns]="gridCols(sportService.sports().length)">
+                      @for (sport of sportService.sports(); track sport.id) {
                         <button class="type-btn"
                           [style.--cat-color]="sport.color"
+                          [class.type-btn--done]="sportDoneMap().has(sport.id)"
                           (click)="openSessionLogger(sport)"
                           [disabled]="sportToggling()">
+                          @if (sportDoneMap().has(sport.id)) {
+                            <span class="type-done-check material-symbols-outlined">check_circle</span>
+                          }
                           <span class="material-symbols-outlined type-icon">{{ sport.icon }}</span>
                           <span class="type-label">{{ sport.name }}</span>
+                          @if (sportDoneMap().get(sport.id)?.subtypeId; as sid) {
+                            <span class="type-sport-sub">{{ subtypeName(sport, sid) }}</span>
+                          }
                         </button>
                       }
                     </div>
@@ -1093,78 +1083,10 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .section-body-inner { overflow: hidden; }
     .section-body-inner .sbi-content { padding-top: 12px; }
 
-    .sports-grid {
-      display: grid; gap: 10px;
-    }
-
-    .sport-btn {
-      position: relative;
-      display: flex; flex-direction: column; align-items: center; gap: 7px;
-      padding: 16px 4px 14px;
-      border: 1.5px solid color-mix(in srgb, var(--sport-color) 45%, var(--c-border));
-      border-radius: 16px;
-      background: color-mix(in srgb, var(--sport-color) 8%, var(--c-card));
-      color: color-mix(in srgb, var(--sport-color) 80%, var(--c-text));
-      cursor: pointer; touch-action: manipulation;
-      transition: all 0.18s ease;
-
-      &:hover:not(:disabled) {
-        border-color: var(--sport-color);
-        background: color-mix(in srgb, var(--sport-color) 14%, var(--c-card));
-        transform: translateY(-1px);
-      }
-      &:active:not(:disabled) { transform: scale(0.97); }
-
-      &.active {
-        border-color: var(--sport-color);
-        background: color-mix(in srgb, var(--sport-color) 16%, var(--c-card));
-      }
-      &:disabled { opacity: 0.65; cursor: default; }
-    }
-
-    .sport-icon {
-      font-size: 28px;
-      font-variation-settings: 'FILL' 0, 'wght' 300;
-      transition: font-variation-settings 0.15s;
-      .active & { font-variation-settings: 'FILL' 1, 'wght' 400; }
-    }
-
-    .sport-name {
-      font-size: 11px; font-weight: 700; letter-spacing: 0.2px;
-      text-align: center; line-height: 1.1;
-    }
-
-    .sport-check {
-      position: absolute; top: 6px; right: 6px;
-      font-size: 15px;
-      color: var(--sport-color);
-      font-variation-settings: 'FILL' 1, 'wght' 500;
-    }
-
-    .sport-subtype-label {
-      font-size: 10px; font-weight: 600; color: var(--sport-color);
-      text-align: center; line-height: 1.1;
+    .type-sport-sub {
+      font-size: 9px; font-weight: 700; color: var(--cat-color);
+      text-align: center; line-height: 1; letter-spacing: 0.1px;
       max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-
-    /* ── Subtype picker row ── */
-    .subtype-row {
-      display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
-      padding: 10px 2px 2px;
-    }
-    .subtype-row-label {
-      font-size: 11px; font-weight: 600; color: var(--c-text-2);
-      flex-shrink: 0;
-    }
-    .subtype-chip {
-      padding: 5px 12px;
-      border: 1.5px solid var(--c-border); border-radius: 20px;
-      background: var(--c-card); font-size: 12px; font-weight: 600; color: var(--c-text-2);
-      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      &.active {
-        background: var(--c-brand); color: var(--c-card); border-color: var(--c-brand);
-      }
-      &:hover:not(.active) { border-color: var(--c-brand); color: var(--c-brand); }
     }
 
     /* ── Skeleton screens ── */
@@ -1265,11 +1187,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
     .spin { animation: spin 1s linear infinite; }
 
-    /* ── Sport summary line ── */
-    .sport-summary {
-      font-size: 10px; font-weight: 600; color: var(--sport-color);
-      text-align: center; line-height: 1.1;
-    }
 
     /* ── Session logger bottom sheet ── */
     .sl-backdrop {
@@ -1511,6 +1428,18 @@ export class TrainComponent {
     return this.sportService.sports().filter(s => !doneIds.has(s.id));
   });
 
+  readonly sportDoneMap = computed(() => {
+    const map = new Map<string, { id: string; subtypeId?: string }>();
+    for (const { session, sport } of this.dateSportSessions()) {
+      map.set(sport.id, { id: session.id, subtypeId: session.subtypeId });
+    }
+    return map;
+  });
+
+  subtypeName(sport: Sport, subtypeId: string): string {
+    return sport.subtypes.find(s => s.id === subtypeId)?.name ?? '';
+  }
+
   async deleteSportSession(sessionId: string, ev: Event): Promise<void> {
     ev.stopPropagation();
     this.sportToggling.set(true);
@@ -1566,7 +1495,7 @@ export class TrainComponent {
         color: this.workoutPrimaryColor(w),
         icon: cats.length ? (CATEGORY_ICONS[cats[0] as ExerciseCategory] ?? 'fitness_center') : 'fitness_center',
         label: this.workoutLabel(w),
-        meta: vol ? `${this.workoutSetsCount(w)} sèr · ${vol}` : `${w.entries.length} ex · ${this.workoutSetsCount(w)} sèr`,
+        meta: `${w.entries.length} ex · ${this.workoutSetsCount(w)} sèr`,
         workoutId: w.id,
       };
     }
