@@ -147,20 +147,13 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         <div class="week-obj">
           <span class="week-obj-label">Setmana</span>
           <div class="week-obj-cats">
-            @for (cat of workoutTypes; track cat.value) {
-              <div class="week-obj-cat" [class.done]="weekDoneCategories().has(cat.value)"
-                   [style.--woc]="cat.color">
+            @for (item of weekObjectiveItems(); track item.label) {
+              <div class="week-obj-cat" [class.done]="item.done" [style.--woc]="item.color">
                 <span class="woc-dot"></span>
-                <span class="woc-label">{{ cat.label }}</span>
+                <span class="woc-label">{{ item.label }}</span>
               </div>
             }
           </div>
-          @if (sportService.sports().length > 0 && weekSportCount() > 0) {
-            <div class="week-obj-sport">
-              <span class="material-symbols-outlined">sports_soccer</span>
-              {{ weekSportCount() }}
-            </div>
-          }
         </div>
 
         <!-- ── Skeleton (initial data load) ── -->
@@ -661,12 +654,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .week-obj-cat.done & { background: var(--woc); }
     }
     .woc-label { font-size: 12px; font-weight: 600; }
-    .week-obj-sport {
-      display: flex; align-items: center; gap: 3px;
-      font-size: 11px; font-weight: 700; color: var(--c-text-2);
-      flex-shrink: 0;
-      .material-symbols-outlined { font-size: 13px; }
-    }
 
     /* ── Active workout floating header (reuses .workout-card) ── */
     .aw-header-sticky {
@@ -1597,6 +1584,39 @@ export class TrainComponent {
     const monday = mondayOf(this.selectedDate());
     return Array.from({ length: 7 }, (_, i) => addDays(monday, i))
       .reduce((sum, d) => sum + this.sportService.getSportSessionsForDate(d).length, 0);
+  });
+
+  readonly weekSportDoneIds = computed((): Set<string> => {
+    const monday = mondayOf(this.selectedDate());
+    const done = new Set<string>();
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(monday, i);
+      for (const { sport } of this.sportService.getSportSessionsForDate(d)) {
+        done.add(sport.id);
+      }
+    }
+    return done;
+  });
+
+  readonly weekObjectiveItems = computed((): { color: string; label: string; done: boolean }[] => {
+    const goal = this.settingsService.fitnessGoal() ?? 'strength';
+    const doneCats    = this.weekDoneCategories();
+    const doneSportIds = this.weekSportDoneIds();
+    const sports      = this.sportService.sports();
+
+    const gymItems = this.workoutTypes.map(cat => ({
+      color: cat.color, label: cat.label, done: doneCats.has(cat.value),
+    }));
+    const sportItems = sports.map(s => ({
+      color: s.color, label: s.name, done: doneSportIds.has(s.id),
+    }));
+
+    switch (goal) {
+      case 'fitness': return [...gymItems, ...sportItems];
+      case 'weight':  return sportItems.length > 0 ? [...sportItems, ...gymItems] : gymItems;
+      case 'sport':   return sportItems.length > 0 ? sportItems : gymItems;
+      default:        return gymItems; // 'strength' + null
+    }
   });
 
   readonly pickerCat = signal<ExerciseCategory | null>(null);
