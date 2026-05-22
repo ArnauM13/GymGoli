@@ -145,14 +145,12 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
         <!-- ── Weekly objective progress ── -->
         <div class="week-obj">
-          <span class="week-obj-label">Setmana</span>
-          <div class="week-obj-cats">
-            @for (item of weekObjectiveItems(); track item.label) {
-              <div class="week-obj-cat" [class.done]="item.done" [style.--woc]="item.color">
-                <span class="woc-dot"></span>
-                <span class="woc-label">{{ item.label }}</span>
-              </div>
-            }
+          <div class="week-obj-row">
+            <span class="week-obj-label">Objectiu setmanal</span>
+            <span class="week-obj-frac">{{ weekObjDone() }}/{{ weekObjectiveItems().length }}</span>
+          </div>
+          <div class="week-obj-track">
+            <div class="week-obj-fill" [style.width.%]="weekObjPct()"></div>
           </div>
         </div>
 
@@ -627,33 +625,32 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     /* ── Weekly objective progress ── */
     .week-obj {
-      display: flex; align-items: center; gap: 10px;
       margin: 0 16px 12px;
       padding: 10px 14px;
       background: var(--c-card);
       border-radius: 14px;
       box-shadow: 0 2px 10px var(--c-shadow);
       border: 1.5px solid var(--c-border-2);
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .week-obj-row {
+      display: flex; align-items: center; justify-content: space-between;
     }
     .week-obj-label {
       font-size: 10px; font-weight: 700; color: var(--c-text-3);
       text-transform: uppercase; letter-spacing: 0.5px;
-      flex-shrink: 0;
     }
-    .week-obj-cats { display: flex; align-items: center; gap: 8px; flex: 1; }
-    .week-obj-cat {
-      display: flex; align-items: center; gap: 5px;
-      color: var(--c-text-3);
-      transition: color 0.15s;
-      &.done { color: var(--woc); }
+    .week-obj-frac { font-size: 11px; font-weight: 700; color: var(--c-text-2); }
+    .week-obj-track {
+      height: 6px; border-radius: 3px;
+      background: var(--c-border-2); overflow: hidden;
     }
-    .woc-dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      background: var(--c-border);
-      flex-shrink: 0; transition: background 0.15s;
-      .week-obj-cat.done & { background: var(--woc); }
+    .week-obj-fill {
+      height: 100%; border-radius: 3px;
+      background: var(--c-brand);
+      transition: width 0.4s cubic-bezier(0.34, 1.2, 0.64, 1);
+      min-width: 0;
     }
-    .woc-label { font-size: 12px; font-weight: 600; }
 
     /* ── Active workout floating header (reuses .workout-card) ── */
     .aw-header-sticky {
@@ -1617,6 +1614,14 @@ export class TrainComponent {
       case 'sport':   return sportItems.length > 0 ? sportItems : gymItems;
       default:        return gymItems; // 'strength' + null
     }
+  });
+
+  readonly weekObjDone = computed(() =>
+    this.weekObjectiveItems().filter(i => i.done).length
+  );
+  readonly weekObjPct = computed(() => {
+    const items = this.weekObjectiveItems();
+    return items.length ? Math.round((this.weekObjDone() / items.length) * 100) : 0;
   });
 
   readonly pickerCat = signal<ExerciseCategory | null>(null);
