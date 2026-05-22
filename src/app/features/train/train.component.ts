@@ -2,7 +2,7 @@ import { Component, ViewChild, computed, effect, inject, signal, untracked } fro
 import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { InlineDatePickerComponent } from '../../shared/components/inline-date-picker/inline-date-picker.component';
+import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
 import { workoutCategories, mondayOf, addDays } from '../../shared/utils/calendar-utils';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { TrainerService } from '../../core/services/trainer.service';
@@ -38,7 +38,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 @Component({
   selector: 'app-train',
   standalone: true,
-  imports: [WorkoutEditorComponent, InlineDatePickerComponent, FitnessInsightsComponent],
+  imports: [WorkoutEditorComponent, CalendarComponent, FitnessInsightsComponent],
   template: `
     <div class="page" [style.padding-bottom]="pagePaddingBottom()">
 
@@ -86,10 +86,18 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       } @else {
 
         <!-- ══ DASHBOARD MODE ══ -->
-        <app-inline-date-picker
-          [selectedDate]="selectedDate()"
-          (dateSelected)="selectedDate.set($event)"
-        />
+        <header class="page-header">
+          <div class="page-header-top">
+            <h1>Entrenament</h1>
+          </div>
+        </header>
+
+        <div class="calendar-wrap">
+          <app-calendar
+            [selectedDate]="selectedDate()"
+            (dateSelected)="selectedDate.set($event)"
+          />
+        </div>
 
         <!-- ── Fitness insights ── -->
 
@@ -529,6 +537,20 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
   `,
   styles: [`
     .page { padding: 0; }
+
+    /* ── Page header ── */
+    .page-header { padding: 16px 16px 10px; }
+    .page-header-top {
+      display: flex; align-items: center; justify-content: space-between;
+      h1 { margin: 0; font-size: 22px; font-weight: 700; }
+    }
+
+    /* ── Calendar wrapper ── */
+    .calendar-wrap {
+      margin: 0 16px 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      border-radius: 16px; overflow: hidden;
+    }
 
     /* ── Active workout floating header (reuses .workout-card) ── */
     .aw-header-sticky {

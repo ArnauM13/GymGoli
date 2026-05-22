@@ -24,7 +24,6 @@ import { ExerciseEntryCardComponent } from '../../shared/components/exercise-ent
       <header class="page-header">
         <div class="page-header-top">
           <h1>Historial</h1>
-          <!-- View mode toggle -->
           <div class="view-seg">
             <button class="view-seg-btn" [class.active]="viewMode() === 'calendar'"
                     (click)="viewMode.set('calendar')">
@@ -38,10 +37,6 @@ import { ExerciseEntryCardComponent } from '../../shared/components/exercise-ent
             </button>
           </div>
         </div>
-        <span class="count">
-          @if (isLoading() && allWorkouts().length === 0) { ··· }
-          @else { {{ allWorkouts().length }} entrenaments }
-        </span>
       </header>
 
       <!-- ══════════════════════════════════
@@ -337,10 +332,9 @@ import { ExerciseEntryCardComponent } from '../../shared/components/exercise-ent
       padding: 16px 16px 10px;
     }
     .page-header-top {
-      display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;
+      display: flex; align-items: center; justify-content: space-between;
       h1 { margin: 0; font-size: 22px; font-weight: 700; }
     }
-    .count { font-size: 12px; color: var(--c-text-2); }
 
     /* ── View mode segmented control ── */
     .view-seg {
