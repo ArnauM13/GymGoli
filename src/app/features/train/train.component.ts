@@ -12,6 +12,7 @@ import {
   CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_MUSCLES,
   Exercise, ExerciseCategory,
 } from '../../core/models/exercise.model';
+import { FITNESS_GOAL_WEEKLY_DEFAULTS } from '../../core/models/user-settings.model';
 import { Sport, SportMetricDef } from '../../core/models/sport.model';
 import { BUILT_IN_TEMPLATES, BuiltInTemplate, WorkoutTemplate } from '../../core/models/template.model';
 import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry } from '../../core/models/workout.model';
@@ -145,13 +146,18 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
         <!-- ── Weekly objective progress ── -->
         <div class="week-obj">
-          <div class="week-obj-row">
-            <span class="week-obj-label">Objectiu setmanal</span>
-            <span class="week-obj-frac">{{ weekObjDone() }}/{{ weekObjectiveItems().length }}</span>
-          </div>
-          <div class="week-obj-track">
-            <div class="week-obj-fill" [style.width.%]="weekObjPct()"></div>
-          </div>
+          @for (bar of weekBars(); track bar.kind + bar.label) {
+            <div class="week-obj-bar">
+              <div class="week-obj-row">
+                <span class="week-obj-label">{{ bar.label }}</span>
+                <span class="week-obj-frac">{{ bar.done }}/{{ bar.target }}</span>
+              </div>
+              <div class="week-obj-track">
+                <div class="week-obj-fill" [style.width.%]="bar.pct"
+                     [style.background]="bar.color"></div>
+              </div>
+            </div>
+          }
         </div>
 
         <!-- ── Skeleton (initial data load) ── -->
@@ -631,8 +637,9 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       border-radius: 14px;
       box-shadow: 0 2px 10px var(--c-shadow);
       border: 1.5px solid var(--c-border-2);
-      display: flex; flex-direction: column; gap: 8px;
+      display: flex; flex-direction: column; gap: 10px;
     }
+    .week-obj-bar { display: flex; flex-direction: column; gap: 6px; }
     .week-obj-row {
       display: flex; align-items: center; justify-content: space-between;
     }
@@ -647,9 +654,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
     .week-obj-fill {
       height: 100%; border-radius: 3px;
-      background: var(--c-brand);
       transition: width 0.4s cubic-bezier(0.34, 1.2, 0.64, 1);
-      min-width: 0;
     }
 
     /* ── Active workout floating header (reuses .workout-card) ── */
@@ -1565,63 +1570,40 @@ export class TrainComponent {
     else if (bc.kind === 'suggestion' && bc.suggestion) this.handleSuggestionClick(bc.suggestion);
   }
 
-  readonly weekDoneCategories = computed((): Set<string> => {
-    const monday = mondayOf(this.selectedDate());
-    const done = new Set<string>();
-    for (let i = 0; i < 7; i++) {
-      const d = addDays(monday, i);
-      for (const w of this.workoutService.getWorkoutsForDate(d)) {
-        for (const cat of workoutCategories(w)) done.add(cat);
-      }
-    }
-    return done;
-  });
+  readonly weekBars = computed(() => {
+    const goal      = this.settingsService.fitnessGoal() ?? 'strength';
+    const gymGoal   = this.settingsService.weeklyGymGoal();
+    const sportGoal = this.settingsService.weeklySportGoal();
+    const actGoal   = this.settingsService.weeklyActivityGoal();
+    const monday    = mondayOf(this.selectedDate());
+    const days      = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
 
-  readonly weekSportCount = computed((): number => {
-    const monday = mondayOf(this.selectedDate());
-    return Array.from({ length: 7 }, (_, i) => addDays(monday, i))
-      .reduce((sum, d) => sum + this.sportService.getSportSessionsForDate(d).length, 0);
-  });
+    const gymSessions   = days.reduce((s, d) => s + this.workoutService.getWorkoutsForDate(d).length, 0);
+    const sportSessions = days.reduce((s, d) => s + this.sportService.getSportSessionsForDate(d).length, 0);
+    const activeDays    = days.filter(d =>
+      this.workoutService.getWorkoutsForDate(d).length > 0 ||
+      this.sportService.getSportSessionsForDate(d).length > 0
+    ).length;
 
-  readonly weekSportDoneIds = computed((): Set<string> => {
-    const monday = mondayOf(this.selectedDate());
-    const done = new Set<string>();
-    for (let i = 0; i < 7; i++) {
-      const d = addDays(monday, i);
-      for (const { sport } of this.sportService.getSportSessionsForDate(d)) {
-        done.add(sport.id);
-      }
-    }
-    return done;
-  });
-
-  readonly weekObjectiveItems = computed((): { color: string; label: string; done: boolean }[] => {
-    const goal = this.settingsService.fitnessGoal() ?? 'strength';
-    const doneCats    = this.weekDoneCategories();
-    const doneSportIds = this.weekSportDoneIds();
-    const sports      = this.sportService.sports();
-
-    const gymItems = this.workoutTypes.map(cat => ({
-      color: cat.color, label: cat.label, done: doneCats.has(cat.value),
-    }));
-    const sportItems = sports.map(s => ({
-      color: s.color, label: s.name, done: doneSportIds.has(s.id),
-    }));
+    const bar = (label: string, color: string, done: number, target: number) => {
+      const t = Math.max(1, target);
+      return { label, color, done, target: t, pct: Math.min(100, Math.round(done / t * 100)) };
+    };
+    const brand = 'var(--c-brand)';
 
     switch (goal) {
-      case 'fitness': return [...gymItems, ...sportItems];
-      case 'weight':  return sportItems.length > 0 ? [...sportItems, ...gymItems] : gymItems;
-      case 'sport':   return sportItems.length > 0 ? sportItems : gymItems;
-      default:        return gymItems; // 'strength' + null
+      case 'strength':
+        return [bar('Gimnàs', brand, gymSessions, gymGoal ?? FITNESS_GOAL_WEEKLY_DEFAULTS.strength)];
+      case 'sport':
+        return [bar('Esport', brand, sportSessions, sportGoal ?? FITNESS_GOAL_WEEKLY_DEFAULTS.sport)];
+      case 'fitness':
+        return [bar('Activitat', brand, activeDays, actGoal ?? FITNESS_GOAL_WEEKLY_DEFAULTS.fitness)];
+      case 'weight':
+        return [
+          bar('Esport', brand, sportSessions, sportGoal ?? Math.ceil(FITNESS_GOAL_WEEKLY_DEFAULTS.weight / 2)),
+          bar('Gimnàs', 'var(--c-text-2)', gymSessions, gymGoal ?? Math.floor(FITNESS_GOAL_WEEKLY_DEFAULTS.weight / 2)),
+        ];
     }
-  });
-
-  readonly weekObjDone = computed(() =>
-    this.weekObjectiveItems().filter(i => i.done).length
-  );
-  readonly weekObjPct = computed(() => {
-    const items = this.weekObjectiveItems();
-    return items.length ? Math.round((this.weekObjDone() / items.length) * 100) : 0;
   });
 
   readonly pickerCat = signal<ExerciseCategory | null>(null);
