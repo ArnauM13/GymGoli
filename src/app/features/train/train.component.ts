@@ -30,13 +30,12 @@ type SportSuggestion = { type: 'sport'; sport: Sport;               label: strin
 type TodaySuggestion = GymSuggestion | SportSuggestion;
 
 type BottomCard = {
-  kind: 'workout' | 'sport' | 'suggestion';
+  kind: 'workout' | 'suggestion';
   color: string;
   icon: string;
   label: string;
   meta: string;
   workoutId?: string;
-  sport?: Sport;
   suggestion?: TodaySuggestion;
 };
 
@@ -1570,18 +1569,6 @@ export class TrainComponent {
         workoutId: w.id,
       };
     }
-    const sports = this.dateSportSessions();
-    if (sports.length > 0) {
-      const { session, sport } = sports[0];
-      return {
-        kind: 'sport',
-        color: sport.color,
-        icon: sport.icon,
-        label: sport.name,
-        meta: session.duration ? `${session.duration} min` : '',
-        sport,
-      };
-    }
     const s = this.todaySuggestion();
     if (s) {
       return { kind: 'suggestion', color: s.color, icon: s.icon, label: s.label, meta: '', suggestion: s };
@@ -1591,7 +1578,6 @@ export class TrainComponent {
 
   handleBottomCardClick(bc: BottomCard): void {
     if (bc.kind === 'workout' && bc.workoutId) this.openWorkout(bc.workoutId);
-    else if (bc.kind === 'sport' && bc.sport) this.openSessionLogger(bc.sport);
     else if (bc.kind === 'suggestion' && bc.suggestion) this.handleSuggestionClick(bc.suggestion);
   }
 
