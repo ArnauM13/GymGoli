@@ -4,7 +4,7 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 import { ExerciseService } from './exercise.service';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
-import { FeelingLevel, Workout, WorkoutEntry, WorkoutSet } from '../models/workout.model';
+import { FeelingLevel, PlannedSource, Workout, WorkoutEntry, WorkoutSet, WorkoutStatus } from '../models/workout.model';
 
 // ── Supabase row → typed Workout ────────────────────────────────────────────
 function toWorkout(row: Record<string, unknown>): Workout {
@@ -18,6 +18,8 @@ function toWorkout(row: Record<string, unknown>): Workout {
     feeling:          (row['feeling'] as FeelingLevel | undefined) ?? undefined,
     sourceProposalId: (row['source_proposal_id'] as string | null | undefined) ?? undefined,
     createdAt:        new Date(row['created_at'] as string),
+    status:           (row['status'] as WorkoutStatus | undefined) ?? 'done',
+    plannedSource:    (row['planned_source'] as PlannedSource | undefined) ?? undefined,
   };
 }
 
@@ -50,6 +52,20 @@ export class WorkoutService {
   readonly pastWorkouts = computed(() =>
     this.workouts().filter(w => w.date !== this._todayStr)
   );
+
+  readonly plannedWorkouts = computed(() =>
+    this._historical().filter(w => w.status === 'planned')
+  );
+
+  readonly plannedByDate = computed(() => {
+    const map = new Map<string, Workout[]>();
+    for (const w of this.plannedWorkouts()) {
+      const bucket = map.get(w.date) ?? [];
+      bucket.push(w);
+      map.set(w.date, bucket);
+    }
+    return map;
+  });
 
   readonly exercisesWithData = computed((): Set<string> =>
     new Set(
@@ -111,6 +127,8 @@ export class WorkoutService {
     this.ensureMonthLoaded(now.getFullYear(), now.getMonth());
     const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     this.ensureMonthLoaded(prev.getFullYear(), prev.getMonth());
+    const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    this.ensureMonthLoaded(next.getFullYear(), next.getMonth());
   }
 
   async ensureMonthLoaded(year: number, month: number): Promise<void> {
@@ -200,6 +218,14 @@ export class WorkoutService {
     return this.workouts().filter(w => w.date === date);
   }
 
+  getPlannedForDate(date: string): Workout[] {
+    return this.plannedWorkouts().filter(w => w.date === date);
+  }
+
+  getDoneWorkoutsForDate(date: string): Workout[] {
+    return this.getWorkoutsForDate(date).filter(w => (w.status ?? 'done') !== 'planned');
+  }
+
   getWorkoutsForExercise(exerciseId: string): Workout[] {
     return this.workouts()
       .filter(w => w.entries.some(e => e.exerciseId === exerciseId))
@@ -277,6 +303,50 @@ export class WorkoutService {
     this._monthCache.set(monthKey, [newWorkout, ...existing]);
     this._rebuildHistorical();
     return data['id'] as string;
+  }
+
+  async createPlannedWorkout(date: string, category?: string, entries: WorkoutEntry[] = []): Promise<string> {
+    const uid = this._uid();
+    const row: Record<string, unknown> = {
+      user_id: uid, date,
+      entries: entries.map(e => ({ exerciseId: e.exerciseId, exerciseName: e.exerciseName, sets: [] })),
+      categories: category ? [category] : [],
+      status: 'planned',
+      planned_source: 'self',
+    };
+    if (category) row['category'] = category;
+    const { data, error } = await this.supabase.from('workouts').insert(row).select().single();
+    if (error) throw error;
+    const newWorkout = toWorkout(data as Record<string, unknown>);
+    const monthKey = newWorkout.date.substring(0, 7);
+    const existing = this._monthCache.get(monthKey) ?? [];
+    this._monthCache.set(monthKey, [newWorkout, ...existing]);
+    this._rebuildHistorical();
+    return data['id'] as string;
+  }
+
+  async createPlannedFromProposal(date: string, proposalId: string, entries: WorkoutEntry[]): Promise<string> {
+    const uid = this._uid();
+    const row: Record<string, unknown> = {
+      user_id: uid, date,
+      entries: entries.map(e => ({ exerciseId: e.exerciseId, exerciseName: e.exerciseName, sets: [] })),
+      categories: [],
+      status: 'planned',
+      planned_source: 'trainer',
+      source_proposal_id: proposalId,
+    };
+    const { data, error } = await this.supabase.from('workouts').insert(row).select().single();
+    if (error) throw error;
+    const newWorkout = toWorkout(data as Record<string, unknown>);
+    const monthKey = newWorkout.date.substring(0, 7);
+    const existing = this._monthCache.get(monthKey) ?? [];
+    this._monthCache.set(monthKey, [newWorkout, ...existing]);
+    this._rebuildHistorical();
+    return data['id'] as string;
+  }
+
+  async startPlannedWorkout(workoutId: string): Promise<void> {
+    await this._updateWorkout(workoutId, { status: 'done' });
   }
 
   async createWorkoutFromTemplate(date: string, category: string, templateEntries: WorkoutEntry[]): Promise<string> {
@@ -380,11 +450,13 @@ export class WorkoutService {
   private async _updateWorkout(id: string, changes: Partial<Workout>): Promise<void> {
     const uid = this._uid();
     const patch: Record<string, unknown> = {};
-    if (changes.entries    !== undefined) patch['entries']    = changes.entries;
-    if (changes.categories !== undefined) patch['categories'] = changes.categories;
-    if (changes.category   !== undefined) patch['category']   = changes.category;
-    if (changes.notes      !== undefined) patch['notes']      = changes.notes;
+    if (changes.entries        !== undefined) patch['entries']        = changes.entries;
+    if (changes.categories     !== undefined) patch['categories']     = changes.categories;
+    if (changes.category       !== undefined) patch['category']       = changes.category;
+    if (changes.notes          !== undefined) patch['notes']          = changes.notes;
     if ('feeling' in changes) patch['feeling'] = changes.feeling ?? null;
+    if (changes.status         !== undefined) patch['status']         = changes.status;
+    if (changes.plannedSource  !== undefined) patch['planned_source'] = changes.plannedSource;
 
     const { error } = await this.supabase
       .from('workouts')

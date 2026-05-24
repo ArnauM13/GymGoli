@@ -1,11 +1,11 @@
-import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal, booleanAttribute } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 import { WorkoutService } from '../../../core/services/workout.service';
 import { SportService } from '../../../core/services/sport.service';
 import {
   MONTHS_CA, MONTHS_SHORT, CalDay,
-  mondayOf, addDays, catDotBackground, sportDotBackground,
+  mondayOf, addDays, catDotBackground, sportDotBackground, workoutCategories,
 } from '../../utils/calendar-utils';
 
 @Component({
@@ -75,15 +75,18 @@ import {
               [class.is-today]="cell.isToday"
               [class.is-selected]="cell.isSelected"
               [class.is-future]="cell.isFuture"
-              [disabled]="cell.isFuture"
+              [class.has-planned]="cell.hasPlanned && !cell.hasWorkout"
+              [disabled]="cell.isFuture && !allowFuturePlanning()"
               (click)="selectDay(cell.date)">
               <span class="week-dow">{{ getDow(cell.date) }}</span>
               <span class="week-num">{{ cell.day }}</span>
-              @if (cell.hasWorkout || cell.hasSport) {
+              @if (cell.hasWorkout || cell.hasSport || cell.hasPlanned) {
                 <div class="dots-row">
                   @if (cell.hasWorkout) {
                     <span class="workout-dot"
                           [style.background]="getCatDotBackground(cell.workoutCategories)"></span>
+                  } @else if (cell.hasPlanned) {
+                    <span class="planned-dot"></span>
                   }
                   @for (icon of cell.sportIcons.slice(0, 2); track icon; let i = $index) {
                     <span class="week-sport-icon material-symbols-outlined"
@@ -112,15 +115,18 @@ import {
                 [class.is-today]="cell.isToday"
                 [class.is-selected]="cell.isSelected"
                 [class.is-future]="cell.isFuture"
-                [disabled]="cell.isFuture"
+                [class.has-planned]="cell.hasPlanned && !cell.hasWorkout"
+                [disabled]="cell.isFuture && !allowFuturePlanning()"
                 (click)="selectDay(cell.date)"
                 [attr.aria-label]="cell.day">
                 <span class="day-num">{{ cell.day }}</span>
-                @if (cell.hasWorkout || cell.hasSport) {
+                @if (cell.hasWorkout || cell.hasSport || cell.hasPlanned) {
                   <div class="dots-row">
                     @if (cell.hasWorkout) {
                       <span class="workout-dot"
                             [style.background]="getCatDotBackground(cell.workoutCategories)"></span>
+                    } @else if (cell.hasPlanned) {
+                      <span class="planned-dot"></span>
                     }
                     @if (cell.hasSport) {
                       <span class="sport-dot"
@@ -303,8 +309,14 @@ import {
     }
     .workout-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
     .sport-dot   { width: 5px; height: 5px; border-radius: 2px; flex-shrink: 0; }
+    .planned-dot {
+      width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+      background: transparent; border: 1.5px dashed var(--c-text-3);
+    }
     .is-selected .workout-dot,
     .is-selected .sport-dot { background: rgba(255,255,255,0.85) !important; }
+    .is-selected .planned-dot { border-color: rgba(255,255,255,0.65) !important; }
+    .is-future.has-planned { color: var(--c-text-2); opacity: 0.9; }
 
     /* ── Footer ── */
     .cal-footer {
@@ -326,8 +338,9 @@ export class CalendarComponent {
   private dialogRef      = inject(MatDialogRef<CalendarComponent>, { optional: true });
   private dialogData     = inject<{ selectedDate?: string; initialView?: 'week' | 'month' }>(MAT_DIALOG_DATA, { optional: true });
 
-  readonly selectedDate = input<string | null>(null);
-  readonly dateSelected = output<string>();
+  readonly selectedDate          = input<string | null>(null);
+  readonly allowFuturePlanning   = input(false, { transform: booleanAttribute });
+  readonly dateSelected          = output<string>();
 
   // ── View ──────────────────────────────────────────────────────────────────
   readonly view    = signal<'week' | 'month'>('week');
@@ -403,6 +416,7 @@ export class CalendarComponent {
 
   // ── Navigation ────────────────────────────────────────────────────────────
   readonly canNavForward = computed(() => {
+    if (this.allowFuturePlanning()) return true;
     if (this.view() === 'month') {
       const now = new Date();
       return this.calYear() < now.getFullYear() ||
@@ -486,16 +500,20 @@ export class CalendarComponent {
     const monday = this.weekStart();
     const today  = this.workoutService.todayDateString();
     const sel    = this.selectedDate() ?? this.dialogData?.selectedDate ?? null;
-    const workoutByDate = new Map(this.workoutService.workouts().map(w => [w.date, w]));
+    const doneByDate    = new Map(
+      this.workoutService.workouts().filter(w => (w.status ?? 'done') !== 'planned').map(w => [w.date, w])
+    );
+    const plannedByDate = this.workoutService.plannedByDate();
     const _s = this.sportService.sessions();
     const _p = this.sportService.sports();
 
     const days: CalDay[] = [];
     for (let i = 0; i < 7; i++) {
-      const dateStr = addDays(monday, i);
-      const d = new Date(dateStr + 'T12:00:00');
-      const w = workoutByDate.get(dateStr);
-      const sports = this.sportService.getSportsForDate(dateStr);
+      const dateStr   = addDays(monday, i);
+      const d         = new Date(dateStr + 'T12:00:00');
+      const w         = doneByDate.get(dateStr);
+      const planned   = plannedByDate.get(dateStr) ?? [];
+      const sports    = this.sportService.getSportsForDate(dateStr);
       days.push({
         date: dateStr, day: d.getDate(),
         hasWorkout: !!w,
@@ -503,9 +521,11 @@ export class CalendarComponent {
         hasSport: sports.length > 0,
         sportColors: sports.map(s => s.color),
         sportIcons:  sports.map(s => s.icon),
-        isToday:   dateStr === today,
-        isFuture:  dateStr > today,
+        isToday:    dateStr === today,
+        isFuture:   dateStr > today,
         isSelected: dateStr === sel,
+        hasPlanned: planned.length > 0,
+        plannedCategories: planned.flatMap(pw => workoutCategories(pw)),
       });
     }
     return days;
@@ -516,7 +536,10 @@ export class CalendarComponent {
     const y = this.calYear(), m = this.calMonth();
     const today = this.workoutService.todayDateString();
     const sel   = this.selectedDate() ?? this.dialogData?.selectedDate ?? null;
-    const workoutByDate = new Map(this.workoutService.workouts().map(w => [w.date, w]));
+    const doneByDate    = new Map(
+      this.workoutService.workouts().filter(w => (w.status ?? 'done') !== 'planned').map(w => [w.date, w])
+    );
+    const plannedByDate = this.workoutService.plannedByDate();
     const _s = this.sportService.sessions();
     const _p = this.sportService.sports();
 
@@ -528,8 +551,9 @@ export class CalendarComponent {
     for (let i = 0; i < startPad; i++) cells.push(null);
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const w = workoutByDate.get(dateStr);
-      const sports = this.sportService.getSportsForDate(dateStr);
+      const w       = doneByDate.get(dateStr);
+      const planned = plannedByDate.get(dateStr) ?? [];
+      const sports  = this.sportService.getSportsForDate(dateStr);
       cells.push({
         date: dateStr, day: d,
         hasWorkout: !!w,
@@ -537,9 +561,11 @@ export class CalendarComponent {
         hasSport: sports.length > 0,
         sportColors: sports.map(s => s.color),
         sportIcons:  sports.map(s => s.icon),
-        isToday:   dateStr === today,
-        isFuture:  dateStr > today,
+        isToday:    dateStr === today,
+        isFuture:   dateStr > today,
         isSelected: dateStr === sel,
+        hasPlanned: planned.length > 0,
+        plannedCategories: planned.flatMap(pw => workoutCategories(pw)),
       });
     }
     return cells;

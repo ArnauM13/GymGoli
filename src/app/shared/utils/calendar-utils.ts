@@ -14,6 +14,7 @@ export interface CalDay {
   hasWorkout: boolean; workoutCategories: string[];
   hasSport: boolean; sportColors: string[]; sportIcons: string[];
   isToday: boolean; isFuture: boolean; isSelected: boolean;
+  hasPlanned: boolean; plannedCategories: string[];
 }
 
 export function mondayOf(dateStr: string): string {

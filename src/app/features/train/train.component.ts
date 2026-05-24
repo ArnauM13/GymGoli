@@ -30,7 +30,7 @@ type SportSuggestion = { type: 'sport'; sport: Sport;               label: strin
 type TodaySuggestion = GymSuggestion | SportSuggestion;
 
 type BottomCard = {
-  kind: 'workout' | 'suggestion';
+  kind: 'workout' | 'suggestion' | 'plan';
   color: string;
   icon: string;
   label: string;
@@ -379,7 +379,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
                   [class.sc-icon--fill]="bc.kind !== 'suggestion'">{{ bc.icon }}</span>
           </div>
           <div class="sc-info">
-            <span class="sc-eyebrow">{{ bc.kind === 'suggestion' ? 'Avui toca' : 'Fet avui' }}</span>
+            <span class="sc-eyebrow">{{ bc.kind === 'suggestion' ? 'Avui toca' : bc.kind === 'plan' ? 'Pla pendent' : 'Fet avui' }}</span>
             <span class="sc-label">{{ bc.label }}</span>
           </div>
           @if (bc.kind === 'suggestion') {
@@ -1353,9 +1353,9 @@ export class TrainComponent {
     const prop = this.trainerService.getProposalForDate(date);
     if (!prop) return null;
     if (this._dismissedDates.has(date)) return null;
-    // Hide if already accepted (workout with source_proposal_id for this date)
+    // Hide if already accepted as a done workout
     const alreadyAccepted = this.workoutService
-      .getWorkoutsForDate(date)
+      .getDoneWorkoutsForDate(date)
       .some(w => w.sourceProposalId === prop.id);
     return alreadyAccepted ? null : prop;
   });
@@ -1369,7 +1369,7 @@ export class TrainComponent {
     if (this.selectedDate() !== today) return null;
 
     // Only suggest when no activity has been logged today
-    const hasGymToday = this.workoutService.getWorkoutsForDate(today).length > 0;
+    const hasGymToday = this.workoutService.getDoneWorkoutsForDate(today).length > 0;
     const hasSportToday = this.sportService.getSportSessionsForDate(today).length > 0;
     if (hasGymToday || hasSportToday) return null;
 
@@ -1412,7 +1412,7 @@ export class TrainComponent {
   });
 
   readonly dateWorkouts = computed(() =>
-    this.workoutService.getWorkoutsForDate(this.selectedDate())
+    this.workoutService.getDoneWorkoutsForDate(this.selectedDate())
   );
 
   readonly pagePaddingBottom = computed(() =>
@@ -1489,7 +1489,6 @@ export class TrainComponent {
     if (workouts.length > 0) {
       const w = workouts[0];
       const cats = workoutCategories(w);
-      const vol  = this.workoutVolumeFmt(w);
       return {
         kind: 'workout',
         color: this.workoutPrimaryColor(w),
@@ -1498,6 +1497,17 @@ export class TrainComponent {
         meta: `${w.entries.length} ex · ${this.workoutSetsCount(w)} sèr`,
         workoutId: w.id,
       };
+    }
+    if (this.selectedDate() === TODAY()) {
+      const plans = this.workoutService.getPlannedForDate(TODAY());
+      if (plans.length > 0) {
+        const brand = getComputedStyle(document.documentElement).getPropertyValue('--c-brand').trim() || '#006874';
+        return {
+          kind: 'plan', color: brand, icon: 'event',
+          label: 'Tens un pla per avui',
+          meta: `${plans.length} pla${plans.length > 1 ? 'ns' : ''} pendent${plans.length > 1 ? 's' : ''}`,
+        };
+      }
     }
     const s = this.todaySuggestion();
     if (s) {
@@ -1509,6 +1519,7 @@ export class TrainComponent {
   handleBottomCardClick(bc: BottomCard): void {
     if (bc.kind === 'workout' && bc.workoutId) this.openWorkout(bc.workoutId);
     else if (bc.kind === 'suggestion' && bc.suggestion) this.handleSuggestionClick(bc.suggestion);
+    else if (bc.kind === 'plan') this.router.navigate(['/calendar']);
   }
 
   private readonly _goalIcons: Record<string, string> = {
@@ -1536,13 +1547,13 @@ export class TrainComponent {
     if (mode === 'combined') {
       if (!actGoal) return [];
       const activeDays = days.filter(d =>
-        this.workoutService.getWorkoutsForDate(d).length > 0 ||
+        this.workoutService.getDoneWorkoutsForDate(d).length > 0 ||
         this.sportService.getSportSessionsForDate(d).length > 0
       ).length;
       const icon = fitnessGoal ? (this._goalIcons[fitnessGoal] ?? 'directions_run') : 'directions_run';
       return [mk(icon, activeDays, actGoal)];
     } else {
-      const gymSessions   = days.reduce((s, d) => s + this.workoutService.getWorkoutsForDate(d).length, 0);
+      const gymSessions   = days.reduce((s, d) => s + this.workoutService.getDoneWorkoutsForDate(d).length, 0);
       const sportSessions = days.reduce((s, d) => s + this.sportService.getSportSessionsForDate(d).length, 0);
       const bars = [];
       if (gymGoal)   bars.push(mk('fitness_center', gymSessions, gymGoal));

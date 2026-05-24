@@ -1,4 +1,6 @@
 export type FeelingLevel = 1 | 2 | 3 | 4 | 5;
+export type WorkoutStatus = 'planned' | 'done';
+export type PlannedSource = 'self' | 'trainer';
 
 export const FEELING_EMOJI: Record<FeelingLevel, string> = {
   1: '🔥',  // Excel·lent — menys fatigant
@@ -46,4 +48,7 @@ export interface Workout {
   /** Set when this workout was created by accepting a trainer proposal */
   sourceProposalId?: string | null;
   createdAt: Date;
+  /** 'done' (default) or 'planned' (future/scheduled) */
+  status?: WorkoutStatus;
+  plannedSource?: PlannedSource;
 }
