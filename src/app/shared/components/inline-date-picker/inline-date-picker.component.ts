@@ -412,6 +412,7 @@ export class InlineDatePickerComponent {
         isToday:    dateStr === today,
         isFuture:   dateStr > today,
         isSelected: dateStr === sel,
+        hasPlanned: false, plannedCategories: [],
       });
     }
     return days;
@@ -443,6 +444,7 @@ export class InlineDatePickerComponent {
         isToday:    dateStr === today,
         isFuture:   dateStr > today,
         isSelected: dateStr === sel,
+        hasPlanned: false, plannedCategories: [],
       });
     }
     return cells;

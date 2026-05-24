@@ -432,13 +432,13 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
 
   // ── Summary strip ────────────────────────────────────────────────────────
 
-  readonly totalWorkouts = computed(() => this.workoutService.workouts().length);
+  readonly totalWorkouts = computed(() => this.workoutService.doneWorkouts().length);
 
   readonly thisWeekCount = computed(() => {
     const today = new Date().toISOString().slice(0, 10);
     const monday = mondayOf(today);
     const sunday = addDays(monday, 6);
-    return this.workoutService.workouts().filter(w => w.date >= monday && w.date <= sunday).length;
+    return this.workoutService.doneWorkouts().filter(w => w.date >= monday && w.date <= sunday).length;
   });
 
   readonly goalMode        = computed(() => this.settingsService.goalMode());
@@ -464,7 +464,7 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
   });
 
   readonly weekStreak = computed(() => {
-    const workouts = this.workoutService.workouts();
+    const workouts = this.workoutService.doneWorkouts();
     if (workouts.length === 0) return 0;
     const today = new Date().toISOString().slice(0, 10);
     let streak = 0;

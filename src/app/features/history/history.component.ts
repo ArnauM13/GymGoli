@@ -752,7 +752,7 @@ export class HistoryComponent {
   get searchQueryValue(): string { return this.searchQuery(); }
   set searchQueryValue(v: string) { this.searchQuery.set(v); }
 
-  readonly allWorkouts = this.workoutService.workouts;
+  readonly allWorkouts = this.workoutService.doneWorkouts;
 
   readonly filteredWorkouts = computed(() => {
     const cat   = this.filterCat();

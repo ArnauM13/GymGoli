@@ -167,7 +167,7 @@ export class WeeklySummaryComponent {
     const DOW_CA  = ['Dl', 'Dt', 'Dc', 'Dj', 'Dv', 'Ds', 'Dg'];
 
     return dates.map((date, i) => {
-      const workouts    = this.workoutService.getWorkoutsForDate(date);
+      const workouts    = this.workoutService.getDoneWorkoutsForDate(date);
       const sessionSports = this.sportService.getSportsForDate(date);
       const gymCats     = [...new Set(workouts.flatMap(w => workoutCategories(w)))];
 
