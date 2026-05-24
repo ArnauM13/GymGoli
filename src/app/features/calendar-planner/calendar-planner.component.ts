@@ -33,7 +33,10 @@ const MONTHS_CA_FULL = [
       <!-- Page header -->
       <div class="page-header">
         <div class="page-header-top">
-          <h1>Calendari</h1>
+          <button class="back-btn" (click)="goBack()">
+            <span class="material-symbols-outlined">arrow_back</span>
+          </button>
+          <h1>Planifica</h1>
         </div>
       </div>
 
@@ -165,8 +168,20 @@ const MONTHS_CA_FULL = [
 
     .page-header { padding: 16px 16px 10px; }
     .page-header-top {
-      display: flex; align-items: center; justify-content: space-between;
-      h1 { margin: 0; font-size: 22px; font-weight: 700; }
+      display: flex; align-items: center; gap: 8px;
+      h1 { margin: 0; font-size: 22px; font-weight: 700; flex: 1; }
+    }
+
+    .back-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 36px; height: 36px; border-radius: 50%;
+      border: none; background: var(--c-subtle); color: var(--c-text-2);
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s;
+      flex-shrink: 0;
+      span { font-size: 20px; }
+      &:hover  { background: var(--c-hover); }
+      &:active { opacity: 0.7; }
     }
 
     .calendar-wrap {
@@ -369,6 +384,8 @@ export class CalendarPlannerComponent {
     if (diff === 1)  return 'Demà';
     return `${DAYS_CA[d.getDay()]}, ${d.getDate()} ${MONTHS_CA_FULL[d.getMonth()]}`;
   });
+
+  goBack(): void { this.router.navigate(['/train']); }
 
   selectDate(date: string): void {
     this.selectedDate.set(date);

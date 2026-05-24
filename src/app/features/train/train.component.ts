@@ -317,6 +317,18 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             </div>
           </div>
 
+          <!-- ── Planificació section ── -->
+          <div class="plan-section" (click)="navigateToPlanner()">
+            <div class="sports-header">
+              <span class="material-symbols-outlined sports-header-icon">calendar_month</span>
+              <h2 class="sports-title">Planifica el teu entrenament</h2>
+              @if (upcomingPlansCount() > 0) {
+                <span class="section-count-badge">{{ upcomingPlansCount() }}</span>
+              }
+              <span class="material-symbols-outlined section-chevron" style="transform:rotate(-90deg)">expand_more</span>
+            </div>
+          </div>
+
           <!-- ── Esports section ── -->
           <div class="sports-section">
             <div class="sports-header" (click)="sportsCollapsed.set(!sportsCollapsed())">
@@ -1040,6 +1052,19 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
 
     /* ── Sports section ── */
+    .plan-section {
+      margin: 12px 16px 0;
+      padding: 14px;
+      background: var(--c-card);
+      border-radius: 18px;
+      box-shadow: 0 2px 10px var(--c-shadow);
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+      transition: box-shadow 0.15s;
+      &:hover  { box-shadow: 0 4px 16px var(--c-shadow); }
+      &:active { opacity: 0.85; }
+      .sports-header { cursor: default; }
+    }
+
     .sports-section {
       margin: 12px 16px 0;
       padding: 14px;
@@ -1483,6 +1508,13 @@ export class TrainComponent {
   readonly doneCategories = computed((): Set<string> =>
     new Set(this.dateWorkouts().flatMap(w => workoutCategories(w)))
   );
+
+  readonly upcomingPlansCount = computed(() => {
+    const today = TODAY();
+    return this.workoutService.plannedWorkouts().filter(w => w.date >= today).length;
+  });
+
+  navigateToPlanner(): void { this.router.navigate(['/calendar']); }
 
   readonly bottomCard = computed((): BottomCard | null => {
     const workouts = this.dateWorkouts();
