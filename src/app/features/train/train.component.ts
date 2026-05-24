@@ -1380,7 +1380,7 @@ export class TrainComponent {
     const doneCats = new Set(
       Array.from({ length: 7 }, (_, i) => addDays(monday, i))
         .filter(d => d < today)
-        .flatMap(d => this.workoutService.getWorkoutsForDate(d).flatMap(w => workoutCategories(w)))
+        .flatMap(d => this.workoutService.getDoneWorkoutsForDate(d).flatMap(w => workoutCategories(w)))
     );
     const gymOrder: ExerciseCategory[] = ['push', 'pull', 'legs'];
     const nextGymCat = gymOrder.find(c => !doneCats.has(c)) ?? null;

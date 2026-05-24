@@ -57,6 +57,10 @@ export class WorkoutService {
     this._historical().filter(w => w.status === 'planned')
   );
 
+  readonly doneWorkouts = computed((): Workout[] =>
+    this.workouts().filter(w => (w.status ?? 'done') !== 'planned')
+  );
+
   readonly plannedByDate = computed(() => {
     const map = new Map<string, Workout[]>();
     for (const w of this.plannedWorkouts()) {

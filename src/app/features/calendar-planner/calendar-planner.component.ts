@@ -3,7 +3,6 @@ import { Router } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { WorkoutService } from '../../core/services/workout.service';
-import { SportService } from '../../core/services/sport.service';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
 import { workoutCategories } from '../../shared/utils/calendar-utils';
@@ -328,7 +327,6 @@ const MONTHS_CA_FULL = [
 })
 export class CalendarPlannerComponent {
   readonly workoutService = inject(WorkoutService);
-  readonly sportService   = inject(SportService);
   private router          = inject(Router);
   private snackBar        = inject(MatSnackBar);
 
@@ -357,7 +355,7 @@ export class CalendarPlannerComponent {
   });
 
   readonly showAddPlan = computed(() =>
-    this.isSelectedFuture() || this.selectedPlanned().length === 0
+    this.selectedDate() >= this.todayStr
   );
 
   readonly dayLabel = computed(() => {

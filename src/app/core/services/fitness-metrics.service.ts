@@ -77,7 +77,7 @@ export class FitnessMetricsService {
     const monday = mondayOfWeek(today);
     const weekAgo = offsetDate(today, -7);
 
-    const workouts = this.workoutService.workouts();
+    const workouts = this.workoutService.doneWorkouts();
     const sessions = this.sportService.sessions();
     const sports   = this.sportService.sports();
     const cfg         = this.settingsService.settings();
@@ -383,7 +383,7 @@ export class FitnessMetricsService {
     if (!hasGoal) return 0;
 
     const today    = TODAY();
-    const workouts = this.workoutService.workouts();
+    const workouts = this.workoutService.doneWorkouts();
     const sessions = this.sportService.sessions();
 
     let streak = 0;
