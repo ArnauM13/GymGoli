@@ -1,13 +1,17 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, ViewChild, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { WorkoutService } from '../../core/services/workout.service';
+import { SportService } from '../../core/services/sport.service';
+import { UserSettingsService } from '../../core/services/user-settings.service';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
-import { workoutCategories } from '../../shared/utils/calendar-utils';
-import { Workout } from '../../core/models/workout.model';
-import { CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_COLORS, ExerciseCategory } from '../../core/models/exercise.model';
+import { ExercisePickerDialogComponent } from '../train/components/exercise-picker-dialog.component';
+import { workoutCategories, mondayOf, addDays } from '../../shared/utils/calendar-utils';
+import { Workout, WorkoutEntry } from '../../core/models/workout.model';
+import { Exercise, CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_COLORS, ExerciseCategory } from '../../core/models/exercise.model';
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
 
@@ -59,9 +63,27 @@ const MONTHS_CA_FULL = [
               Fet
             </button>
           </div>
-          <app-workout-editor [workout]="ew" [alwaysEditable]="true"></app-workout-editor>
+          <app-workout-editor [workout]="ew" [alwaysEditable]="true"
+            (requestAddExercise)="openExercisePicker(ew)"></app-workout-editor>
         </div>
       } @else {
+
+        <!-- Week compliance strip -->
+        @if (weekCompliance(); as wc) {
+          <div class="week-strip">
+            <div class="ws-info">
+              <span class="ws-label">{{ wc.weekLabel }}</span>
+              <span class="ws-count" [class.ws-count--met]="wc.met">
+                {{ wc.done }}/{{ wc.goal }}
+                <span class="material-symbols-outlined ws-check" *ngIf="false">check_circle</span>
+              </span>
+            </div>
+            <div class="ws-track">
+              <div class="ws-fill" [style.width]="wc.pct + '%'"
+                   [class.ws-fill--met]="wc.met"></div>
+            </div>
+          </div>
+        }
 
         <!-- Selected day panel -->
         <div class="day-section">
@@ -88,44 +110,30 @@ const MONTHS_CA_FULL = [
 
           <!-- Planned workouts -->
           @for (plan of selectedPlanned(); track plan.id) {
-            <div class="plan-card" [style.--pc]="planColor(plan)">
-              <div class="pc-bar" [style.background]="planColor(plan)"></div>
-              <div class="pc-body">
-                <div class="pc-header">
-                  <span class="material-symbols-outlined pc-icon">{{ planIcon(plan) }}</span>
-                  <span class="pc-title">{{ planLabel(plan) }}</span>
-                  <span class="pc-badge"
-                        [class.pc-badge--trainer]="plan.plannedSource === 'trainer'">
+            <div class="plan-card" [style.--ic]="planColor(plan)">
+              <div class="ic-bar" [style.background]="planColor(plan)"></div>
+              <div class="ic-info">
+                <div class="ic-label">
+                  <span class="material-symbols-outlined ic-icon">{{ planIcon(plan) }}</span>
+                  {{ planLabel(plan) }}
+                  <span class="pc-badge" [class.pc-badge--trainer]="plan.plannedSource === 'trainer'">
                     {{ plan.plannedSource === 'trainer' ? 'Entrenador' : 'Tu' }}
                   </span>
                 </div>
-                @if (plan.entries.length > 0) {
-                  <div class="pc-exercises">
-                    @for (e of plan.entries.slice(0, 4); track e.exerciseId) {
-                      <span class="pc-ex">{{ e.exerciseName }}</span>
-                    }
-                    @if (plan.entries.length > 4) {
-                      <span class="pc-ex pc-ex--more">+{{ plan.entries.length - 4 }} més</span>
-                    }
-                  </div>
-                }
-                @if (plan.notes) {
-                  <p class="pc-notes">{{ plan.notes }}</p>
-                }
-                <div class="pc-actions">
-                  @if (selectedDate() <= todayStr) {
-                    <button class="pc-start" (click)="startPlan(plan)">
-                      <span class="material-symbols-outlined">play_arrow</span>
-                      Comença
-                    </button>
-                  }
-                  <button class="pc-action-btn pc-edit" (click)="editPlan(plan)">
-                    <span class="material-symbols-outlined">edit</span>
+                <span class="ic-meta">{{ planMeta(plan) }}</span>
+              </div>
+              <div class="pc-actions">
+                @if (selectedDate() <= todayStr) {
+                  <button class="pc-start" (click)="startPlan(plan)" title="Comença">
+                    <span class="material-symbols-outlined">play_arrow</span>
                   </button>
-                  <button class="pc-action-btn pc-delete" (click)="deletePlan(plan)">
-                    <span class="material-symbols-outlined">delete</span>
-                  </button>
-                </div>
+                }
+                <button class="pc-action-btn pc-edit" (click)="editPlan(plan)">
+                  <span class="material-symbols-outlined">edit</span>
+                </button>
+                <button class="pc-action-btn pc-delete" (click)="deletePlan(plan)">
+                  <span class="material-symbols-outlined">delete</span>
+                </button>
               </div>
             </div>
           }
@@ -226,49 +234,56 @@ const MONTHS_CA_FULL = [
       font-variation-settings: 'FILL' 1, 'wght' 400;
     }
 
-    /* ── Plan card ── */
+    /* ── Week compliance strip ── */
+    .week-strip {
+      margin: 0 16px 4px;
+      background: var(--c-card); border-radius: 14px;
+      padding: 10px 14px; box-shadow: 0 1px 6px var(--c-shadow);
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .ws-info { display: flex; justify-content: space-between; align-items: center; }
+    .ws-label { font-size: 12px; font-weight: 600; color: var(--c-text-2); }
+    .ws-count {
+      font-size: 12px; font-weight: 700; color: var(--c-text-2);
+      &.ws-count--met { color: #43a047; }
+    }
+    .ws-track {
+      height: 5px; background: var(--c-subtle); border-radius: 3px; overflow: hidden;
+    }
+    .ws-fill {
+      height: 100%; border-radius: 3px;
+      background: var(--c-brand); transition: width 0.4s ease;
+      &.ws-fill--met { background: #43a047; }
+    }
+
+    /* ── Plan card (same layout as item-card, dashed border) ── */
     .plan-card {
-      display: flex;
-      border: 1.5px solid color-mix(in srgb, var(--pc, var(--c-brand)) 40%, var(--c-border-2));
-      border-radius: 14px; overflow: hidden;
-      background: color-mix(in srgb, var(--pc, var(--c-brand)) 5%, var(--c-card));
+      display: flex; align-items: center;
+      border: 1.5px dashed color-mix(in srgb, var(--ic, var(--c-brand)) 55%, var(--c-border-2));
+      border-radius: 14px;
+      background: color-mix(in srgb, var(--ic, var(--c-brand)) 5%, var(--c-card));
+      overflow: hidden;
     }
-    .pc-bar { width: 5px; align-self: stretch; flex-shrink: 0; }
-    .pc-body { flex: 1; min-width: 0; padding: 12px 12px 10px; display: flex; flex-direction: column; gap: 8px; }
-    .pc-header { display: flex; align-items: center; gap: 7px; }
-    .pc-icon {
-      font-size: 18px; flex-shrink: 0; color: var(--pc, var(--c-brand));
-      font-variation-settings: 'FILL' 1, 'wght' 400;
-    }
-    .pc-title { font-size: 14px; font-weight: 700; color: var(--c-text); flex: 1; min-width: 0; }
     .pc-badge {
-      font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; flex-shrink: 0;
+      font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 8px; flex-shrink: 0;
       background: rgba(var(--c-brand-rgb), 0.12); color: var(--c-brand);
       &.pc-badge--trainer { background: rgba(255,152,0,0.12); color: #ef6c00; }
     }
-    .pc-exercises { display: flex; flex-wrap: wrap; gap: 4px; }
-    .pc-ex {
-      font-size: 11px; font-weight: 600; color: var(--c-text-2);
-      background: var(--c-subtle); border-radius: 8px; padding: 2px 7px;
-      &.pc-ex--more { color: var(--c-text-3); font-style: italic; }
-    }
-    .pc-notes { margin: 0; font-size: 12px; color: var(--c-text-2); font-style: italic; line-height: 1.4; }
-    .pc-actions { display: flex; align-items: center; gap: 8px; }
+    .pc-actions { display: flex; align-items: center; gap: 6px; padding: 0 10px 0 0; flex-shrink: 0; }
     .pc-start {
-      flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
-      padding: 9px 14px; border: none; border-radius: 10px;
-      background: var(--c-brand); color: white;
-      font-size: 13px; font-weight: 700; cursor: pointer; touch-action: manipulation;
-      transition: background 0.15s;
-      .material-symbols-outlined { font-size: 16px; }
+      width: 34px; height: 34px; border: none; border-radius: 10px;
+      background: var(--c-brand); color: white; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
+      .material-symbols-outlined { font-size: 18px; }
       &:hover { background: var(--c-brand-dk); }
     }
     .pc-action-btn {
-      width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+      width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
       border: 1.5px solid var(--c-border-2); background: transparent;
       display: flex; align-items: center; justify-content: center;
       cursor: pointer; touch-action: manipulation; color: var(--c-text-3);
-      .material-symbols-outlined { font-size: 16px; }
+      .material-symbols-outlined { font-size: 15px; }
       transition: all 0.15s;
       &:hover { border-color: var(--c-border); color: var(--c-text-2); }
     }
@@ -341,9 +356,14 @@ const MONTHS_CA_FULL = [
   `],
 })
 export class CalendarPlannerComponent {
-  readonly workoutService = inject(WorkoutService);
-  private router          = inject(Router);
-  private snackBar        = inject(MatSnackBar);
+  readonly workoutService  = inject(WorkoutService);
+  private readonly sport   = inject(SportService);
+  private readonly settings= inject(UserSettingsService);
+  private router           = inject(Router);
+  private dialog           = inject(MatDialog);
+  private snackBar         = inject(MatSnackBar);
+
+  @ViewChild(WorkoutEditorComponent) private editor?: WorkoutEditorComponent;
 
   readonly selectedDate  = signal<string>(TODAY());
   readonly editingId     = signal<string | null>(null);
@@ -372,6 +392,42 @@ export class CalendarPlannerComponent {
   readonly showAddPlan = computed(() =>
     this.selectedDate() >= this.todayStr
   );
+
+  readonly weekCompliance = computed((): { weekLabel: string; done: number; goal: number; pct: number; met: boolean } | null => {
+    const monday = mondayOf(this.selectedDate());
+    const sunday = addDays(monday, 6);
+    const today  = this.todayStr;
+    const g      = this.settings.getGoalForDate(monday);
+
+    let totalGoal: number | null;
+    let gymGoal:   number | null;
+    let sportGoal: number | null;
+    if (g.goalMode === 'combined') {
+      totalGoal = g.weeklyActivityGoal;
+      gymGoal = sportGoal = null;
+    } else {
+      gymGoal   = g.weeklyGymGoal;
+      sportGoal = g.weeklySportGoal;
+      totalGoal = (gymGoal ?? 0) + (sportGoal ?? 0) || null;
+    }
+    if (!totalGoal) return null;
+
+    const days    = Array.from({ length: 7 }, (_, i) => addDays(monday, i)).filter(d => d <= today);
+    const gymDone = days.reduce((s, d) => s + this.workoutService.getDoneWorkoutsForDate(d).length, 0);
+    const spDone  = days.reduce((s, d) => s + this.sport.getSportSessionsForDate(d).length, 0);
+    const done    = gymDone + spDone;
+
+    const met = g.goalMode === 'combined'
+      ? done >= totalGoal
+      : gymDone >= (gymGoal ?? 0) && spDone >= (sportGoal ?? 0);
+
+    const fmt = (d: Date) => `${d.getDate()} ${['gen','feb','mar','abr','mai','jun','jul','ago','set','oct','nov','des'][d.getMonth()]}`;
+    const m = new Date(monday + 'T12:00:00');
+    const s = new Date(sunday + 'T12:00:00');
+    const weekLabel = `${fmt(m)}–${fmt(s)}`;
+
+    return { weekLabel, done, goal: totalGoal, pct: Math.min(100, Math.round((done / totalGoal) * 100)), met };
+  });
 
   readonly dayLabel = computed(() => {
     const d = new Date(this.selectedDate() + 'T12:00:00');
@@ -427,6 +483,32 @@ export class CalendarPlannerComponent {
     } catch {
       this.snackBar.open('Error en eliminar el pla', '', { duration: 2500 });
     }
+  }
+
+  planMeta(w: Workout): string {
+    if (!w.entries.length) return 'Pla buit';
+    const names = w.entries.slice(0, 2).map(e => e.exerciseName).join(', ');
+    return w.entries.length > 2 ? `${names} +${w.entries.length - 2}` : names;
+  }
+
+  openExercisePicker(workout: Workout): void {
+    const ref = this.dialog.open(ExercisePickerDialogComponent, {
+      data: {
+        excludeIds:      workout.entries.map(e => e.exerciseId),
+        defaultCategory: workout.category as ExerciseCategory | undefined,
+      },
+      width: '420px', maxHeight: '80vh',
+    });
+    ref.afterClosed().subscribe(async (exercise: Exercise | undefined) => {
+      if (!exercise) return;
+      const entry: WorkoutEntry = { exerciseId: exercise.id, exerciseName: exercise.name, sets: [] };
+      try {
+        await this.workoutService.addExerciseToWorkout(workout.id, entry);
+        setTimeout(() => this.editor?.startAddSet(entry), 0);
+      } catch {
+        this.snackBar.open('Error en afegir l\'exercici', '', { duration: 2500 });
+      }
+    });
   }
 
   planLabel(w: Workout): string {

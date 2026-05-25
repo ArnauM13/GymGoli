@@ -4,16 +4,30 @@ import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { DEFAULT_USER_SETTINGS, FitnessGoal, UserSettings } from '../models/user-settings.model';
 
+export interface GoalSnapshot {
+  effectiveFrom: string;
+  goalMode: string;
+  weeklyActivityGoal: number | null;
+  weeklyGymGoal:      number | null;
+  weeklySportGoal:    number | null;
+}
+
+const GOAL_KEYS: (keyof UserSettings)[] = [
+  'goalMode', 'weeklyActivityGoal', 'weeklyGymGoal', 'weeklySportGoal',
+];
+
 @Injectable({ providedIn: 'root' })
 export class UserSettingsService {
   private supabase = inject(SupabaseService).client;
   private auth     = inject(AuthService);
 
-  private readonly _settings = signal<UserSettings>(DEFAULT_USER_SETTINGS);
-  private readonly _loaded   = signal(false);
+  private readonly _settings    = signal<UserSettings>(DEFAULT_USER_SETTINGS);
+  private readonly _loaded      = signal(false);
+  private readonly _goalHistory = signal<GoalSnapshot[]>([]);
 
   readonly settings            = this._settings.asReadonly();
   readonly loaded              = this._loaded.asReadonly();
+  readonly goalHistory         = this._goalHistory.asReadonly();
   readonly metricsEnabled      = computed(() => this._settings().metricsEnabled);
   readonly goalMode            = computed(() => this._settings().goalMode);
   readonly weeklyActivityGoal  = computed(() => this._settings().weeklyActivityGoal ?? null);
@@ -71,16 +85,84 @@ export class UserSettingsService {
         this._settings.set(merged);
         this._writeLocalStorage(uid, merged);
       }
+
+      // Load goal history (best-effort; table may not exist yet)
+      try {
+        const { data: hist } = await this.supabase
+          .from('goal_history')
+          .select('effective_from,goal_mode,weekly_activity_goal,weekly_gym_goal,weekly_sport_goal')
+          .eq('user_id', uid)
+          .order('effective_from', { ascending: false });
+        if (hist) {
+          this._goalHistory.set(hist.map(r => ({
+            effectiveFrom:       r['effective_from'] as string,
+            goalMode:            r['goal_mode'] as string,
+            weeklyActivityGoal:  r['weekly_activity_goal'] as number | null,
+            weeklyGymGoal:       r['weekly_gym_goal'] as number | null,
+            weeklySportGoal:     r['weekly_sport_goal'] as number | null,
+          })));
+        }
+      } catch { /* table may not exist yet */ }
     } catch { /* table may not exist yet */ }
 
     // Mark loaded once Supabase has responded (no-op if already set from cache)
     this._loaded.set(true);
   }
 
+  async saveGoalSnapshot(effectiveFrom: string): Promise<void> {
+    const uid = this.auth.uid();
+    if (!uid) return;
+    const s = this._settings();
+    const row = {
+      user_id:              uid,
+      effective_from:       effectiveFrom,
+      goal_mode:            s.goalMode ?? 'combined',
+      weekly_activity_goal: s.weeklyActivityGoal ?? null,
+      weekly_gym_goal:      s.weeklyGymGoal ?? null,
+      weekly_sport_goal:    s.weeklySportGoal ?? null,
+    };
+    try {
+      await this.supabase
+        .from('goal_history')
+        .upsert(row, { onConflict: 'user_id,effective_from' });
+      const entry: GoalSnapshot = {
+        effectiveFrom,
+        goalMode:           row.goal_mode,
+        weeklyActivityGoal: row.weekly_activity_goal,
+        weeklyGymGoal:      row.weekly_gym_goal,
+        weeklySportGoal:    row.weekly_sport_goal,
+      };
+      const existing = this._goalHistory();
+      const idx = existing.findIndex(g => g.effectiveFrom === effectiveFrom);
+      if (idx >= 0) {
+        const updated = [...existing]; updated[idx] = entry;
+        this._goalHistory.set(updated);
+      } else {
+        this._goalHistory.set(
+          [entry, ...existing].sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))
+        );
+      }
+    } catch { /* best-effort */ }
+  }
+
+  getGoalForDate(date: string): GoalSnapshot {
+    const match = this._goalHistory().find(g => g.effectiveFrom <= date);
+    if (match) return match;
+    const s = this._settings();
+    return {
+      effectiveFrom:       date,
+      goalMode:            s.goalMode ?? 'combined',
+      weeklyActivityGoal:  s.weeklyActivityGoal ?? null,
+      weeklyGymGoal:       s.weeklyGymGoal ?? null,
+      weeklySportGoal:     s.weeklySportGoal ?? null,
+    };
+  }
+
   async update(patch: Partial<UserSettings>): Promise<void> {
     const uid = this.auth.uid();
     if (!uid) return;
 
+    const hasGoalChange = GOAL_KEYS.some(k => k in patch);
     const next = { ...this._settings(), ...patch };
     this._settings.set(next);
     this._writeLocalStorage(uid, next);
@@ -89,6 +171,9 @@ export class UserSettingsService {
       await this.supabase
         .from('user_settings')
         .upsert({ user_id: uid, settings: next, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+      if (hasGoalChange) {
+        await this.saveGoalSnapshot(new Date().toISOString().split('T')[0]);
+      }
     } catch { /* best-effort */ }
   }
 }
