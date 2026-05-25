@@ -61,7 +61,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           <button class="back-btn" (click)="closeWorkout()">
             <span class="material-symbols-outlined">arrow_back</span>
           </button>
-          <h1>{{ workoutLabel(w) }}</h1>
+          <h1>{{ awPageTitle(w) }}</h1>
         </header>
 
         <!-- Floating card header (same style as dashboard workout-card) -->
@@ -147,7 +147,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             (dateSelected)="selectedDate.set($event)"
           />
         </div>
-        <app-weekly-summary [weekAnchor]="selectedDate()" />
+        <app-weekly-summary />
 
         <!-- ── Skeleton (initial data load) ── -->
         @if (workoutService.isLoading() && dateWorkouts().length === 0 && !creating()) {
@@ -819,11 +819,11 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     .sd-container {
       flex-shrink: 0; margin-left: auto;
-      display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+      position: relative; width: 56px;
     }
     .sd-items {
+      position: absolute; bottom: calc(100% + 8px); right: 0;
       display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
-      padding-bottom: 4px;
       animation: sd-items-in 0.2s cubic-bezier(0.34, 1.4, 0.64, 1) both;
     }
     @keyframes sd-items-in {
@@ -1616,6 +1616,12 @@ export class TrainComponent {
   closeWorkout(): void {
     this.activeWorkoutId.set(null);
     this.editor?.reset();
+  }
+
+  awPageTitle(w: Workout): string {
+    if (w.date === TODAY()) return "Entrenament d'avui";
+    const d = new Date(w.date + 'T12:00:00');
+    return d.toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'short' });
   }
 
   topbarDateLabel(w: Workout): string {

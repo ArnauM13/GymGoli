@@ -251,7 +251,7 @@ import {
         background: var(--c-brand) !important; color: white;
       }
       &.is-future { opacity: 0.35; }
-      &.is-future-plan { opacity: 0.65; }
+      &.is-future-plan { opacity: 0.85; }
       &.is-future-plan:hover { opacity: 1; }
     }
 
@@ -298,7 +298,7 @@ import {
         background: var(--c-brand) !important; color: white; font-weight: 700;
       }
       &.is-future { opacity: 0.35; }
-      &.is-future-plan { opacity: 0.65; }
+      &.is-future-plan { opacity: 0.85; }
       &.is-future-plan:hover { opacity: 1; }
     }
 
@@ -317,7 +317,7 @@ import {
     .sport-dot   { width: 5px; height: 5px; border-radius: 2px; flex-shrink: 0; }
     .planned-dot {
       width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
-      background: color-mix(in srgb, var(--pc, var(--c-brand)) 45%, transparent);
+      background: color-mix(in srgb, var(--pc, var(--c-brand)) 65%, transparent);
       border: 1.5px dashed var(--pc, var(--c-brand));
     }
     .is-selected .workout-dot,

@@ -67,7 +67,7 @@ const MONTHS_CA_FULL = [
         </div>
       } @else {
 
-        <app-weekly-summary [weekAnchor]="selectedDate()" />
+        <app-weekly-summary />
 
         <!-- Selected day panel -->
         <div class="day-section">
