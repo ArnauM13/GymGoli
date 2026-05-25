@@ -63,9 +63,6 @@ import { ExerciseEntryCardComponent } from '../../shared/components/exercise-ent
             }
 
             <div class="detail-header">
-              <button class="back-btn" (click)="selectedDate.set(null)">
-                <span class="material-symbols-outlined">arrow_back</span>
-              </button>
               <h2 class="detail-title">{{ selectedDateLabel() }}</h2>
             </div>
 
@@ -384,19 +381,8 @@ import { ExerciseEntryCardComponent } from '../../shared/components/exercise-ent
     .detail-color-bar { height: 5px; width: 100%; }
 
     .detail-header {
-      display: flex; align-items: center; gap: 10px;
       padding: 14px 16px 10px;
       border-bottom: 1px solid var(--c-border-2);
-    }
-    .back-btn {
-      display: flex; align-items: center; justify-content: center;
-      width: 36px; height: 36px; border-radius: 50%;
-      border: none; background: var(--c-subtle); color: var(--c-text-2);
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-      transition: background 0.15s; flex-shrink: 0;
-      span { font-size: 20px; }
-      &:hover  { background: var(--c-hover); }
-      &:active { opacity: 0.7; }
     }
     .detail-title {
       margin: 0; font-size: 16px; font-weight: 700; color: var(--c-text);
