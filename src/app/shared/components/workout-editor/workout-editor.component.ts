@@ -1004,7 +1004,7 @@ export class WorkoutEditorComponent implements OnDestroy {
       }
       // Start rest timer after logging sets
       const restSecs = this.settingsService.restTimerSeconds();
-      if (restSecs > 0) this.startRestTimer(restSecs, exerciseId);
+      if (restSecs > 0 && w.status !== 'planned') this.startRestTimer(restSecs, exerciseId);
       this.cancelSet();
     } catch {
       this.snackBar.open('Error en afegir les sèries', '', { duration: 3000 });
