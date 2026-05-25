@@ -226,8 +226,8 @@ interface ChartPoint {
     .page { padding: 0 0 16px; }
 
     .page-header {
-      padding: 16px 16px 8px;
-      h1 { margin: 0; font-size: 22px; font-weight: 600; }
+      padding: 16px 16px 10px;
+      h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
     }
 
     /* ── Summary block ───────────────────────────────────── */
