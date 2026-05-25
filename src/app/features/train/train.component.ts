@@ -143,6 +143,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
         <div class="calendar-wrap">
           <app-calendar
+            [allowFuturePlanning]="true"
             [selectedDate]="selectedDate()"
             (dateSelected)="selectedDate.set($event)"
           />
@@ -238,9 +239,9 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           <div class="workout-section">
             <div class="sports-header" (click)="gymCollapsed.set(!gymCollapsed())">
               <span class="material-symbols-outlined sports-header-icon">fitness_center</span>
-              <h2 class="sports-title">Entrenaments</h2>
-              @if (dateWorkouts().length > 0) {
-                <span class="section-count-badge">{{ dateWorkouts().length }}</span>
+              <h2 class="sports-title">{{ isSelectedFuture() ? 'Plans' : 'Entrenaments' }}</h2>
+              @if (sectionCount() > 0) {
+                <span class="section-count-badge">{{ sectionCount() }}</span>
               }
               <span class="material-symbols-outlined section-chevron"
                     [class.rotated]="gymCollapsed()">expand_more</span>
@@ -284,7 +285,35 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
                       </button>
                     </div>
                   }
-                  <div class="type-grid" [class.type-grid--mt]="dateWorkouts().length > 0"
+
+                  <!-- Planned workouts for the selected date -->
+                  @for (plan of datePlanned(); track plan.id) {
+                    <div class="plan-card" [style.--ic]="workoutPrimaryColor(plan)" (click)="openWorkout(plan.id)">
+                      <div class="ic-bar" [style.background]="workoutPrimaryColor(plan)"></div>
+                      <div class="ic-info">
+                        <div class="ic-label">
+                          <span class="material-symbols-outlined ic-icon">{{ planIcon(plan) }}</span>
+                          {{ workoutLabel(plan) }}
+                          @if (plan.plannedSource === 'trainer') {
+                            <span class="pc-badge pc-badge--trainer">Entrenador</span>
+                          }
+                        </div>
+                        <span class="ic-meta">{{ planMeta(plan) }}</span>
+                      </div>
+                      <div class="pc-actions">
+                        @if (!isSelectedFuture()) {
+                          <button class="pc-start" (click)="$event.stopPropagation(); startPlan(plan)" title="Comença">
+                            <span class="material-symbols-outlined">play_arrow</span>
+                          </button>
+                        }
+                        <button class="pc-action-btn pc-delete" (click)="$event.stopPropagation(); confirmDeleteWorkout(plan)" title="Eliminar">
+                          <span class="material-symbols-outlined">delete</span>
+                        </button>
+                      </div>
+                    </div>
+                  }
+
+                  <div class="type-grid" [class.type-grid--mt]="sectionCount() > 0"
                        [style.grid-template-columns]="gridCols(workoutTypes.length)">
                     @for (cat of workoutTypes; track cat.value) {
                       <button class="type-btn"
@@ -304,19 +333,8 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             </div>
           </div>
 
-          <!-- ── Planificació section ── -->
-          <div class="plan-section" (click)="navigateToPlanner()">
-            <div class="sports-header">
-              <span class="material-symbols-outlined sports-header-icon">calendar_month</span>
-              <h2 class="sports-title">Planifica el teu entrenament</h2>
-              @if (upcomingPlansCount() > 0) {
-                <span class="section-count-badge">{{ upcomingPlansCount() }}</span>
-              }
-              <span class="material-symbols-outlined section-chevron" style="transform:rotate(-90deg)">expand_more</span>
-            </div>
-          </div>
-
-          <!-- ── Esports section ── -->
+          <!-- ── Esports section (not for future planning) ── -->
+          @if (!isSelectedFuture()) {
           <div class="sports-section">
             <div class="sports-header" (click)="sportsCollapsed.set(!sportsCollapsed())">
               <span class="material-symbols-outlined sports-header-icon">sports_soccer</span>
@@ -355,6 +373,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               </div>
             </div>
           </div>
+          }
 
         }
       }
@@ -392,17 +411,19 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       <div class="sd-container">
         @if (speedDialOpen()) {
           <div class="sd-items">
-            @for (sport of sportService.sports(); track sport.id; let i = $index) {
-              <div class="sd-item" [style.--sd-i]="i">
-                <span class="sd-label">{{ sport.name }}</span>
-                <button class="sd-btn" [style.background]="sport.color"
-                  (click)="speedDialPickSport(sport)">
-                  <span class="material-symbols-outlined">{{ sport.icon }}</span>
-                </button>
-              </div>
+            @if (!isSelectedFuture()) {
+              @for (sport of sportService.sports(); track sport.id; let i = $index) {
+                <div class="sd-item" [style.--sd-i]="i">
+                  <span class="sd-label">{{ sport.name }}</span>
+                  <button class="sd-btn" [style.background]="sport.color"
+                    (click)="speedDialPickSport(sport)">
+                    <span class="material-symbols-outlined">{{ sport.icon }}</span>
+                  </button>
+                </div>
+              }
             }
             @for (cat of workoutTypes; track cat.value; let i = $index) {
-              <div class="sd-item" [style.--sd-i]="sportService.sports().length + i">
+              <div class="sd-item" [style.--sd-i]="(isSelectedFuture() ? 0 : sportService.sports().length) + i">
                 <span class="sd-label">{{ cat.label }}</span>
                 <button class="sd-btn" [style.background]="cat.color"
                   (click)="speedDialPickCategory(cat.value)">
@@ -1002,18 +1023,51 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
 
     /* ── Sports section ── */
-    .plan-section {
-      margin: 12px 16px 0;
-      padding: 14px;
-      background: var(--c-card);
-      border-radius: 18px;
-      box-shadow: 0 2px 10px var(--c-shadow);
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-      transition: box-shadow 0.15s;
-      &:hover  { box-shadow: 0 4px 16px var(--c-shadow); }
-      &:active { opacity: 0.85; }
-      .sports-header { cursor: default; }
+    /* ── Planned workout card (dashed border) ── */
+    .plan-card {
+      display: flex; align-items: center; margin-bottom: 8px;
+      border: 1.5px dashed color-mix(in srgb, var(--ic, var(--c-brand)) 55%, var(--c-border-2));
+      border-radius: 14px;
+      background: color-mix(in srgb, var(--ic, var(--c-brand)) 5%, var(--c-card));
+      overflow: hidden; cursor: pointer; touch-action: manipulation;
+      transition: box-shadow 0.15s, background 0.15s;
+      &:hover { box-shadow: 0 2px 8px var(--c-shadow); background: color-mix(in srgb, var(--ic, var(--c-brand)) 9%, var(--c-card)); }
     }
+    .ic-bar { width: 5px; align-self: stretch; flex-shrink: 0; }
+    .ic-info {
+      flex: 1; min-width: 0; padding: 10px 10px;
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .ic-label {
+      font-size: 13px; font-weight: 700; color: var(--c-text);
+      display: flex; align-items: center; gap: 5px;
+    }
+    .ic-icon { font-size: 15px; font-variation-settings: 'FILL' 1, 'wght' 400; color: var(--ic, var(--c-brand)); }
+    .ic-meta { font-size: 11px; color: var(--c-text-3); }
+    .pc-badge {
+      font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 8px; flex-shrink: 0;
+      background: rgba(var(--c-brand-rgb), 0.12); color: var(--c-brand);
+      &.pc-badge--trainer { background: rgba(255,152,0,0.12); color: #ef6c00; }
+    }
+    .pc-actions { display: flex; align-items: center; gap: 6px; padding: 0 10px 0 0; flex-shrink: 0; }
+    .pc-start {
+      width: 34px; height: 34px; border: none; border-radius: 10px;
+      background: var(--c-brand); color: white; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { background: var(--c-brand-dk); }
+    }
+    .pc-action-btn {
+      width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
+      border: 1.5px solid var(--c-border-2); background: transparent;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation; color: var(--c-text-3);
+      .material-symbols-outlined { font-size: 15px; }
+      transition: all 0.15s;
+      &:hover { border-color: var(--c-border); color: var(--c-text-2); }
+    }
+    .pc-delete:hover { border-color: rgba(239,83,80,0.35) !important; color: #ef5350 !important; }
 
     .sports-section {
       margin: 12px 16px 0;
@@ -1390,6 +1444,16 @@ export class TrainComponent {
     this.workoutService.getDoneWorkoutsForDate(this.selectedDate())
   );
 
+  readonly isSelectedFuture = computed(() => this.selectedDate() > TODAY());
+
+  readonly datePlanned = computed(() =>
+    this.workoutService.getPlannedForDate(this.selectedDate())
+  );
+
+  readonly sectionCount = computed(() =>
+    this.dateWorkouts().length + this.datePlanned().length
+  );
+
   readonly pagePaddingBottom = computed(() =>
     '88px' // clear the FAB / bottom-bar in both modes
   );
@@ -1441,7 +1505,7 @@ export class TrainComponent {
   readonly activeWorkout = computed((): Workout | null => {
     const id = this.activeWorkoutId();
     if (!id) return null;
-    return this.dateWorkouts().find(w => w.id === id) ?? null;
+    return this.workoutService.getWorkoutsForDate(this.selectedDate()).find(w => w.id === id) ?? null;
   });
 
   readonly activeWorkoutCategories = computed((): string[] => {
@@ -1458,13 +1522,6 @@ export class TrainComponent {
   readonly doneCategories = computed((): Set<string> =>
     new Set(this.dateWorkouts().flatMap(w => workoutCategories(w)))
   );
-
-  readonly upcomingPlansCount = computed(() => {
-    const today = TODAY();
-    return this.workoutService.plannedWorkouts().filter(w => w.date >= today).length;
-  });
-
-  navigateToPlanner(): void { this.router.navigate(['/calendar']); }
 
   readonly bottomCard = computed((): BottomCard | null => {
     const workouts = this.dateWorkouts();
@@ -1501,7 +1558,10 @@ export class TrainComponent {
   handleBottomCardClick(bc: BottomCard): void {
     if (bc.kind === 'workout' && bc.workoutId) this.openWorkout(bc.workoutId);
     else if (bc.kind === 'suggestion' && bc.suggestion) this.handleSuggestionClick(bc.suggestion);
-    else if (bc.kind === 'plan') this.router.navigate(['/calendar']);
+    else if (bc.kind === 'plan') {
+      const plan = this.workoutService.getPlannedForDate(TODAY())[0];
+      if (plan) this.openWorkout(plan.id);
+    }
   }
 
 
@@ -1619,9 +1679,31 @@ export class TrainComponent {
   }
 
   awPageTitle(w: Workout): string {
-    if (w.date === TODAY()) return "Entrenament d'avui";
+    const isPlan = (w.status ?? 'done') === 'planned';
+    if (w.date === TODAY()) return isPlan ? "Pla d'avui" : "Entrenament d'avui";
     const d = new Date(w.date + 'T12:00:00');
-    return d.toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'short' });
+    const label = d.toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'short' });
+    return isPlan ? `Pla · ${label}` : label;
+  }
+
+  async startPlan(w: Workout): Promise<void> {
+    try {
+      await this.workoutService.startPlannedWorkout(w.id);
+      this.openWorkout(w.id);
+    } catch {
+      this.snackBar.open('Error en iniciar el pla', '', { duration: 2500 });
+    }
+  }
+
+  planIcon(w: Workout): string {
+    const cats = workoutCategories(w);
+    return cats.length ? (CATEGORY_ICONS[cats[0] as ExerciseCategory] ?? 'fitness_center') : 'fitness_center';
+  }
+
+  planMeta(w: Workout): string {
+    if (!w.entries.length) return 'Pla buit';
+    const names = w.entries.slice(0, 2).map(e => e.exerciseName).join(', ');
+    return w.entries.length > 2 ? `${names} +${w.entries.length - 2}` : names;
   }
 
   topbarDateLabel(w: Workout): string {
@@ -1738,13 +1820,24 @@ export class TrainComponent {
 
   closePicker(): void { this.pickerCat.set(null); }
 
+  /** Create a planned workout (future date) or a live one (today/past), then open it. */
+  private async _createForSelectedDate(cat: ExerciseCategory, entries: WorkoutEntry[]): Promise<string> {
+    if (this.isSelectedFuture()) {
+      return this.workoutService.createPlannedWorkout(this.selectedDate(), cat, entries);
+    }
+    if (entries.length) {
+      return this.workoutService.createWorkoutFromTemplate(this.selectedDate(), cat, entries);
+    }
+    return this.workoutService.createWorkoutForDate(this.selectedDate(), cat);
+  }
+
   async pickerStartEmpty(): Promise<void> {
     const cat = this.pickerCat();
     if (!cat) return;
     this.closePicker();
     this.creating.set(true);
     try {
-      const id = await this.workoutService.createWorkoutForDate(this.selectedDate(), cat);
+      const id = await this._createForSelectedDate(cat, []);
       this.openWorkout(id);
     } catch {
       this.snackBar.open('Error en crear l\'entrenament', '', { duration: 3000 });
@@ -1758,9 +1851,7 @@ export class TrainComponent {
     this.closePicker();
     this.creating.set(true);
     try {
-      const id = await this.workoutService.createWorkoutFromTemplate(
-        this.selectedDate(), cat, last?.entries ?? []
-      );
+      const id = await this._createForSelectedDate(cat, last?.entries ?? []);
       this.openWorkout(id);
     } catch {
       this.snackBar.open('Error en crear l\'entrenament', '', { duration: 3000 });
@@ -1776,9 +1867,7 @@ export class TrainComponent {
     try {
       const useCat = t.category === 'mixed' ? cat : t.category as ExerciseCategory;
       const entries: WorkoutEntry[] = t.entries.map(e => ({ ...e, sets: [] }));
-      const id = await this.workoutService.createWorkoutFromTemplate(
-        this.selectedDate(), useCat, entries
-      );
+      const id = await this._createForSelectedDate(useCat, entries);
       this.openWorkout(id);
     } catch {
       this.snackBar.open('Error en crear l\'entrenament', '', { duration: 3000 });
@@ -1796,9 +1885,7 @@ export class TrainComponent {
         .map(name => exercises.find(e => e.name === name))
         .filter((e): e is Exercise => e !== undefined)
         .map(e => ({ exerciseId: e.id, exerciseName: e.name, sets: [] }));
-      const id = await this.workoutService.createWorkoutFromTemplate(
-        this.selectedDate(), cat, entries
-      );
+      const id = await this._createForSelectedDate(cat, entries);
       this.openWorkout(id);
     } catch {
       this.snackBar.open('Error en crear l\'entrenament', '', { duration: 3000 });
