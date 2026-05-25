@@ -4,12 +4,11 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { WorkoutService } from '../../core/services/workout.service';
-import { SportService } from '../../core/services/sport.service';
-import { UserSettingsService } from '../../core/services/user-settings.service';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
+import { WeeklySummaryComponent } from '../train/components/weekly-summary.component';
 import { ExercisePickerDialogComponent } from '../train/components/exercise-picker-dialog.component';
-import { workoutCategories, mondayOf, addDays } from '../../shared/utils/calendar-utils';
+import { workoutCategories } from '../../shared/utils/calendar-utils';
 import { Workout, WorkoutEntry } from '../../core/models/workout.model';
 import { Exercise, CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_COLORS, ExerciseCategory } from '../../core/models/exercise.model';
 
@@ -30,7 +29,7 @@ const MONTHS_CA_FULL = [
 @Component({
   selector: 'app-calendar-planner',
   standalone: true,
-  imports: [CalendarComponent, WorkoutEditorComponent],
+  imports: [CalendarComponent, WorkoutEditorComponent, WeeklySummaryComponent],
   template: `
     <div class="page">
 
@@ -68,22 +67,7 @@ const MONTHS_CA_FULL = [
         </div>
       } @else {
 
-        <!-- Week compliance strip -->
-        @if (weekCompliance(); as wc) {
-          <div class="week-strip">
-            <div class="ws-info">
-              <span class="ws-label">{{ wc.weekLabel }}</span>
-              <span class="ws-count" [class.ws-count--met]="wc.met">
-                {{ wc.done }}/{{ wc.goal }}
-                <span class="material-symbols-outlined ws-check" *ngIf="false">check_circle</span>
-              </span>
-            </div>
-            <div class="ws-track">
-              <div class="ws-fill" [style.width]="wc.pct + '%'"
-                   [class.ws-fill--met]="wc.met"></div>
-            </div>
-          </div>
-        }
+        <app-weekly-summary [weekAnchor]="selectedDate()" />
 
         <!-- Selected day panel -->
         <div class="day-section">
@@ -234,28 +218,6 @@ const MONTHS_CA_FULL = [
       font-variation-settings: 'FILL' 1, 'wght' 400;
     }
 
-    /* ── Week compliance strip ── */
-    .week-strip {
-      margin: 0 16px 4px;
-      background: var(--c-card); border-radius: 14px;
-      padding: 10px 14px; box-shadow: 0 1px 6px var(--c-shadow);
-      display: flex; flex-direction: column; gap: 6px;
-    }
-    .ws-info { display: flex; justify-content: space-between; align-items: center; }
-    .ws-label { font-size: 12px; font-weight: 600; color: var(--c-text-2); }
-    .ws-count {
-      font-size: 12px; font-weight: 700; color: var(--c-text-2);
-      &.ws-count--met { color: #43a047; }
-    }
-    .ws-track {
-      height: 5px; background: var(--c-subtle); border-radius: 3px; overflow: hidden;
-    }
-    .ws-fill {
-      height: 100%; border-radius: 3px;
-      background: var(--c-brand); transition: width 0.4s ease;
-      &.ws-fill--met { background: #43a047; }
-    }
-
     /* ── Plan card (same layout as item-card, dashed border) ── */
     .plan-card {
       display: flex; align-items: center;
@@ -356,10 +318,8 @@ const MONTHS_CA_FULL = [
   `],
 })
 export class CalendarPlannerComponent {
-  readonly workoutService  = inject(WorkoutService);
-  private readonly sport   = inject(SportService);
-  private readonly settings= inject(UserSettingsService);
-  private router           = inject(Router);
+  readonly workoutService = inject(WorkoutService);
+  private router          = inject(Router);
   private dialog           = inject(MatDialog);
   private snackBar         = inject(MatSnackBar);
 
@@ -392,42 +352,6 @@ export class CalendarPlannerComponent {
   readonly showAddPlan = computed(() =>
     this.selectedDate() >= this.todayStr
   );
-
-  readonly weekCompliance = computed((): { weekLabel: string; done: number; goal: number; pct: number; met: boolean } | null => {
-    const monday = mondayOf(this.selectedDate());
-    const sunday = addDays(monday, 6);
-    const today  = this.todayStr;
-    const g      = this.settings.getGoalForDate(monday);
-
-    let totalGoal: number | null;
-    let gymGoal:   number | null;
-    let sportGoal: number | null;
-    if (g.goalMode === 'combined') {
-      totalGoal = g.weeklyActivityGoal;
-      gymGoal = sportGoal = null;
-    } else {
-      gymGoal   = g.weeklyGymGoal;
-      sportGoal = g.weeklySportGoal;
-      totalGoal = (gymGoal ?? 0) + (sportGoal ?? 0) || null;
-    }
-    if (!totalGoal) return null;
-
-    const days    = Array.from({ length: 7 }, (_, i) => addDays(monday, i)).filter(d => d <= today);
-    const gymDone = days.reduce((s, d) => s + this.workoutService.getDoneWorkoutsForDate(d).length, 0);
-    const spDone  = days.reduce((s, d) => s + this.sport.getSportSessionsForDate(d).length, 0);
-    const done    = gymDone + spDone;
-
-    const met = g.goalMode === 'combined'
-      ? done >= totalGoal
-      : gymDone >= (gymGoal ?? 0) && spDone >= (sportGoal ?? 0);
-
-    const fmt = (d: Date) => `${d.getDate()} ${['gen','feb','mar','abr','mai','jun','jul','ago','set','oct','nov','des'][d.getMonth()]}`;
-    const m = new Date(monday + 'T12:00:00');
-    const s = new Date(sunday + 'T12:00:00');
-    const weekLabel = `${fmt(m)}–${fmt(s)}`;
-
-    return { weekLabel, done, goal: totalGoal, pct: Math.min(100, Math.round((done / totalGoal) * 100)), met };
-  });
 
   readonly dayLabel = computed(() => {
     const d = new Date(this.selectedDate() + 'T12:00:00');
