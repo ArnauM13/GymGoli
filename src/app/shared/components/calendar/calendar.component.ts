@@ -87,7 +87,7 @@ import {
                   @if (cell.hasWorkout) {
                     <span class="workout-dot"
                           [style.background]="getCatDotBackground(cell.workoutCategories)"></span>
-                  @else if (cell.hasPlanned) {
+                  } @else if (cell.hasPlanned) {
                     <span class="planned-dot"
                           [style.--pc]="getPlanDotColor(cell.plannedCategories)"></span>
                   }
@@ -129,7 +129,7 @@ import {
                     @if (cell.hasWorkout) {
                       <span class="workout-dot"
                             [style.background]="getCatDotBackground(cell.workoutCategories)"></span>
-                    @else if (cell.hasPlanned) {
+                    } @else if (cell.hasPlanned) {
                       <span class="planned-dot"
                             [style.--pc]="getPlanDotColor(cell.plannedCategories)"></span>
                     }
