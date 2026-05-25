@@ -3,6 +3,7 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 import { WorkoutService } from '../../../core/services/workout.service';
 import { SportService } from '../../../core/services/sport.service';
+import { CATEGORY_COLORS, ExerciseCategory } from '../../../core/models/exercise.model';
 import {
   MONTHS_CA, MONTHS_SHORT, CalDay,
   mondayOf, addDays, catDotBackground, sportDotBackground, workoutCategories,
@@ -87,7 +88,8 @@ import {
                     <span class="workout-dot"
                           [style.background]="getCatDotBackground(cell.workoutCategories)"></span>
                   } @else if (cell.hasPlanned) {
-                    <span class="planned-dot"></span>
+                    <span class="planned-dot"
+                          [style.--pc]="getPlanDotColor(cell.plannedCategories)"></span>
                   }
                   @for (icon of cell.sportIcons.slice(0, 2); track icon; let i = $index) {
                     <span class="week-sport-icon material-symbols-outlined"
@@ -128,7 +130,8 @@ import {
                       <span class="workout-dot"
                             [style.background]="getCatDotBackground(cell.workoutCategories)"></span>
                     } @else if (cell.hasPlanned) {
-                      <span class="planned-dot"></span>
+                      <span class="planned-dot"
+                            [style.--pc]="getPlanDotColor(cell.plannedCategories)"></span>
                     }
                     @if (cell.hasSport) {
                       <span class="sport-dot"
@@ -314,11 +317,15 @@ import {
     .sport-dot   { width: 5px; height: 5px; border-radius: 2px; flex-shrink: 0; }
     .planned-dot {
       width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
-      background: transparent; border: 1.5px dashed var(--c-text-3);
+      background: color-mix(in srgb, var(--pc, var(--c-brand)) 45%, transparent);
+      border: 1.5px dashed var(--pc, var(--c-brand));
     }
     .is-selected .workout-dot,
     .is-selected .sport-dot { background: rgba(255,255,255,0.85) !important; }
-    .is-selected .planned-dot { border-color: rgba(255,255,255,0.65) !important; }
+    .is-selected .planned-dot {
+      background: rgba(255,255,255,0.35) !important;
+      border-color: rgba(255,255,255,0.75) !important;
+    }
 
     /* ── Footer ── */
     .cal-footer {
@@ -585,4 +592,10 @@ export class CalendarComponent {
 
   readonly getCatDotBackground  = catDotBackground;
   readonly getSportDotBackground = sportDotBackground;
+
+  getPlanDotColor(cats: string[]): string {
+    const brand = getComputedStyle(document.documentElement).getPropertyValue('--c-brand').trim() || '#006874';
+    if (!cats?.length) return brand;
+    return CATEGORY_COLORS[cats[0] as ExerciseCategory] ?? brand;
+  }
 }
