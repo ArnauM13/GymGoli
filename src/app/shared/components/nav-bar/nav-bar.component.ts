@@ -107,11 +107,10 @@ export class NavBarComponent {
 
   readonly navItems = computed<NavItem[]>(() => {
     const base: NavItem[] = [
-      { path: '/train',    icon: 'exercise',        label: 'Entrena' },
-      { path: '/history',  icon: 'history',         label: 'Historial' },
-      { path: '/library',  icon: 'fitness_center',  label: 'Exercicis' },
-      { path: '/charts',   icon: 'bar_chart',       label: 'Progrés' },
-      { path: '/settings', icon: 'account_circle',  label: 'Perfil' },
+      { path: '/train',    icon: 'exercise',       label: 'Entrena' },
+      { path: '/history',  icon: 'history',        label: 'Historial' },
+      { path: '/charts',   icon: 'bar_chart',      label: 'Progrés' },
+      { path: '/settings', icon: 'account_circle', label: 'Perfil' },
     ];
     if (this.trainerService.isTrainer()) {
       base.splice(4, 0, { path: '/trainer', icon: 'sports', label: 'Clients' });

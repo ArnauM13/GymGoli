@@ -369,7 +369,30 @@ import {
         }
       </div>
 
-      <!-- ── Bloc 5: Contingut ── -->
+      <!-- ── Bloc 5: Configuració ── -->
+      <div class="section">
+        <h2 class="section-title">Configuració</h2>
+
+        <a class="nav-row" routerLink="/exercises">
+          <span class="material-symbols-outlined nav-row-icon">fitness_center</span>
+          <div class="setting-info">
+            <span class="setting-label">Configurar exercicis</span>
+            <span class="setting-desc">Afegeix, edita i organitza els teus exercicis.</span>
+          </div>
+          <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
+        </a>
+
+        <a class="nav-row" routerLink="/sports-config">
+          <span class="material-symbols-outlined nav-row-icon">sports_soccer</span>
+          <div class="setting-info">
+            <span class="setting-label">Configurar esports</span>
+            <span class="setting-desc">Gestiona els teus esports, mètriques i subtipus.</span>
+          </div>
+          <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
+        </a>
+      </div>
+
+      <!-- ── Bloc 6: Contingut ── -->
       <div class="section">
         <h2 class="section-title">Contingut</h2>
 
@@ -489,6 +512,10 @@ import {
     }
     .nav-row-arrow {
       font-size: 22px; color: var(--c-text-3); flex-shrink: 0;
+    }
+    .nav-row-icon {
+      font-size: 22px; color: var(--c-brand); flex-shrink: 0;
+      font-variation-settings: 'FILL' 0, 'wght' 400;
     }
 
     /* ── Unit toggle ── */
