@@ -1,4 +1,4 @@
-import { Component, computed, inject, input } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 
 import { CATEGORY_COLORS, CATEGORY_ICONS, ExerciseCategory } from '../../../core/models/exercise.model';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
@@ -15,14 +15,8 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     @if (show()) {
       <div class="ws-card">
 
-        <!-- Header: títol + badge de compliment -->
         <div class="ws-header">
-          <div class="ws-header-left">
-            <span class="ws-title">{{ isCurrentWeek() ? 'Aquesta setmana' : weekRangeLabel() }}</span>
-            @if (!isCurrentWeek()) {
-              <span class="ws-sub">{{ weekRangeLabel() }}</span>
-            }
-          </div>
+          <span class="ws-title">Aquesta setmana</span>
           @if (weekBars().length > 0) {
             <div class="ws-count-badge" [class.ws-count-badge--done]="allMet()">
               <span class="ws-count-num">{{ totalActive() }}</span>
@@ -35,7 +29,6 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
           }
         </div>
 
-        <!-- Barres d'objectiu (1 o 2 depenent del mode) -->
         @for (bar of weekBars(); track bar.icon) {
           <div class="ws-bar-row"
                [class.wob--progress]="bar.pct > 0 && bar.pct < 100"
@@ -52,7 +45,6 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
           </div>
         }
 
-        <!-- Desglossat: dies i pips de categoria -->
         <div class="ws-days">
           @for (day of weekDays(); track day.date) {
             <div class="ws-day" [class.ws-day--today]="day.isToday" [class.ws-day--future]="day.isFuture">
@@ -73,8 +65,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
           }
         </div>
 
-        <!-- Missatge motivacional (només setmana actual) -->
-        @if (isCurrentWeek() && message()) {
+        @if (message()) {
           <div class="ws-message">{{ message() }}</div>
         }
 
@@ -93,9 +84,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     .ws-header {
       display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
     }
-    .ws-header-left { display: flex; flex-direction: column; gap: 2px; }
     .ws-title { font-size: 14px; font-weight: 700; color: var(--c-text); }
-    .ws-sub   { font-size: 11px; color: var(--c-text-3); }
 
     .ws-count-badge {
       display: flex; align-items: center; gap: 3px;
@@ -113,7 +102,6 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
       .ws-count-icon { color: var(--c-brand); font-variation-settings: 'FILL' 1, 'wght' 400; }
     }
 
-    /* ── Barres d'objectiu ── */
     .ws-bar-row {
       display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
     }
@@ -140,7 +128,6 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     }
     .ws-bar-frac { font-size: 11px; font-weight: 700; color: var(--c-text-3); flex-shrink: 0; min-width: 26px; text-align: right; }
 
-    /* ── Pips de dies ── */
     .ws-days {
       display: flex; gap: 4px; justify-content: space-between;
     }
@@ -173,28 +160,20 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
   `],
 })
 export class WeeklySummaryComponent {
-  /** Any date in the target week. Defaults to today (= current week). */
-  readonly weekAnchor = input<string>(TODAY());
-
   private readonly workoutService  = inject(WorkoutService);
   private readonly sportService    = inject(SportService);
   private readonly settingsService = inject(UserSettingsService);
 
   readonly show = computed(() => this.settingsService.metricsEnabled() && this.settingsService.loaded());
 
-  private readonly _monday = computed(() => mondayOf(this.weekAnchor()));
-  readonly isCurrentWeek   = computed(() => this._monday() === mondayOf(TODAY()));
+  private readonly _monday = computed(() => mondayOf(TODAY()));
 
   private readonly _weekDates = computed((): string[] =>
     Array.from({ length: 7 }, (_, i) => addDays(this._monday(), i))
   );
 
-  private readonly _goalSnap = computed(() =>
-    this.settingsService.getGoalForDate(this._monday())
-  );
-
   readonly weekBars = computed(() => {
-    const g     = this._goalSnap();
+    const s     = this.settingsService.settings();
     const days  = this._weekDates();
     const today = TODAY();
     const doneDays = days.filter(d => d <= today);
@@ -204,8 +183,8 @@ export class WeeklySummaryComponent {
       pct: Math.min(100, Math.round(done / Math.max(1, target) * 100)),
     });
 
-    if (g.goalMode === 'combined') {
-      const total = g.weeklyActivityGoal;
+    if (s.goalMode === 'combined' || !s.goalMode) {
+      const total = s.weeklyActivityGoal;
       if (!total) return [];
       const activeDays = doneDays.filter(d =>
         this.workoutService.getDoneWorkoutsForDate(d).length > 0 ||
@@ -220,10 +199,10 @@ export class WeeklySummaryComponent {
       return [mk(icon, activeDays, total)];
     }
 
-    const gymGoal   = g.weeklyGymGoal;
-    const sportGoal = g.weeklySportGoal;
-    const gymDone   = doneDays.reduce((s, d) => s + this.workoutService.getDoneWorkoutsForDate(d).length, 0);
-    const spDone    = doneDays.reduce((s, d) => s + this.sportService.getSportSessionsForDate(d).length, 0);
+    const gymGoal   = s.weeklyGymGoal;
+    const sportGoal = s.weeklySportGoal;
+    const gymDone   = doneDays.reduce((acc, d) => acc + this.workoutService.getDoneWorkoutsForDate(d).length, 0);
+    const spDone    = doneDays.reduce((acc, d) => acc + this.sportService.getSportSessionsForDate(d).length, 0);
     const bars = [];
     if (gymGoal)   bars.push(mk('fitness_center', gymDone, gymGoal));
     if (sportGoal) bars.push(mk('sports_soccer',  spDone,  sportGoal));
@@ -251,16 +230,6 @@ export class WeeklySummaryComponent {
         sportColors: sessionSports.map(s => s.color),
       };
     });
-  });
-
-  readonly weekRangeLabel = computed(() => {
-    const dates = this._weekDates();
-    const MONTHS = ['gen','feb','mar','abr','mai','jun','jul','ago','set','oct','nov','des'];
-    const fmt = (d: string) => {
-      const dt = new Date(d + 'T12:00:00');
-      return `${dt.getDate()} ${MONTHS[dt.getMonth()]}`;
-    };
-    return `${fmt(dates[0])} – ${fmt(dates[6])}`;
   });
 
   readonly message = computed(() => {
