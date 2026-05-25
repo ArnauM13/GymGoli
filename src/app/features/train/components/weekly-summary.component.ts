@@ -1,6 +1,6 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
 
-import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, ExerciseCategory } from '../../../core/models/exercise.model';
+import { CATEGORY_COLORS, CATEGORY_ICONS, ExerciseCategory } from '../../../core/models/exercise.model';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { SportService } from '../../../core/services/sport.service';
@@ -15,32 +15,44 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     @if (show()) {
       <div class="ws-card">
 
-        <!-- Header: progrés general -->
+        <!-- Header: títol + badge de compliment -->
         <div class="ws-header">
           <div class="ws-header-left">
-            <span class="ws-title">Aquesta setmana</span>
-            <span class="ws-sub">{{ weekRangeLabel() }}</span>
-          </div>
-          <div class="ws-count-badge" [class.ws-count-badge--done]="goalMet()">
-            <span class="ws-count-num">{{ totalDone() }}</span>
-            @if (goal()) {
-              <span class="ws-count-sep">/</span>
-              <span class="ws-count-goal">{{ goal() }}</span>
+            <span class="ws-title">{{ isCurrentWeek() ? 'Aquesta setmana' : weekRangeLabel() }}</span>
+            @if (!isCurrentWeek()) {
+              <span class="ws-sub">{{ weekRangeLabel() }}</span>
             }
-            <span class="ws-count-icon material-symbols-outlined">
-              {{ goalMet() ? 'check_circle' : 'directions_run' }}
-            </span>
           </div>
+          @if (weekBars().length > 0) {
+            <div class="ws-count-badge" [class.ws-count-badge--done]="allMet()">
+              <span class="ws-count-num">{{ totalActive() }}</span>
+              <span class="ws-count-sep">/</span>
+              <span class="ws-count-goal">{{ totalGoal() }}</span>
+              <span class="ws-count-icon material-symbols-outlined">
+                {{ allMet() ? 'check_circle' : 'directions_run' }}
+              </span>
+            </div>
+          }
         </div>
 
-        <!-- Barra de progrés -->
-        @if (goal()) {
-          <div class="ws-bar-track">
-            <div class="ws-bar-fill" [style.width.%]="barPct()"></div>
+        <!-- Barres d'objectiu (1 o 2 depenent del mode) -->
+        @for (bar of weekBars(); track bar.icon) {
+          <div class="ws-bar-row"
+               [class.wob--progress]="bar.pct > 0 && bar.pct < 100"
+               [class.wob--done]="bar.pct >= 100">
+            <span class="material-symbols-outlined ws-bar-icon">{{ bar.icon }}</span>
+            <div class="ws-bar-track">
+              <div class="ws-bar-fill" [style.width.%]="bar.pct"></div>
+            </div>
+            @if (bar.pct >= 100) {
+              <span class="material-symbols-outlined ws-bar-check">check_circle</span>
+            } @else {
+              <span class="ws-bar-frac">{{ bar.done }}/{{ bar.target }}</span>
+            }
           </div>
         }
 
-        <!-- Desglossat: dies i categories -->
+        <!-- Desglossat: dies i pips de categoria -->
         <div class="ws-days">
           @for (day of weekDays(); track day.date) {
             <div class="ws-day" [class.ws-day--today]="day.isToday" [class.ws-day--future]="day.isFuture">
@@ -61,8 +73,8 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
           }
         </div>
 
-        <!-- Missatge motivacional -->
-        @if (message()) {
+        <!-- Missatge motivacional (només setmana actual) -->
+        @if (isCurrentWeek() && message()) {
           <div class="ws-message">{{ message() }}</div>
         }
 
@@ -101,21 +113,34 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
       .ws-count-icon { color: var(--c-brand); font-variation-settings: 'FILL' 1, 'wght' 400; }
     }
 
+    /* ── Barres d'objectiu ── */
+    .ws-bar-row {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+    }
+    .ws-bar-icon {
+      font-size: 15px; color: var(--c-text-3); flex-shrink: 0;
+      font-variation-settings: 'FILL' 0, 'wght' 300;
+    }
+    .wob--done .ws-bar-icon,
+    .wob--progress .ws-bar-icon { color: var(--c-brand); }
     .ws-bar-track {
-      position: relative;
-      height: 10px; background: var(--c-subtle); border-radius: 6px;
-      overflow: hidden; margin-bottom: 12px;
-      border: 1px solid var(--c-border-2);
+      flex: 1; height: 10px; background: var(--c-subtle); border-radius: 6px;
+      overflow: hidden; border: 1px solid var(--c-border-2);
     }
     .ws-bar-fill {
       height: 100%;
       background: linear-gradient(90deg, var(--c-brand) 0%, color-mix(in srgb, var(--c-brand) 75%, white) 100%);
-      border-radius: 6px;
-      transition: width 0.5s ease;
-      max-width: 100%;
+      border-radius: 6px; transition: width 0.5s ease; max-width: 100%;
       box-shadow: 0 0 6px rgba(var(--c-brand-rgb), 0.4);
     }
+    .wob--done .ws-bar-fill { background: #43a047; box-shadow: none; }
+    .ws-bar-check {
+      font-size: 16px; color: #43a047; flex-shrink: 0;
+      font-variation-settings: 'FILL' 1, 'wght' 400;
+    }
+    .ws-bar-frac { font-size: 11px; font-weight: 700; color: var(--c-text-3); flex-shrink: 0; min-width: 26px; text-align: right; }
 
+    /* ── Pips de dies ── */
     .ws-days {
       display: flex; gap: 4px; justify-content: space-between;
     }
@@ -148,74 +173,105 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
   `],
 })
 export class WeeklySummaryComponent {
-  private workoutService  = inject(WorkoutService);
-  private sportService    = inject(SportService);
-  private settingsService = inject(UserSettingsService);
+  /** Any date in the target week. Defaults to today (= current week). */
+  readonly weekAnchor = input<string>(TODAY());
+
+  private readonly workoutService  = inject(WorkoutService);
+  private readonly sportService    = inject(SportService);
+  private readonly settingsService = inject(UserSettingsService);
 
   readonly show = computed(() => this.settingsService.metricsEnabled() && this.settingsService.loaded());
-  readonly goal = computed(() => this.settingsService.weeklyActivityGoal());
 
-  private readonly _weekDates = computed((): string[] => {
-    const monday = mondayOf(TODAY());
-    return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+  private readonly _monday = computed(() => mondayOf(this.weekAnchor()));
+  readonly isCurrentWeek   = computed(() => this._monday() === mondayOf(TODAY()));
+
+  private readonly _weekDates = computed((): string[] =>
+    Array.from({ length: 7 }, (_, i) => addDays(this._monday(), i))
+  );
+
+  private readonly _goalSnap = computed(() =>
+    this.settingsService.getGoalForDate(this._monday())
+  );
+
+  readonly weekBars = computed(() => {
+    const g     = this._goalSnap();
+    const days  = this._weekDates();
+    const today = TODAY();
+    const doneDays = days.filter(d => d <= today);
+
+    const mk = (icon: string, done: number, target: number) => ({
+      icon, done, target: Math.max(1, target),
+      pct: Math.min(100, Math.round(done / Math.max(1, target) * 100)),
+    });
+
+    if (g.goalMode === 'combined') {
+      const total = g.weeklyActivityGoal;
+      if (!total) return [];
+      const activeDays = doneDays.filter(d =>
+        this.workoutService.getDoneWorkoutsForDate(d).length > 0 ||
+        this.sportService.getSportSessionsForDate(d).length > 0
+      ).length;
+      const fitnessGoal = this.settingsService.fitnessGoal();
+      const iconMap: Record<string, string> = {
+        strength: 'fitness_center', fitness: 'directions_run',
+        weight: 'monitor_weight',   sport: 'sports_soccer',
+      };
+      const icon = fitnessGoal ? (iconMap[fitnessGoal] ?? 'directions_run') : 'directions_run';
+      return [mk(icon, activeDays, total)];
+    }
+
+    const gymGoal   = g.weeklyGymGoal;
+    const sportGoal = g.weeklySportGoal;
+    const gymDone   = doneDays.reduce((s, d) => s + this.workoutService.getDoneWorkoutsForDate(d).length, 0);
+    const spDone    = doneDays.reduce((s, d) => s + this.sportService.getSportSessionsForDate(d).length, 0);
+    const bars = [];
+    if (gymGoal)   bars.push(mk('fitness_center', gymDone, gymGoal));
+    if (sportGoal) bars.push(mk('sports_soccer',  spDone,  sportGoal));
+    return bars;
   });
 
+  readonly totalActive = computed(() => this.weekBars().reduce((s, b) => s + b.done, 0));
+  readonly totalGoal   = computed(() => this.weekBars().reduce((s, b) => s + b.target, 0));
+  readonly allMet      = computed(() => this.weekBars().length > 0 && this.weekBars().every(b => b.pct >= 100));
+
   readonly weekDays = computed(() => {
-    const dates   = this._weekDates();
-    const today   = TODAY();
-    const sports  = this.sportService.sports();
-    const DOW_CA  = ['Dl', 'Dt', 'Dc', 'Dj', 'Dv', 'Ds', 'Dg'];
-
+    const dates  = this._weekDates();
+    const today  = TODAY();
+    const DOW_CA = ['Dl', 'Dt', 'Dc', 'Dj', 'Dv', 'Ds', 'Dg'];
     return dates.map((date, i) => {
-      const workouts    = this.workoutService.getDoneWorkoutsForDate(date);
+      const workouts      = this.workoutService.getDoneWorkoutsForDate(date);
       const sessionSports = this.sportService.getSportsForDate(date);
-      const gymCats     = [...new Set(workouts.flatMap(w => workoutCategories(w)))];
-
       return {
         date,
         dow:         DOW_CA[i],
         isToday:     date === today,
         isFuture:    date > today,
-        gymCats,
+        gymCats:     [...new Set(workouts.flatMap(w => workoutCategories(w)))],
         sportIcons:  sessionSports.map(s => s.icon),
         sportColors: sessionSports.map(s => s.color),
       };
     });
   });
 
-  readonly totalDone = computed(() =>
-    this.weekDays().filter(d => !d.isFuture && (d.gymCats.length > 0 || d.sportIcons.length > 0)).length
-  );
-
-  readonly goalMet = computed(() => {
-    const g = this.goal();
-    return g !== null && this.totalDone() >= g;
-  });
-
-  readonly barPct = computed(() => {
-    const g = this.goal();
-    if (!g) return 0;
-    return Math.min(100, Math.round((this.totalDone() / g) * 100));
-  });
-
   readonly weekRangeLabel = computed(() => {
     const dates = this._weekDates();
+    const MONTHS = ['gen','feb','mar','abr','mai','jun','jul','ago','set','oct','nov','des'];
     const fmt = (d: string) => {
       const dt = new Date(d + 'T12:00:00');
-      return `${dt.getDate()}/${dt.getMonth() + 1}`;
+      return `${dt.getDate()} ${MONTHS[dt.getMonth()]}`;
     };
     return `${fmt(dates[0])} – ${fmt(dates[6])}`;
   });
 
   readonly message = computed(() => {
-    const done = this.totalDone();
-    const goal = this.goal();
-    const days = this.weekDays();
-    const daysLeft = days.filter(d => d.isFuture).length;
-
-    if (goal !== null && done >= goal) return '🎯 Objectiu setmanal assolit!';
-    if (done === 0 && daysLeft <= 4) return 'Encara no has entrenat aquesta setmana. Endavant!';
-    if (goal !== null && daysLeft > 0 && (goal - done) <= daysLeft) return `${goal - done} activitat${goal - done === 1 ? '' : 's'} més per arribar a l'objectiu.`;
+    const bars     = this.weekBars();
+    if (!bars.length) return null;
+    const daysLeft = this.weekDays().filter(d => d.isFuture).length;
+    if (this.allMet()) return '🎯 Objectiu setmanal assolit!';
+    const remaining = bars.reduce((s, b) => s + Math.max(0, b.target - b.done), 0);
+    if (remaining > 0 && daysLeft > 0 && remaining <= daysLeft)
+      return `${remaining} activitat${remaining === 1 ? '' : 's'} més per arribar a l'objectiu.`;
+    if (bars[0].done === 0 && daysLeft <= 4) return 'Encara no has entrenat aquesta setmana. Endavant!';
     return null;
   });
 

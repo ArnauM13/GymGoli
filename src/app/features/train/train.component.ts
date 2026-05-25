@@ -21,6 +21,7 @@ import { SportService } from '../../core/services/sport.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
 import { FitnessInsightsComponent } from '../../shared/components/fitness-insights/fitness-insights.component';
+import { WeeklySummaryComponent } from './components/weekly-summary.component';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
@@ -48,7 +49,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 @Component({
   selector: 'app-train',
   standalone: true,
-  imports: [WorkoutEditorComponent, CalendarComponent, FitnessInsightsComponent],
+  imports: [WorkoutEditorComponent, CalendarComponent, FitnessInsightsComponent, WeeklySummaryComponent],
   template: `
     <div class="page" [style.padding-bottom]="pagePaddingBottom()">
 
@@ -141,26 +142,8 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             [selectedDate]="selectedDate()"
             (dateSelected)="selectedDate.set($event)"
           />
-          @if (weekBars().length > 0) {
-            <div class="week-obj">
-              @for (bar of weekBars(); track bar.icon) {
-                <div class="week-obj-bar"
-                     [class.wob--progress]="bar.pct > 0 && bar.pct < 100"
-                     [class.wob--done]="bar.pct >= 100">
-                  <span class="material-symbols-outlined week-obj-icon">{{ bar.icon }}</span>
-                  <div class="week-obj-track">
-                    <div class="week-obj-fill" [style.width.%]="bar.pct"></div>
-                  </div>
-                  @if (bar.pct >= 100) {
-                    <span class="material-symbols-outlined week-obj-check">check_circle</span>
-                  } @else {
-                    <span class="week-obj-frac">{{ bar.done }}/{{ bar.target }}</span>
-                  }
-                </div>
-              }
-            </div>
-          }
         </div>
+        <app-weekly-summary [weekAnchor]="selectedDate()" />
 
         <!-- ── Skeleton (initial data load) ── -->
         @if (workoutService.isLoading() && dateWorkouts().length === 0 && !creating()) {
@@ -626,49 +609,12 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       h1 { margin: 0; font-size: 22px; font-weight: 700; }
     }
 
-    /* ── Calendar wrapper (also contains week-obj) ── */
+    /* ── Calendar wrapper ── */
     .calendar-wrap {
       margin: 0 16px 12px;
       box-shadow: 0 2px 12px rgba(0,0,0,0.08);
       border-radius: 16px; overflow: hidden;
       background: var(--c-card);
-    }
-
-    /* ── Weekly objective progress (inside calendar-wrap) ── */
-    .week-obj {
-      padding: 9px 14px 10px;
-      border-top: 1px solid var(--c-border-2);
-      display: flex; flex-direction: column; gap: 7px;
-    }
-    .week-obj-bar { display: flex; align-items: center; gap: 10px; }
-    .week-obj-icon {
-      font-size: 16px; flex-shrink: 0;
-      color: var(--c-border);
-      font-variation-settings: 'FILL' 0, 'wght' 300;
-      transition: color 0.2s, font-variation-settings 0.2s;
-      .wob--progress & { color: var(--c-brand); }
-      .wob--done & { color: #43a047; font-variation-settings: 'FILL' 1, 'wght' 400; }
-    }
-    .week-obj-track {
-      flex: 1; height: 5px; border-radius: 3px;
-      background: var(--c-border-2); overflow: hidden;
-    }
-    .week-obj-fill {
-      height: 100%; border-radius: 3px;
-      background: var(--c-border);
-      transition: width 0.4s cubic-bezier(0.34, 1.2, 0.64, 1), background 0.2s;
-      .wob--progress & { background: var(--c-brand); }
-      .wob--done & { background: #43a047; }
-    }
-    .week-obj-frac {
-      font-size: 11px; font-weight: 700;
-      color: var(--c-text-3); flex-shrink: 0; min-width: 26px; text-align: right;
-      transition: color 0.2s;
-      .wob--progress & { color: var(--c-text-2); }
-    }
-    .week-obj-check {
-      font-size: 16px; flex-shrink: 0; color: #43a047;
-      font-variation-settings: 'FILL' 1, 'wght' 400;
     }
 
     /* ── Active workout floating header (reuses .workout-card) ── */
@@ -1554,45 +1500,7 @@ export class TrainComponent {
     else if (bc.kind === 'plan') this.router.navigate(['/calendar']);
   }
 
-  private readonly _goalIcons: Record<string, string> = {
-    strength: 'fitness_center',
-    fitness:  'directions_run',
-    weight:   'monitor_weight',
-    sport:    'sports_soccer',
-  };
 
-  readonly weekBars = computed(() => {
-    const mode        = this.settingsService.goalMode();
-    const gymGoal     = this.settingsService.weeklyGymGoal();
-    const sportGoal   = this.settingsService.weeklySportGoal();
-    const actGoal     = this.settingsService.weeklyActivityGoal();
-    const fitnessGoal = this.settingsService.fitnessGoal();
-
-    const monday = mondayOf(this.selectedDate());
-    const days   = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
-
-    const mk = (icon: string, done: number, target: number) => {
-      const t = Math.max(1, target);
-      return { icon, done, target: t, pct: Math.min(100, Math.round(done / t * 100)) };
-    };
-
-    if (mode === 'combined') {
-      if (!actGoal) return [];
-      const activeDays = days.filter(d =>
-        this.workoutService.getDoneWorkoutsForDate(d).length > 0 ||
-        this.sportService.getSportSessionsForDate(d).length > 0
-      ).length;
-      const icon = fitnessGoal ? (this._goalIcons[fitnessGoal] ?? 'directions_run') : 'directions_run';
-      return [mk(icon, activeDays, actGoal)];
-    } else {
-      const gymSessions   = days.reduce((s, d) => s + this.workoutService.getDoneWorkoutsForDate(d).length, 0);
-      const sportSessions = days.reduce((s, d) => s + this.sportService.getSportSessionsForDate(d).length, 0);
-      const bars = [];
-      if (gymGoal)   bars.push(mk('fitness_center', gymSessions, gymGoal));
-      if (sportGoal) bars.push(mk('sports_soccer', sportSessions, sportGoal));
-      return bars;
-    }
-  });
 
   readonly pickerCat = signal<ExerciseCategory | null>(null);
 
