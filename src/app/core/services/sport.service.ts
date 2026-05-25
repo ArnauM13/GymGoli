@@ -2,7 +2,7 @@ import { Injectable, computed, effect, inject, signal } from '@angular/core';
 
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
-import { DEFAULT_SPORTS, Sport, SportMetricDef, SportSession, SportSubtype } from '../models/sport.model';
+import { DEFAULT_SPORTS, Sport, SportMetricDef, SportSession, SportSessionStatus, SportSubtype } from '../models/sport.model';
 import { FeelingLevel } from '../models/workout.model';
 
 // ── Row mappers ──────────────────────────────────────────────────────────────
@@ -29,6 +29,7 @@ function toSportSession(row: Record<string, unknown>): SportSession {
     feeling:   (row['feeling'] as FeelingLevel | null) ?? undefined,
     metrics:   (row['metrics'] as Record<string, string | number> | null) ?? undefined,
     notes:     (row['notes'] as string | null) ?? undefined,
+    status:    (row['status'] as SportSessionStatus | undefined) ?? 'done',
     createdAt: new Date(row['created_at'] as string),
   };
 }
@@ -48,10 +49,18 @@ export class SportService {
   private readonly _monthCache = new Map<string, SportSession[]>();
   private readonly _sessions   = signal<SportSession[]>([]);
   readonly isLoading = signal(false);
-  readonly sessions  = this._sessions.asReadonly();
+
+  /** Public sessions are DONE-only so stats/charts/calendar never count plans. */
+  readonly sessions = computed(() =>
+    this._sessions().filter(s => (s.status ?? 'done') !== 'planned')
+  );
+  /** Planned (future) sport sessions. */
+  readonly plannedSessions = computed(() =>
+    this._sessions().filter(s => s.status === 'planned')
+  );
 
   readonly todaySessions = computed(() =>
-    this._sessions().filter(s => s.date === this._todayStr)
+    this.sessions().filter(s => s.date === this._todayStr)
   );
 
   constructor() {
@@ -179,18 +188,29 @@ export class SportService {
 
   todayDateString(): string { return this._todayStr; }
 
-  /** Returns full Sport objects for a given date (sorted by creation order). */
+  /** Returns full Sport objects (DONE sessions) for a given date. */
   getSportsForDate(date: string): Sport[] {
-    const sessions  = this._sessions().filter(s => s.date === date);
+    const sessions  = this._sessions().filter(s => s.date === date && (s.status ?? 'done') !== 'planned');
     const sportsMap = new Map(this._sports().map(s => [s.id, s]));
     return sessions
       .map(s => sportsMap.get(s.sportId))
       .filter((s): s is Sport => !!s);
   }
 
-  /** Returns sport + full session pairs for a given date. */
+  /** Returns sport + DONE session pairs for a given date. */
   getSportSessionsForDate(date: string): Array<{ sport: Sport; session: SportSession }> {
-    const sessions  = this._sessions().filter(s => s.date === date);
+    return this._pairsForDate(date, s => (s.status ?? 'done') !== 'planned');
+  }
+
+  /** Returns sport + PLANNED session pairs for a given date. */
+  getPlannedSportSessionsForDate(date: string): Array<{ sport: Sport; session: SportSession }> {
+    return this._pairsForDate(date, s => s.status === 'planned');
+  }
+
+  private _pairsForDate(
+    date: string, predicate: (s: SportSession) => boolean,
+  ): Array<{ sport: Sport; session: SportSession }> {
+    const sessions  = this._sessions().filter(s => s.date === date && predicate(s));
     const sportsMap = new Map(this._sports().map(s => [s.id, s]));
     const result: Array<{ sport: Sport; session: SportSession }> = [];
     for (const s of sessions) {
@@ -200,17 +220,18 @@ export class SportService {
     return result;
   }
 
-  /** Returns the session for a specific sport on a specific date. */
+  /** Returns the session for a specific sport on a specific date (any status). */
   getSessionForDate(date: string, sportId: string): SportSession | undefined {
     return this._sessions().find(s => s.date === date && s.sportId === sportId);
   }
 
   hasSportOnDate(date: string, sportId: string): boolean {
-    return this._sessions().some(s => s.date === date && s.sportId === sportId);
+    return this._sessions().some(s =>
+      s.date === date && s.sportId === sportId && (s.status ?? 'done') !== 'planned');
   }
 
   hasAnySportOnDate(date: string): boolean {
-    return this._sessions().some(s => s.date === date);
+    return this._sessions().some(s => s.date === date && (s.status ?? 'done') !== 'planned');
   }
 
   // ── Session log / toggle ────────────────────────────────────────────────
@@ -218,7 +239,8 @@ export class SportService {
   /** Full session create with all metrics. Used by the session logger UI. */
   async logSession(
     date: string, sportId: string,
-    data: { subtypeId?: string; duration?: number; feeling?: FeelingLevel; metrics?: Record<string, string | number>; notes?: string }
+    data: { subtypeId?: string; duration?: number; feeling?: FeelingLevel; metrics?: Record<string, string | number>; notes?: string },
+    status: SportSessionStatus = 'done',
   ): Promise<void> {
     const uid = this._uid();
     const { data: row, error } = await this.supabase.from('sport_sessions').insert({
@@ -228,6 +250,7 @@ export class SportService {
       feeling:    data.feeling   ?? null,
       metrics:    data.metrics   ?? null,
       notes:      data.notes     ?? null,
+      status,
     }).select().single();
     if (error) throw error;
 
@@ -235,6 +258,19 @@ export class SportService {
     const key     = date.substring(0, 7);
     const bucket  = this._monthCache.get(key) ?? [];
     this._monthCache.set(key, [...bucket, session]);
+    this._rebuild();
+  }
+
+  /** Convert a planned sport session into a done one. */
+  async startPlannedSession(id: string, date: string): Promise<void> {
+    const uid = this._uid();
+    const { error } = await this.supabase.from('sport_sessions')
+      .update({ status: 'done' }).eq('id', id).eq('user_id', uid);
+    if (error) throw error;
+
+    const key    = date.substring(0, 7);
+    const bucket = this._monthCache.get(key) ?? [];
+    this._monthCache.set(key, bucket.map(s => s.id === id ? { ...s, status: 'done' } : s));
     this._rebuild();
   }
 

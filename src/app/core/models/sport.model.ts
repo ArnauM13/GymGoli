@@ -30,6 +30,8 @@ export interface Sport {
   createdAt: Date;
 }
 
+export type SportSessionStatus = 'planned' | 'done';
+
 export interface SportSession {
   id: string;
   date: string;
@@ -39,6 +41,7 @@ export interface SportSession {
   feeling?: FeelingLevel;  // 1–5
   metrics?: Record<string, string | number>;
   notes?: string;
+  status?: SportSessionStatus; // absent = 'done' (retrocompat)
   createdAt: Date;
 }
 

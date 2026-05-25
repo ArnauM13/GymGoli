@@ -12,7 +12,7 @@ import {
   CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_MUSCLES,
   Exercise, ExerciseCategory,
 } from '../../core/models/exercise.model';
-import { Sport, SportMetricDef } from '../../core/models/sport.model';
+import { Sport, SportMetricDef, SportSession } from '../../core/models/sport.model';
 import { BUILT_IN_TEMPLATES, BuiltInTemplate, WorkoutTemplate } from '../../core/models/template.model';
 import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry } from '../../core/models/workout.model';
 import { ExerciseService } from '../../core/services/exercise.service';
@@ -148,6 +148,14 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             (dateSelected)="selectedDate.set($event)"
           />
         </div>
+
+        @if (isSelectedFuture()) {
+          <div class="plan-pill">
+            <span class="material-symbols-outlined">event_upcoming</span>
+            <span>Planificant · {{ planPillLabel() }}</span>
+          </div>
+        }
+
         <app-weekly-summary />
 
         <!-- ── Skeleton (initial data load) ── -->
@@ -239,7 +247,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           <div class="workout-section">
             <div class="sports-header" (click)="gymCollapsed.set(!gymCollapsed())">
               <span class="material-symbols-outlined sports-header-icon">fitness_center</span>
-              <h2 class="sports-title">{{ isSelectedFuture() ? 'Plans' : 'Entrenaments' }}</h2>
+              <h2 class="sports-title">Entrenaments</h2>
               @if (sectionCount() > 0) {
                 <span class="section-count-badge">{{ sectionCount() }}</span>
               }
@@ -333,14 +341,13 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             </div>
           </div>
 
-          <!-- ── Esports section (not for future planning) ── -->
-          @if (!isSelectedFuture()) {
+          <!-- ── Esports section ── -->
           <div class="sports-section">
             <div class="sports-header" (click)="sportsCollapsed.set(!sportsCollapsed())">
               <span class="material-symbols-outlined sports-header-icon">sports_soccer</span>
               <h2 class="sports-title">Esports</h2>
-              @if (dateSportSessions().length > 0) {
-                <span class="section-count-badge">{{ dateSportSessions().length }}</span>
+              @if (sportsSectionCount() > 0) {
+                <span class="section-count-badge">{{ sportsSectionCount() }}</span>
               }
               <span class="material-symbols-outlined section-chevron"
                     [class.rotated]="sportsCollapsed()">expand_more</span>
@@ -348,8 +355,33 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             <div class="section-body" [class.collapsed]="sportsCollapsed()">
               <div class="section-body-inner">
                 <div class="sbi-content">
+
+                  <!-- Planned sport sessions for the selected date -->
+                  @for (item of datePlannedSports(); track item.session.id) {
+                    <div class="plan-card" [style.--ic]="item.sport.color" (click)="openSessionLogger(item.sport)">
+                      <div class="ic-bar" [style.background]="item.sport.color"></div>
+                      <div class="ic-info">
+                        <div class="ic-label">
+                          <span class="material-symbols-outlined ic-icon">{{ item.sport.icon }}</span>
+                          {{ item.sport.name }}
+                        </div>
+                        <span class="ic-meta">{{ sportPlanMeta(item.sport, item.session) }}</span>
+                      </div>
+                      <div class="pc-actions">
+                        @if (!isSelectedFuture()) {
+                          <button class="pc-start" (click)="$event.stopPropagation(); startPlannedSport(item)" title="Comença">
+                            <span class="material-symbols-outlined">play_arrow</span>
+                          </button>
+                        }
+                        <button class="pc-action-btn pc-delete" (click)="$event.stopPropagation(); deleteSportSession(item.session.id, $event)" title="Eliminar">
+                          <span class="material-symbols-outlined">delete</span>
+                        </button>
+                      </div>
+                    </div>
+                  }
+
                   @if (sportService.sports().length > 0) {
-                    <div class="type-grid"
+                    <div class="type-grid" [class.type-grid--mt]="datePlannedSports().length > 0"
                          [style.grid-template-columns]="gridCols(sportService.sports().length)">
                       @for (sport of sportService.sports(); track sport.id) {
                         <button class="type-btn"
@@ -373,7 +405,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               </div>
             </div>
           </div>
-          }
 
         }
       }
@@ -411,19 +442,17 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       <div class="sd-container">
         @if (speedDialOpen()) {
           <div class="sd-items">
-            @if (!isSelectedFuture()) {
-              @for (sport of sportService.sports(); track sport.id; let i = $index) {
-                <div class="sd-item" [style.--sd-i]="i">
-                  <span class="sd-label">{{ sport.name }}</span>
-                  <button class="sd-btn" [style.background]="sport.color"
-                    (click)="speedDialPickSport(sport)">
-                    <span class="material-symbols-outlined">{{ sport.icon }}</span>
-                  </button>
-                </div>
-              }
+            @for (sport of sportService.sports(); track sport.id; let i = $index) {
+              <div class="sd-item" [style.--sd-i]="i">
+                <span class="sd-label">{{ sport.name }}</span>
+                <button class="sd-btn" [style.background]="sport.color"
+                  (click)="speedDialPickSport(sport)">
+                  <span class="material-symbols-outlined">{{ sport.icon }}</span>
+                </button>
+              </div>
             }
             @for (cat of workoutTypes; track cat.value; let i = $index) {
-              <div class="sd-item" [style.--sd-i]="(isSelectedFuture() ? 0 : sportService.sports().length) + i">
+              <div class="sd-item" [style.--sd-i]="sportService.sports().length + i">
                 <span class="sd-label">{{ cat.label }}</span>
                 <button class="sd-btn" [style.background]="cat.color"
                   (click)="speedDialPickCategory(cat.value)">
@@ -581,18 +610,20 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           </div>
         }
 
-        <!-- Feeling -->
-        <div class="sl-field">
-          <span class="sl-field-label">Sensació</span>
-          <div class="sl-feeling-row">
-            @for (level of feelingLevels; track level) {
-              <button class="sl-feeling-btn" [class.active]="loggerFeeling() === level"
-                      (click)="toggleFeeling(level)">
-                {{ feelingEmoji(level) }}
-              </button>
-            }
+        <!-- Feeling (only when logging a real session, not when planning) -->
+        @if (!isSelectedFuture()) {
+          <div class="sl-field">
+            <span class="sl-field-label">Sensació</span>
+            <div class="sl-feeling-row">
+              @for (level of feelingLevels; track level) {
+                <button class="sl-feeling-btn" [class.active]="loggerFeeling() === level"
+                        (click)="toggleFeeling(level)">
+                  {{ feelingEmoji(level) }}
+                </button>
+              }
+            </div>
           </div>
-        </div>
+        }
 
         <!-- Notes -->
         <div class="sl-field">
@@ -616,7 +647,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           <div class="sl-main-actions">
             <button class="sl-cancel" (click)="closeSessionLogger()">Cancel·lar</button>
             <button class="sl-save" (click)="saveSession()" [disabled]="sportToggling()">
-              Guardar
+              {{ isSelectedFuture() ? 'Planificar' : 'Guardar' }}
             </button>
           </div>
         </div>
@@ -654,6 +685,19 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       box-shadow: 0 2px 12px rgba(0,0,0,0.08);
       border-radius: 16px; overflow: hidden;
       background: var(--c-card);
+    }
+
+    /* ── Planning mode pill (shown under calendar for future dates) ── */
+    .plan-pill {
+      display: flex; align-items: center; gap: 6px;
+      margin: -2px 16px 12px; padding: 8px 14px;
+      background: rgba(var(--c-brand-rgb), 0.08);
+      border: 1px solid rgba(var(--c-brand-rgb), 0.22);
+      border-radius: 12px;
+      font-size: 12.5px; font-weight: 700; color: var(--c-brand);
+      text-transform: capitalize;
+      animation: pill-in 0.2s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+      .material-symbols-outlined { font-size: 17px; font-variation-settings: 'FILL' 1; }
     }
 
     /* ── Active workout floating header (reuses .workout-card) ── */
@@ -1462,6 +1506,39 @@ export class TrainComponent {
     this.sportService.getSportSessionsForDate(this.selectedDate())
   );
 
+  readonly datePlannedSports = computed(() =>
+    this.sportService.getPlannedSportSessionsForDate(this.selectedDate())
+  );
+
+  readonly sportsSectionCount = computed(() =>
+    this.dateSportSessions().length + this.datePlannedSports().length
+  );
+
+  planPillLabel(): string {
+    const d = new Date(this.selectedDate() + 'T12:00:00');
+    const label = d.toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }
+
+  sportPlanMeta(sport: Sport, session: SportSession): string {
+    const parts: string[] = [];
+    if (session.subtypeId) {
+      const sub = sport.subtypes.find(s => s.id === session.subtypeId);
+      if (sub) parts.push(sub.name);
+    }
+    if (session.duration) parts.push(`${session.duration}min`);
+    return parts.length ? parts.join(' · ') : 'Sessió planificada';
+  }
+
+  async startPlannedSport(item: { sport: Sport; session: SportSession }): Promise<void> {
+    try {
+      await this.sportService.startPlannedSession(item.session.id, this.selectedDate());
+      this.openSessionLogger(item.sport);
+    } catch {
+      this.snackBar.open('Error en iniciar el pla', '', { duration: 2500 });
+    }
+  }
+
   readonly pendingSports = computed(() => {
     const doneIds = new Set(this.dateSportSessions().map(x => x.sport.id));
     return this.sportService.sports().filter(s => !doneIds.has(s.id));
@@ -2020,7 +2097,7 @@ export class TrainComponent {
       if (existingId) {
         await this.sportService.updateSession(existingId, date, data);
       } else {
-        await this.sportService.logSession(date, sport.id, data);
+        await this.sportService.logSession(date, sport.id, data, this.isSelectedFuture() ? 'planned' : 'done');
       }
       this.closeSessionLogger();
     } catch {
