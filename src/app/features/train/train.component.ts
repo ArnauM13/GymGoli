@@ -57,6 +57,13 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
         <!-- ══ ACTIVE WORKOUT MODE ══ -->
 
+        <header class="page-header page-header--aw">
+          <button class="back-btn" (click)="closeWorkout()">
+            <span class="material-symbols-outlined">arrow_back</span>
+          </button>
+          <h1>{{ workoutLabel(w) }}</h1>
+        </header>
+
         <!-- Floating card header (same style as dashboard workout-card) -->
         <div class="workout-card aw-header-sticky" [style.--wc]="workoutPrimaryColor(w)">
           <div class="wc-bar" [style.background]="workoutCardColor(w)"></div>
@@ -123,9 +130,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
         <button class="aw-delete-fab" (click)="deleteActiveWorkout()">
           <span class="material-symbols-outlined">delete</span>
-        </button>
-        <button class="aw-back-fab" (click)="closeWorkout()">
-          <span class="material-symbols-outlined">arrow_back</span>
         </button>
 
       } @else {
@@ -604,9 +608,23 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     /* ── Page header ── */
     .page-header { padding: 16px 16px 10px; }
+    .page-header--aw {
+      display: flex; align-items: center; gap: 10px;
+      h1 { margin: 0; font-size: 18px; font-weight: 700; color: var(--c-text); }
+    }
     .page-header-top {
       display: flex; align-items: center; justify-content: space-between;
       h1 { margin: 0; font-size: 22px; font-weight: 700; }
+    }
+    .back-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 36px; height: 36px; border-radius: 50%;
+      border: none; background: var(--c-subtle); color: var(--c-text-2);
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s; flex-shrink: 0;
+      span { font-size: 20px; }
+      &:hover  { background: var(--c-hover); }
+      &:active { opacity: 0.7; }
     }
 
     /* ── Calendar wrapper ── */
@@ -688,20 +706,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       transition: background 0.15s, color 0.15s, transform 0.15s;
       .material-symbols-outlined { font-size: 24px; }
       &:hover { background: rgba(239,83,80,0.08); transform: scale(1.06); }
-      &:active { transform: scale(0.94); }
-    }
-    .aw-back-fab {
-      position: fixed; left: 20px;
-      bottom: calc(var(--nav-height) + 16px);
-      z-index: 89;
-      width: 56px; height: 56px; border-radius: 50%; border: 1.5px solid var(--c-border);
-      background: var(--c-card); color: var(--c-text-2);
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; touch-action: manipulation;
-      box-shadow: 0 4px 16px var(--c-shadow-md);
-      transition: background 0.15s, color 0.15s, transform 0.15s;
-      .material-symbols-outlined { font-size: 24px; }
-      &:hover { background: var(--c-hover); color: var(--c-text); transform: scale(1.06); }
       &:active { transform: scale(0.94); }
     }
     @keyframes pill-in {
