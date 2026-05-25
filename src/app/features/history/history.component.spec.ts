@@ -23,6 +23,7 @@ describe('HistoryComponent', () => {
 
     const mockWorkoutService = {
       workouts:         mockWorkouts,
+      doneWorkouts:     mockWorkouts,
       isLoading:        signal(false),
       getWorkoutForDate:  jasmine.createSpy().and.returnValue(null),
       todayDateString:    jasmine.createSpy().and.returnValue(TODAY),
@@ -178,27 +179,6 @@ describe('HistoryComponent', () => {
     });
   });
 
-  // ── selectExercise() ────────────────────────────────────────────────────
-
-  describe('selectExercise()', () => {
-    it('sets selectedExerciseId', () => {
-      component.selectExercise('ex1');
-      expect(component.selectedExerciseId()).toBe('ex1');
-    });
-
-    it('collapses when the same id is selected again', () => {
-      component.selectExercise('ex1');
-      component.selectExercise('ex1');
-      expect(component.selectedExerciseId()).toBeNull();
-    });
-
-    it('switches to a different exercise', () => {
-      component.selectExercise('ex1');
-      component.selectExercise('ex2');
-      expect(component.selectedExerciseId()).toBe('ex2');
-    });
-  });
-
   // ── getEntrySubLabel() ──────────────────────────────────────────────────
 
   describe('getEntrySubLabel()', () => {
@@ -238,10 +218,18 @@ describe('HistoryComponent', () => {
       expect(component.selectedDate()).toBeNull();
     });
 
-    it('resets selectedExerciseId on each date change', () => {
-      component.selectedExerciseId.set('ex1');
+    it('expands the workout for the selected date', () => {
+      const svc = TestBed.inject(WorkoutService) as any;
+      svc.getWorkoutForDate.and.returnValue(makeWorkout({ id: 'w9', date: '2024-03-15' }));
       component.selectDate('2024-03-15');
-      expect(component.selectedExerciseId()).toBeNull();
+      expect(component.expandedId()).toBe('w9');
+    });
+
+    it('clears the expanded workout when deselecting', () => {
+      component.expandedId.set('w9');
+      component.selectDate('2024-03-15');
+      component.selectDate('2024-03-15');
+      expect(component.expandedId()).toBeNull();
     });
   });
 
@@ -274,18 +262,24 @@ describe('HistoryComponent', () => {
       const ids = component.filteredWorkouts().map(w => w.id);
       expect(ids).toEqual(['1', '2', '3']);
     });
+
+    it('filters to a single day when a date is selected', () => {
+      component.selectDate('2024-03-02');
+      const ids = component.filteredWorkouts().map(w => w.id);
+      expect(ids).toEqual(['2']);
+    });
   });
 
-  // ── viewMode signal ──────────────────────────────────────────────────────
+  // ── calendarOpen signal ──────────────────────────────────────────────────
 
-  describe('viewMode signal', () => {
-    it('defaults to calendar mode', () => {
-      expect(component.viewMode()).toBe('calendar');
+  describe('calendarOpen signal', () => {
+    it('defaults to open', () => {
+      expect(component.calendarOpen()).toBeTrue();
     });
 
-    it('can be switched to list mode', () => {
-      component.viewMode.set('list');
-      expect(component.viewMode()).toBe('list');
+    it('can be collapsed', () => {
+      component.calendarOpen.set(false);
+      expect(component.calendarOpen()).toBeFalse();
     });
   });
 

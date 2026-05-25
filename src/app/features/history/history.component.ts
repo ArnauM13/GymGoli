@@ -10,13 +10,11 @@ import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
 import { kgToDisplay } from '../../shared/utils/weight.utils';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
-import { ExerciseProgressInlineComponent } from '../../shared/components/exercise-progress-inline.component';
-import { ExerciseEntryCardComponent } from '../../shared/components/exercise-entry-card/exercise-entry-card.component';
 
 @Component({
   selector: 'app-history',
   standalone: true,
-  imports: [CalendarComponent, ExerciseProgressInlineComponent, ExerciseEntryCardComponent, FormsModule],
+  imports: [CalendarComponent, FormsModule],
   template: `
     <div class="page">
 
@@ -24,137 +22,27 @@ import { ExerciseEntryCardComponent } from '../../shared/components/exercise-ent
       <header class="page-header">
         <div class="page-header-top">
           <h1>Historial</h1>
-          <div class="view-seg">
-            <button class="view-seg-btn" [class.active]="viewMode() === 'calendar'"
-                    (click)="viewMode.set('calendar')">
-              <span class="material-symbols-outlined">calendar_month</span>
-              Calendari
-            </button>
-            <button class="view-seg-btn" [class.active]="viewMode() === 'list'"
-                    (click)="viewMode.set('list')">
-              <span class="material-symbols-outlined">format_list_bulleted</span>
-              Historial
-            </button>
-          </div>
+          <button class="cal-toggle" [class.cal-toggle--open]="calendarOpen()"
+                  (click)="calendarOpen.set(!calendarOpen())"
+                  [attr.aria-label]="calendarOpen() ? 'Amaga calendari' : 'Mostra calendari'">
+            <span class="material-symbols-outlined">calendar_month</span>
+            <span class="material-symbols-outlined cal-toggle-chev">
+              {{ calendarOpen() ? 'expand_less' : 'expand_more' }}
+            </span>
+          </button>
         </div>
       </header>
 
-      <!-- ══════════════════════════════════
-           MODE: CALENDARI
-      ═════════════════════════════════════ -->
-      @if (viewMode() === 'calendar') {
-
-        <div class="calendar-wrap">
-          <app-calendar [selectedDate]="selectedDate()" (dateSelected)="selectDate($event)" />
+      <!-- ── Calendari plegable ── -->
+      <div class="cal-collapse" [class.cal-collapse--open]="calendarOpen()">
+        <div class="cal-collapse-inner">
+          <div class="calendar-wrap">
+            <app-calendar [selectedDate]="selectedDate()" (dateSelected)="selectDate($event)" />
+          </div>
         </div>
+      </div>
 
-        @if (!selectedDate()) {
-          <div class="select-day-hint">
-            <span class="material-symbols-outlined">touch_app</span>
-            Selecciona un dia per veure el detall
-          </div>
-        }
-
-        @if (selectedDate()) {
-          <div class="detail-section">
-
-            @if (selectedWorkout()) {
-              <div class="detail-color-bar" [style.background]="workoutBarStyle()"></div>
-            }
-
-            <div class="detail-header">
-              <h2 class="detail-title">{{ selectedDateLabel() }}</h2>
-            </div>
-
-            <!-- Esports del dia -->
-            @if (selectedDateSports().length > 0) {
-              <div class="sports-row">
-                @for (item of selectedDateSports(); track item.sport.id) {
-                  <span class="sport-tag" [style.--sport-color]="item.sport.color">
-                    <span class="material-symbols-outlined sport-tag-icon">{{ item.sport.icon }}</span>
-                    {{ item.sport.name }}
-                    @if (item.session.subtypeId && getSubtypeName(item.sport, item.session.subtypeId); as subName) {
-                      <span class="sport-tag-subtype">· {{ subName }}</span>
-                    }
-                    @if (item.session.duration) {
-                      <span class="sport-tag-subtype">· {{ item.session.duration }}min</span>
-                    }
-                    @if (item.session.feeling) {
-                      <span class="sport-tag-subtype">{{ getFeelingEmoji(item.session.feeling) }}</span>
-                    }
-                  </span>
-                }
-              </div>
-            }
-
-            @if (!selectedWorkout()) {
-              <div class="detail-empty">
-                @if (selectedDateSports().length === 0) {
-                  <span class="material-symbols-outlined empty-icon">fitness_center</span>
-                  <p>Cap activitat registrada</p>
-                } @else {
-                  <span class="material-symbols-outlined empty-icon">sports_soccer</span>
-                  <p>Sense entrenament al gimnàs</p>
-                }
-              </div>
-            } @else {
-
-              <!-- Llista d'exercicis (compactes, verticals) -->
-              <div class="ex-grid">
-                @for (entry of selectedWorkout()!.entries; track entry.exerciseId) {
-                  <app-exercise-entry-card
-                    [entry]="entry"
-                    [catColor]="getEntryCatColor(entry)"
-                    [collapsed]="selectedExerciseId() !== entry.exerciseId"
-                    [maxWeight]="getMaxWeight(entry)"
-                    [unit]="unit()"
-                    [feelingLevel]="entry.feeling"
-                    (headerClick)="selectExercise(entry.exerciseId)">
-
-                    <!-- Projected detail (sets + chart) -->
-                    @if (entry.sets.length > 0) {
-                      <div class="ex-sets-col" [style.--ec]="getEntryCatColor(entry)">
-                        @for (set of entry.sets; track $index) {
-                          <div class="ex-set-line" [class.ex-set-line--max]="isMaxSet(entry, set)">
-                            <span class="exs-num">{{ $index + 1 }}</span>
-                            <span class="exs-weight">{{ dispW(set.weight) }}<small>{{ unit() }}</small></span>
-                            <span class="exs-x">×</span>
-                            <span class="exs-reps">{{ set.reps }}</span>
-                            @if (isMaxSet(entry, set)) { <span class="exs-pr">PR</span> }
-                          </div>
-                        }
-                      </div>
-                    }
-                    <div class="ex-card-analysis">
-                      <app-exercise-progress-inline
-                        [exerciseId]="entry.exerciseId"
-                        [exerciseName]="entry.exerciseName" />
-                    </div>
-
-                  </app-exercise-entry-card>
-                }
-              </div>
-
-            }
-          </div>
-        }
-
-        @if (allWorkouts().length === 0 && !isLoading()) {
-          <div class="empty-state">
-            <span class="material-symbols-outlined empty-icon">calendar_month</span>
-            <h2>Cap entrenament</h2>
-            <p>Encara no hi ha cap entrenament registrat</p>
-          </div>
-        }
-
-      }
-
-      <!-- ══════════════════════════════════
-           MODE: LLISTA
-      ═════════════════════════════════════ -->
-      @if (viewMode() === 'list') {
-
-        @if (isLoading() && allWorkouts().length === 0) {
+      @if (isLoading() && allWorkouts().length === 0) {
           <!-- ── Skeleton (initial data load) ── -->
           <div class="sk-list">
             @for (_ of [1,2,3,4,5]; track $index) {
@@ -194,6 +82,14 @@ import { ExerciseEntryCardComponent } from '../../shared/components/exercise-ent
             <span class="material-symbols-outlined">{{ sortDesc() ? 'arrow_downward' : 'arrow_upward' }}</span>
           </button>
           <div class="filter-divider"></div>
+          @if (selectedDate()) {
+            <button class="date-chip" (click)="selectDate(selectedDate()!)">
+              <span class="material-symbols-outlined">event</span>
+              {{ selectedDateLabel() }}
+              <span class="material-symbols-outlined date-chip-x">close</span>
+            </button>
+            <div class="filter-divider"></div>
+          }
           <button class="filter-icon" [class.active]="filterCat() === null"
                   (click)="filterCat.set(null)" aria-label="Tots" title="Tots">
             <span class="material-symbols-outlined">apps</span>
@@ -207,6 +103,27 @@ import { ExerciseEntryCardComponent } from '../../shared/components/exercise-ent
             </button>
           }
         </div>
+
+        <!-- ── Esports del dia seleccionat ── -->
+        @if (selectedDate() && selectedDateSports().length > 0) {
+          <div class="sports-row">
+            @for (item of selectedDateSports(); track item.sport.id) {
+              <span class="sport-tag" [style.--sport-color]="item.sport.color">
+                <span class="material-symbols-outlined sport-tag-icon">{{ item.sport.icon }}</span>
+                {{ item.sport.name }}
+                @if (item.session.subtypeId && getSubtypeName(item.sport, item.session.subtypeId); as subName) {
+                  <span class="sport-tag-subtype">· {{ subName }}</span>
+                }
+                @if (item.session.duration) {
+                  <span class="sport-tag-subtype">· {{ item.session.duration }}min</span>
+                }
+                @if (item.session.feeling) {
+                  <span class="sport-tag-subtype">{{ getFeelingEmoji(item.session.feeling) }}</span>
+                }
+              </span>
+            }
+          </div>
+        }
 
         @if (filteredWorkouts().length > 0) {
           <div class="workout-list-wrap">
@@ -331,8 +248,6 @@ import { ExerciseEntryCardComponent } from '../../shared/components/exercise-ent
 
         } <!-- end @else (not loading) -->
 
-      }
-
     </div>
   `,
   styles: [`
@@ -347,52 +262,53 @@ import { ExerciseEntryCardComponent } from '../../shared/components/exercise-ent
       h1 { margin: 0; font-size: 22px; font-weight: 700; }
     }
 
-    /* ── View mode segmented control ── */
-    .view-seg {
-      display: flex; align-items: center;
-      border: 1.5px solid var(--c-border); border-radius: 10px; overflow: hidden;
-      flex-shrink: 0;
-    }
-    .view-seg-btn {
-      height: 34px; padding: 0 12px; border: none; background: transparent;
-      display: flex; align-items: center; justify-content: center; gap: 5px;
-      cursor: pointer; color: var(--c-text-2); transition: all 0.15s; touch-action: manipulation;
-      font-size: 12px; font-weight: 600; white-space: nowrap;
-      .material-symbols-outlined { font-size: 16px; }
-      &.active { background: var(--c-brand); color: white; }
-      &:not(.active):hover { background: rgba(var(--c-brand-rgb), 0.08); color: var(--c-brand); }
+    /* ── Calendar toggle ── */
+    .cal-toggle {
+      display: flex; align-items: center; gap: 2px; flex-shrink: 0;
+      height: 34px; padding: 0 8px 0 10px;
+      border: 1.5px solid var(--c-border); border-radius: 10px;
+      background: var(--c-subtle); color: var(--c-text-2);
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 18px; }
+      .cal-toggle-chev { font-size: 18px; }
+      &:hover { background: var(--c-border-2); color: var(--c-text); }
+      &.cal-toggle--open { background: var(--c-brand); color: white; border-color: var(--c-brand); }
     }
 
-    /* ════════════════════════════════
-       CALENDAR MODE
-    ════════════════════════════════ */
+    /* ── Collapsible calendar ── */
+    .cal-collapse {
+      display: grid; grid-template-rows: 0fr;
+      transition: grid-template-rows 0.3s ease;
+    }
+    .cal-collapse--open { grid-template-rows: 1fr; }
+    .cal-collapse-inner { overflow: hidden; min-height: 0; }
+
     .calendar-wrap {
       margin: 4px 16px 12px;
       box-shadow: 0 2px 12px rgba(0,0,0,0.08);
       border-radius: 16px; overflow: hidden;
     }
 
-    .detail-section {
-      margin: 0 16px 12px;
-      background: var(--c-card); border-radius: 16px;
-      box-shadow: 0 2px 12px var(--c-shadow); overflow: hidden;
-    }
-
-    .detail-color-bar { height: 5px; width: 100%; }
-
-    .detail-header {
-      padding: 14px 16px 10px;
-      border-bottom: 1px solid var(--c-border-2);
-    }
-    .detail-title {
-      margin: 0; font-size: 16px; font-weight: 700; color: var(--c-text);
-      text-transform: capitalize;
+    /* ── Date filter chip ── */
+    .date-chip {
+      display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
+      height: 34px; padding: 0 6px 0 10px; border-radius: 17px;
+      border: 1.5px solid var(--c-brand);
+      background: rgba(var(--c-brand-rgb), 0.1); color: var(--c-brand);
+      font-size: 12px; font-weight: 700; text-transform: capitalize;
+      cursor: pointer; touch-action: manipulation; white-space: nowrap;
+      .material-symbols-outlined { font-size: 16px; }
+      .date-chip-x {
+        font-size: 16px; border-radius: 50%; background: rgba(var(--c-brand-rgb), 0.18);
+        padding: 1px;
+      }
+      &:hover { background: rgba(var(--c-brand-rgb), 0.16); }
     }
 
     /* Sports */
     .sports-row {
       display: flex; flex-wrap: wrap; gap: 6px;
-      padding: 10px 16px 8px; border-bottom: 1px solid var(--c-border-2);
+      margin: 0 16px 10px;
     }
     .sport-tag {
       display: inline-flex; align-items: center; gap: 4px;
@@ -404,54 +320,6 @@ import { ExerciseEntryCardComponent } from '../../shared/components/exercise-ent
     }
     .sport-tag-icon { font-size: 14px; font-variation-settings: 'FILL' 1; }
     .sport-tag-subtype { font-weight: 400; opacity: 0.85; }
-
-    .detail-empty {
-      display: flex; flex-direction: column; align-items: center;
-      gap: 8px; padding: 24px; text-align: center;
-      .empty-icon { font-size: 36px; color: var(--c-border); }
-      p { margin: 0; font-size: 14px; color: var(--c-text-2); }
-    }
-
-    /* Exercise list — uses app-exercise-entry-card */
-    .ex-grid {
-      display: flex; flex-direction: column; gap: 8px;
-      padding: 12px 14px;
-    }
-
-    /* Sets + chart detail projected inside the card */
-    .ex-sets-col {
-      display: flex; flex-direction: column; gap: 3px;
-      padding: 12px 14px 8px;
-    }
-    .ex-set-line {
-      display: grid;
-      grid-template-columns: 18px auto auto auto auto;
-      justify-content: start;
-      align-items: baseline; gap: 6px;
-      padding: 5px 8px; border-radius: 8px;
-      background: var(--c-card);
-      box-shadow: 0 1px 2px var(--c-shadow);
-    }
-    .ex-set-line--max {
-      background: color-mix(in srgb, var(--ec, var(--c-brand)) 10%, var(--c-card));
-      box-shadow: 0 1px 4px color-mix(in srgb, var(--ec, var(--c-brand)) 18%, transparent);
-    }
-    .exs-num { font-size: 10px; font-weight: 700; color: var(--c-text-3); text-align: right; }
-    .exs-weight {
-      font-size: 14px; font-weight: 800; color: var(--c-text);
-      small { font-size: 9px; font-weight: 400; color: var(--c-text-3); margin-left: 1px; }
-    }
-    .ex-set-line--max .exs-weight {
-      color: color-mix(in srgb, var(--ec, var(--c-brand)) 80%, var(--c-text));
-    }
-    .exs-x { font-size: 11px; color: var(--c-text-3); }
-    .exs-reps { font-size: 13px; font-weight: 600; color: var(--c-text-2); }
-    .exs-pr {
-      font-size: 9px; font-weight: 800; letter-spacing: 0.3px;
-      color: #b88500; background: rgba(255, 193, 7, 0.2);
-      padding: 1px 6px; border-radius: 6px; line-height: 1.3;
-    }
-    .ex-card-analysis { border-top: 1px solid var(--c-hover); }
 
     /* ════════════════════════════════
        LIST MODE
@@ -681,15 +549,6 @@ import { ExerciseEntryCardComponent } from '../../shared/components/exercise-ent
       .wvf-sep { color: var(--c-border-2); }
     }
 
-    /* ── Select-day hint ── */
-    .select-day-hint {
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      margin: 0 16px 12px; padding: 12px 16px;
-      background: rgba(var(--c-brand-rgb), 0.06); border-radius: 12px;
-      font-size: 13px; font-weight: 500; color: var(--c-brand);
-      .material-symbols-outlined { font-size: 17px; }
-    }
-
     /* ── Empty state ── */
     .empty-state {
       display: flex; flex-direction: column; align-items: center;
@@ -741,10 +600,9 @@ export class HistoryComponent {
   readonly unit = this.settingsService.weightUnit;
   dispW(kg: number): number { return kgToDisplay(kg, this.unit()); }
 
-  readonly viewMode     = signal<'calendar' | 'list'>('calendar');
+  readonly calendarOpen = signal(true);
   readonly selectedDate = signal<string | null>(null);
   readonly expandedId   = signal<string | null>(null);
-  readonly selectedExerciseId = signal<string | null>(null);
 
   readonly sortDesc    = signal(true);
   readonly filterCat   = signal<string | null>(null);
@@ -757,7 +615,11 @@ export class HistoryComponent {
   readonly filteredWorkouts = computed(() => {
     const cat   = this.filterCat();
     const query = this.searchQuery().trim().toLowerCase();
+    const date  = this.selectedDate();
     let list = this.allWorkouts();
+    if (date) {
+      list = list.filter(w => w.date === date);
+    }
     if (cat) {
       list = list.filter(w => {
         const cats = w.categories?.length ? w.categories : (w.category ? [w.category] : []);
@@ -770,21 +632,9 @@ export class HistoryComponent {
     return this.sortDesc() ? list : [...list].reverse();
   });
 
-  readonly selectedWorkout = computed(() => {
-    const d = this.selectedDate();
-    return d ? this.workoutService.getWorkoutForDate(d) : null;
-  });
-
   readonly selectedDateSports = computed(() => {
     const d = this.selectedDate();
     return d ? this.sportService.getSportSessionsForDate(d) : [];
-  });
-
-  readonly selectedEntry = computed((): WorkoutEntry | null => {
-    const id = this.selectedExerciseId();
-    const w  = this.selectedWorkout();
-    if (!id || !w) return null;
-    return w.entries.find(e => e.exerciseId === id) ?? null;
   });
 
   readonly selectedDateLabel = computed(() => {
@@ -801,20 +651,6 @@ export class HistoryComponent {
     const d = new Date(sel + 'T00:00:00');
     const label = d.toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'long' });
     return label.charAt(0).toUpperCase() + label.slice(1);
-  });
-
-  readonly workoutBarStyle = computed((): string => {
-    const w = this.selectedWorkout();
-    if (!w) return '';
-    const cats = w.categories?.length ? w.categories : (w.category ? [w.category] : []);
-    if (cats.length === 0) return 'background: var(--c-border-2)';
-    if (cats.length === 1) return `background: ${this.getCatColor(cats[0])}`;
-    const stops = cats.map((c, i) => {
-      const p1 = Math.round((i / cats.length) * 100);
-      const p2 = Math.round(((i + 1) / cats.length) * 100);
-      return `${this.getCatColor(c)} ${p1}% ${p2}%`;
-    }).join(', ');
-    return `background: linear-gradient(90deg, ${stops})`;
   });
 
   getWorkoutStripe(workout: Workout): string {
@@ -899,14 +735,14 @@ export class HistoryComponent {
   }
 
   selectDate(date: string): void {
-    this.selectedDate.set(this.selectedDate() === date ? null : date);
-    this.selectedExerciseId.set(null);
-  }
-
-  selectExercise(exerciseId: string): void {
-    const next = this.selectedExerciseId() === exerciseId ? null : exerciseId;
-    this.selectedExerciseId.set(next);
-    if (next) this.workoutService.loadAllWorkouts();
+    const next = this.selectedDate() === date ? null : date;
+    this.selectedDate.set(next);
+    if (next) {
+      const w = this.workoutService.getWorkoutForDate(next);
+      this.expandedId.set(w?.id ?? null);
+    } else {
+      this.expandedId.set(null);
+    }
   }
 
   toggleExpanded(id: string): void {
