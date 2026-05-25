@@ -247,8 +247,8 @@ import {
       &.is-selected {
         background: var(--c-brand) !important; color: white;
       }
-      &.is-future { color: var(--c-border); }
-      &.is-future-plan { color: var(--c-text-2); opacity: 0.65; }
+      &.is-future { opacity: 0.35; }
+      &.is-future-plan { opacity: 0.65; }
       &.is-future-plan:hover { opacity: 1; }
     }
 
@@ -258,16 +258,12 @@ import {
     }
     .is-today .week-dow  { color: var(--c-brand); }
     .is-selected .week-dow { color: rgba(255,255,255,0.75); }
-    .is-future .week-dow { color: var(--c-border); }
-    .is-future-plan .week-dow { color: var(--c-text-3); }
 
     .week-num {
       font-size: 16px; font-weight: 700; color: var(--c-text); line-height: 1;
     }
     .is-today .week-num    { color: var(--c-brand); }
     .is-selected .week-num { color: white; }
-    .is-future .week-num   { color: var(--c-border); }
-    .is-future-plan .week-num { color: var(--c-text); }
 
     /* ══ MENSUAL ══ */
     .cal-grid {
@@ -298,9 +294,8 @@ import {
       &.is-selected {
         background: var(--c-brand) !important; color: white; font-weight: 700;
       }
-      &.is-future { color: var(--c-border); }
-      &.has-workout.is-future { color: var(--c-border-2); }
-      &.is-future-plan { color: var(--c-text-2); opacity: 0.65; }
+      &.is-future { opacity: 0.35; }
+      &.is-future-plan { opacity: 0.65; }
       &.is-future-plan:hover { opacity: 1; }
     }
 
@@ -324,7 +319,6 @@ import {
     .is-selected .workout-dot,
     .is-selected .sport-dot { background: rgba(255,255,255,0.85) !important; }
     .is-selected .planned-dot { border-color: rgba(255,255,255,0.65) !important; }
-    .is-future.has-planned { color: var(--c-text-2); opacity: 0.9; }
 
     /* ── Footer ── */
     .cal-footer {
