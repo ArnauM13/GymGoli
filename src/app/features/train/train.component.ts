@@ -61,7 +61,11 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           <button class="back-btn" (click)="closeWorkout()">
             <span class="material-symbols-outlined">arrow_back</span>
           </button>
-          <h1>{{ awPageTitle(w) }}</h1>
+          <div class="aw-title-block">
+            <h1>{{ (w.status ?? 'done') === 'planned' ? 'El meu pla' : 'El meu entrenament' }}</h1>
+            <span class="aw-date-sub">{{ workoutDateLabel(w) }}</span>
+          </div>
+          <span class="aw-type-badge" [style.--bc]="workoutPrimaryColor(w)">{{ workoutLabel(w) }}</span>
         </header>
 
         <!-- Floating card header (same style as dashboard workout-card) -->
@@ -662,7 +666,24 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .page-header { padding: 16px 16px 10px; }
     .page-header--aw {
       display: flex; align-items: center; gap: 10px;
-      h1 { margin: 0; font-size: 18px; font-weight: 700; color: var(--c-text); }
+    }
+    .aw-title-block {
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column; gap: 1px;
+      h1 { margin: 0; font-size: 16px; font-weight: 700; color: var(--c-text); line-height: 1.2; }
+    }
+    .aw-date-sub {
+      font-size: 12px; color: var(--c-text-3); font-weight: 500;
+      line-height: 1.2; text-transform: capitalize;
+    }
+    .aw-type-badge {
+      --bc: var(--c-brand); flex-shrink: 0;
+      padding: 4px 10px; border-radius: 20px;
+      background: color-mix(in srgb, var(--bc) 12%, var(--c-card));
+      color: var(--bc); font-size: 11px; font-weight: 700;
+      border: 1px solid color-mix(in srgb, var(--bc) 25%, transparent);
+      white-space: nowrap; max-width: 110px;
+      overflow: hidden; text-overflow: ellipsis;
     }
     .page-header-top {
       display: flex; align-items: center; justify-content: space-between;
@@ -1755,12 +1776,10 @@ export class TrainComponent {
     this.editor?.reset();
   }
 
-  awPageTitle(w: Workout): string {
-    const isPlan = (w.status ?? 'done') === 'planned';
-    if (w.date === TODAY()) return isPlan ? "Pla d'avui" : "Entrenament d'avui";
+  workoutDateLabel(w: Workout): string {
     const d = new Date(w.date + 'T12:00:00');
-    const label = d.toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'short' });
-    return isPlan ? `Pla · ${label}` : label;
+    const label = d.toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+    return label.charAt(0).toUpperCase() + label.slice(1);
   }
 
   async startPlan(w: Workout): Promise<void> {
