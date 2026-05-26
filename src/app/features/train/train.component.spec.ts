@@ -9,6 +9,7 @@ import { TrainComponent } from './train.component';
 import { WorkoutService } from '../../core/services/workout.service';
 import { SportService } from '../../core/services/sport.service';
 import { Workout, WorkoutEntry } from '../../core/models/workout.model';
+import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 
 const TODAY = new Date().toISOString().split('T')[0];
 
@@ -46,8 +47,9 @@ describe('TrainComponent', () => {
       providers: [
         { provide: WorkoutService, useValue: mockWorkoutService },
         { provide: SportService,   useValue: mockSportService },
-        { provide: MatDialog,      useValue: { open: jasmine.createSpy() } },
-        { provide: MatSnackBar,    useValue: { open: jasmine.createSpy() } },
+        { provide: MatDialog,         useValue: { open: jasmine.createSpy() } },
+        { provide: MatSnackBar,       useValue: { open: jasmine.createSpy() } },
+        { provide: ConfirmDialogService, useValue: { confirm: jasmine.createSpy('confirm').and.resolveTo(false) } },
       ],
     })
       .overrideComponent(TrainComponent, {

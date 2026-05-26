@@ -12,6 +12,7 @@ import { FitnessMetricsService } from '../../core/services/fitness-metrics.servi
 import { WorkoutService } from '../../core/services/workout.service';
 import { SportService } from '../../core/services/sport.service';
 import { ExerciseService } from '../../core/services/exercise.service';
+import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 
 describe('SettingsComponent', () => {
   let component: SettingsComponent;
@@ -102,6 +103,10 @@ describe('SettingsComponent', () => {
         {
           provide: MatSnackBar,
           useValue: { open: mockSnackBarOpen },
+        },
+        {
+          provide: ConfirmDialogService,
+          useValue: { confirm: jasmine.createSpy('confirm').and.resolveTo(false) },
         },
       ],
     })
