@@ -5,7 +5,7 @@ import { DatePipe } from '@angular/common';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
-
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { TrainerService } from '../../core/services/trainer.service';
 import {
   ClientGoals, TrainerClient, TrainerProposal, WEEKDAY_FULL, WEEKDAY_LABELS,
@@ -20,18 +20,17 @@ type DashboardView = 'clients' | 'detail';
 @Component({
   selector: 'app-trainer',
   standalone: true,
-  imports: [DatePipe],
+  imports: [DatePipe, PageHeaderComponent],
   template: `
     <div class="page">
 
-      <header class="page-header">
-        <h1>Entrenador</h1>
+      <app-page-header title="Entrenador">
         @if (trainerService.clients().length > 0) {
           <button class="header-add" (click)="showInvitePanel()" aria-label="Convidar client">
             <span class="material-symbols-outlined">person_add</span>
           </button>
         }
-      </header>
+      </app-page-header>
 
       <!-- ── Invite panel ──────────────────────────────────────────────── -->
       @if (invitePanelOpen()) {
@@ -389,11 +388,6 @@ type DashboardView = 'clients' | 'detail';
   styles: [`
     .page { padding: 0 0 84px; }
 
-    .page-header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 16px 16px 8px;
-      h1 { margin: 0; font-size: 20px; font-weight: 700; color: #1a1a1a; letter-spacing: -0.2px; }
-    }
     .header-add {
       width: 36px; height: 36px; border-radius: 50%; border: none;
       background: #006874; color: white; cursor: pointer;

@@ -27,7 +27,7 @@ interface SessionPoint {
             <span class="material-symbols-outlined esd-title-icon">bar_chart</span>
             <h2 class="esd-title">{{ resolvedName() }}</h2>
           </div>
-          <button class="esd-close-btn" type="button" (click)="close()">
+          <button class="esd-close-btn" type="button" (click)="close()" aria-label="Tancar">
             <span class="material-symbols-outlined">close</span>
           </button>
         </div>

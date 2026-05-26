@@ -1,18 +1,13 @@
 import { Component } from '@angular/core';
-import { Location } from '@angular/common';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 
 @Component({
   selector: 'app-privacy',
   standalone: true,
+  imports: [PageHeaderComponent],
   template: `
     <div class="page">
-
-      <div class="page-header">
-        <button class="back-btn" (click)="back()" aria-label="Tornar">
-          <span class="material-symbols-outlined">arrow_back_ios</span>
-        </button>
-        <h1 class="page-title">Privacitat i Condicions</h1>
-      </div>
+      <app-page-header title="Privacitat i Condicions" [showBack]="true" />
 
       <div class="card">
 
@@ -99,23 +94,6 @@ import { Location } from '@angular/common';
   styles: [`
     .page { padding: 0 16px 84px; max-width: 640px; margin: 0 auto; }
 
-    /* ── Header ── */
-    .page-header {
-      display: flex; align-items: center; gap: 4px;
-      padding: 12px 0 16px;
-    }
-    .back-btn {
-      width: 36px; height: 36px; border-radius: 50%; border: none;
-      background: transparent; cursor: pointer; color: var(--c-text-2); flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center;
-      transition: background 0.15s; touch-action: manipulation;
-      .material-symbols-outlined { font-size: 20px; }
-      &:hover { background: var(--c-hover); }
-    }
-    .page-title {
-      margin: 0; font-size: 20px; font-weight: 800; color: var(--c-text); letter-spacing: -0.3px;
-    }
-
     /* ── Content card ── */
     .card {
       background: var(--c-card); border-radius: 18px;
@@ -151,7 +129,4 @@ import { Location } from '@angular/common';
     }
   `],
 })
-export class PrivacyComponent {
-  constructor(private location: Location) {}
-  back(): void { this.location.back(); }
-}
+export class PrivacyComponent {}

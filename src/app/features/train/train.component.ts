@@ -24,6 +24,7 @@ import { WorkoutEditorComponent } from '../../shared/components/workout-editor/w
 import { FitnessInsightsComponent } from '../../shared/components/fitness-insights/fitness-insights.component';
 import { WeeklySummaryComponent } from './components/weekly-summary.component';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
 
@@ -50,7 +51,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 @Component({
   selector: 'app-train',
   standalone: true,
-  imports: [WorkoutEditorComponent, CalendarComponent, FitnessInsightsComponent, WeeklySummaryComponent],
+  imports: [WorkoutEditorComponent, CalendarComponent, FitnessInsightsComponent, WeeklySummaryComponent, PageHeaderComponent],
   template: `
     <div class="page" [style.padding-bottom]="pagePaddingBottom()">
 
@@ -140,11 +141,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       } @else {
 
         <!-- ══ DASHBOARD MODE ══ -->
-        <header class="page-header">
-          <div class="page-header-top">
-            <h1>Entrenament</h1>
-          </div>
-        </header>
+        <app-page-header title="Entrenament" />
 
         <div class="calendar-wrap">
           <app-calendar
@@ -674,8 +671,8 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .page { padding: 0; }
 
     /* ── Page header ── */
-    .page-header { padding: 16px 16px 10px; }
     .page-header--aw {
+      padding: 16px 16px 10px;
       display: flex; align-items: center; gap: 10px;
     }
     .aw-title-block {
@@ -695,10 +692,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       border: 1px solid color-mix(in srgb, var(--bc) 25%, transparent);
       white-space: nowrap; max-width: 110px;
       overflow: hidden; text-overflow: ellipsis;
-    }
-    .page-header-top {
-      display: flex; align-items: center; justify-content: space-between;
-      h1 { margin: 0; font-size: 22px; font-weight: 700; }
     }
     .back-btn {
       display: flex; align-items: center; justify-content: center;
