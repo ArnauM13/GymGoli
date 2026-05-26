@@ -80,7 +80,7 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
                 @if (exercise.muscles?.length || exercise.setsRange) {
                   <div class="ic-meta">
                     @if (exercise.setsRange && exercise.repsRange) {
-                      <span class="ic-guide">{{ exercise.setsRange[0] }}–{{ exercise.setsRange[1] }} × {{ exercise.repsRange[0] }}–{{ exercise.repsRange[1] }}</span>
+                      <span class="ic-guide">{{ formatGuidance(exercise) }}</span>
                     }
                     @for (m of (exercise.muscles ?? []); track m; let i = $index) {
                       @if (i < 3) {
@@ -190,9 +190,9 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
     /* ── Page header ── */
     .page-header {
       display: flex; align-items: center;
-      padding: 16px 16px 8px;
+      padding: 16px 16px 10px;
       &.page-header--mt { padding-top: 24px; }
-      h1 { margin: 0; font-size: 20px; font-weight: 700; color: var(--c-text); letter-spacing: -0.2px; }
+      h1 { margin: 0; font-size: 22px; font-weight: 700; color: var(--c-text); letter-spacing: -0.3px; }
     }
 
     /* ── Speed dial FAB ── */
@@ -437,6 +437,14 @@ export class LibraryComponent {
   setMuscle(m: string): void {
     this.muscleFilter.set(this.muscleFilter() === m ? null : m);
     this.activeFilter.set(null);
+  }
+
+  formatGuidance(exercise: Exercise): string {
+    const s = exercise.setsRange!;
+    const r = exercise.repsRange!;
+    const sets = s[0] === s[1] ? `${s[0]}` : `${s[0]}–${s[1]}`;
+    const reps = r[0] === r[1] ? `${r[0]}` : `${r[0]}–${r[1]}`;
+    return `${reps} × ${sets}`;
   }
 
   getCategoryLabel(cat: ExerciseCategory): string { return CATEGORY_LABELS[cat]; }
