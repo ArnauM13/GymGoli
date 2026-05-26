@@ -37,9 +37,20 @@ export const routes: Routes = [
   },
   {
     path: 'library',
+    redirectTo: 'exercises',
+    pathMatch: 'full',
+  },
+  {
+    path: 'exercises',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./features/library/library.component').then(m => m.LibraryComponent),
+      import('./features/exercises/exercises.component').then(m => m.ExercisesComponent),
+  },
+  {
+    path: 'sports-config',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/sports-config/sports-config.component').then(m => m.SportsConfigComponent),
   },
   {
     path: 'charts',
