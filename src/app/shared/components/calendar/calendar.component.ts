@@ -95,6 +95,12 @@ import {
                     <span class="week-sport-icon material-symbols-outlined"
                           [style.color]="cell.sportColors[i]">{{ icon }}</span>
                   }
+                  @if (cell.hasPlannedSport) {
+                    @for (icon of cell.plannedSportIcons.slice(0, 2 - cell.sportIcons.length); track icon; let i = $index) {
+                      <span class="week-sport-icon week-sport-icon--planned material-symbols-outlined"
+                            [style.color]="cell.plannedSportColors[i]">{{ icon }}</span>
+                    }
+                  }
                 </div>
               }
             </button>
@@ -136,6 +142,10 @@ import {
                     @if (cell.hasSport) {
                       <span class="sport-dot"
                             [style.background]="getSportDotBackground(cell.sportColors)"></span>
+                    }
+                    @if (cell.hasPlannedSport && !cell.hasSport) {
+                      <span class="sport-dot sport-dot--planned"
+                            [style.--sc]="cell.plannedSportColors[0] ?? 'var(--c-brand)'"></span>
                     }
                   </div>
                 }
@@ -315,6 +325,14 @@ import {
     }
     .workout-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
     .sport-dot   { width: 5px; height: 5px; border-radius: 2px; flex-shrink: 0; }
+    .sport-dot--planned {
+      background: transparent !important;
+      border: 1.5px dashed var(--sc, var(--c-brand));
+      opacity: 0.8;
+    }
+    .week-sport-icon--planned { opacity: 0.45; }
+    .is-selected .week-sport-icon--planned { opacity: 0.65; color: rgba(255,255,255,0.7) !important; }
+    .is-selected .sport-dot--planned { border-color: rgba(255,255,255,0.55) !important; }
     .planned-dot {
       width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
       background: color-mix(in srgb, var(--pc, var(--c-brand)) 65%, transparent);
@@ -518,11 +536,12 @@ export class CalendarComponent {
 
     const days: CalDay[] = [];
     for (let i = 0; i < 7; i++) {
-      const dateStr   = addDays(monday, i);
-      const d         = new Date(dateStr + 'T12:00:00');
-      const w         = doneByDate.get(dateStr);
-      const planned   = plannedByDate.get(dateStr) ?? [];
-      const sports    = this.sportService.getSportsForDate(dateStr);
+      const dateStr       = addDays(monday, i);
+      const d             = new Date(dateStr + 'T12:00:00');
+      const w             = doneByDate.get(dateStr);
+      const planned       = plannedByDate.get(dateStr) ?? [];
+      const sports        = this.sportService.getSportsForDate(dateStr);
+      const plannedSports = this.sportService.getPlannedSportSessionsForDate(dateStr);
       days.push({
         date: dateStr, day: d.getDate(),
         hasWorkout: !!w,
@@ -530,6 +549,9 @@ export class CalendarComponent {
         hasSport: sports.length > 0,
         sportColors: sports.map(s => s.color),
         sportIcons:  sports.map(s => s.icon),
+        hasPlannedSport: plannedSports.length > 0,
+        plannedSportColors: plannedSports.map(p => p.sport.color),
+        plannedSportIcons:  plannedSports.map(p => p.sport.icon),
         isToday:    dateStr === today,
         isFuture:   dateStr > today,
         isSelected: dateStr === sel,
@@ -559,10 +581,11 @@ export class CalendarComponent {
     const cells: (CalDay | null)[] = [];
     for (let i = 0; i < startPad; i++) cells.push(null);
     for (let d = 1; d <= daysInMonth; d++) {
-      const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const w       = doneByDate.get(dateStr);
-      const planned = plannedByDate.get(dateStr) ?? [];
-      const sports  = this.sportService.getSportsForDate(dateStr);
+      const dateStr       = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const w             = doneByDate.get(dateStr);
+      const planned       = plannedByDate.get(dateStr) ?? [];
+      const sports        = this.sportService.getSportsForDate(dateStr);
+      const plannedSports = this.sportService.getPlannedSportSessionsForDate(dateStr);
       cells.push({
         date: dateStr, day: d,
         hasWorkout: !!w,
@@ -570,6 +593,9 @@ export class CalendarComponent {
         hasSport: sports.length > 0,
         sportColors: sports.map(s => s.color),
         sportIcons:  sports.map(s => s.icon),
+        hasPlannedSport: plannedSports.length > 0,
+        plannedSportColors: plannedSports.map(p => p.sport.color),
+        plannedSportIcons:  plannedSports.map(p => p.sport.icon),
         isToday:    dateStr === today,
         isFuture:   dateStr > today,
         isSelected: dateStr === sel,

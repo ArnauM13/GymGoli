@@ -13,6 +13,7 @@ export interface CalDay {
   date: string; day: number;
   hasWorkout: boolean; workoutCategories: string[];
   hasSport: boolean; sportColors: string[]; sportIcons: string[];
+  hasPlannedSport: boolean; plannedSportColors: string[]; plannedSportIcons: string[];
   isToday: boolean; isFuture: boolean; isSelected: boolean;
   hasPlanned: boolean; plannedCategories: string[];
 }

@@ -412,7 +412,7 @@ export class InlineDatePickerComponent {
         isToday:    dateStr === today,
         isFuture:   dateStr > today,
         isSelected: dateStr === sel,
-        hasPlanned: false, plannedCategories: [],
+        hasPlanned: false, plannedCategories: [], hasPlannedSport: false, plannedSportColors: [], plannedSportIcons: [],
       });
     }
     return days;
@@ -444,7 +444,7 @@ export class InlineDatePickerComponent {
         isToday:    dateStr === today,
         isFuture:   dateStr > today,
         isSelected: dateStr === sel,
-        hasPlanned: false, plannedCategories: [],
+        hasPlanned: false, plannedCategories: [], hasPlannedSport: false, plannedSportColors: [], plannedSportIcons: [],
       });
     }
     return cells;
