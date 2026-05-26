@@ -82,7 +82,7 @@ import {
               (click)="selectDay(cell.date)">
               <span class="week-dow">{{ getDow(cell.date) }}</span>
               <span class="week-num">{{ cell.day }}</span>
-              @if (cell.hasWorkout || cell.hasSport || cell.hasPlanned) {
+              @if (cell.hasWorkout || cell.hasSport || cell.hasPlanned || cell.hasPlannedSport) {
                 <div class="dots-row">
                   @if (cell.hasWorkout) {
                     <span class="workout-dot"
@@ -130,7 +130,7 @@ import {
                 (click)="selectDay(cell.date)"
                 [attr.aria-label]="cell.day">
                 <span class="day-num">{{ cell.day }}</span>
-                @if (cell.hasWorkout || cell.hasSport || cell.hasPlanned) {
+                @if (cell.hasWorkout || cell.hasSport || cell.hasPlanned || cell.hasPlannedSport) {
                   <div class="dots-row">
                     @if (cell.hasWorkout) {
                       <span class="workout-dot"
