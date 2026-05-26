@@ -322,6 +322,7 @@ import {
     .is-selected .week-sport-icon { color: rgba(255,255,255,0.9) !important; }
     .dots-row {
       display: flex; align-items: center; justify-content: center; gap: 3px;
+      min-height: 13px;
     }
     .workout-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
     .sport-dot   { width: 5px; height: 5px; border-radius: 2px; flex-shrink: 0; }
