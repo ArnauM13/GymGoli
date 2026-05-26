@@ -4,6 +4,8 @@ import {
 import { DatePipe } from '@angular/common';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
+import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
+
 import { TrainerService } from '../../core/services/trainer.service';
 import {
   ClientGoals, TrainerClient, TrainerProposal, WEEKDAY_FULL, WEEKDAY_LABELS,
@@ -693,7 +695,8 @@ type DashboardView = 'clients' | 'detail';
 })
 export class TrainerComponent implements OnInit {
   readonly trainerService = inject(TrainerService);
-  private snackBar = inject(MatSnackBar);
+  private snackBar        = inject(MatSnackBar);
+  private confirmDialog   = inject(ConfirmDialogService);
 
   readonly invitePanelOpen  = signal(false);
   readonly generatingInvite = signal(false);
@@ -938,7 +941,7 @@ export class TrainerComponent implements OnInit {
   }
 
   async deleteProposal(p: TrainerProposal): Promise<void> {
-    if (!confirm(`Eliminar aquesta proposta?`)) return;
+    if (!await this.confirmDialog.confirm('Eliminar aquesta proposta?', { variant: 'danger', confirmLabel: 'Eliminar' })) return;
     try {
       await this.trainerService.deleteProposal(p.id);
       const updated = (this.clientProposalsCache.get(p.clientId) ?? []).filter(x => x.id !== p.id);
@@ -970,7 +973,7 @@ export class TrainerComponent implements OnInit {
   }
 
   async confirmRemoveClient(c: TrainerClient): Promise<void> {
-    if (!confirm(`Eliminar ${this.clientName(c)} de la teva llista de clients?\n\nLes propostes creades s'eliminaran.`)) return;
+    if (!await this.confirmDialog.confirm(`Eliminar ${this.clientName(c)} de la teva llista de clients? Les propostes creades s'eliminaran.`, { variant: 'danger', confirmLabel: 'Eliminar' })) return;
     try {
       await this.trainerService.removeClient(c.clientId);
       this.selectedClient.set(null);

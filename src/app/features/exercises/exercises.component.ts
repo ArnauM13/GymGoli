@@ -4,6 +4,8 @@ import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
+import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
+
 import {
   CATEGORY_COLORS,
   CATEGORY_ICONS,
@@ -281,6 +283,7 @@ export class ExercisesComponent {
   private authService     = inject(AuthService);
   private dialog          = inject(MatDialog);
   private snackBar        = inject(MatSnackBar);
+  private confirmDialog   = inject(ConfirmDialogService);
   private router          = inject(Router);
 
   readonly searchQuery  = signal('');
@@ -357,7 +360,7 @@ export class ExercisesComponent {
   }
 
   async deleteExercise(exercise: Exercise): Promise<void> {
-    if (!confirm(`Eliminar "${exercise.name}"?`)) return;
+    if (!await this.confirmDialog.confirm(`Eliminar "${exercise.name}"?`, { variant: 'danger', confirmLabel: 'Eliminar' })) return;
     try {
       await this.exerciseService.delete(exercise.id);
       this.snackBar.open('Exercici eliminat', '', { duration: 2000 });

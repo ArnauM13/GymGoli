@@ -6,6 +6,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Sport } from '../../core/models/sport.model';
 import { SportService } from '../../core/services/sport.service';
 import { SportFormDialogComponent } from '../library/components/sport-form-dialog.component';
+import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 
 @Component({
   selector: 'app-sports-config',
@@ -156,6 +157,7 @@ export class SportsConfigComponent {
   private sportService = inject(SportService);
   private dialog       = inject(MatDialog);
   private snackBar     = inject(MatSnackBar);
+  private confirmDialog = inject(ConfirmDialogService);
   private router       = inject(Router);
 
   readonly sports = this.sportService.sports;
@@ -183,7 +185,7 @@ export class SportsConfigComponent {
   }
 
   async deleteSport(sport: Sport): Promise<void> {
-    if (!confirm(`Eliminar "${sport.name}"?`)) return;
+    if (!await this.confirmDialog.confirm(`Eliminar "${sport.name}"?`, { variant: 'danger', confirmLabel: 'Eliminar' })) return;
     try {
       await this.sportService.deleteSport(sport.id);
       this.snackBar.open('Esport eliminat', '', { duration: 2000 });

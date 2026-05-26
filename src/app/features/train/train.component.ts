@@ -18,6 +18,7 @@ import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry } from '../../core/m
 import { ExerciseService } from '../../core/services/exercise.service';
 import { TemplateService } from '../../core/services/template.service';
 import { SportService } from '../../core/services/sport.service';
+import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
 import { FitnessInsightsComponent } from '../../shared/components/fitness-insights/fitness-insights.component';
@@ -380,6 +381,17 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
                           <span class="material-symbols-outlined">delete</span>
                         </button>
                       </div>
+                    </div>
+                  }
+
+                  @if (sportService.sports().length === 0 && datePlannedSports().length === 0) {
+                    <div class="es-empty">
+                      <span class="material-symbols-outlined es-empty-icon">sports_soccer</span>
+                      <span class="es-empty-msg">Afegeix els esports que practiques</span>
+                      <button class="es-empty-btn" (click)="router.navigate(['/sports-config'])">
+                        Configurar esports
+                        <span class="material-symbols-outlined">arrow_forward</span>
+                      </button>
                     </div>
                   }
 
@@ -854,6 +866,20 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .sc--done .sc-eyebrow { color: color-mix(in srgb, var(--sc) 80%, var(--c-text-3)); }
 
     /* ── Type grid (inside workout-section) ── */
+    .es-empty {
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
+      padding: 24px 16px; text-align: center;
+    }
+    .es-empty-icon { font-size: 32px; color: var(--c-text-3); font-variation-settings: 'FILL' 0, 'wght' 200; }
+    .es-empty-msg { font-size: 13px; color: var(--c-text-3); }
+    .es-empty-btn {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 8px 16px; border-radius: 10px; border: none;
+      background: var(--c-brand); color: #fff;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      .material-symbols-outlined { font-size: 16px; }
+    }
+
     .type-grid {
       display: grid; gap: 10px;
       &.type-grid--mt { margin-top: 10px; }
@@ -1410,9 +1436,10 @@ export class TrainComponent {
   private settingsService  = inject(UserSettingsService);
   private exerciseService  = inject(ExerciseService);
   private templateService  = inject(TemplateService);
-  private router           = inject(Router);
+  readonly router          = inject(Router);
   private dialog           = inject(MatDialog);
   private snackBar         = inject(MatSnackBar);
+  private confirmDialog    = inject(ConfirmDialogService);
 
   @ViewChild('editor') editor?: WorkoutEditorComponent;
 
@@ -1869,7 +1896,7 @@ export class TrainComponent {
   }
 
   async deleteActiveWorkout(): Promise<void> {
-    if (!confirm('Eliminar l\'entrenament?')) return;
+    if (!await this.confirmDialog.confirm('Eliminar l\'entrenament?', { variant: 'danger', confirmLabel: 'Eliminar' })) return;
     const w = this.activeWorkout();
     if (!w) return;
     try {
@@ -1881,7 +1908,7 @@ export class TrainComponent {
   }
 
   async confirmDeleteWorkout(w: Workout): Promise<void> {
-    if (!confirm(`Eliminar "${this.workoutLabel(w)}"?`)) return;
+    if (!await this.confirmDialog.confirm(`Eliminar "${this.workoutLabel(w)}"?`, { variant: 'danger', confirmLabel: 'Eliminar' })) return;
     try {
       await this.workoutService.deleteWorkout(w.id);
     } catch {

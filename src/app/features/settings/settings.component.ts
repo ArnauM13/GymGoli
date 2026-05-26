@@ -11,6 +11,7 @@ import { SportService } from '../../core/services/sport.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { TrainerService } from '../../core/services/trainer.service';
+import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import {
   FitnessGoal, GoalMode, WeightUnit,
   FITNESS_GOAL_EMOJIS, FITNESS_GOAL_LABELS, FITNESS_GOAL_WEEKLY_DEFAULTS,
@@ -770,6 +771,7 @@ export class SettingsComponent {
   private router           = inject(Router);
   private snackBar         = inject(MatSnackBar);
   private doc              = inject(DOCUMENT);
+  private confirmDialog    = inject(ConfirmDialogService);
 
   readonly userName = computed(() =>
     this.authService.user()?.user_metadata?.['full_name'] as string | undefined
@@ -956,7 +958,7 @@ export class SettingsComponent {
 
   async disconnectTrainer(): Promise<void> {
     const trainerName = this.trainerService.myTrainer()?.displayName ?? 'l\'entrenador';
-    if (!confirm(`Vols desconnectar-te de ${trainerName}?\n\nDeixaràs de rebre propostes d'entrenament.`)) return;
+    if (!await this.confirmDialog.confirm(`Vols desconnectar-te de ${trainerName}? Deixaràs de rebre propostes d'entrenament.`, { confirmLabel: 'Desconnectar' })) return;
     try {
       await this.trainerService.disconnectFromTrainer();
       this.snackBar.open('Entrenador desconnectat', '', { duration: 2000 });
@@ -989,8 +991,9 @@ export class SettingsComponent {
   // ── Account ──────────────────────────────────────────────────────────────
 
   async deleteAccount(): Promise<void> {
-    const confirmed = confirm(
-      'Estàs segur/a que vols eliminar el compte?\n\nTotes les teves dades (entrenaments, esports, configuració) s\'eliminaran de forma permanent i no es podran recuperar.'
+    const confirmed = await this.confirmDialog.confirm(
+      'Totes les teves dades (entrenaments, esports, configuració) s\'eliminaran de forma permanent i no es podran recuperar.',
+      { title: 'Eliminar compte', variant: 'danger', confirmLabel: 'Eliminar compte' }
     );
     if (!confirmed) return;
 

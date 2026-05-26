@@ -2,6 +2,8 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
+import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
+
 import {
   CATEGORY_COLORS,
   CATEGORY_ICONS,
@@ -402,6 +404,7 @@ export class LibraryComponent {
   private authService     = inject(AuthService);
   private dialog          = inject(MatDialog);
   private snackBar        = inject(MatSnackBar);
+  private confirmDialog   = inject(ConfirmDialogService);
 
   readonly sports = this.sportService.sports;
 
@@ -482,7 +485,7 @@ export class LibraryComponent {
   }
 
   async deleteExercise(exercise: Exercise): Promise<void> {
-    if (!confirm(`Eliminar "${exercise.name}"?`)) return;
+    if (!await this.confirmDialog.confirm(`Eliminar "${exercise.name}"?`, { variant: 'danger', confirmLabel: 'Eliminar' })) return;
     try {
       await this.exerciseService.delete(exercise.id);
       this.snackBar.open('Exercici eliminat', '', { duration: 2000 });
@@ -522,7 +525,7 @@ export class LibraryComponent {
   }
 
   async deleteSport(sport: Sport): Promise<void> {
-    if (!confirm(`Eliminar "${sport.name}"?`)) return;
+    if (!await this.confirmDialog.confirm(`Eliminar "${sport.name}"?`, { variant: 'danger', confirmLabel: 'Eliminar' })) return;
     try {
       await this.sportService.deleteSport(sport.id);
       this.snackBar.open('Esport eliminat', '', { duration: 2000 });
