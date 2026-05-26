@@ -245,8 +245,8 @@ import {
 
     .cal-week-day {
       display: flex; flex-direction: column; align-items: center;
-      justify-content: center; gap: 4px;
-      padding: 10px 2px; border: none; border-radius: 12px;
+      justify-content: flex-start; gap: 4px;
+      padding: 10px 2px 8px; border: none; border-radius: 12px;
       background: transparent; cursor: pointer;
       transition: background 0.15s; touch-action: manipulation;
 
@@ -291,7 +291,7 @@ import {
 
     .cal-day {
       display: flex; flex-direction: column; align-items: center;
-      justify-content: center; gap: 3px;
+      justify-content: flex-start; gap: 3px;
       min-height: 40px; width: 100%;
       border: none; border-radius: 10px; background: transparent;
       font-size: 14px; font-weight: 500; color: var(--c-text);
