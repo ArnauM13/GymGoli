@@ -53,7 +53,7 @@ export class ExerciseService {
       .eq('user_id', uid)
       .order('name');
 
-    if (error) { console.error('ExerciseService._load', error); return; }
+    if (error) return;
     this._exercises.set((data ?? []).map(r => toExercise(r as Record<string, unknown>)));
   }
 

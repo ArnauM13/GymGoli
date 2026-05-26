@@ -28,7 +28,7 @@ function makeWorkoutWithCats(date: string, cats: string[]): Workout {
 }
 
 function makeSport(id = 's1', color = '#43A047'): Sport {
-  return { id, name: 'Futbol', icon: 'sports_soccer', color, subtypes: [], createdAt: new Date() };
+  return { id, name: 'Futbol', icon: 'sports_soccer', color, subtypes: [], metricDefs: [], createdAt: new Date() };
 }
 
 function makeSession(date: string, sportId = 's1'): SportSession {

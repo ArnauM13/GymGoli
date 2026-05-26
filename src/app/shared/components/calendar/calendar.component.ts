@@ -145,7 +145,7 @@ import {
                     }
                     @if (cell.hasPlannedSport && !cell.hasSport) {
                       <span class="sport-dot sport-dot--planned"
-                            [style.--sc]="cell.plannedSportColors[0] ?? 'var(--c-brand)'"></span>
+                            [style.--sc]="cell.plannedSportColors[0] || 'var(--c-brand)'"></span>
                     }
                   </div>
                 }

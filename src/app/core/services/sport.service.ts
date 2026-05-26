@@ -177,8 +177,8 @@ export class SportService {
 
       this._monthCache.set(key, (data ?? []).map(r => toSportSession(r as Record<string, unknown>)));
       this._rebuild();
-    } catch (err) {
-      console.warn('[SportService] ensureMonthLoaded error:', err);
+    } catch {
+      // silent — month stays missing, UI shows empty
     } finally {
       this.isLoading.set(false);
     }

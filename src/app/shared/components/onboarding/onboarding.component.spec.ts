@@ -63,18 +63,18 @@ describe('OnboardingComponent', () => {
     });
   });
 
-  // ── skipToEnd() ──────────────────────────────────────────────────────────
+  // ── skipToGoal() ─────────────────────────────────────────────────────────
 
-  describe('skipToEnd()', () => {
-    it('jumps to the last slide from step 0', () => {
-      component.skipToEnd();
-      expect(component.step()).toBe(component.slides.length - 1);
+  describe('skipToGoal()', () => {
+    it('jumps to the goal step from step 0', () => {
+      component.skipToGoal();
+      expect(component.step()).toBe(component.slides.length);
     });
 
     it('works from any intermediate step', () => {
       component.next(); // step 1
-      component.skipToEnd();
-      expect(component.step()).toBe(component.slides.length - 1);
+      component.skipToGoal();
+      expect(component.step()).toBe(component.slides.length);
     });
   });
 
