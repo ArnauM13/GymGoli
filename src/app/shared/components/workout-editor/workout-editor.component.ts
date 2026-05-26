@@ -174,19 +174,23 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                       </div>
                     </div>
                   </div>
+                  <div class="we-qty-row">
+                    @for (n of setQtyOptions; track n) {
+                      <button type="button" class="we-qty-chip"
+                              [class.we-qty-chip--active]="setQty() === n"
+                              (click)="setQty.set(n)">×{{ n }}</button>
+                    }
+                  </div>
                   <div class="we-set-form-actions">
-                    <button type="button" class="we-cancel-btn" (click)="cancelSet()">Cancel·lar</button>
-                    <div class="we-quick-add">
-                      <button type="button" class="we-qty-btn" (click)="submitSets(entry.exerciseId, 2)"
-                              [disabled]="setForm.invalid">×2</button>
-                      <button type="button" class="we-qty-btn" (click)="submitSets(entry.exerciseId, 4)"
-                              [disabled]="setForm.invalid">×4</button>
-                      <button type="button" class="we-submit-btn" (click)="submitSets(entry.exerciseId, 1)"
-                              [disabled]="setForm.invalid">
-                        <span class="material-symbols-outlined">add</span>
-                        Afegir
-                      </button>
-                    </div>
+                    <button type="button" class="we-cancel-btn" (click)="cancelSet()">
+                      <span class="material-symbols-outlined">close</span>
+                    </button>
+                    <button type="button" class="we-submit-btn"
+                            (click)="submitSets(entry.exerciseId, setQty())"
+                            [disabled]="setForm.invalid">
+                      <span class="material-symbols-outlined">add</span>
+                      {{ setQty() > 1 ? 'Afegir ×' + setQty() : 'Afegir' }}
+                    </button>
                   </div>
                 </form>
               } @else {
@@ -545,68 +549,75 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       }
     }
 
-    /* ── Add-set form action buttons ── */
+    /* ── Quantity chips + form actions ── */
+    .we-qty-row {
+      display: flex; gap: 6px;
+    }
+    .we-qty-chip {
+      flex: 1; padding: 10px 4px; border-radius: 10px;
+      border: 1.5px solid var(--c-border); background: var(--c-card);
+      color: var(--c-text-2); font-size: 14px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      &:hover { border-color: var(--c-brand); color: var(--c-brand); }
+      &:active { transform: scale(0.94); }
+      &.we-qty-chip--active {
+        border-color: var(--c-brand);
+        background: rgba(var(--c-brand-rgb), 0.1);
+        color: var(--c-brand);
+      }
+    }
     .we-set-form-actions {
       display: flex; align-items: center; gap: 8px;
     }
     .we-cancel-btn {
-      padding: 10px 14px; border-radius: 10px;
+      width: 44px; height: 44px; flex-shrink: 0; border-radius: 10px;
       border: 1.5px solid var(--c-border); background: transparent;
-      color: var(--c-text-3); font-size: 14px; font-weight: 600;
-      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      color: var(--c-text-3); cursor: pointer; touch-action: manipulation;
+      display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 20px; }
       &:hover { background: var(--c-subtle); color: var(--c-text-2); }
-      &:active { transform: scale(0.95); }
-    }
-    .we-quick-add {
-      flex: 1; display: flex; gap: 6px; justify-content: flex-end; align-items: stretch;
-    }
-    .we-qty-btn {
-      padding: 10px 14px; border-radius: 10px;
-      border: 1.5px solid var(--c-border); background: var(--c-subtle);
-      color: var(--c-text-2); font-size: 14px; font-weight: 700;
-      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      &:hover:not(:disabled) { background: var(--c-hover); color: var(--c-text); }
-      &:active:not(:disabled) { transform: scale(0.95); }
-      &:disabled { opacity: 0.4; cursor: default; }
+      &:active { transform: scale(0.94); }
     }
     .we-submit-btn {
-      display: flex; align-items: center; gap: 4px;
-      padding: 10px 16px; border-radius: 10px;
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
+      padding: 12px 16px; border-radius: 10px;
       border: none; background: var(--c-brand);
-      color: white; font-size: 14px; font-weight: 700;
+      color: white; font-size: 15px; font-weight: 700;
       cursor: pointer; touch-action: manipulation; transition: all 0.15s;
       .material-symbols-outlined { font-size: 18px; }
       &:hover:not(:disabled) { background: var(--c-brand-dk); }
-      &:active:not(:disabled) { transform: scale(0.95); }
+      &:active:not(:disabled) { transform: scale(0.97); }
       &:disabled { opacity: 0.4; cursor: default; }
     }
 
     /* ── Add / Repeat row ── */
     .we-add-set-row {
-      display: flex; align-items: stretch;
-      border-top: 1px solid rgba(var(--c-brand-rgb), 0.08);
+      display: flex; align-items: stretch; gap: 8px;
+      padding: 10px 14px; border-top: 1px solid var(--c-border-2);
     }
-
     .we-add-set-btn {
-      flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
-      padding: 14px; border: none; background: rgba(var(--c-brand-rgb), 0.06);
-      color: var(--c-brand); font-size: 14px; font-weight: 600;
-      cursor: pointer; touch-action: manipulation;
-      &:hover { background: rgba(var(--c-brand-rgb), 0.12); }
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
+      padding: 12px; border-radius: 10px;
+      border: 1.5px dashed rgba(var(--c-brand-rgb), 0.45);
+      background: rgba(var(--c-brand-rgb), 0.05);
+      color: var(--c-brand); font-size: 14px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 20px; }
+      &:hover { background: rgba(var(--c-brand-rgb), 0.1); border-style: solid; }
+      &:active { transform: scale(0.97); }
     }
-
     .we-repeat-btn {
       display: flex; align-items: center; gap: 5px;
-      padding: 14px 16px;
-      border: none; border-left: 1px solid rgba(var(--c-brand-rgb), 0.12);
-      background: rgba(var(--c-brand-rgb), 0.04);
-      color: var(--c-brand); font-size: 13px; font-weight: 600;
-      cursor: pointer; touch-action: manipulation;
-      transition: background 0.15s; white-space: nowrap;
-      .material-symbols-outlined { font-size: 18px; }
-      &:hover { background: rgba(var(--c-brand-rgb), 0.12); }
+      padding: 12px 14px; border-radius: 10px;
+      border: 1.5px solid var(--c-border);
+      background: var(--c-card);
+      color: var(--c-text-2); font-size: 13px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s; white-space: nowrap;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover { border-color: var(--c-brand); color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.05); }
+      &:active { transform: scale(0.97); }
     }
-    .we-repeat-label { font-size: 13px; font-weight: 600; }
+    .we-repeat-label { font-size: 13px; font-weight: 700; }
 
     /* ── Add-exercise button (history edit mode) ── */
     .we-add-exercise-btn {
@@ -700,6 +711,8 @@ export class WorkoutEditorComponent implements OnDestroy {
   readonly requestAddExercise = output<void>();
 
   readonly addingFor        = signal<string | null>(null);
+  readonly setQty           = signal(1);
+  readonly setQtyOptions    = [1, 2, 3, 4, 5];
   readonly editingSet       = signal<{ exerciseId: string; index: number } | null>(null);
   readonly lastSessionData  = signal<{ exerciseId: string; date: string; maxWeight: number; feeling?: FeelingLevel } | null>(null);
   readonly recData          = signal<{ exerciseId: string; sets: number; reps: number; goalLabel: string } | null>(null);
@@ -785,6 +798,7 @@ export class WorkoutEditorComponent implements OnDestroy {
   private _resetForm(): void {
     this.addingFor.set(null);
     this.editingSet.set(null);
+    this.setQty.set(1);
     this.setForm.reset({ weight: 0, reps: 8 });
   }
 
