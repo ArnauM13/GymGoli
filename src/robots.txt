@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /train
+Disallow: /history
+Disallow: /exercises
+Disallow: /sports-config
+Disallow: /charts
+Disallow: /settings
+Disallow: /templates
+Disallow: /trainer
+
+Sitemap: https://app-gym-two.vercel.app/sitemap.xml
