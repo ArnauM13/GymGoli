@@ -6,30 +6,22 @@
 -- comparison at write time. PostgreSQL native ENUMs are stored internally as
 -- 4-byte OIDs (numeric), validated at write-time by the type system, and
 -- self-documenting via pg_type — without extra join tables or indexes.
--- For any fixed-vocabulary set this is the recommended PostgreSQL pattern.
 --
 -- IMPACT ON APPLICATION CODE
 -- --------------------------
 -- No changes required. The Supabase/PostgREST driver returns ENUM values as
--- plain strings, identical to the current text columns. All TypeScript types
--- (WorkoutStatus, PlannedSource, ExerciseCategory, etc.) remain unchanged.
+-- plain strings. All TypeScript types remain unchanged.
 --
--- COLUMNS MIGRATED
--- ----------------
--- exercises.category            text CHECK ('push','pull','legs')    → exercise_category_t
--- workouts.categories           text[]                               → exercise_category_t[]
--- workouts.status               text CHECK ('planned','done')        → workout_status_t
--- workouts.planned_source       text CHECK ('self','trainer')        → planned_source_t
--- sport_sessions.status         text CHECK ('planned','done')        → sport_status_t
--- user_profiles.role            text CHECK ('user','trainer')        → user_role_t
--- trainer_clients.status        text CHECK ('active','removed')      → client_status_t
--- trainer_proposals.proposal_type text CHECK ('specific','weekly')   → proposal_type_t
--- goal_history.goal_mode        text CHECK ('combined','separate')   → goal_mode_t
+-- ROBUSTNESS
+-- ----------
+-- Sections that depend on optional migrations (007, 010) are wrapped in
+-- DO $$ blocks that check for table existence first, so this migration is
+-- safe to run regardless of which prior migrations have been applied.
 --
--- PRE-REQUISITES: migrations 001 (schema), 007, 009, 010, 011 must be applied.
+-- PRE-REQUISITES: migrations 001 (schema), 002, 009, 011.
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 1. Create all ENUM types
+-- 1. Create ENUM types (always)
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 CREATE TYPE exercise_category_t AS ENUM ('push', 'pull', 'legs');
@@ -42,36 +34,22 @@ CREATE TYPE proposal_type_t     AS ENUM ('specific', 'weekly');
 CREATE TYPE goal_mode_t         AS ENUM ('combined', 'separate');
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 2. Drop redundant CHECK constraints
---
--- These CHECK constraints compare column values against text literals.
--- After converting columns to ENUM types, PostgreSQL cannot resolve the
--- `ENUM = text` operator and the CHECK expression becomes invalid.
--- The ENUM type itself enforces the same invariant, making these CHECKs
--- completely redundant — safe to drop permanently.
+-- 2. exercises.category  (schema.sql — always exists)
 -- ═══════════════════════════════════════════════════════════════════════════════
 
-ALTER TABLE exercises         DROP CONSTRAINT IF EXISTS exercises_category_check;
-ALTER TABLE workouts          DROP CONSTRAINT IF EXISTS workouts_status_check;
-ALTER TABLE workouts          DROP CONSTRAINT IF EXISTS workouts_planned_source_check;
-ALTER TABLE sport_sessions    DROP CONSTRAINT IF EXISTS sport_sessions_status_check;
-ALTER TABLE user_profiles     DROP CONSTRAINT IF EXISTS user_profiles_role_check;
-ALTER TABLE trainer_clients   DROP CONSTRAINT IF EXISTS trainer_clients_status_check;
-ALTER TABLE trainer_proposals DROP CONSTRAINT IF EXISTS trainer_proposals_proposal_type_check;
-ALTER TABLE goal_history      DROP CONSTRAINT IF EXISTS goal_history_goal_mode_check;
-
--- ═══════════════════════════════════════════════════════════════════════════════
--- 3. exercises.category
--- ═══════════════════════════════════════════════════════════════════════════════
+ALTER TABLE exercises DROP CONSTRAINT IF EXISTS exercises_category_check;
 
 ALTER TABLE exercises
   ALTER COLUMN category TYPE exercise_category_t
     USING category::exercise_category_t;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 4. workouts.categories (text[] → exercise_category_t[])
---    Safe: the app never writes values outside ('push','pull','legs').
+-- 3. workouts.categories + workouts.status + workouts.planned_source
+--    (schema.sql + 009 — always exists)
 -- ═══════════════════════════════════════════════════════════════════════════════
+
+ALTER TABLE workouts DROP CONSTRAINT IF EXISTS workouts_status_check;
+ALTER TABLE workouts DROP CONSTRAINT IF EXISTS workouts_planned_source_check;
 
 ALTER TABLE workouts
   ALTER COLUMN categories DROP DEFAULT;
@@ -83,10 +61,6 @@ ALTER TABLE workouts
 ALTER TABLE workouts
   ALTER COLUMN categories SET DEFAULT '{}'::exercise_category_t[];
 
--- ═══════════════════════════════════════════════════════════════════════════════
--- 5. workouts.status
--- ═══════════════════════════════════════════════════════════════════════════════
-
 ALTER TABLE workouts
   ALTER COLUMN status DROP DEFAULT;
 
@@ -97,17 +71,15 @@ ALTER TABLE workouts
 ALTER TABLE workouts
   ALTER COLUMN status SET DEFAULT 'done'::workout_status_t;
 
--- ═══════════════════════════════════════════════════════════════════════════════
--- 6. workouts.planned_source
--- ═══════════════════════════════════════════════════════════════════════════════
-
 ALTER TABLE workouts
   ALTER COLUMN planned_source TYPE planned_source_t
     USING planned_source::planned_source_t;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 7. sport_sessions.status
+-- 4. sport_sessions.status  (002 + 011 — always exists)
 -- ═══════════════════════════════════════════════════════════════════════════════
+
+ALTER TABLE sport_sessions DROP CONSTRAINT IF EXISTS sport_sessions_status_check;
 
 ALTER TABLE sport_sessions
   ALTER COLUMN status DROP DEFAULT;
@@ -120,59 +92,74 @@ ALTER TABLE sport_sessions
   ALTER COLUMN status SET DEFAULT 'done'::sport_status_t;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 8. user_profiles.role
---    The function generate_trainer_invite() compares role = 'trainer';
---    PostgreSQL implicitly casts the text literal to user_role_t — no
---    function changes needed.
+-- 5. user_profiles.role  (migration 007 — conditional)
 -- ═══════════════════════════════════════════════════════════════════════════════
 
-ALTER TABLE user_profiles
-  ALTER COLUMN role DROP DEFAULT;
-
-ALTER TABLE user_profiles
-  ALTER COLUMN role TYPE user_role_t
-    USING role::user_role_t;
-
-ALTER TABLE user_profiles
-  ALTER COLUMN role SET DEFAULT 'user'::user_role_t;
-
--- ═══════════════════════════════════════════════════════════════════════════════
--- 9. trainer_clients.status
---    The RLS policy "profiles_related" compares tc.status = 'active';
---    implicit cast from text literal to client_status_t is valid.
--- ═══════════════════════════════════════════════════════════════════════════════
-
-ALTER TABLE trainer_clients
-  ALTER COLUMN status DROP DEFAULT;
-
-ALTER TABLE trainer_clients
-  ALTER COLUMN status TYPE client_status_t
-    USING status::client_status_t;
-
-ALTER TABLE trainer_clients
-  ALTER COLUMN status SET DEFAULT 'active'::client_status_t;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'user_profiles'
+  ) THEN
+    ALTER TABLE user_profiles DROP CONSTRAINT IF EXISTS user_profiles_role_check;
+    ALTER TABLE user_profiles ALTER COLUMN role DROP DEFAULT;
+    ALTER TABLE user_profiles ALTER COLUMN role TYPE user_role_t USING role::user_role_t;
+    ALTER TABLE user_profiles ALTER COLUMN role SET DEFAULT 'user'::user_role_t;
+  END IF;
+END;
+$$;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 10. trainer_proposals.proposal_type
---     The named cross-field CONSTRAINT proposal_type_check references
---     proposal_type = 'specific' / 'weekly'; implicit cast keeps it valid.
---     Only the redundant unnamed CHECK (proposal_type IN (...)) is dropped above.
+-- 6. trainer_clients.status  (migration 007 — conditional)
 -- ═══════════════════════════════════════════════════════════════════════════════
 
-ALTER TABLE trainer_proposals
-  ALTER COLUMN proposal_type TYPE proposal_type_t
-    USING proposal_type::proposal_type_t;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'trainer_clients'
+  ) THEN
+    ALTER TABLE trainer_clients DROP CONSTRAINT IF EXISTS trainer_clients_status_check;
+    ALTER TABLE trainer_clients ALTER COLUMN status DROP DEFAULT;
+    ALTER TABLE trainer_clients ALTER COLUMN status TYPE client_status_t USING status::client_status_t;
+    ALTER TABLE trainer_clients ALTER COLUMN status SET DEFAULT 'active'::client_status_t;
+  END IF;
+END;
+$$;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 11. goal_history.goal_mode
+-- 7. trainer_proposals.proposal_type  (migration 007 — conditional)
+--    The named cross-field CONSTRAINT proposal_type_check uses implicit cast
+--    (proposal_type = 'specific') — remains valid after ENUM conversion.
 -- ═══════════════════════════════════════════════════════════════════════════════
 
-ALTER TABLE goal_history
-  ALTER COLUMN goal_mode DROP DEFAULT;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'trainer_proposals'
+  ) THEN
+    ALTER TABLE trainer_proposals DROP CONSTRAINT IF EXISTS trainer_proposals_proposal_type_check;
+    ALTER TABLE trainer_proposals ALTER COLUMN proposal_type TYPE proposal_type_t
+      USING proposal_type::proposal_type_t;
+  END IF;
+END;
+$$;
 
-ALTER TABLE goal_history
-  ALTER COLUMN goal_mode TYPE goal_mode_t
-    USING goal_mode::goal_mode_t;
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 8. goal_history.goal_mode  (migration 010 — conditional)
+-- ═══════════════════════════════════════════════════════════════════════════════
 
-ALTER TABLE goal_history
-  ALTER COLUMN goal_mode SET DEFAULT 'combined'::goal_mode_t;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'goal_history'
+  ) THEN
+    ALTER TABLE goal_history DROP CONSTRAINT IF EXISTS goal_history_goal_mode_check;
+    ALTER TABLE goal_history ALTER COLUMN goal_mode DROP DEFAULT;
+    ALTER TABLE goal_history ALTER COLUMN goal_mode TYPE goal_mode_t USING goal_mode::goal_mode_t;
+    ALTER TABLE goal_history ALTER COLUMN goal_mode SET DEFAULT 'combined'::goal_mode_t;
+  END IF;
+END;
+$$;
