@@ -16,15 +16,15 @@
 --
 -- COLUMNS MIGRATED
 -- ----------------
--- exercises.category          text CHECK ('push','pull','legs')    → exercise_category_t
--- workouts.categories         text[]                               → exercise_category_t[]
--- workouts.status             text CHECK ('planned','done')        → workout_status_t
--- workouts.planned_source     text CHECK ('self','trainer')        → planned_source_t
--- sport_sessions.status       text CHECK ('planned','done')        → sport_status_t
--- user_profiles.role          text CHECK ('user','trainer')        → user_role_t
--- trainer_clients.status      text CHECK ('active','removed')      → client_status_t
--- trainer_proposals.proposal_type text CHECK ('specific','weekly') → proposal_type_t
--- goal_history.goal_mode      text CHECK ('combined','separate')   → goal_mode_t
+-- exercises.category            text CHECK ('push','pull','legs')    → exercise_category_t
+-- workouts.categories           text[]                               → exercise_category_t[]
+-- workouts.status               text CHECK ('planned','done')        → workout_status_t
+-- workouts.planned_source       text CHECK ('self','trainer')        → planned_source_t
+-- sport_sessions.status         text CHECK ('planned','done')        → sport_status_t
+-- user_profiles.role            text CHECK ('user','trainer')        → user_role_t
+-- trainer_clients.status        text CHECK ('active','removed')      → client_status_t
+-- trainer_proposals.proposal_type text CHECK ('specific','weekly')   → proposal_type_t
+-- goal_history.goal_mode        text CHECK ('combined','separate')   → goal_mode_t
 --
 -- PRE-REQUISITES: migrations 001 (schema), 007, 009, 010, 011 must be applied.
 
@@ -42,7 +42,26 @@ CREATE TYPE proposal_type_t     AS ENUM ('specific', 'weekly');
 CREATE TYPE goal_mode_t         AS ENUM ('combined', 'separate');
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 2. exercises.category
+-- 2. Drop redundant CHECK constraints
+--
+-- These CHECK constraints compare column values against text literals.
+-- After converting columns to ENUM types, PostgreSQL cannot resolve the
+-- `ENUM = text` operator and the CHECK expression becomes invalid.
+-- The ENUM type itself enforces the same invariant, making these CHECKs
+-- completely redundant — safe to drop permanently.
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+ALTER TABLE exercises         DROP CONSTRAINT IF EXISTS exercises_category_check;
+ALTER TABLE workouts          DROP CONSTRAINT IF EXISTS workouts_status_check;
+ALTER TABLE workouts          DROP CONSTRAINT IF EXISTS workouts_planned_source_check;
+ALTER TABLE sport_sessions    DROP CONSTRAINT IF EXISTS sport_sessions_status_check;
+ALTER TABLE user_profiles     DROP CONSTRAINT IF EXISTS user_profiles_role_check;
+ALTER TABLE trainer_clients   DROP CONSTRAINT IF EXISTS trainer_clients_status_check;
+ALTER TABLE trainer_proposals DROP CONSTRAINT IF EXISTS trainer_proposals_proposal_type_check;
+ALTER TABLE goal_history      DROP CONSTRAINT IF EXISTS goal_history_goal_mode_check;
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 3. exercises.category
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 ALTER TABLE exercises
@@ -50,18 +69,22 @@ ALTER TABLE exercises
     USING category::exercise_category_t;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 3. workouts.categories (text[] → exercise_category_t[])
+-- 4. workouts.categories (text[] → exercise_category_t[])
 --    Safe: the app never writes values outside ('push','pull','legs').
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 ALTER TABLE workouts
+  ALTER COLUMN categories DROP DEFAULT;
+
+ALTER TABLE workouts
   ALTER COLUMN categories TYPE exercise_category_t[]
-    USING ARRAY(
-      SELECT unnest(categories)::exercise_category_t
-    );
+    USING ARRAY(SELECT unnest(categories)::exercise_category_t);
+
+ALTER TABLE workouts
+  ALTER COLUMN categories SET DEFAULT '{}'::exercise_category_t[];
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 4. workouts.status
+-- 5. workouts.status
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 ALTER TABLE workouts
@@ -75,7 +98,7 @@ ALTER TABLE workouts
   ALTER COLUMN status SET DEFAULT 'done'::workout_status_t;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 5. workouts.planned_source
+-- 6. workouts.planned_source
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 ALTER TABLE workouts
@@ -83,7 +106,7 @@ ALTER TABLE workouts
     USING planned_source::planned_source_t;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 6. sport_sessions.status
+-- 7. sport_sessions.status
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 ALTER TABLE sport_sessions
@@ -97,9 +120,9 @@ ALTER TABLE sport_sessions
   ALTER COLUMN status SET DEFAULT 'done'::sport_status_t;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 7. user_profiles.role
---    Note: the existing function generate_trainer_invite() compares
---    role = 'trainer' — PostgreSQL implicitly casts the text literal, no
+-- 8. user_profiles.role
+--    The function generate_trainer_invite() compares role = 'trainer';
+--    PostgreSQL implicitly casts the text literal to user_role_t — no
 --    function changes needed.
 -- ═══════════════════════════════════════════════════════════════════════════════
 
@@ -114,9 +137,9 @@ ALTER TABLE user_profiles
   ALTER COLUMN role SET DEFAULT 'user'::user_role_t;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 8. trainer_clients.status
+-- 9. trainer_clients.status
 --    The RLS policy "profiles_related" compares tc.status = 'active';
---    implicit cast continues to work after this change.
+--    implicit cast from text literal to client_status_t is valid.
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 ALTER TABLE trainer_clients
@@ -130,9 +153,10 @@ ALTER TABLE trainer_clients
   ALTER COLUMN status SET DEFAULT 'active'::client_status_t;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 9. trainer_proposals.proposal_type
---    The cross-field CHECK constraint references proposal_type = 'specific'
---    and proposal_type = 'weekly'; implicit cast keeps it valid.
+-- 10. trainer_proposals.proposal_type
+--     The named cross-field CONSTRAINT proposal_type_check references
+--     proposal_type = 'specific' / 'weekly'; implicit cast keeps it valid.
+--     Only the redundant unnamed CHECK (proposal_type IN (...)) is dropped above.
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 ALTER TABLE trainer_proposals
@@ -140,7 +164,7 @@ ALTER TABLE trainer_proposals
     USING proposal_type::proposal_type_t;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 10. goal_history.goal_mode
+-- 11. goal_history.goal_mode
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 ALTER TABLE goal_history
