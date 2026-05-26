@@ -13,7 +13,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
   standalone: true,
   template: `
     @if (show()) {
-      <div class="ws-card">
+      <div class="ws-strip">
 
         <div class="ws-header">
           <span class="ws-title">Aquesta setmana</span>
@@ -29,18 +29,13 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
           }
         </div>
 
-        @for (bar of weekBars(); track bar.icon) {
-          <div class="ws-bar-row"
-               [class.wob--progress]="bar.pct > 0 && bar.pct < 100"
-               [class.wob--done]="bar.pct >= 100">
-            <span class="material-symbols-outlined ws-bar-icon">{{ bar.icon }}</span>
-            <div class="ws-bar-track">
-              <div class="ws-bar-fill" [style.width.%]="bar.pct"></div>
-            </div>
-            @if (bar.pct >= 100) {
-              <span class="material-symbols-outlined ws-bar-check">check_circle</span>
-            } @else {
-              <span class="ws-bar-frac">{{ bar.done }}/{{ bar.target }}</span>
+        @if (weekBars().length > 0) {
+          <div class="ws-bars">
+            @for (bar of weekBars(); track bar.icon) {
+              <div class="ws-bar-track">
+                <div class="ws-bar-fill" [style.width.%]="bar.pct"
+                     [class.ws-bar-fill--done]="bar.pct >= 100"></div>
+              </div>
             }
           </div>
         }
@@ -73,60 +68,48 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     }
   `,
   styles: [`
-    .ws-card {
-      margin: 0 16px 0;
-      padding: 14px 14px 12px;
+    .ws-strip {
+      padding: 10px 14px 12px;
+      border-top: 1px solid var(--c-border-2);
       background: var(--c-card);
-      border-radius: 18px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
     }
 
     .ws-header {
-      display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
     }
-    .ws-title { font-size: 14px; font-weight: 700; color: var(--c-text); }
+    .ws-title { font-size: 13px; font-weight: 700; color: var(--c-text-2); }
 
     .ws-count-badge {
       display: flex; align-items: center; gap: 3px;
-      padding: 5px 10px; border-radius: 20px;
+      padding: 3px 8px; border-radius: 20px;
       background: var(--c-subtle); border: 1.5px solid var(--c-border);
     }
-    .ws-count-num  { font-size: 18px; font-weight: 800; color: var(--c-text); line-height: 1; }
-    .ws-count-sep  { font-size: 13px; color: var(--c-text-3); }
-    .ws-count-goal { font-size: 13px; color: var(--c-text-3); font-weight: 600; }
-    .ws-count-icon { font-size: 16px; color: var(--c-text-3); margin-left: 2px;
-                     font-variation-settings: 'FILL' 0, 'wght' 300; }
+    .ws-count-num  { font-size: 15px; font-weight: 800; color: var(--c-text); line-height: 1; }
+    .ws-count-sep  { font-size: 11px; color: var(--c-text-3); }
+    .ws-count-goal { font-size: 11px; color: var(--c-text-3); font-weight: 600; }
+    .ws-count-icon {
+      font-size: 13px; color: var(--c-text-3); margin-left: 2px;
+      font-variation-settings: 'FILL' 0, 'wght' 300;
+    }
     .ws-count-badge--done {
       background: rgba(0,104,116,0.08); border-color: rgba(0,104,116,0.3);
       .ws-count-num  { color: var(--c-brand); }
       .ws-count-icon { color: var(--c-brand); font-variation-settings: 'FILL' 1, 'wght' 400; }
     }
 
-    .ws-bar-row {
-      display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+    .ws-bars {
+      display: flex; gap: 4px; margin-bottom: 10px;
     }
-    .ws-bar-icon {
-      font-size: 15px; color: var(--c-text-3); flex-shrink: 0;
-      font-variation-settings: 'FILL' 0, 'wght' 300;
-    }
-    .wob--done .ws-bar-icon,
-    .wob--progress .ws-bar-icon { color: var(--c-brand); }
     .ws-bar-track {
-      flex: 1; height: 10px; background: var(--c-subtle); border-radius: 6px;
-      overflow: hidden; border: 1px solid var(--c-border-2);
+      flex: 1; height: 4px; background: var(--c-border); border-radius: 3px;
+      overflow: hidden;
     }
     .ws-bar-fill {
       height: 100%;
       background: linear-gradient(90deg, var(--c-brand) 0%, color-mix(in srgb, var(--c-brand) 75%, white) 100%);
-      border-radius: 6px; transition: width 0.5s ease; max-width: 100%;
-      box-shadow: 0 0 6px rgba(var(--c-brand-rgb), 0.4);
+      border-radius: 3px; transition: width 0.4s ease; max-width: 100%;
+      &.ws-bar-fill--done { background: #43a047; }
     }
-    .wob--done .ws-bar-fill { background: #43a047; box-shadow: none; }
-    .ws-bar-check {
-      font-size: 16px; color: #43a047; flex-shrink: 0;
-      font-variation-settings: 'FILL' 1, 'wght' 400;
-    }
-    .ws-bar-frac { font-size: 11px; font-weight: 700; color: var(--c-text-3); flex-shrink: 0; min-width: 26px; text-align: right; }
 
     .ws-days {
       display: flex; gap: 4px; justify-content: space-between;
@@ -152,9 +135,9 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     }
 
     .ws-message {
-      margin-top: 10px; padding: 8px 10px;
-      background: rgba(0,104,116,0.06); border-radius: 10px;
-      font-size: 12px; color: var(--c-text-2); line-height: 1.4;
+      margin-top: 8px; padding: 7px 10px;
+      background: rgba(0,104,116,0.06); border-radius: 8px;
+      font-size: 11px; color: var(--c-text-2); line-height: 1.4;
       border: 1px solid rgba(0,104,116,0.12);
     }
   `],

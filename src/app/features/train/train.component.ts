@@ -151,6 +151,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             [selectedDate]="selectedDate()"
             (dateSelected)="selectedDate.set($event)"
           />
+          <app-weekly-summary />
         </div>
 
         @if (isSelectedFuture()) {
@@ -159,8 +160,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             <span>Planificant · {{ planPillLabel() }}</span>
           </div>
         }
-
-        <app-weekly-summary />
 
         <!-- ── Skeleton (initial data load) ── -->
         @if (workoutService.isLoading() && dateWorkouts().length === 0 && !creating()) {
