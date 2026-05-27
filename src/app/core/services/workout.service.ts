@@ -366,6 +366,16 @@ export class WorkoutService {
     return id;
   }
 
+  /** Creates a workout with fully-populated entries (including sets) in 2 DB calls. */
+  async createWorkoutWithEntries(date: string, entries: WorkoutEntry[], category?: string): Promise<string> {
+    const id = await this.createWorkoutForDate(date, category);
+    if (entries.length > 0) {
+      const categories = this._computeCategories(entries, category);
+      await this._updateWorkout(id, { entries, categories });
+    }
+    return id;
+  }
+
   // ── Mutations ─────────────────────────────────────────────────────────────
   async addExerciseToWorkout(workoutId: string, entry: WorkoutEntry): Promise<void> {
     const workout = this._find(workoutId);
