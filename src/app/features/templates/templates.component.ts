@@ -78,7 +78,7 @@ const CAT_LABEL: Record<EditorCat, string> = {
                   @if (t.entries.length > 0) {
                     <div class="tc-exercises">
                       @for (e of t.entries.slice(0, 4); track e.exerciseId) {
-                        <span class="tc-ex-pill">{{ e.exerciseName }}</span>
+                        <span class="tc-ex-pill">{{ entryDisplay(e) }}</span>
                       }
                       @if (t.entries.length > 4) {
                         <span class="tc-ex-pill tc-ex-more">+{{ t.entries.length - 4 }}</span>
@@ -147,7 +147,22 @@ const CAT_LABEL: Record<EditorCat, string> = {
             @for (entry of editorEntries; track entry.exerciseId; let i = $index) {
               <div class="editor-ex-row" cdkDrag>
                 <span class="material-symbols-outlined ex-drag" cdkDragHandle>drag_indicator</span>
-                <span class="ex-name">{{ entry.exerciseName }}</span>
+                <div class="ex-body">
+                  <span class="ex-name">{{ entry.exerciseName }}</span>
+                  <div class="ex-params">
+                    <label class="ex-param-lbl">Sèr</label>
+                    <input class="ex-param-input" type="number" min="1" max="99"
+                           [(ngModel)]="entry.sets" placeholder="—">
+                    <span class="ex-param-sep">×</span>
+                    <label class="ex-param-lbl">Rep</label>
+                    <input class="ex-param-input" type="number" min="1" max="99"
+                           [(ngModel)]="entry.reps" placeholder="—">
+                    <span class="ex-param-gap"></span>
+                    <input class="ex-param-input ex-param-weight" type="number" min="0" step="0.5"
+                           [(ngModel)]="entry.weight" placeholder="—">
+                    <label class="ex-param-lbl">kg</label>
+                  </div>
+                </div>
                 <button class="ex-remove" (click)="removeExercise(i)">
                   <span class="material-symbols-outlined">close</span>
                 </button>
@@ -318,7 +333,21 @@ const CAT_LABEL: Record<EditorCat, string> = {
       flex-shrink: 0; user-select: none; touch-action: none;
       &:active { cursor: grabbing; }
     }
-    .ex-name { flex: 1; font-size: 14px; font-weight: 500; color: var(--c-text); }
+    .ex-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+    .ex-name { font-size: 14px; font-weight: 600; color: var(--c-text); }
+    .ex-params { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+    .ex-param-lbl { font-size: 11px; font-weight: 600; color: var(--c-text-3); }
+    .ex-param-input {
+      width: 40px; padding: 3px 5px; border-radius: 6px;
+      border: 1.5px solid var(--c-border); background: var(--c-card);
+      font-size: 13px; font-weight: 600; color: var(--c-text); text-align: center;
+      appearance: textfield;
+      &::-webkit-inner-spin-button, &::-webkit-outer-spin-button { appearance: none; }
+      &:focus { border-color: var(--c-brand); outline: none; background: var(--c-card); }
+    }
+    .ex-param-weight { width: 50px; }
+    .ex-param-sep { font-size: 13px; font-weight: 700; color: var(--c-text-3); }
+    .ex-param-gap { flex: 1; min-width: 6px; }
     .ex-remove {
       width: 28px; height: 28px; border-radius: 6px;
       border: none; background: transparent; cursor: pointer;
@@ -381,6 +410,13 @@ export class TemplatesComponent {
 
   catColor(cat: EditorCat | string): string { return CAT_COLOR[cat as EditorCat] ?? '#bbb'; }
   catLabel(cat: EditorCat | string): string { return CAT_LABEL[cat as EditorCat] ?? cat; }
+
+  entryDisplay(e: TemplateEntry): string {
+    let s = e.exerciseName;
+    if (e.sets && e.reps) s += ` · ${e.sets}×${e.reps}`;
+    if (e.weight) s += ` · ${e.weight}kg`;
+    return s;
+  }
 
   openEditor(template: WorkoutTemplate | null): void {
     if (template) {

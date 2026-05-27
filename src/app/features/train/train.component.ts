@@ -1981,7 +1981,13 @@ export class TrainComponent {
     this.templateService.recordUse(t.id);
     try {
       const useCat = t.category === 'mixed' ? cat : t.category as ExerciseCategory;
-      const entries: WorkoutEntry[] = t.entries.map(e => ({ ...e, sets: [] }));
+      const entries: WorkoutEntry[] = t.entries.map(e => ({
+        exerciseId: e.exerciseId,
+        exerciseName: e.exerciseName,
+        sets: (e.sets && e.reps && e.sets > 0 && e.reps > 0)
+          ? Array.from({ length: e.sets }, () => ({ weight: e.weight ?? 0, reps: e.reps! }))
+          : [],
+      }));
       const id = await this._createForSelectedDate(useCat, entries);
       this.openWorkout(id);
     } catch {

@@ -3,6 +3,9 @@ import { ExerciseCategory } from './exercise.model';
 export interface TemplateEntry {
   exerciseId: string;
   exerciseName: string;
+  sets?:   number; // number of sets (optional)
+  reps?:   number; // reps per set (optional)
+  weight?: number; // suggested weight in kg (optional)
 }
 
 export interface WorkoutTemplate {
