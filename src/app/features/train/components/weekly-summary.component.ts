@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
 
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 import { WorkoutService } from '../../../core/services/workout.service';
@@ -71,10 +71,13 @@ export class WeeklySummaryComponent {
   private readonly sportService    = inject(SportService);
   private readonly settingsService = inject(UserSettingsService);
 
+  /** The date whose week should be shown. Defaults to today. */
+  readonly weekDate = input<string | null>(null);
+
   readonly show = computed(() => this.settingsService.metricsEnabled() && this.settingsService.loaded());
 
   private readonly _weekDates = computed((): string[] => {
-    const monday = mondayOf(TODAY());
+    const monday = mondayOf(this.weekDate() ?? TODAY());
     return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
   });
 

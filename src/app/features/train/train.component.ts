@@ -149,7 +149,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             [selectedDate]="selectedDate()"
             (dateSelected)="selectedDate.set($event)"
           />
-          <app-weekly-summary />
+          <app-weekly-summary [weekDate]="selectedDate()" />
         </div>
 
         @if (isSelectedFuture()) {

@@ -105,7 +105,7 @@ import {
 
       </div>
 
-      @if (isShowingCurrent() && settingsSvc.loaded()) {
+      @if (isShowingCurrentOrPast() && settingsSvc.loaded()) {
         @if (goalMode() === 'separate') {
           @if (weeklyGymGoal()) {
             <div class="idp-goal">
@@ -384,6 +384,16 @@ export class InlineDatePickerComponent {
     }
     const sunday = addDays(this.weekStart(), 6);
     return this.weekStart() <= this.todayStr && this.todayStr <= sunday;
+  });
+
+  /** True for current week/month AND all past ones (goal bars should show). */
+  readonly isShowingCurrentOrPast = computed(() => {
+    if (this.expanded()) {
+      const now = new Date();
+      return this.calYear() < now.getFullYear() ||
+        (this.calYear() === now.getFullYear() && this.calMonth() <= now.getMonth());
+    }
+    return this.weekStart() <= this.todayStr;
   });
 
   // Shared map to avoid rebuilding it in both weekDays and calDays
