@@ -21,6 +21,7 @@ import { TemplateService } from '../../core/services/template.service';
 import { SportService } from '../../core/services/sport.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { WorkoutService } from '../../core/services/workout.service';
+import { WorkoutProfileService } from '../../core/services/workout-profile.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
 import { FitnessInsightsComponent } from '../../shared/components/fitness-insights/fitness-insights.component';
 import { WeeklySummaryComponent } from './components/weekly-summary.component';
@@ -29,8 +30,8 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
 
-type GymSuggestion   = { type: 'gym';   category: ExerciseCategory; label: string; color: string; icon: string };
-type SportSuggestion = { type: 'sport'; sport: Sport;               label: string; color: string; icon: string };
+type GymSuggestion   = { type: 'gym';   category: ExerciseCategory; label: string; color: string; icon: string; reason?: string };
+type SportSuggestion = { type: 'sport'; sport: Sport;               label: string; color: string; icon: string; reason?: string };
 type TodaySuggestion = GymSuggestion | SportSuggestion;
 
 type BottomCard = {
@@ -481,6 +482,9 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           <div class="sc-info">
             <span class="sc-eyebrow">{{ bc.kind === 'suggestion' ? 'Avui toca' : bc.kind === 'plan' ? 'Pla pendent' : 'Fet avui' }}</span>
             <span class="sc-label">{{ bc.label }}</span>
+            @if (bc.kind === 'suggestion' && bc.meta) {
+              <span class="sc-reason">{{ bc.meta }}</span>
+            }
           </div>
           @if (bc.kind === 'suggestion') {
             <span class="material-symbols-outlined sc-chevron">chevron_right</span>
@@ -966,6 +970,10 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .sc-label {
       font-size: 13px; font-weight: 700; color: var(--c-text); line-height: 1.2;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .sc-reason {
+      font-size: 10px; font-weight: 600; letter-spacing: 0.1px;
+      color: color-mix(in srgb, var(--sc) 65%, var(--c-text-3));
     }
     .sc-chevron {
       font-size: 18px; color: var(--c-text-3); margin-right: 10px; flex-shrink: 0;
@@ -1550,6 +1558,7 @@ export class TrainComponent {
   private settingsService  = inject(UserSettingsService);
   private exerciseService  = inject(ExerciseService);
   private templateService  = inject(TemplateService);
+  private profileService   = inject(WorkoutProfileService);
   readonly router          = inject(Router);
   private dialog           = inject(MatDialog);
   private snackBar         = inject(MatSnackBar);
@@ -1605,28 +1614,39 @@ export class TrainComponent {
     const today = TODAY();
     if (this.selectedDate() !== today) return null;
 
-    // Only suggest when no activity has been logged today
-    const hasGymToday = this.workoutService.getDoneWorkoutsForDate(today).length > 0;
+    const hasGymToday   = this.workoutService.getDoneWorkoutsForDate(today).length > 0;
     const hasSportToday = this.sportService.getSportSessionsForDate(today).length > 0;
     if (hasGymToday || hasSportToday) return null;
 
-    const goal = this.settingsService.fitnessGoal();
+    const goal    = this.settingsService.fitnessGoal();
+    const profile = this.profileService.profile();
 
-    // Next gym category in weekly rotation (excluding today)
-    const monday = mondayOf(today);
-    const doneCats = new Set(
-      Array.from({ length: 7 }, (_, i) => addDays(monday, i))
-        .filter(d => d < today)
-        .flatMap(d => this.workoutService.getDoneWorkoutsForDate(d).flatMap(w => workoutCategories(w)))
-    );
-    const gymOrder: ExerciseCategory[] = ['push', 'pull', 'legs'];
-    const nextGymCat = gymOrder.find(c => !doneCats.has(c)) ?? null;
-    const nextSport = this.sportService.sports()[0] ?? null;
+    // Score each gym category by how "overdue" it is relative to the user's
+    // actual training cycle. Only include categories that have had enough
+    // recovery time since the last session.
+    const gymCandidates = (['push', 'pull', 'legs'] as ExerciseCategory[])
+      .map(cat => ({ cat, ...profile.gym[cat] }))
+      .filter(c => c.daysSinceLast >= profile.minRecovery)
+      .sort((a, b) => b.overdueScore - a.overdueScore);
 
-    const mkGym = (cat: ExerciseCategory): GymSuggestion => ({
-      type: 'gym', category: cat,
-      label: CATEGORY_LABELS[cat], color: CATEGORY_COLORS[cat], icon: CATEGORY_ICONS[cat],
-    });
+    const nextGymCat = gymCandidates[0]?.cat ?? null;
+
+    // Sport: prefer the most-recently-done sport (maintains momentum),
+    // fall back to the 30-day favourite, then first available.
+    const nextSport = profile.recentSport ?? profile.favoriteSport
+                   ?? this.sportService.sports()[0] ?? null;
+
+    const mkGym = (cat: ExerciseCategory): GymSuggestion => {
+      const p = profile.gym[cat];
+      const reason = p.daysSinceLast < 99
+        ? p.daysSinceLast === 1 ? 'Fa 1 dia' : `Fa ${p.daysSinceLast} dies`
+        : undefined;
+      return {
+        type: 'gym', category: cat,
+        label: CATEGORY_LABELS[cat], color: CATEGORY_COLORS[cat], icon: CATEGORY_ICONS[cat],
+        reason,
+      };
+    };
     const mkSport = (s: Sport): SportSuggestion => ({
       type: 'sport', sport: s, label: s.name, color: s.color, icon: s.icon,
     });
@@ -1791,7 +1811,7 @@ export class TrainComponent {
     }
     const s = this.todaySuggestion();
     if (s) {
-      return { kind: 'suggestion', color: s.color, icon: s.icon, label: s.label, meta: '', suggestion: s };
+      return { kind: 'suggestion', color: s.color, icon: s.icon, label: s.label, meta: s.reason ?? '', suggestion: s };
     }
     return null;
   });
