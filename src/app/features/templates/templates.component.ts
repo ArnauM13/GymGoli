@@ -6,6 +6,7 @@ import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-
 
 import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
 import { TemplateEntry, WorkoutTemplate } from '../../core/models/template.model';
+import { FitWorkoutExportService } from '../../core/services/fit-workout-export.service';
 import { TemplateService } from '../../core/services/template.service';
 import { ExercisePickerDialogComponent } from '../train/components/exercise-picker-dialog.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
@@ -87,6 +88,9 @@ const CAT_LABEL: Record<EditorCat, string> = {
                   }
                 </div>
                 <div class="tc-actions">
+                  <button class="tc-action-btn" (click)="exportToWatch(t)" title="Enviar al rellotge" aria-label="Enviar al rellotge">
+                    <span class="material-symbols-outlined">watch</span>
+                  </button>
                   <button class="tc-action-btn" (click)="openEditor(t)" title="Editar">
                     <span class="material-symbols-outlined">edit</span>
                   </button>
@@ -363,6 +367,7 @@ const CAT_LABEL: Record<EditorCat, string> = {
 })
 export class TemplatesComponent {
   readonly templateService = inject(TemplateService);
+  private fitExport        = inject(FitWorkoutExportService);
   private dialog           = inject(MatDialog);
   private snackBar         = inject(MatSnackBar);
 
@@ -378,6 +383,8 @@ export class TemplatesComponent {
   editorName    = '';
   editorCat: EditorCat = 'push';
   editorEntries: TemplateEntry[] = [];
+
+  exportToWatch(t: WorkoutTemplate): void { this.fitExport.export(t); }
 
   catColor(cat: EditorCat | string): string { return CAT_COLOR[cat as EditorCat] ?? '#bbb'; }
   catLabel(cat: EditorCat | string): string { return CAT_LABEL[cat as EditorCat] ?? cat; }
