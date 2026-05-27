@@ -20,16 +20,15 @@ import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
 import { ExerciseFormDialogComponent } from './components/exercise-form-dialog.component';
 import { SportFormDialogComponent } from './components/sport-form-dialog.component';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 
 @Component({
   selector: 'app-library',
   standalone: true,
-  imports: [],
+  imports: [PageHeaderComponent],
   template: `
     <div class="page">
-      <header class="page-header">
-        <h1>Exercicis</h1>
-      </header>
+      <app-page-header title="Exercicis" />
 
       <!-- Category filter -->
       <div class="filter-bar">
@@ -110,9 +109,9 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
       }
 
       <!-- ══ Secció Esports ══ -->
-      <header class="page-header page-header--mt">
-        <h1>Esports</h1>
-      </header>
+      <div class="sports-section-header">
+        <h2>Esports</h2>
+      </div>
 
       @if (sports().length === 0) {
         <div class="card-section">
@@ -189,12 +188,10 @@ import { SportFormDialogComponent } from './components/sport-form-dialog.compone
   styles: [`
     .page { padding: 0 0 88px; }
 
-    /* ── Page header ── */
-    .page-header {
-      display: flex; align-items: center;
-      padding: 16px 16px 10px;
-      &.page-header--mt { padding-top: 24px; }
-      h1 { margin: 0; font-size: 22px; font-weight: 700; color: var(--c-text); letter-spacing: -0.3px; }
+    /* ── Sports section header ── */
+    .sports-section-header {
+      padding: 24px 16px 8px;
+      h2 { margin: 0; font-size: 22px; font-weight: 700; color: var(--c-text); letter-spacing: -0.3px; }
     }
 
     /* ── Speed dial FAB ── */

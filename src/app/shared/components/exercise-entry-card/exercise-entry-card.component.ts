@@ -46,7 +46,7 @@ import { kgToDisplay } from '../../utils/weight.utils';
           </div>
           <div class="eec-actions">
             @if (showMenu() && (!collapsed() || !hideMetaWhenCollapsed())) {
-              <button type="button" class="eec-menu-btn"
+              <button type="button" class="eec-menu-btn" aria-label="Opcions"
                 (click)="$event.stopPropagation(); menuClick.emit()">
                 <span class="material-symbols-outlined">more_vert</span>
               </button>

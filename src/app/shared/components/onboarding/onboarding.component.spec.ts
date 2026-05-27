@@ -66,7 +66,7 @@ describe('OnboardingComponent', () => {
   // ── skipToGoal() ─────────────────────────────────────────────────────────
 
   describe('skipToGoal()', () => {
-    it('jumps to the goal step from step 0', () => {
+    it('jumps to the goal step (slides.length) from step 0', () => {
       component.skipToGoal();
       expect(component.step()).toBe(component.slides.length);
     });

@@ -1,6 +1,5 @@
 import { Component, computed, inject, signal, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Location } from '@angular/common';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
@@ -9,6 +8,7 @@ import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../../core/m
 import { TemplateEntry, WorkoutTemplate } from '../../core/models/template.model';
 import { TemplateService } from '../../core/services/template.service';
 import { ExercisePickerDialogComponent } from '../train/components/exercise-picker-dialog.component';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 
 type EditorCat = ExerciseCategory | 'mixed';
 
@@ -36,16 +36,11 @@ const CAT_LABEL: Record<EditorCat, string> = {
 @Component({
   selector: 'app-templates',
   standalone: true,
-  imports: [FormsModule, DragDropModule],
+  imports: [FormsModule, DragDropModule, PageHeaderComponent],
   template: `
     <div class="page">
 
-      <div class="page-header">
-        <button class="back-btn" (click)="back()">
-          <span class="material-symbols-outlined">arrow_back_ios</span>
-        </button>
-        <h1 class="page-title">Plantilles</h1>
-      </div>
+      <app-page-header title="Plantilles" [showBack]="true" />
 
       <!-- Empty state -->
       @if (sortedTemplates().length === 0 && !editorOpen()) {
@@ -181,21 +176,6 @@ const CAT_LABEL: Record<EditorCat, string> = {
   `,
   styles: [`
     .page { min-height: 100vh; background: var(--c-bg); padding-bottom: 32px; }
-
-    .page-header {
-      display: flex; align-items: center; gap: 8px;
-      padding: 16px 16px 12px; position: sticky; top: 0;
-      background: var(--c-bg); z-index: 10;
-    }
-    .back-btn {
-      width: 36px; height: 36px; border-radius: 50%;
-      border: none; background: transparent; cursor: pointer;
-      color: var(--c-text-2); display: flex; align-items: center; justify-content: center;
-      touch-action: manipulation; transition: background 0.15s;
-      .material-symbols-outlined { font-size: 20px; }
-      &:hover { background: var(--c-subtle); }
-    }
-    .page-title { font-size: 22px; font-weight: 800; color: var(--c-text); margin: 0; }
 
     .section { padding: 0 16px; margin-top: 8px; }
 
@@ -383,7 +363,6 @@ const CAT_LABEL: Record<EditorCat, string> = {
 })
 export class TemplatesComponent {
   readonly templateService = inject(TemplateService);
-  private location         = inject(Location);
   private dialog           = inject(MatDialog);
   private snackBar         = inject(MatSnackBar);
 
@@ -399,8 +378,6 @@ export class TemplatesComponent {
   editorName    = '';
   editorCat: EditorCat = 'push';
   editorEntries: TemplateEntry[] = [];
-
-  back(): void { this.location.back(); }
 
   catColor(cat: EditorCat | string): string { return CAT_COLOR[cat as EditorCat] ?? '#bbb'; }
   catLabel(cat: EditorCat | string): string { return CAT_LABEL[cat as EditorCat] ?? cat; }

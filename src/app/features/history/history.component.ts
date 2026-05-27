@@ -10,28 +10,26 @@ import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
 import { kgToDisplay } from '../../shared/utils/weight.utils';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 
 @Component({
   selector: 'app-history',
   standalone: true,
-  imports: [CalendarComponent, FormsModule],
+  imports: [CalendarComponent, FormsModule, PageHeaderComponent],
   template: `
     <div class="page">
 
       <!-- ── Page header ── -->
-      <header class="page-header">
-        <div class="page-header-top">
-          <h1>Historial</h1>
-          <button class="cal-toggle" [class.cal-toggle--open]="calendarOpen()"
-                  (click)="calendarOpen.set(!calendarOpen())"
-                  [attr.aria-label]="calendarOpen() ? 'Amaga calendari' : 'Mostra calendari'">
-            <span class="material-symbols-outlined">calendar_month</span>
-            <span class="material-symbols-outlined cal-toggle-chev">
-              {{ calendarOpen() ? 'expand_less' : 'expand_more' }}
-            </span>
-          </button>
-        </div>
-      </header>
+      <app-page-header title="Historial">
+        <button class="cal-toggle" [class.cal-toggle--open]="calendarOpen()"
+                (click)="calendarOpen.set(!calendarOpen())"
+                [attr.aria-label]="calendarOpen() ? 'Amaga calendari' : 'Mostra calendari'">
+          <span class="material-symbols-outlined">calendar_month</span>
+          <span class="material-symbols-outlined cal-toggle-chev">
+            {{ calendarOpen() ? 'expand_less' : 'expand_more' }}
+          </span>
+        </button>
+      </app-page-header>
 
       <!-- ── Calendari plegable ── -->
       <div class="cal-collapse" [class.cal-collapse--open]="calendarOpen()">
@@ -68,9 +66,10 @@ import { CalendarComponent } from '../../shared/components/calendar/calendar.com
         <div class="search-wrap">
           <span class="material-symbols-outlined search-icon">search</span>
           <input class="search-input" type="search" [(ngModel)]="searchQueryValue"
-                 placeholder="Cerca per exercici..." autocomplete="off">
+                 placeholder="Cerca per exercici..." autocomplete="off"
+                 aria-label="Cerca per exercici">
           @if (searchQuery()) {
-            <button class="search-clear" (click)="searchQuery.set('')">
+            <button class="search-clear" (click)="searchQuery.set('')" aria-label="Esborrar cerca">
               <span class="material-symbols-outlined">close</span>
             </button>
           }
@@ -252,15 +251,6 @@ import { CalendarComponent } from '../../shared/components/calendar/calendar.com
   `,
   styles: [`
     .page { padding: 0 0 16px; }
-
-    /* ── Page header ── */
-    .page-header {
-      padding: 16px 16px 10px;
-    }
-    .page-header-top {
-      display: flex; align-items: center; justify-content: space-between;
-      h1 { margin: 0; font-size: 22px; font-weight: 700; }
-    }
 
     /* ── Calendar toggle ── */
     .cal-toggle {

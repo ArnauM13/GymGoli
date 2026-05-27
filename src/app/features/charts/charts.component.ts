@@ -31,6 +31,7 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { addDays, mondayOf } from '../../shared/utils/calendar-utils';
 import { kgToDisplay } from '../../shared/utils/weight.utils';
+import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, Title, Tooltip, Legend);
 
@@ -44,12 +45,10 @@ interface ChartPoint {
 @Component({
   selector: 'app-charts',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, PageHeaderComponent],
   template: `
     <div class="page">
-      <header class="page-header">
-        <h1>Progrés</h1>
-      </header>
+      <app-page-header title="Progrés" />
 
       <!-- Summary strip (only when there is data) -->
       @if (!isLoading() && totalWorkouts() > 0) {
@@ -224,11 +223,6 @@ interface ChartPoint {
   `,
   styles: [`
     .page { padding: 0 0 16px; }
-
-    .page-header {
-      padding: 16px 16px 10px;
-      h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
-    }
 
     /* ── Summary block ───────────────────────────────────── */
     .summary-block { display: flex; flex-direction: column; gap: 12px; padding: 8px 16px 4px; }
