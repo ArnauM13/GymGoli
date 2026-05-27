@@ -340,6 +340,24 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
                       </button>
                     }
                   </div>
+
+                  <!-- Device import row -->
+                  <div class="import-row">
+                    <button class="import-device-btn" (click)="triggerFitImport()"
+                            [disabled]="deviceImporting()" title="Importa entrenament Garmin (.FIT)">
+                      @if (deviceImporting()) {
+                        <span class="material-symbols-outlined spin">sync</span>
+                      } @else {
+                        <span class="material-symbols-outlined">watch</span>
+                      }
+                      Garmin
+                    </button>
+                    <button class="import-device-btn" (click)="triggerAppleImport()"
+                            [disabled]="deviceImporting()" title="Importa Apple Health (.xml)">
+                      <span class="material-symbols-outlined">phone_iphone</span>
+                      Apple
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -580,20 +598,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             </span>
             <span class="sl-sport-name">{{ loggerSport()!.name }}</span>
           </div>
-          <button class="sl-fit-btn" (click)="triggerFitImport()"
-                  [disabled]="deviceImporting()" title="Importa .FIT (Garmin)">
-            @if (deviceImporting()) {
-              <span class="material-symbols-outlined spin">sync</span>
-            } @else {
-              <span class="material-symbols-outlined">watch</span>
-            }
-            <span>Garmin</span>
-          </button>
-          <button class="sl-fit-btn" (click)="triggerAppleImport()"
-                  [disabled]="deviceImporting()" title="Importa Apple Health (.xml)">
-            <span class="material-symbols-outlined">phone_iphone</span>
-            <span>Apple</span>
-          </button>
           <button class="sl-close" (click)="closeSessionLogger()">
             <span class="material-symbols-outlined">close</span>
           </button>
@@ -937,6 +941,22 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       font-size: 15px;
       color: var(--cat-color);
       font-variation-settings: 'FILL' 1;
+    }
+    .import-row {
+      display: flex; gap: 8px; margin-top: 10px;
+    }
+    .import-device-btn {
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
+      height: 34px; border-radius: 10px;
+      border: 1.5px dashed var(--c-border); background: transparent;
+      font-size: 12px; font-weight: 600; color: var(--c-text-3);
+      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover:not(:disabled) {
+        border-color: var(--c-brand); color: var(--c-brand); border-style: solid;
+        background: color-mix(in srgb, var(--c-brand) 5%, transparent);
+      }
+      &:disabled { opacity: 0.5; cursor: not-allowed; }
     }
 
     /* ── Speed Dial FAB ── */
@@ -1367,16 +1387,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       transition: background 0.15s; flex-shrink: 0;
       .material-symbols-outlined { font-size: 18px; }
       &:hover { background: var(--c-hover); }
-    }
-    .sl-fit-btn {
-      display: flex; align-items: center; gap: 3px;
-      height: 28px; padding: 0 9px; border-radius: 8px; margin-right: 4px;
-      border: 1.5px solid var(--c-border); background: var(--c-subtle);
-      font-size: 11px; font-weight: 700; color: var(--c-text-2);
-      cursor: pointer; transition: all 0.15s; touch-action: manipulation; flex-shrink: 0;
-      .material-symbols-outlined { font-size: 14px; }
-      &:hover:not(:disabled) { border-color: var(--c-brand); color: var(--c-brand); background: color-mix(in srgb, var(--c-brand) 6%, var(--c-card)); }
-      &:disabled { opacity: 0.55; cursor: not-allowed; }
     }
     @keyframes spin { to { transform: rotate(360deg); } }
     .spin { animation: spin 1s linear infinite; display: inline-block; }
