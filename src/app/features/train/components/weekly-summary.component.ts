@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
 
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 import { WorkoutService } from '../../../core/services/workout.service';
@@ -7,22 +7,34 @@ import { addDays, mondayOf } from '../../../shared/utils/calendar-utils';
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
 
+const MONTHS_CA = ['gen', 'feb', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'des'];
+
 @Component({
   selector: 'app-weekly-summary',
   standalone: true,
   template: `
-    @if (show() && weekBars().length > 0) {
+    @if (show() && (weekBars().length > 0 || isFutureWeek())) {
       <div class="ws-strip">
-        @for (bar of weekBars(); track bar.icon) {
-          <div class="ws-row" [class.ws-row--done]="bar.pct >= 100">
-            <span class="material-symbols-outlined ws-icon">{{ bar.icon }}</span>
-            <div class="ws-track">
-              <div class="ws-fill" [style.width.%]="bar.pct"
-                   [class.ws-fill--done]="bar.pct >= 100"></div>
+        <div class="ws-header">
+          <span class="ws-label">{{ weekLabel() }}</span>
+        </div>
+        @if (!isFutureWeek()) {
+          @for (bar of weekBars(); track bar.icon) {
+            <div class="ws-row" [class.ws-row--done]="bar.pct >= 100">
+              <span class="material-symbols-outlined ws-icon">{{ bar.icon }}</span>
+              <div class="ws-track">
+                <div class="ws-fill" [style.width.%]="bar.pct"
+                     [class.ws-fill--done]="bar.pct >= 100"></div>
+              </div>
+              <span class="ws-badge" [class.ws-badge--done]="bar.pct >= 100">
+                {{ bar.done }}/{{ bar.target }}
+              </span>
             </div>
-            <span class="ws-badge" [class.ws-badge--done]="bar.pct >= 100">
-              {{ bar.done }}/{{ bar.target }}
-            </span>
+          }
+        } @else {
+          <div class="ws-future">
+            <span class="material-symbols-outlined ws-future-icon">calendar_month</span>
+            <span>Objectiu: {{ totalGoal() }} activitat{{ totalGoal() === 1 ? '' : 's' }}</span>
           </div>
         }
       </div>
@@ -34,6 +46,14 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
       border-top: 1px solid var(--c-border-2);
       background: var(--c-card);
       display: flex; flex-direction: column; gap: 8px;
+    }
+
+    .ws-header {
+      display: flex; align-items: center;
+    }
+    .ws-label {
+      font-size: 11px; font-weight: 700; color: var(--c-text-3);
+      text-transform: uppercase; letter-spacing: 0.4px;
     }
 
     .ws-row {
@@ -64,25 +84,59 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
       flex-shrink: 0; min-width: 28px; text-align: right;
     }
     .ws-badge--done { color: #43a047; }
+
+    .ws-future {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--c-text-3);
+    }
+    .ws-future-icon { font-size: 14px; font-variation-settings: 'FILL' 0, 'wght' 300; }
   `],
 })
 export class WeeklySummaryComponent {
+  /** Any date within the week to display. Defaults to today (current week). */
+  readonly weekDate = input<string>(TODAY());
+
   private readonly workoutService  = inject(WorkoutService);
   private readonly sportService    = inject(SportService);
   private readonly settingsService = inject(UserSettingsService);
 
   readonly show = computed(() => this.settingsService.metricsEnabled() && this.settingsService.loaded());
 
-  private readonly _weekDates = computed((): string[] => {
-    const monday = mondayOf(TODAY());
-    return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+  private readonly _today         = computed(() => TODAY());
+  private readonly _monday        = computed(() => mondayOf(this.weekDate()));
+  private readonly _currentMonday = computed(() => mondayOf(this._today()));
+
+  readonly isCurrentWeek = computed(() => this._monday() === this._currentMonday());
+  readonly isPastWeek    = computed(() => this._monday() < this._currentMonday());
+  readonly isFutureWeek  = computed(() => this._monday() > this._currentMonday());
+
+  private readonly _weekDates = computed((): string[] =>
+    Array.from({ length: 7 }, (_, i) => addDays(this._monday(), i))
+  );
+
+  readonly weekLabel = computed(() => {
+    if (this.isCurrentWeek()) return 'Aquesta setmana';
+    const monday = this._monday();
+    const sunday = addDays(monday, 6);
+    const d1 = new Date(monday + 'T00:00:00');
+    const d2 = new Date(sunday + 'T00:00:00');
+    const d1Day = d1.getDate();
+    const d2Day = d2.getDate();
+    const d1Mon = MONTHS_CA[d1.getMonth()];
+    const d2Mon = MONTHS_CA[d2.getMonth()];
+    if (d1.getMonth() === d2.getMonth()) return `${d1Day}–${d2Day} ${d2Mon}`;
+    return `${d1Day} ${d1Mon} – ${d2Day} ${d2Mon}`;
   });
 
   readonly weekBars = computed(() => {
-    const s        = this.settingsService.settings();
-    const days     = this._weekDates();
-    const today    = TODAY();
-    const doneDays = days.filter(d => d <= today);
+    const s     = this.settingsService.settings();
+    const days  = this._weekDates();
+    const today = this._today();
+
+    // Past weeks: count all 7 days; current: up to today; future: nothing yet
+    const doneDays = this.isPastWeek()   ? days
+                   : this.isFutureWeek() ? []
+                   : days.filter(d => d <= today);
 
     const mk = (icon: string, done: number, target: number) => ({
       icon, done, target: Math.max(1, target),
@@ -114,4 +168,6 @@ export class WeeklySummaryComponent {
     if (sportGoal) bars.push(mk('sports_soccer',  spDone,  sportGoal));
     return bars;
   });
+
+  readonly totalGoal = computed(() => this.weekBars().reduce((s, b) => s + b.target, 0));
 }

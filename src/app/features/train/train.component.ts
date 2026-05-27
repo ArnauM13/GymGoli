@@ -149,7 +149,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             [selectedDate]="selectedDate()"
             (dateSelected)="selectedDate.set($event)"
           />
-          <app-weekly-summary />
+          <app-weekly-summary [weekDate]="selectedDate()" />
         </div>
 
         @if (isSelectedFuture()) {
@@ -1738,6 +1738,14 @@ export class TrainComponent {
       const month = parseInt(monthStr) - 1;
       this.workoutService.ensureMonthLoaded(year, month);
       this.sportService.ensureMonthLoaded(year, month);
+      // Also load Monday's month when the week straddles two months
+      const monday = mondayOf(date);
+      const mYear  = parseInt(monday.split('-')[0]);
+      const mMonth = parseInt(monday.split('-')[1]) - 1;
+      if (mMonth !== month || mYear !== year) {
+        this.workoutService.ensureMonthLoaded(mYear, mMonth);
+        this.sportService.ensureMonthLoaded(mYear, mMonth);
+      }
       untracked(() => {
         this.activeWorkoutId.set(null);
         this.pickerCat.set(null);
