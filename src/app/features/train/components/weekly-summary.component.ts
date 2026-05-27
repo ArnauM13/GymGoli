@@ -1,6 +1,6 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, OnChanges, computed, inject, input, signal } from '@angular/core';
 
-import { UserSettingsService } from '../../../core/services/user-settings.service';
+import { GoalSnapshot, UserSettingsService } from '../../../core/services/user-settings.service';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { SportService } from '../../../core/services/sport.service';
 import { addDays, mondayOf } from '../../../shared/utils/calendar-utils';
@@ -66,22 +66,56 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     .ws-badge--done { color: #43a047; }
   `],
 })
-export class WeeklySummaryComponent {
+export class WeeklySummaryComponent implements OnChanges {
+  /** A date within the week to display. Defaults to today's week when omitted. */
+  readonly weekDate = input<string>();
+
   private readonly workoutService  = inject(WorkoutService);
   private readonly sportService    = inject(SportService);
   private readonly settingsService = inject(UserSettingsService);
 
   readonly show = computed(() => this.settingsService.metricsEnabled() && this.settingsService.loaded());
 
+  private readonly _goals = signal<GoalSnapshot | null>(null);
+
+  private _lastMonday = '';
+
+  ngOnChanges(): void {
+    const monday = mondayOf(this.weekDate() ?? TODAY());
+    if (monday !== this._lastMonday) {
+      this._lastMonday = monday;
+      this._loadGoals(monday);
+    }
+  }
+
+  private async _loadGoals(monday: string): Promise<void> {
+    const snapshot = await this.settingsService.getGoalsForWeek(monday);
+    this._goals.set(snapshot);
+  }
+
   private readonly _weekDates = computed((): string[] => {
-    const monday = mondayOf(TODAY());
+    const monday = mondayOf(this.weekDate() ?? TODAY());
     return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
   });
 
   readonly weekBars = computed(() => {
-    const s        = this.settingsService.settings();
-    const days     = this._weekDates();
-    const today    = TODAY();
+    const g = this._goals();
+    if (!g) {
+      // fallback to current settings while loading
+      const s = this.settingsService.settings();
+      return this._computeBars({
+        goalMode:           s.goalMode ?? 'combined',
+        weeklyActivityGoal: s.weeklyActivityGoal ?? null,
+        weeklyGymGoal:      s.weeklyGymGoal ?? null,
+        weeklySportGoal:    s.weeklySportGoal ?? null,
+      });
+    }
+    return this._computeBars(g);
+  });
+
+  private _computeBars(g: GoalSnapshot): Array<{ icon: string; done: number; target: number; pct: number }> {
+    const days    = this._weekDates();
+    const today   = TODAY();
     const doneDays = days.filter(d => d <= today);
 
     const mk = (icon: string, done: number, target: number) => ({
@@ -89,8 +123,8 @@ export class WeeklySummaryComponent {
       pct: Math.min(100, Math.round(done / Math.max(1, target) * 100)),
     });
 
-    if (s.goalMode === 'combined' || !s.goalMode) {
-      const total = s.weeklyActivityGoal;
+    if (g.goalMode === 'combined' || !g.goalMode) {
+      const total = g.weeklyActivityGoal;
       if (!total) return [];
       const activeDays = doneDays.filter(d =>
         this.workoutService.getDoneWorkoutsForDate(d).length > 0 ||
@@ -105,13 +139,11 @@ export class WeeklySummaryComponent {
       return [mk(icon, activeDays, total)];
     }
 
-    const gymGoal   = s.weeklyGymGoal;
-    const sportGoal = s.weeklySportGoal;
-    const gymDone   = doneDays.reduce((acc, d) => acc + this.workoutService.getDoneWorkoutsForDate(d).length, 0);
-    const spDone    = doneDays.reduce((acc, d) => acc + this.sportService.getSportSessionsForDate(d).length, 0);
+    const gymDone = doneDays.reduce((acc, d) => acc + this.workoutService.getDoneWorkoutsForDate(d).length, 0);
+    const spDone  = doneDays.reduce((acc, d) => acc + this.sportService.getSportSessionsForDate(d).length, 0);
     const bars = [];
-    if (gymGoal)   bars.push(mk('fitness_center', gymDone, gymGoal));
-    if (sportGoal) bars.push(mk('sports_soccer',  spDone,  sportGoal));
+    if (g.weeklyGymGoal)   bars.push(mk('fitness_center', gymDone, g.weeklyGymGoal));
+    if (g.weeklySportGoal) bars.push(mk('sports_soccer',  spDone,  g.weeklySportGoal));
     return bars;
-  });
+  }
 }
