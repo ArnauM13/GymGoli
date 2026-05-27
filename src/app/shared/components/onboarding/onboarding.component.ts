@@ -26,6 +26,11 @@ const SLIDES: OnboardingSlide[] = [
     body: 'Gym, esports, cardio... tot compta. Afegeix sessions en segons i consulta el teu historial quan vulguis.',
   },
   {
+    emoji: '📋',
+    title: 'Plantilles d\'entrenament',
+    body: 'Crea plantilles amb exercicis, sèries i repeticions. Guarda qualsevol entrenament com a plantilla i comença el següent en un tap.',
+  },
+  {
     emoji: '🎯',
     title: 'Personalitzat per a tu',
     body: 'Diga\'ns quin és el teu objectiu i l\'app t\'acompanyarà al teu ritme, sense alarmes ni pressions.',

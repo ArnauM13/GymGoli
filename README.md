@@ -12,10 +12,12 @@ App personal de seguiment d'entrenaments construïda amb Angular 19 i Supabase.
 
 ## Funcionalitats
 
-- **Avui** — Registra l'entrenament del dia: exercicis, sèries, pes, repeticions i sensació (🔥💪😐😓💀). Botó flotant per afegir exercicis, edició inline de sèries, botó de repetir l'última sèrie
-- **Historial** — Consulta i edita entrenaments passats per calendari o llista
+- **Avui** — Registra l'entrenament del dia: exercicis, sèries, pes, repeticions i sensació (🔥💪😐😓💀). Botó flotant per afegir exercicis, edició inline de sèries, botó de repetir l'última sèrie. Menú de tres punts per eliminar o guardar l'entrenament com a plantilla
+- **Plantilles** — Crea plantilles reutilitzables amb exercicis, sèries, repeticions i pes suggerit (tots opcionals). Guarda qualsevol entrenament com a plantilla en un tap. Els exercicis es filtren per la categoria de la plantilla (push/pull/cames). En iniciar un entrenament des d'una plantilla, les sèries es pre-omplen automàticament
+- **Historial** — Consulta i edita entrenaments passats per calendari o llista. Barres d'objectiu setmanal visibles per qualsevol setmana (no només l'actual)
 - **Exercicis** — Biblioteca organitzada per Push / Pull / Cames, amb subcategories i CRUD complet
 - **Progrés** — Gràfiques d'evolució per exercici: pes màxim, volum total i fatiga
+- **Objectius setmanals** — Seguiment del compliment d'objectiu per a la setmana seleccionada (gimnàs i/o esport, mode combinat o separat)
 
 ## Configuració Supabase
 

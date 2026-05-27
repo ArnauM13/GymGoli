@@ -1,4 +1,5 @@
 import { Component, ViewChild, computed, effect, inject, signal, untracked } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -51,7 +52,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 @Component({
   selector: 'app-train',
   standalone: true,
-  imports: [WorkoutEditorComponent, CalendarComponent, FitnessInsightsComponent, WeeklySummaryComponent, PageHeaderComponent],
+  imports: [FormsModule, WorkoutEditorComponent, CalendarComponent, FitnessInsightsComponent, WeeklySummaryComponent, PageHeaderComponent],
   template: `
     <div class="page" [style.padding-bottom]="pagePaddingBottom()">
 
@@ -134,9 +135,47 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           (requestAddExercise)="openPicker()"
         />
 
-        <button class="aw-delete-fab" (click)="deleteActiveWorkout()">
-          <span class="material-symbols-outlined">delete</span>
+        <!-- ── Three-dots action menu ── -->
+        @if (workoutMenuOpen()) {
+          <div class="aw-menu-backdrop" (click)="workoutMenuOpen.set(false)"></div>
+          <div class="aw-menu-dropdown">
+            <button class="aw-menu-item" (click)="openSaveAsTemplate(w)">
+              <span class="material-symbols-outlined">bookmark_add</span>
+              Guardar com a plantilla
+            </button>
+            <button class="aw-menu-item aw-menu-item--danger" (click)="workoutMenuOpen.set(false); deleteActiveWorkout()">
+              <span class="material-symbols-outlined">delete</span>
+              Eliminar entrenament
+            </button>
+          </div>
+        }
+        <button class="aw-menu-fab" [class.aw-menu-fab--open]="workoutMenuOpen()"
+                (click)="workoutMenuOpen.set(!workoutMenuOpen())">
+          <span class="material-symbols-outlined">more_vert</span>
         </button>
+
+        <!-- ── Save as template bottom sheet ── -->
+        @if (saveTemplateOpen()) {
+          <div class="aw-tpl-backdrop" (click)="saveTemplateOpen.set(false)"></div>
+          <div class="aw-tpl-sheet">
+            <div class="aw-tpl-header">
+              <span class="aw-tpl-title">Guardar com a plantilla</span>
+              <button class="aw-tpl-close" (click)="saveTemplateOpen.set(false)">
+                <span class="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div class="aw-tpl-field">
+              <label class="aw-tpl-label">Nom de la plantilla</label>
+              <input class="aw-tpl-input" [(ngModel)]="saveTemplateName"
+                     placeholder="Ex: Push A" maxlength="40" autocomplete="off">
+            </div>
+            <div class="aw-tpl-actions">
+              <button class="aw-tpl-cancel" (click)="saveTemplateOpen.set(false)">Cancel·lar</button>
+              <button class="aw-tpl-save" (click)="confirmSaveAsTemplate()"
+                      [disabled]="!saveTemplateName.trim()">Guardar</button>
+            </div>
+          </div>
+        }
 
       } @else {
 
@@ -783,20 +822,102 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
     .wc-feeling { font-size: 14px; line-height: 1; }
 
-    /* ── Active workout action FABs ── */
-    .aw-delete-fab {
+    /* ── Active workout action menu FAB ── */
+    .aw-menu-fab {
       position: fixed; right: 20px;
       bottom: calc(var(--nav-height) + 16px);
       z-index: 89;
       width: 56px; height: 56px; border-radius: 50%;
-      border: 1.5px solid rgba(239,83,80,0.35); background: var(--c-card); color: #ef5350;
+      border: 1.5px solid var(--c-border); background: var(--c-card); color: var(--c-text-2);
       display: flex; align-items: center; justify-content: center;
       cursor: pointer; touch-action: manipulation;
       box-shadow: 0 4px 16px var(--c-shadow-md);
-      transition: background 0.15s, color 0.15s, transform 0.15s;
+      transition: background 0.15s, transform 0.15s;
       .material-symbols-outlined { font-size: 24px; }
-      &:hover { background: rgba(239,83,80,0.08); transform: scale(1.06); }
+      &:hover { background: var(--c-subtle); transform: scale(1.06); }
       &:active { transform: scale(0.94); }
+      &.aw-menu-fab--open { background: var(--c-subtle); border-color: var(--c-brand); color: var(--c-brand); }
+    }
+    .aw-menu-backdrop { position: fixed; inset: 0; z-index: 88; }
+    .aw-menu-dropdown {
+      position: fixed; right: 16px;
+      bottom: calc(var(--nav-height) + 16px + 56px + 10px);
+      z-index: 90; min-width: 230px;
+      background: var(--c-card); border-radius: 14px;
+      box-shadow: 0 4px 24px var(--c-shadow-md), 0 0 0 1px var(--c-border);
+      padding: 6px;
+      transform-origin: bottom right;
+      animation: menu-in 0.18s cubic-bezier(0.34, 1.2, 0.64, 1) both;
+    }
+    @keyframes menu-in {
+      from { opacity: 0; transform: scale(0.85); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    .aw-menu-item {
+      display: flex; align-items: center; gap: 12px;
+      width: 100%; padding: 13px 14px; border-radius: 10px;
+      border: none; background: transparent;
+      color: var(--c-text); font-size: 14px; font-weight: 600;
+      cursor: pointer; touch-action: manipulation; text-align: left;
+      transition: background 0.12s;
+      .material-symbols-outlined { font-size: 20px; color: var(--c-text-3); }
+      &:hover { background: var(--c-subtle); }
+      &.aw-menu-item--danger { color: #ef5350; }
+      &.aw-menu-item--danger .material-symbols-outlined { color: #ef5350; }
+      &.aw-menu-item--danger:hover { background: rgba(239,83,80,0.07); }
+    }
+
+    /* ── Save as template sheet ── */
+    .aw-tpl-backdrop { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.4); }
+    .aw-tpl-sheet {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 201;
+      background: var(--c-card); border-radius: 20px 20px 0 0;
+      padding: 20px 20px 36px;
+      box-shadow: 0 -4px 24px var(--c-shadow-md);
+      animation: sheet-in 0.25s cubic-bezier(0.32, 1.2, 0.64, 1) both;
+    }
+    @keyframes sheet-in {
+      from { transform: translateY(100%); }
+      to   { transform: translateY(0); }
+    }
+    .aw-tpl-header {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;
+    }
+    .aw-tpl-title { font-size: 17px; font-weight: 800; color: var(--c-text); }
+    .aw-tpl-close {
+      width: 32px; height: 32px; border-radius: 50%;
+      border: none; background: var(--c-subtle); cursor: pointer;
+      color: var(--c-text-3); display: flex; align-items: center; justify-content: center;
+      touch-action: manipulation; transition: background 0.15s;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { background: var(--c-hover); }
+    }
+    .aw-tpl-field { margin-bottom: 4px; }
+    .aw-tpl-label {
+      display: block; font-size: 12px; font-weight: 700; color: var(--c-text-2);
+      text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px;
+    }
+    .aw-tpl-input {
+      width: 100%; padding: 12px 14px; border-radius: 10px; box-sizing: border-box;
+      border: 1.5px solid var(--c-border); background: var(--c-subtle);
+      font-size: 16px; color: var(--c-text); outline: none; transition: border-color 0.15s;
+      &:focus { border-color: var(--c-brand); background: var(--c-card); }
+    }
+    .aw-tpl-actions { display: flex; gap: 8px; margin-top: 18px; }
+    .aw-tpl-cancel {
+      flex: 1; padding: 13px; border-radius: 12px;
+      border: 1.5px solid var(--c-border); background: transparent;
+      color: var(--c-text-2); font-size: 15px; font-weight: 600;
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
+      &:hover { background: var(--c-subtle); }
+    }
+    .aw-tpl-save {
+      flex: 2; padding: 13px; border-radius: 12px;
+      border: none; background: var(--c-brand);
+      color: white; font-size: 15px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
+      &:hover:not(:disabled) { background: var(--c-brand-dk); }
+      &:disabled { opacity: 0.4; cursor: default; }
     }
     @keyframes pill-in {
       from { opacity: 0; transform: translateY(10px); }
@@ -1440,6 +1561,9 @@ export class TrainComponent {
   readonly sportToggling   = signal(false);
   readonly workoutTypes    = WORKOUT_TYPES;
   readonly speedDialOpen   = signal(false);
+  readonly workoutMenuOpen = signal(false);
+  readonly saveTemplateOpen = signal(false);
+  saveTemplateName = '';
   readonly activeWorkoutId = signal<string | null>(null);
   readonly gymCollapsed    = signal(false);
   readonly sportsCollapsed = signal(false);
@@ -1886,6 +2010,29 @@ export class TrainComponent {
     } catch {
       this.snackBar.open('Error en guardar la sensació', '', { duration: 2000 });
     }
+  }
+
+  openSaveAsTemplate(w: Workout): void {
+    this.workoutMenuOpen.set(false);
+    const cats = w.categories ?? (w.category ? [w.category] : []);
+    const cat = cats.length === 1 ? cats[0] as ExerciseCategory : null;
+    this.saveTemplateName = cat ? (CATEGORY_LABELS[cat] ?? '') : '';
+    this.saveTemplateOpen.set(true);
+  }
+
+  confirmSaveAsTemplate(): void {
+    const name = this.saveTemplateName.trim();
+    const w = this.activeWorkout();
+    if (!name || !w) return;
+    const cats = w.categories ?? (w.category ? [w.category] : []);
+    const cat: ExerciseCategory | 'mixed' = cats.length === 1
+      ? cats[0] as ExerciseCategory
+      : 'mixed';
+    const entries = w.entries.map(e => ({ exerciseId: e.exerciseId, exerciseName: e.exerciseName }));
+    this.templateService.create(name, cat, entries);
+    this.saveTemplateOpen.set(false);
+    this.saveTemplateName = '';
+    this.snackBar.open('Plantilla guardada', '', { duration: 2000 });
   }
 
   async deleteActiveWorkout(): Promise<void> {
