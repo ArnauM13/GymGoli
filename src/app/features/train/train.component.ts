@@ -26,6 +26,7 @@ import { WeeklySummaryComponent } from './components/weekly-summary.component';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { ImportPreviewComponent } from './components/import-preview.component';
+import { WatchPickerComponent } from './components/watch-picker.component';
 import { FitImportService, ImportedWorkout } from '../../core/services/fit-import.service';
 import { AppleHealthImportService } from '../../core/services/apple-health-import.service';
 
@@ -54,7 +55,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 @Component({
   selector: 'app-train',
   standalone: true,
-  imports: [WorkoutEditorComponent, CalendarComponent, FitnessInsightsComponent, WeeklySummaryComponent, PageHeaderComponent, ImportPreviewComponent],
+  imports: [WorkoutEditorComponent, CalendarComponent, FitnessInsightsComponent, WeeklySummaryComponent, PageHeaderComponent, ImportPreviewComponent, WatchPickerComponent],
   template: `
     <div class="page" [style.padding-bottom]="pagePaddingBottom()">
 
@@ -343,19 +344,15 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
                   <!-- Device import row -->
                   <div class="import-row">
-                    <button class="import-device-btn" (click)="triggerFitImport()"
-                            [disabled]="deviceImporting()" title="Importa entrenament Garmin (.FIT)">
+                    <button class="import-device-btn"
+                            (click)="showWatchPicker.set(true)"
+                            [disabled]="deviceImporting()">
                       @if (deviceImporting()) {
                         <span class="material-symbols-outlined spin">sync</span>
                       } @else {
                         <span class="material-symbols-outlined">watch</span>
                       }
-                      Garmin
-                    </button>
-                    <button class="import-device-btn" (click)="triggerAppleImport()"
-                            [disabled]="deviceImporting()" title="Importa Apple Health (.xml)">
-                      <span class="material-symbols-outlined">phone_iphone</span>
-                      Apple
+                      Importa del rellotge
                     </button>
                   </div>
                 </div>
@@ -570,6 +567,14 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           <span class="material-symbols-outlined">chevron_right</span>
         </button>
       </div>
+    }
+
+    <!-- Watch brand picker -->
+    @if (showWatchPicker()) {
+      <app-watch-picker
+        (closed)="showWatchPicker.set(false)"
+        (selected)="onWatchSelected($event)"
+      />
     }
 
     <!-- Hidden file inputs for device import -->
@@ -1498,6 +1503,7 @@ export class TrainComponent {
   readonly sportToggling   = signal(false);
   readonly deviceImporting = signal(false);
   readonly importedWorkout = signal<ImportedWorkout | null>(null);
+  readonly showWatchPicker = signal(false);
   readonly workoutTypes    = WORKOUT_TYPES;
   readonly speedDialOpen   = signal(false);
   readonly activeWorkoutId = signal<string | null>(null);
@@ -2220,6 +2226,11 @@ export class TrainComponent {
   }
 
   // ── Device import ────────────────────────────────────────────────────────
+
+  onWatchSelected(format: import('./components/watch-picker.component').WatchFormat): void {
+    if (format === 'fit') this.triggerFitImport();
+    else this.triggerAppleImport();
+  }
 
   triggerFitImport(): void {
     this.fitInputRef.nativeElement.value = '';
