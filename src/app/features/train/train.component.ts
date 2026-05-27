@@ -1,4 +1,4 @@
-import { Component, ViewChild, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, ElementRef, ViewChild, computed, effect, inject, signal, untracked } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -25,6 +25,9 @@ import { FitnessInsightsComponent } from '../../shared/components/fitness-insigh
 import { WeeklySummaryComponent } from './components/weekly-summary.component';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { ImportPreviewComponent } from './components/import-preview.component';
+import { FitImportService, ImportedWorkout } from '../../core/services/fit-import.service';
+import { AppleHealthImportService } from '../../core/services/apple-health-import.service';
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
 
@@ -51,7 +54,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 @Component({
   selector: 'app-train',
   standalone: true,
-  imports: [WorkoutEditorComponent, CalendarComponent, FitnessInsightsComponent, WeeklySummaryComponent, PageHeaderComponent],
+  imports: [WorkoutEditorComponent, CalendarComponent, FitnessInsightsComponent, WeeklySummaryComponent, PageHeaderComponent, ImportPreviewComponent],
   template: `
     <div class="page" [style.padding-bottom]="pagePaddingBottom()">
 
@@ -551,6 +554,21 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       </div>
     }
 
+    <!-- Hidden file inputs for device import -->
+    <input #fitInput type="file" accept=".fit" style="display:none"
+           (change)="onFitFileSelected($event)">
+    <input #appleInput type="file" accept=".xml" style="display:none"
+           (change)="onAppleFileSelected($event)">
+
+    <!-- Import workout preview -->
+    @if (importedWorkout()) {
+      <app-import-preview
+        [workout]="importedWorkout()!"
+        (closed)="importedWorkout.set(null)"
+        (saved)="onWorkoutImported($event)"
+      />
+    }
+
     <!-- ── Session logger bottom sheet ── -->
     @if (loggerSport()) {
       <div class="sl-backdrop" (click)="closeSessionLogger()"></div>
@@ -562,6 +580,20 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             </span>
             <span class="sl-sport-name">{{ loggerSport()!.name }}</span>
           </div>
+          <button class="sl-fit-btn" (click)="triggerFitImport()"
+                  [disabled]="deviceImporting()" title="Importa .FIT (Garmin)">
+            @if (deviceImporting()) {
+              <span class="material-symbols-outlined spin">sync</span>
+            } @else {
+              <span class="material-symbols-outlined">watch</span>
+            }
+            <span>Garmin</span>
+          </button>
+          <button class="sl-fit-btn" (click)="triggerAppleImport()"
+                  [disabled]="deviceImporting()" title="Importa Apple Health (.xml)">
+            <span class="material-symbols-outlined">phone_iphone</span>
+            <span>Apple</span>
+          </button>
           <button class="sl-close" (click)="closeSessionLogger()">
             <span class="material-symbols-outlined">close</span>
           </button>
@@ -1336,6 +1368,18 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .material-symbols-outlined { font-size: 18px; }
       &:hover { background: var(--c-hover); }
     }
+    .sl-fit-btn {
+      display: flex; align-items: center; gap: 3px;
+      height: 28px; padding: 0 9px; border-radius: 8px; margin-right: 4px;
+      border: 1.5px solid var(--c-border); background: var(--c-subtle);
+      font-size: 11px; font-weight: 700; color: var(--c-text-2);
+      cursor: pointer; transition: all 0.15s; touch-action: manipulation; flex-shrink: 0;
+      .material-symbols-outlined { font-size: 14px; }
+      &:hover:not(:disabled) { border-color: var(--c-brand); color: var(--c-brand); background: color-mix(in srgb, var(--c-brand) 6%, var(--c-card)); }
+      &:disabled { opacity: 0.55; cursor: not-allowed; }
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { animation: spin 1s linear infinite; display: inline-block; }
 
     .sl-field { margin-bottom: 16px; }
     .sl-field-label {
@@ -1433,11 +1477,17 @@ export class TrainComponent {
   private dialog           = inject(MatDialog);
   private snackBar         = inject(MatSnackBar);
   private confirmDialog    = inject(ConfirmDialogService);
+  private fitService       = inject(FitImportService);
+  private appleService     = inject(AppleHealthImportService);
 
-  @ViewChild('editor') editor?: WorkoutEditorComponent;
+  @ViewChild('editor')     editor?:      WorkoutEditorComponent;
+  @ViewChild('fitInput')   fitInputRef!: ElementRef<HTMLInputElement>;
+  @ViewChild('appleInput') appleInputRef!: ElementRef<HTMLInputElement>;
 
   readonly selectedDate    = signal<string>(TODAY());
   readonly sportToggling   = signal(false);
+  readonly deviceImporting = signal(false);
+  readonly importedWorkout = signal<ImportedWorkout | null>(null);
   readonly workoutTypes    = WORKOUT_TYPES;
   readonly speedDialOpen   = signal(false);
   readonly activeWorkoutId = signal<string | null>(null);
@@ -2157,5 +2207,77 @@ export class TrainComponent {
     } finally {
       this.sportToggling.set(false);
     }
+  }
+
+  // ── Device import ────────────────────────────────────────────────────────
+
+  triggerFitImport(): void {
+    this.fitInputRef.nativeElement.value = '';
+    this.fitInputRef.nativeElement.click();
+  }
+
+  triggerAppleImport(): void {
+    this.appleInputRef.nativeElement.value = '';
+    this.appleInputRef.nativeElement.click();
+  }
+
+  async onFitFileSelected(event: Event): Promise<void> {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    this.deviceImporting.set(true);
+    try {
+      const result = await this.fitService.parseAuto(file);
+      this._handleImportResult(result);
+    } catch (err) {
+      this.snackBar.open(err instanceof Error ? err.message : 'Error en llegir el fitxer', '', { duration: 3000 });
+    } finally {
+      this.deviceImporting.set(false);
+    }
+  }
+
+  async onAppleFileSelected(event: Event): Promise<void> {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    this.deviceImporting.set(true);
+    try {
+      const result = await this.appleService.parse(file);
+      this._handleImportResult(result);
+    } catch (err) {
+      this.snackBar.open(err instanceof Error ? err.message : 'Error en llegir el fitxer', '', { duration: 3000 });
+    } finally {
+      this.deviceImporting.set(false);
+    }
+  }
+
+  private _handleImportResult(result: import('../../core/services/fit-import.service').ImportResult): void {
+    if (result.kind === 'workout') {
+      this.closeSessionLogger();
+      this.importedWorkout.set(result.data as ImportedWorkout);
+    } else {
+      // Sport session: pre-fill the logger fields
+      const fit = result.data as { durationSecs?: number; distanceMeters?: number; avgHeartRate?: number; maxHeartRate?: number; calories?: number };
+      if (fit.durationSecs !== undefined) {
+        this.loggerDuration.set(Math.max(1, Math.round(fit.durationSecs / 60)));
+      }
+      const sport = this.loggerSport();
+      if (sport && fit.distanceMeters !== undefined) {
+        const hasKm = sport.metricDefs.some(d => d.key === 'distance_km');
+        const hasM  = sport.metricDefs.some(d => d.key === 'distance_m');
+        if (hasKm) this.loggerMetrics.update(m => ({ ...m, distance_km: Math.round(fit.distanceMeters! / 100) / 10 }));
+        else if (hasM) this.loggerMetrics.update(m => ({ ...m, distance_m: Math.round(fit.distanceMeters!) }));
+      }
+      const noteParts: string[] = [];
+      if (fit.avgHeartRate) noteParts.push(`FC avg: ${fit.avgHeartRate}bpm`);
+      if (fit.maxHeartRate) noteParts.push(`màx: ${fit.maxHeartRate}bpm`);
+      if (fit.calories)     noteParts.push(`${fit.calories}kcal`);
+      if (noteParts.length) this.loggerNotes.update(n => n ? `${n}\n${noteParts.join(' · ')}` : noteParts.join(' · '));
+      this.snackBar.open('Dades del rellotge importades', '', { duration: 2000 });
+    }
+  }
+
+  onWorkoutImported(workoutId: string): void {
+    this.snackBar.open('Entrenament importat correctament', '', { duration: 2500 });
+    // Open the imported workout in editor
+    this.activeWorkoutId.set(workoutId);
   }
 }
