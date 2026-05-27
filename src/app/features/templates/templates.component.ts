@@ -436,9 +436,10 @@ export class TemplatesComponent {
   closeEditor(): void { this.editorOpen.set(false); }
 
   pickExercise(): void {
-    const existingIds = this.editorEntries.map(e => e.exerciseId);
+    const existingIds  = this.editorEntries.map(e => e.exerciseId);
+    const defaultCategory = this.editorCat !== 'mixed' ? this.editorCat as ExerciseCategory : undefined;
     const ref = this.dialog.open(ExercisePickerDialogComponent, {
-      data: { excludeIds: existingIds },
+      data: { excludeIds: existingIds, defaultCategory },
       width: '400px', maxHeight: '85vh',
     });
     ref.afterClosed().subscribe(ex => {
