@@ -231,3 +231,23 @@ export class ImportPreviewComponent implements OnInit {
     return created.id;
   }
 }
+
+/*
+ * DESIGN REFERENCE — bottom-sheet amb llista d'ítems
+ *
+ * Patró reutilitzable per a qualsevol bottom-sheet que mostra una llista
+ * d'ítems amb barra de color lateral + accions confirmar/cancel·lar.
+ *
+ * Estructura HTML:
+ *   .ip-backdrop  → fons semitransparent, clica per tancar
+ *   .ip-sheet     → full bottom-sheet amb border-radius 24px 24px 0 0
+ *     .ip-header  → icona + títol/subtítol + botó close
+ *     .ip-entries → llista d'ítems
+ *       .ip-entry [--ec: color]  → targeta amb barra lateral de 4px
+ *         .ip-entry-bar  → la barra de color
+ *         .ip-entry-body → contingut: nom, categoria, pills de detall
+ *     .ip-actions → cancel·lar (outline) + confirmar (brand fill)
+ *
+ * Animations: ip-fade (backdrop) + ip-up (sheet slide from bottom)
+ * CSS variables: --ec per al color de cada ítem
+ */
