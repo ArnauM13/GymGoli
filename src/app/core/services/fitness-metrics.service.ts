@@ -5,6 +5,7 @@ import { FitnessGoal } from '../models/user-settings.model';
 import { SportService } from './sport.service';
 import { UserSettingsService } from './user-settings.service';
 import { WorkoutService } from './workout.service';
+import { WorkoutProfileService } from './workout-profile.service';
 
 export type InsightType =
   | 'setmana_fluixa'
@@ -19,7 +20,8 @@ export type InsightType =
   | 'camino_objectiu'
   | 'anima_objectiu'
   | 'feeling_baixant_esport'
-  | 'constancia_esport';
+  | 'constancia_esport'
+  | 'categoria_endarrerida';
 
 export interface FitnessInsight {
   type: InsightType;
@@ -71,6 +73,7 @@ export class FitnessMetricsService {
   private workoutService  = inject(WorkoutService);
   private sportService    = inject(SportService);
   private settingsService = inject(UserSettingsService);
+  private profileService  = inject(WorkoutProfileService);
 
   readonly insights = computed((): FitnessInsight[] => {
     const today  = TODAY();
@@ -95,6 +98,12 @@ export class FitnessMetricsService {
     // ── Last 7 days ───────────────────────────────────────────────────────
     const last7Workouts = workouts.filter(w => w.date > weekAgo && w.date <= today);
     const last7Sessions = sessions.filter(s => s.date > weekAgo && s.date <= today);
+
+    // ── Today's planned activities ─────────────────────────────────────────
+    const todayPlannedWorkouts = this.workoutService.getPlannedForDate(today);
+    const todayPlannedSports   = this.sportService.getPlannedSportSessionsForDate(today);
+    const hasPlannedGym        = todayPlannedWorkouts.length > 0;
+    const hasPlannedSport      = todayPlannedSports.length > 0;
 
     const candidates: FitnessInsight[] = [];
 
@@ -124,11 +133,18 @@ export class FitnessMetricsService {
     else {
       const dow = new Date(today + 'T12:00:00').getDay();
       if (weekWorkouts.length < 2 && weekSessions.length < 2 && (dow === 0 || dow >= 4)) {
-        const fluixaMsg = _fluixaMessage(fitnessGoal);
+        let fluixaMsg: string;
+        if (hasPlannedSport) {
+          fluixaMsg = `Setmana tranquil·la fins ara, però tens ${todayPlannedSports[0].sport.name} planificat avui. A gaudir-ne!`;
+        } else if (hasPlannedGym) {
+          fluixaMsg = 'Setmana tranquil·la fins ara, però tens el gym planificat avui — aprofita-ho!';
+        } else {
+          fluixaMsg = _fluixaMessage(fitnessGoal);
+        }
         candidates.push({
           type: 'setmana_fluixa',
-          emoji: '💤',
-          title: 'Setmana tranquil·la...',
+          emoji: hasPlannedGym || hasPlannedSport ? '💪' : '💤',
+          title: hasPlannedGym || hasPlannedSport ? 'Avui toca!' : 'Setmana tranquil·la...',
           message: fluixaMsg,
           color: '#0288d1',
         });
@@ -137,26 +153,47 @@ export class FitnessMetricsService {
 
     // ── 4. Prova gym (2+ sessions esport però 0 gym en 7 dies) ───────────
     if (last7Sessions.length >= 2 && last7Workouts.length === 0 && fitnessGoal !== 'sport') {
-      candidates.push({
-        type: 'prova_gym',
-        emoji: '🏋️',
-        title: 'El gym et truca!',
-        message: `Portes ${last7Sessions.length} sessions d'esport però fa dies que no trepitges el gym. Avui, sí?`,
-        color: '#006874',
-      });
+      if (hasPlannedGym) {
+        candidates.push({
+          type: 'prova_gym',
+          emoji: '🏋️',
+          title: 'Gym planificat avui!',
+          message: `Fas esport i avui tens el gym planificat — la combinació perfecta. A per totes!`,
+          color: '#006874',
+        });
+      } else {
+        candidates.push({
+          type: 'prova_gym',
+          emoji: '🏋️',
+          title: 'El gym et truca!',
+          message: `Portes ${last7Sessions.length} sessions d'esport però fa dies que no trepitges el gym. Avui, sí?`,
+          color: '#006874',
+        });
+      }
     }
 
     // ── 6. Prova esport (3+ gym però 0 esport en 7 dies) ─────────────────
     if (last7Workouts.length >= 3 && last7Sessions.length === 0 && sports.length > 0 && fitnessGoal !== 'strength') {
       const favSport  = _favoriteSport(sessions, sports);
       const sportName = favSport ? favSport.name : 'algun esport';
-      candidates.push({
-        type: 'prova_esport',
-        emoji: '🏃',
-        title: 'Molta gym, gens d\'esport!',
-        message: `Portes ${last7Workouts.length} entrenos seguits però res d\'esport. I si avui feies ${sportName}?`,
-        color: '#2e7d32',
-      });
+      if (hasPlannedSport) {
+        const ps = todayPlannedSports[0];
+        candidates.push({
+          type: 'prova_esport',
+          emoji: '🏃',
+          title: `${ps.sport.name} planificat avui!`,
+          message: `Fas molt gym i avui tens ${ps.sport.name} planificat — perfecte equilibri. Gaudeix-ho!`,
+          color: ps.sport.color,
+        });
+      } else {
+        candidates.push({
+          type: 'prova_esport',
+          emoji: '🏃',
+          title: 'Molta gym, gens d\'esport!',
+          message: `Portes ${last7Workouts.length} entrenos seguits però res d\'esport. I si avui feies ${sportName}?`,
+          color: '#2e7d32',
+        });
+      }
     }
 
     // ── 5. Recupera esport preferit (fa 7+ dies sense fer-lo) ────────────
@@ -170,13 +207,24 @@ export class FitnessMetricsService {
 
         if (daysSince >= 7) {
           const ago = lastFav ? daysAgoStr(daysSince) : 'fa molt';
-          candidates.push({
-            type: 'recupera_esport',
-            emoji: '😏',
-            title: `Fa temps que no fas ${favSport.name}!`,
-            message: `L'últim cop que vas fer ${favSport.name} va ser ${ago}. T'apuntes avui?`,
-            color: favSport.color,
-          });
+          const isFavPlanned = todayPlannedSports.some(p => p.sport.id === favSport.id);
+          if (isFavPlanned) {
+            candidates.push({
+              type: 'recupera_esport',
+              emoji: '😏',
+              title: `${favSport.name} planificat avui!`,
+              message: `Fa ${ago} que no fas ${favSport.name} i avui el tens planificat — moment perfecte per tornar-hi!`,
+              color: favSport.color,
+            });
+          } else {
+            candidates.push({
+              type: 'recupera_esport',
+              emoji: '😏',
+              title: `Fa temps que no fas ${favSport.name}!`,
+              message: `L'últim cop que vas fer ${favSport.name} va ser ${ago}. T'apuntes avui?`,
+              color: favSport.color,
+            });
+          }
         }
       }
     }
@@ -319,7 +367,9 @@ export class FitnessMetricsService {
 
         if (sportSessions.length === 3) {
           const [f1, f2, f3] = sportSessions.map(s => s.feeling as number);
-          if (f1 < f2 && f2 < f3) {
+          // f1 is the most recent session. Higher feeling number = more fatiguing.
+          // Worsening trend: most recent feels harder than previous ones.
+          if (f1 > f2 && f2 > f3) {
             candidates.push({
               type: 'feeling_baixant_esport',
               emoji: '📉',
@@ -359,10 +409,45 @@ export class FitnessMetricsService {
       }
     }
 
+    // ── Categoria endarrerida (basat en el perfil real de l'usuari) ──────
+    if (fitnessGoal !== 'sport') {
+      const profile = this.profileService.profile();
+      // Find the single most overdue category (score >= 1.5, at least 2 days over gap)
+      const overdue = GYM_CATS
+        .map(cat => ({ cat, p: profile.gym[cat] }))
+        .filter(({ p }) => p.overdueScore >= 1.5 && p.daysSinceLast >= p.typicalGapDays + 2)
+        .sort((a, b) => b.p.overdueScore - a.p.overdueScore)[0];
+
+      if (overdue) {
+        const { cat, p } = overdue;
+        const daysStr     = p.daysSinceLast === 1 ? '1 dia' : `${p.daysSinceLast} dies`;
+        const isCatPlanned = todayPlannedWorkouts.some(w =>
+          (w.categories ?? []).includes(cat) || w.category === cat
+        );
+        if (isCatPlanned) {
+          candidates.push({
+            type: 'categoria_endarrerida',
+            emoji: '🎯',
+            title: `${DAY_LABEL[cat]} — planificat!`,
+            message: `Fa ${daysStr} que no fas ${CATEGORY_LABELS[cat]} i avui ho tens planificat. Moment perfecte, a per-hi!`,
+            color: CATEGORY_COLORS[cat],
+          });
+        } else {
+          candidates.push({
+            type: 'categoria_endarrerida',
+            emoji: '📆',
+            title: DAY_LABEL[cat],
+            message: `Fa ${daysStr} que no fas ${CATEGORY_LABELS[cat]} (cicle habitual cada ${p.typicalGapDays} dies). Avui toca?`,
+            color: CATEGORY_COLORS[cat],
+          });
+        }
+      }
+    }
+
     // ── Retorna màxim 2 per prioritat ─────────────────────────────────────
     const priority: InsightType[] = [
       'objectiu_assolit', 'augmenta_objectiu', 'gran_setmana', 'descansa', 'prova_gym',
-      'camino_objectiu', 'setmana_fluixa', 'anima_objectiu',
+      'camino_objectiu', 'categoria_endarrerida', 'setmana_fluixa', 'anima_objectiu',
       'feeling_baixant_esport', 'constancia_esport',
       'prova_esport', 'recupera_esport', 'equilibra_gym',
     ];
