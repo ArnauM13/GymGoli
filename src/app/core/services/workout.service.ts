@@ -139,6 +139,8 @@ export class WorkoutService {
     const key = this._monthKey(year, month);
     if (this._monthCache.has(key) || this._allLoaded) return;
 
+    // Mark as in-flight so concurrent calls skip the fetch.
+    this._monthCache.set(key, []);
     this.isLoading.set(true);
     try {
       const start   = `${key}-01`;
@@ -153,7 +155,12 @@ export class WorkoutService {
         .lte('date', end)
         .order('date', { ascending: false });
 
-      this._monthCache.set(key, (data ?? []).map(r => toWorkout(r as Record<string, unknown>)));
+      const fetched  = (data ?? []).map(r => toWorkout(r as Record<string, unknown>));
+      // Preserve any workouts added locally while the fetch was in-flight.
+      const inFlight    = this._monthCache.get(key) ?? [];
+      const fetchedIds  = new Set(fetched.map(w => w.id));
+      const localOnly   = inFlight.filter(w => !fetchedIds.has(w.id));
+      this._monthCache.set(key, [...fetched, ...localOnly]);
       this._rebuildHistorical();
     } finally {
       this.isLoading.set(false);
