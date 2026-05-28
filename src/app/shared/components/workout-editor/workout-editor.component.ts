@@ -350,23 +350,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     .we-entry-footer {
       display: flex; align-items: center; justify-content: space-between; gap: 8px;
       padding: 10px 14px 14px; border-top: 1px solid var(--c-border-2);
-    }
-    .we-footer-feeling-btn {
-      width: 36px; height: 36px; border-radius: 10px; border: 1.5px solid transparent;
-      background: var(--c-subtle); font-size: 18px; line-height: 1;
-      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      display: flex; align-items: center; justify-content: center;
-      .material-symbols-outlined { font-size: 20px; color: var(--c-text-3); }
-      &:hover { background: var(--c-hover); }
-      &:active { transform: scale(0.92); }
-      &.we-footer-feeling-btn--set { border-color: rgba(var(--c-brand-rgb), 0.3); background: rgba(var(--c-brand-rgb), 0.07); }
-    }
-    .we-footer-actions { display: flex; align-items: center; gap: 6px; }
-
-    /* ── Entry footer: stats + delete ── */
-    .we-entry-footer {
-      display: flex; align-items: center; justify-content: flex-end; gap: 8px;
-      padding: 10px 14px 14px; border-top: 1px solid var(--c-border-2);
+      background: color-mix(in srgb, var(--cat) 9%, var(--c-card));
     }
     .we-footer-stats-btn {
       width: 36px; height: 36px; border-radius: 10px;
