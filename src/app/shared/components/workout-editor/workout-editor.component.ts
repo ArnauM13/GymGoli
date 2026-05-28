@@ -72,7 +72,10 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
             <!-- ── Last session info banner ── -->
             @if (lastSessionData()?.exerciseId === entry.exerciseId && entry.sets.length === 0 && addingFor() === entry.exerciseId) {
-              <div class="we-last-session-banner">
+              <div class="we-last-session-banner" role="button" tabindex="0"
+                (click)="applyLastSession(entry.exerciseId)"
+                (keydown.enter)="applyLastSession(entry.exerciseId)"
+                (keydown.space)="applyLastSession(entry.exerciseId)">
                 <span class="material-symbols-outlined we-lsb-icon">history</span>
                 <div class="we-lsb-info">
                   <span class="we-lsb-label">Última sessió</span>
@@ -391,9 +394,10 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     /* ── Last session banner ── */
     .we-last-session-banner {
       display: flex; align-items: center; gap: 10px;
-      margin: 4px 14px 6px; padding: 10px 14px;
+      margin: 4px 14px 6px; padding: 20px 14px;
       background: rgba(var(--c-brand-rgb), 0.07); border: 1px solid rgba(var(--c-brand-rgb), 0.15);
-      border-radius: 10px;
+      border-radius: 10px; cursor: pointer; transition: background 0.15s;
+      &:hover { background: rgba(var(--c-brand-rgb), 0.13); }
     }
     .we-lsb-icon { font-size: 20px; color: var(--c-brand); flex-shrink: 0; }
     .we-lsb-info { display: flex; flex-direction: column; gap: 1px; flex: 1; }
@@ -715,7 +719,7 @@ export class WorkoutEditorComponent implements OnDestroy {
   readonly setQty           = signal(1);
   readonly setQtyOptions    = [1, 2, 3, 4, 5];
   readonly editingSet       = signal<{ exerciseId: string; index: number } | null>(null);
-  readonly lastSessionData  = signal<{ exerciseId: string; date: string; maxWeight: number; feeling?: FeelingLevel } | null>(null);
+  readonly lastSessionData  = signal<{ exerciseId: string; date: string; maxWeight: number; feeling?: FeelingLevel; sets: WorkoutSet[] } | null>(null);
   readonly recData          = signal<{ exerciseId: string; sets: number; reps: number; goalLabel: string } | null>(null);
   readonly feelingPickerFor = signal<string | null>(null);
   readonly collapsedEntries = signal<Set<string>>(new Set());
@@ -917,7 +921,11 @@ export class WorkoutEditorComponent implements OnDestroy {
     if (entry.sets.length === 0 && w) {
       const info = this.workoutService.getLastSessionInfo(entry.exerciseId, w.id);
       if (info) {
-        this.lastSessionData.set({ exerciseId: entry.exerciseId, ...info });
+        const lastEntry = this.workoutService.workouts()
+          .filter(wk => wk.id !== w.id && wk.entries.some(e => e.exerciseId === entry.exerciseId && e.sets.length > 0))
+          .sort((a, b) => b.date.localeCompare(a.date))[0]
+          ?.entries.find(e => e.exerciseId === entry.exerciseId);
+        this.lastSessionData.set({ exerciseId: entry.exerciseId, ...info, sets: lastEntry?.sets ?? [] });
         this.recData.set(null);
         this.setForm.patchValue({ weight: kgToDisplay(info.maxWeight, u), reps: 8 });
       } else {
@@ -1023,6 +1031,19 @@ export class WorkoutEditorComponent implements OnDestroy {
       this.cancelSet();
     } catch {
       this.snackBar.open('Error en afegir les sèries', '', { duration: 3000 });
+    }
+  }
+
+  async applyLastSession(exerciseId: string): Promise<void> {
+    const data = this.lastSessionData();
+    const w    = this.workout();
+    if (!data || !w || data.sets.length === 0) return;
+    try {
+      await this.workoutService.addSetsToEntry(w.id, exerciseId, data.sets);
+      this.lastSessionData.set(null);
+      this.cancelSet();
+    } catch {
+      this.snackBar.open('Error en aplicar l\'última sessió', '', { duration: 3000 });
     }
   }
 
