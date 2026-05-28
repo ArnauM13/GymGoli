@@ -794,26 +794,12 @@ export class SettingsComponent {
 
   setFitnessGoal(goal: FitnessGoal): void {
     if (this.settingsService.fitnessGoal() === goal) {
-      this.settingsService.update({
-        fitnessGoal: null,
-        weeklyActivityGoal: null,
-        weeklyGymGoal: null,
-        weeklySportGoal: null,
-      });
+      this.settingsService.update({ fitnessGoal: null });
       return;
     }
-    const patch: Record<string, unknown> = {
-      fitnessGoal: goal,
-      weeklyActivityGoal: FITNESS_GOAL_WEEKLY_DEFAULTS[goal],
-    };
-    if (!this.settingsService.metricsEnabled()) {
-      patch['metricsEnabled'] = true;
-    }
-    if (goal === 'sport' && this.settingsService.goalMode() === 'combined') {
-      patch['goalMode']        = 'separate';
-      patch['weeklySportGoal'] = FITNESS_GOAL_WEEKLY_DEFAULTS['sport'];
-    }
-    this.settingsService.update(patch as Parameters<typeof this.settingsService.update>[0]);
+    const patch: Partial<Parameters<typeof this.settingsService.update>[0]> = { fitnessGoal: goal };
+    if (!this.settingsService.metricsEnabled()) patch.metricsEnabled = true;
+    this.settingsService.update(patch);
   }
 
   async logout(): Promise<void> {
