@@ -62,7 +62,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         <!-- ══ ACTIVE WORKOUT MODE ══ -->
 
         <header class="page-header page-header--aw">
-          <button class="back-btn" (click)="closeWorkout()">
+          <button class="back-btn" (click)="closeWorkout()" aria-label="Tancar entrenament">
             <span class="material-symbols-outlined">arrow_back</span>
           </button>
           <div class="aw-title-block">
@@ -100,7 +100,9 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           </div>
           <div class="aw-header-right">
             <button class="aw-feeling-btn" (click)="$event.stopPropagation(); awFeelingOpen.set(!awFeelingOpen())"
-                    [class.aw-feeling-btn--set]="w.feeling">
+                    [class.aw-feeling-btn--set]="w.feeling"
+                    [attr.aria-label]="w.feeling ? 'Canviar sensació' : 'Afegir sensació'"
+                    [attr.aria-expanded]="awFeelingOpen()">
               @if (w.feeling) {
                 <span class="aw-feeling-emoji">{{ emojiOf(w.feeling) }}</span>
               } @else {
@@ -121,7 +123,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               </button>
             }
             @if (w.feeling) {
-              <button class="aw-feeling-clear" (click)="pickWorkoutFeeling(w.id, undefined)">
+              <button class="aw-feeling-clear" (click)="pickWorkoutFeeling(w.id, undefined)" aria-label="Treure sensació">
                 <span class="material-symbols-outlined">close</span>
               </button>
             }
@@ -151,7 +153,8 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           </div>
         }
         <button class="aw-menu-fab" [class.aw-menu-fab--open]="workoutMenuOpen()"
-                (click)="workoutMenuOpen.set(!workoutMenuOpen())">
+                (click)="workoutMenuOpen.set(!workoutMenuOpen())"
+                aria-label="Opcions de l'entrenament" [attr.aria-expanded]="workoutMenuOpen()">
           <span class="material-symbols-outlined">more_vert</span>
         </button>
 
@@ -518,7 +521,8 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           </div>
         }
         <button class="sd-fab" [class.sd-fab--open]="speedDialOpen()"
-          (click)="toggleSpeedDial()">
+          (click)="toggleSpeedDial()"
+          aria-label="Nou entrenament" [attr.aria-expanded]="speedDialOpen()">
           <span class="material-symbols-outlined">add</span>
         </button>
       </div>
@@ -538,7 +542,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               <span class="tp-muscles">{{ pickerMuscles() }}</span>
             </div>
           </div>
-          <button class="tp-close" (click)="closePicker()">
+          <button class="tp-close" (click)="closePicker()" aria-label="Tancar">
             <span class="material-symbols-outlined">close</span>
           </button>
         </div>
@@ -605,7 +609,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             </span>
             <span class="sl-sport-name">{{ loggerSport()!.name }}</span>
           </div>
-          <button class="sl-close" (click)="closeSessionLogger()">
+          <button class="sl-close" (click)="closeSessionLogger()" aria-label="Tancar">
             <span class="material-symbols-outlined">close</span>
           </button>
         </div>
