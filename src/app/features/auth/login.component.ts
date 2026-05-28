@@ -159,9 +159,9 @@ function friendlyError(err: unknown): string {
   styles: [`
     .login-page {
       min-height: 100dvh;
-      display: flex; align-items: center; justify-content: center;
+      display: flex; align-items: flex-start; justify-content: center;
       background: linear-gradient(135deg, #f0fafb 0%, #e8f4f5 100%);
-      padding: 24px;
+      padding: max(10dvh, 24px) 24px 48px;
     }
 
     .login-card {
