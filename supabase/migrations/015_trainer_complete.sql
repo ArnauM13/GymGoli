@@ -152,18 +152,28 @@ CREATE POLICY "workouts_trainer_read_clients" ON workouts FOR SELECT
   );
 
 -- ── user_settings: trainer read policy ────────────────────────────────────────
+-- Wrapped in a DO block so it succeeds even if user_settings doesn't exist yet
+-- (created by migration 005; safe to re-run once that table is present).
 
-DROP POLICY IF EXISTS "trainer_read_client_settings" ON user_settings;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'user_settings'
+  ) THEN
+    DROP POLICY IF EXISTS "trainer_read_client_settings" ON user_settings;
 
-CREATE POLICY "trainer_read_client_settings" ON user_settings FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM trainer_clients tc
-      WHERE tc.trainer_id = auth.uid()
-        AND tc.client_id  = user_settings.user_id
-        AND tc.status     = 'active'
-    )
-  );
+    CREATE POLICY "trainer_read_client_settings" ON user_settings FOR SELECT
+      USING (
+        EXISTS (
+          SELECT 1 FROM trainer_clients tc
+          WHERE tc.trainer_id = auth.uid()
+            AND tc.client_id  = user_settings.user_id
+            AND tc.status     = 'active'
+        )
+      );
+  END IF;
+END $$;
 
 -- ── Functions ──────────────────────────────────────────────────────────────────
 
