@@ -390,19 +390,19 @@ type DashboardView = 'clients' | 'detail';
 
     .header-add {
       width: 36px; height: 36px; border-radius: 50%; border: none;
-      background: #006874; color: white; cursor: pointer;
+      background: var(--c-brand); color: white; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.15s, transform 0.1s; touch-action: manipulation;
       .material-symbols-outlined { font-size: 20px; }
-      &:hover  { background: #005a63; }
+      &:hover  { background: var(--c-brand-dk); }
       &:active { transform: scale(0.94); }
     }
 
     .card-section {
       margin: 12px 16px 0;
       padding: 14px 14px 16px;
-      background: white; border-radius: 18px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+      background: var(--c-card); border-radius: 18px;
+      box-shadow: 0 2px 10px var(--c-shadow);
       animation: ic-in 0.25s cubic-bezier(0.34,1.4,0.64,1) both;
     }
     @keyframes ic-in {
@@ -411,26 +411,26 @@ type DashboardView = 'clients' | 'detail';
     }
 
     .section-header { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; }
-    .section-icon   { font-size: 18px; color: #888; font-variation-settings: 'FILL' 0, 'wght' 300; }
-    .section-title  { margin: 0; flex: 1; font-size: 14px; font-weight: 700; color: #555; letter-spacing: 0.2px; }
+    .section-icon   { font-size: 18px; color: var(--c-text-3); font-variation-settings: 'FILL' 0, 'wght' 300; }
+    .section-title  { margin: 0; flex: 1; font-size: 14px; font-weight: 700; color: var(--c-text-2); letter-spacing: 0.2px; }
     .icon-btn {
       width: 32px; height: 32px; border-radius: 50%; border: none;
-      background: transparent; cursor: pointer; color: #888;
+      background: transparent; cursor: pointer; color: var(--c-text-3);
       display: flex; align-items: center; justify-content: center;
       transition: background 0.15s; touch-action: manipulation;
       .material-symbols-outlined { font-size: 18px; }
-      &:hover { background: rgba(0,0,0,0.06); color: #555; }
+      &:hover { background: var(--c-hover); color: var(--c-text-2); }
     }
     .section-add { margin-left: 2px; }
 
     /* ── Invite panel ── */
-    .invite-panel { border: 2px solid rgba(0,104,116,0.18); }
-    .invite-desc  { margin: 0 0 12px; font-size: 13px; color: #666; line-height: 1.4; }
+    .invite-panel { border: 2px solid rgba(var(--c-brand-rgb), 0.22); }
+    .invite-desc  { margin: 0 0 12px; font-size: 13px; color: var(--c-text-2); line-height: 1.4; }
     .invite-code-row {
       display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
     }
     .invite-code {
-      font-size: 26px; font-weight: 800; letter-spacing: 4px; color: #006874;
+      font-size: 26px; font-weight: 800; letter-spacing: 4px; color: var(--c-brand);
       font-family: monospace;
     }
     .invite-link-row { display: flex; gap: 8px; }
@@ -440,21 +440,21 @@ type DashboardView = 'clients' | 'detail';
     .btn-primary {
       display: flex; align-items: center; gap: 6px; justify-content: center;
       padding: 9px 16px; border: none; border-radius: 10px;
-      background: #006874; color: white;
+      background: var(--c-brand); color: white;
       font-size: 13px; font-weight: 700; cursor: pointer;
       transition: background 0.15s; touch-action: manipulation;
       .material-symbols-outlined { font-size: 16px; }
-      &:hover:not(:disabled) { background: #005a63; }
+      &:hover:not(:disabled) { background: var(--c-brand-dk); }
       &:disabled { opacity: 0.5; cursor: default; }
     }
     .btn-secondary {
       display: flex; align-items: center; gap: 6px;
       padding: 8px 14px; border-radius: 10px;
-      border: 1.5px solid #e0e0e0; background: white; color: #555;
+      border: 1.5px solid var(--c-border); background: var(--c-card); color: var(--c-text-2);
       font-size: 13px; font-weight: 600; cursor: pointer;
       transition: all 0.15s; touch-action: manipulation;
       .material-symbols-outlined { font-size: 15px; }
-      &:hover { border-color: #bbb; color: #333; }
+      &:hover { border-color: var(--c-text-3); color: var(--c-text); }
     }
 
     /* ── Client chips ── */
@@ -467,36 +467,35 @@ type DashboardView = 'clients' | 'detail';
     .client-chip {
       display: flex; align-items: center; gap: 5px;
       padding: 7px 14px; border-radius: 20px;
-      border: 1.5px solid #e0e0e0; background: white;
-      font-size: 13px; font-weight: 600; color: #555;
+      border: 1.5px solid var(--c-border); background: var(--c-card);
+      font-size: 13px; font-weight: 600; color: var(--c-text-2);
       cursor: pointer; white-space: nowrap; touch-action: manipulation;
       transition: all 0.15s;
       .chip-icon { font-size: 15px; }
-      &:hover:not(.active) { border-color: #006874; color: #006874; }
-      &.active { background: #006874; border-color: #006874; color: white; }
+      &:hover:not(.active) { border-color: var(--c-brand); color: var(--c-brand); }
+      &.active { background: var(--c-brand); border-color: var(--c-brand); color: white; }
     }
 
     /* ── Client goals ── */
-    .goals-section { }
     .goals-section--empty { opacity: 0.7; }
     .goals-body { display: flex; flex-direction: column; gap: 8px; }
     .goal-pill {
       display: inline-flex; align-items: center; gap: 8px;
       padding: 8px 14px; border-radius: 12px;
-      background: rgba(0,104,116,0.08); border: 1.5px solid rgba(0,104,116,0.2);
+      background: rgba(var(--c-brand-rgb), 0.1); border: 1.5px solid rgba(var(--c-brand-rgb), 0.22);
       align-self: flex-start;
     }
     .goal-emoji { font-size: 20px; line-height: 1; }
-    .goal-label { font-size: 14px; font-weight: 700; color: #006874; }
+    .goal-label { font-size: 14px; font-weight: 700; color: var(--c-brand); }
     .goal-target {
       display: flex; align-items: center; gap: 7px;
-      font-size: 13px; font-weight: 600; color: #555;
+      font-size: 13px; font-weight: 600; color: var(--c-text-2);
     }
     .goal-target-icon {
-      font-size: 16px; color: #006874;
+      font-size: 16px; color: var(--c-brand);
       font-variation-settings: 'FILL' 0, 'wght' 300;
     }
-    .goal-none { margin: 0; font-size: 13px; color: #999; font-style: italic; }
+    .goal-none { margin: 0; font-size: 13px; color: var(--c-text-3); font-style: italic; }
 
     /* ── Week grid ── */
     .week-grid {
@@ -504,67 +503,67 @@ type DashboardView = 'clients' | 'detail';
     }
     .week-cell {
       display: flex; flex-direction: column; align-items: center; gap: 4px;
-      padding: 8px 4px; border-radius: 10px; border: 1.5px solid #efefef;
-      background: #fafafa; min-height: 68px; justify-content: center;
+      padding: 8px 4px; border-radius: 10px; border: 1.5px solid var(--c-border-2);
+      background: var(--c-subtle); min-height: 68px; justify-content: center;
       transition: all 0.15s;
-      &.has-proposal { border-color: rgba(0,104,116,0.3); background: rgba(0,104,116,0.04); }
+      &.has-proposal { border-color: rgba(var(--c-brand-rgb), 0.3); background: rgba(var(--c-brand-rgb), 0.06); }
     }
-    .week-label { font-size: 11px; font-weight: 700; color: #888; letter-spacing: 0.2px; }
+    .week-label { font-size: 11px; font-weight: 700; color: var(--c-text-3); letter-spacing: 0.2px; }
     .week-proposal { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-    .week-proposal-text { font-size: 10px; font-weight: 600; color: #006874; }
+    .week-proposal-text { font-size: 10px; font-weight: 600; color: var(--c-brand); }
     .week-remove {
       width: 20px; height: 20px; border-radius: 50%; border: none;
-      background: transparent; cursor: pointer; color: #ccc;
+      background: transparent; cursor: pointer; color: var(--c-border);
       display: flex; align-items: center; justify-content: center;
       touch-action: manipulation;
       .material-symbols-outlined { font-size: 13px; }
       &:hover { color: #ef5350; }
     }
     .week-add {
-      width: 24px; height: 24px; border-radius: 50%; border: 1.5px dashed #ccc;
-      background: transparent; cursor: pointer; color: #ccc;
+      width: 24px; height: 24px; border-radius: 50%; border: 1.5px dashed var(--c-border);
+      background: transparent; cursor: pointer; color: var(--c-text-3);
       display: flex; align-items: center; justify-content: center;
       touch-action: manipulation; transition: all 0.15s;
       .material-symbols-outlined { font-size: 15px; }
-      &:hover { border-color: #006874; color: #006874; }
+      &:hover { border-color: var(--c-brand); color: var(--c-brand); }
     }
 
     /* ── Item cards ── */
     .item-card {
       display: flex; align-items: center;
       margin-bottom: 6px;
-      border: 1.5px solid #efefef; border-radius: 14px;
-      background: white; overflow: hidden;
+      border: 1.5px solid var(--c-border-2); border-radius: 14px;
+      background: var(--c-card); overflow: hidden;
       transition: box-shadow 0.15s, border-color 0.15s;
-      &:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-color: #ddd; }
+      &:hover { box-shadow: 0 2px 8px var(--c-shadow); border-color: var(--c-border); }
     }
     .ic-bar  { width: 5px; align-self: stretch; flex-shrink: 0; }
     .ic-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 10px 10px; }
-    .ic-name   { font-size: 13px; font-weight: 700; color: #1a1a1a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .ic-detail { font-size: 11px; color: #999; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; &:empty { display: none; } }
+    .ic-name   { font-size: 13px; font-weight: 700; color: var(--c-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ic-detail { font-size: 11px; color: var(--c-text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; &:empty { display: none; } }
     .ic-action {
       width: 36px; height: 36px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
       border: none; background: transparent; cursor: pointer;
-      color: #ccc; touch-action: manipulation;
+      color: var(--c-text-3); touch-action: manipulation;
       transition: color 0.15s, background 0.15s;
       .material-symbols-outlined { font-size: 17px; }
-      &:hover { color: #666; background: rgba(0,0,0,0.04); }
-      &.ic-action--danger:hover { color: #ef5350; background: rgba(239,83,80,0.08); }
+      &:hover { color: var(--c-text-2); background: var(--c-hover); }
+      &.ic-action--danger:hover { color: #ef5350; background: rgba(239,83,80,0.1); }
       &:last-child { margin-right: 4px; }
     }
 
-    .empty-hint { margin: 8px 0 0; font-size: 13px; color: #999; text-align: center; padding: 12px 0 4px; }
+    .empty-hint { margin: 8px 0 0; font-size: 13px; color: var(--c-text-3); text-align: center; padding: 12px 0 4px; }
 
     /* ── Proposal form ── */
-    .proposal-form { border: 2px solid rgba(0,104,116,0.18); }
+    .proposal-form { border: 2px solid rgba(var(--c-brand-rgb), 0.22); }
     .form-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
-    .form-label { font-size: 12px; font-weight: 700; color: #888; letter-spacing: 0.3px; text-transform: uppercase; }
+    .form-label { font-size: 12px; font-weight: 700; color: var(--c-text-3); letter-spacing: 0.3px; text-transform: uppercase; }
     .form-input {
-      padding: 9px 12px; border: 1.5px solid #e0e0e0; border-radius: 10px;
-      font-size: 14px; color: #1a1a1a; background: white; outline: none;
+      padding: 9px 12px; border: 1.5px solid var(--c-border); border-radius: 10px;
+      font-size: 14px; color: var(--c-text); background: var(--c-subtle); outline: none;
       transition: border-color 0.15s;
-      &:focus { border-color: #006874; }
+      &:focus { border-color: var(--c-brand); }
     }
     .form-textarea { min-height: 72px; resize: vertical; font-family: inherit; }
 
@@ -582,12 +581,12 @@ type DashboardView = 'clients' | 'detail';
     /* ── Client workout history ── */
     .workout-card {
       margin-bottom: 10px; padding: 10px 12px;
-      border: 1.5px solid #efefef; border-radius: 14px;
+      border: 1.5px solid var(--c-border-2); border-radius: 14px;
       transition: border-color 0.15s;
-      &.from-proposal { border-color: rgba(0,104,116,0.3); }
+      &.from-proposal { border-color: rgba(var(--c-brand-rgb), 0.3); }
       &:last-child { margin-bottom: 0; }
     }
-    .workout-date { font-size: 12px; font-weight: 700; color: #888; margin-bottom: 6px; }
+    .workout-date { font-size: 12px; font-weight: 700; color: var(--c-text-3); margin-bottom: 6px; }
     .workout-body { display: flex; flex-direction: column; gap: 4px; }
     .workout-categories { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 2px; }
     .cat-chip {
@@ -595,22 +594,22 @@ type DashboardView = 'clients' | 'detail';
       &--push  { background: rgba(229,115,115,0.15); color: #c62828; }
       &--pull  { background: rgba(100,181,246,0.15); color: #1565c0; }
       &--legs  { background: rgba(129,199,132,0.15); color: #2e7d32; }
-      &--mixed { background: rgba(0,104,116,0.1);    color: #006874; }
+      &--mixed { background: rgba(var(--c-brand-rgb), 0.12); color: var(--c-brand); }
     }
     .workout-entry {
       display: flex; align-items: center; gap: 6px;
-      font-size: 12px; color: #555;
+      font-size: 12px; color: var(--c-text-2);
     }
-    .entry-name-text { flex: 1; font-weight: 600; color: #333; }
-    .entry-sets      { color: #999; font-size: 11px; }
+    .entry-name-text { flex: 1; font-weight: 600; color: var(--c-text); }
+    .entry-sets      { color: var(--c-text-3); font-size: 11px; }
     .entry-feeling   { font-size: 13px; }
     .workout-notes {
-      margin: 4px 0 0; font-size: 12px; color: #888; line-height: 1.4;
+      margin: 4px 0 0; font-size: 12px; color: var(--c-text-3); line-height: 1.4;
       font-style: italic;
     }
     .proposal-badge {
       display: inline-flex; align-items: center; gap: 4px;
-      margin-top: 4px; font-size: 11px; font-weight: 600; color: #006874;
+      margin-top: 4px; font-size: 11px; font-weight: 600; color: var(--c-brand);
       .material-symbols-outlined {
         font-size: 13px;
         font-variation-settings: 'FILL' 1;
@@ -620,14 +619,14 @@ type DashboardView = 'clients' | 'detail';
     /* ── Compliance grid ── */
     .compliance-legend {
       display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-      margin-bottom: 10px; font-size: 11px; color: #888;
+      margin-bottom: 10px; font-size: 11px; color: var(--c-text-3);
     }
     .legend-dot {
       width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
-      &--followed { background: #006874; }
+      &--followed { background: var(--c-brand); }
       &--own      { background: #f59e0b; }
       &--missed   { background: #ef5350; }
-      &--free     { background: #e0e0e0; }
+      &--free     { background: var(--c-border); }
     }
     .legend-label { margin-right: 6px; }
     .compliance-grid {
@@ -637,10 +636,10 @@ type DashboardView = 'clients' | 'detail';
     }
     .compliance-dot {
       aspect-ratio: 1; border-radius: 50%;
-      background: #f5f5f5;
+      background: var(--c-border-2);
       transition: transform 0.1s;
       &:hover { transform: scale(1.2); }
-      &--followed { background: #006874; }
+      &--followed { background: var(--c-brand); }
       &--own      { background: #f59e0b; }
       &--missed   { background: rgba(239,83,80,0.7); }
       &--free     { background: #c8e6c9; }
@@ -656,16 +655,16 @@ type DashboardView = 'clients' | 'detail';
       border-radius: 18px; touch-action: manipulation;
       transition: background 0.15s;
       .material-symbols-outlined { font-size: 18px; }
-      &:hover { background: rgba(239,83,80,0.06); }
+      &:hover { background: rgba(239,83,80,0.08); }
     }
 
     /* ── Empty state ── */
     .empty-state {
       display: flex; flex-direction: column; align-items: center; gap: 12px;
-      padding: 28px 16px; text-align: center; color: #888;
+      padding: 28px 16px; text-align: center; color: var(--c-text-3);
     }
     .empty-icon {
-      font-size: 48px; color: #d8d8d8;
+      font-size: 48px; color: var(--c-border);
       font-variation-settings: 'FILL' 0, 'wght' 200;
     }
     .empty-state p { margin: 0; font-size: 14px; font-weight: 500; }
@@ -674,7 +673,7 @@ type DashboardView = 'clients' | 'detail';
     /* ── Skeleton ── */
     .sk-line {
       border-radius: 8px;
-      background: linear-gradient(90deg, #f0f0f0 0%, #e8e8e8 40%, #f0f0f0 80%);
+      background: linear-gradient(90deg, var(--c-border-2) 0%, var(--c-border) 40%, var(--c-border-2) 80%);
       background-size: 600px 100%;
       animation: sk-shimmer 1.5s ease-in-out infinite;
     }

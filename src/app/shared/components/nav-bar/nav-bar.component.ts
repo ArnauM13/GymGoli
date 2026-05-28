@@ -113,7 +113,7 @@ export class NavBarComponent {
       { path: '/settings', icon: 'account_circle', label: 'Perfil' },
     ];
     if (this.trainerService.isTrainer()) {
-      base.splice(4, 0, { path: '/trainer', icon: 'sports', label: 'Clients' });
+      base.splice(2, 0, { path: '/trainer', icon: 'sports', label: 'Clients' });
     }
     return base;
   });
