@@ -2,7 +2,7 @@ import { Injectable, computed, effect, inject, signal } from '@angular/core';
 
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
-import { DEFAULT_USER_SETTINGS, FitnessGoal, UserSettings } from '../models/user-settings.model';
+import { DEFAULT_USER_SETTINGS, FitnessGoal, ThemeMode, UserSettings } from '../models/user-settings.model';
 
 @Injectable({ providedIn: 'root' })
 export class UserSettingsService {
@@ -11,6 +11,9 @@ export class UserSettingsService {
 
   private readonly _settings    = signal<UserSettings>(DEFAULT_USER_SETTINGS);
   private readonly _loaded      = signal(false);
+  private readonly _systemDark  = signal(
+    typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches,
+  );
 
   readonly settings            = this._settings.asReadonly();
   readonly loaded              = this._loaded.asReadonly();
@@ -19,12 +22,23 @@ export class UserSettingsService {
   readonly weeklyActivityGoal  = computed(() => this._settings().weeklyActivityGoal ?? null);
   readonly weeklyGymGoal       = computed(() => this._settings().weeklyGymGoal ?? null);
   readonly weeklySportGoal     = computed(() => this._settings().weeklySportGoal ?? null);
-  readonly darkMode            = computed(() => this._settings().darkMode);
+  readonly themeMode           = computed(() => this._settings().themeMode ?? 'system' as ThemeMode);
+  readonly darkMode            = computed(() => {
+    const mode = this.themeMode();
+    if (mode === 'dark')   return true;
+    if (mode === 'light')  return false;
+    return this._systemDark();
+  });
   readonly weightUnit          = computed(() => this._settings().weightUnit ?? 'kg');
   readonly restTimerSeconds    = computed(() => this._settings().restTimerSeconds ?? 90);
   readonly fitnessGoal         = computed(() => (this._settings().fitnessGoal ?? null) as FitnessGoal | null);
 
   constructor() {
+    if (typeof window !== 'undefined') {
+      window.matchMedia('(prefers-color-scheme: dark)')
+        .addEventListener('change', e => this._systemDark.set(e.matches));
+    }
+
     effect(() => {
       const uid = this.auth.uid();
       this._settings.set(DEFAULT_USER_SETTINGS);

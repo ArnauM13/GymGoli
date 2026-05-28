@@ -13,7 +13,7 @@ import { WorkoutService } from '../../core/services/workout.service';
 import { TrainerService } from '../../core/services/trainer.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import {
-  FitnessGoal, GoalMode, WeightUnit,
+  FitnessGoal, GoalMode, ThemeMode, WeightUnit,
   FITNESS_GOAL_EMOJIS, FITNESS_GOAL_LABELS, FITNESS_GOAL_WEEKLY_DEFAULTS,
 } from '../../core/models/user-settings.model';
 
@@ -209,16 +209,16 @@ import {
       <div class="section">
         <h2 class="section-title">Preferències</h2>
 
-        <div class="setting-row">
+        <div class="setting-row setting-row--top">
           <div class="setting-info">
-            <span class="setting-label">Mode fosc</span>
-            <span class="setting-desc">Redueix la llum de la pantalla per a un ús nocturn còmode.</span>
+            <span class="setting-label">Tema</span>
+            <span class="setting-desc">Clar, fosc, o automàtic segons el sistema.</span>
           </div>
-          <mat-slide-toggle
-            [checked]="settingsService.darkMode()"
-            (change)="toggleDarkMode()"
-            color="primary"
-          />
+          <div class="unit-toggle">
+            <button class="unit-btn" [class.unit-btn--active]="settingsService.themeMode() === 'light'"  (click)="setThemeMode('light')">Clar</button>
+            <button class="unit-btn" [class.unit-btn--active]="settingsService.themeMode() === 'system'" (click)="setThemeMode('system')">Auto</button>
+            <button class="unit-btn" [class.unit-btn--active]="settingsService.themeMode() === 'dark'"   (click)="setThemeMode('dark')">Fosc</button>
+          </div>
         </div>
 
         <div class="setting-row setting-row--top">
@@ -838,8 +838,8 @@ export class SettingsComponent {
     this.settingsService.update({ restTimerSeconds: secs });
   }
 
-  toggleDarkMode(): void {
-    this.settingsService.update({ darkMode: !this.settingsService.darkMode() });
+  setThemeMode(mode: ThemeMode): void {
+    this.settingsService.update({ themeMode: mode });
   }
 
   toggleMetrics(): void {
