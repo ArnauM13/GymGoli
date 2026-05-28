@@ -44,6 +44,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
             [maxWeight]="entryMaxWeight(entry)"
             [unit]="unit()"
             [feelingLevel]="entry.feeling"
+            [prBadge]="prExerciseIds().has(entry.exerciseId)"
             (headerClick)="toggleCollapse(entry.exerciseId)">
 
             <!-- ── Projected body content ──
@@ -133,7 +134,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                       <span class="we-set-num">{{ $index + 1 }}</span>
                       <div class="we-set-pills">
                         <span class="we-set-pill weight"
-                          [class.we-set-pill--pr]="prEntries().has(entry.exerciseId) && set.weight > 0 && set.weight === entryMaxWeight(entry)">
+                          [class.we-set-pill--pr]="prExerciseIds().has(entry.exerciseId) && set.weight > 0 && set.weight === entryMaxWeight(entry)">
                           {{ dispW(set.weight) }}<small>{{ unit() }}</small>
                         </span>
                         <span class="we-set-pill reps">{{ set.reps }}<small>r</small></span>
@@ -731,7 +732,20 @@ export class WorkoutEditorComponent implements OnDestroy {
   private _timerForExercise: string | null = null;
 
   // ── Personal Records ───────────────────────────────────────────────────────
-  readonly prEntries = signal<Set<string>>(new Set());
+  // Reactive computed: recalculates whenever workout entries or historical data change
+  readonly prExerciseIds = computed(() => {
+    const w = this.workout();
+    if (!w) return new Set<string>();
+    const ids = new Set<string>();
+    for (const entry of w.entries) {
+      if (entry.sets.length === 0) continue;
+      const maxInEntry = Math.max(...entry.sets.map(s => s.weight));
+      if (maxInEntry <= 0) continue;
+      const prevMax = this.workoutService.getAllTimeMaxWeight(entry.exerciseId, w.id);
+      if (prevMax > 0 && maxInEntry > prevMax) ids.add(entry.exerciseId);
+    }
+    return ids;
+  });
 
   readonly feelingLevels3: FeelingLevel[] = [1, 3, 5];
   readonly feelingLevels: FeelingLevel[]  = [1, 2, 3, 4, 5];
@@ -1020,11 +1034,6 @@ export class WorkoutEditorComponent implements OnDestroy {
     const sets = Array.from({ length: count }, () => ({ weight: weightKg, reps: reps! }));
     try {
       await this.workoutService.addSetsToEntry(w.id, exerciseId, sets);
-      // PR detection: compare against all historical data excluding this workout
-      const prevMax = this.workoutService.getAllTimeMaxWeight(exerciseId, w.id);
-      if (weightKg > prevMax) {
-        this.prEntries.update(s => new Set([...s, exerciseId]));
-      }
       // Start rest timer after logging sets
       const restSecs = this.settingsService.restTimerSeconds();
       if (restSecs > 0 && w.status !== 'planned') this.startRestTimer(restSecs, exerciseId);
