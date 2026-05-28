@@ -32,50 +32,6 @@ type DashboardView = 'clients' | 'detail';
         }
       </app-page-header>
 
-      <!-- ── Invite panel ──────────────────────────────────────────────── -->
-      @if (invitePanelOpen()) {
-        <div class="card-section invite-panel">
-          <div class="section-header">
-            <span class="material-symbols-outlined section-icon">link</span>
-            <h2 class="section-title">Convidar client</h2>
-            <button class="icon-btn" (click)="invitePanelOpen.set(false)" aria-label="Tancar">
-              <span class="material-symbols-outlined">close</span>
-            </button>
-          </div>
-
-          @if (trainerService.activeInvite(); as inv) {
-            <p class="invite-desc">Comparteix el codi o l'enllaç. Caduca als 7 dies.</p>
-            <div class="invite-code-row">
-              <span class="invite-code">{{ inv.code }}</span>
-              <button class="btn-secondary" (click)="copyCode(inv.code)">
-                <span class="material-symbols-outlined">content_copy</span>
-                Copia codi
-              </button>
-            </div>
-            <div class="invite-link-row">
-              <button class="btn-secondary invite-link-btn" (click)="copyLink(inv.token)">
-                <span class="material-symbols-outlined">share</span>
-                Copia enllaç
-              </button>
-              <button class="btn-secondary invite-link-btn" (click)="generateInvite()">
-                <span class="material-symbols-outlined">refresh</span>
-                Nou
-              </button>
-            </div>
-          } @else {
-            <p class="invite-desc">Genera un codi d'invitació per afegir clients.</p>
-            <button class="btn-primary" (click)="generateInvite()" [disabled]="generatingInvite()">
-              @if (generatingInvite()) {
-                <span class="material-symbols-outlined spin">sync</span>
-              } @else {
-                <span class="material-symbols-outlined">add</span>
-              }
-              Genera invitació
-            </button>
-          }
-        </div>
-      }
-
       <!-- ── No clients yet ────────────────────────────────────────────── -->
       @if (!trainerService.clientsLoaded()) {
         <div class="card-section">
@@ -381,6 +337,50 @@ type DashboardView = 'clients' | 'detail';
             </button>
           </div>
         }
+      }
+
+      <!-- ── Invite panel ──────────────────────────────────────────────── -->
+      @if (invitePanelOpen()) {
+        <div class="card-section invite-panel">
+          <div class="section-header">
+            <span class="material-symbols-outlined section-icon">link</span>
+            <h2 class="section-title">Convidar client</h2>
+            <button class="icon-btn" (click)="invitePanelOpen.set(false)" aria-label="Tancar">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+
+          @if (trainerService.activeInvite(); as inv) {
+            <p class="invite-desc">Comparteix el codi o l'enllaç. Caduca als 7 dies.</p>
+            <div class="invite-code-row">
+              <span class="invite-code">{{ inv.code }}</span>
+              <button class="btn-secondary" (click)="copyCode(inv.code)">
+                <span class="material-symbols-outlined">content_copy</span>
+                Copia codi
+              </button>
+            </div>
+            <div class="invite-link-row">
+              <button class="btn-secondary invite-link-btn" (click)="copyLink(inv.token)">
+                <span class="material-symbols-outlined">share</span>
+                Copia enllaç
+              </button>
+              <button class="btn-secondary invite-link-btn" (click)="generateInvite()">
+                <span class="material-symbols-outlined">refresh</span>
+                Nou
+              </button>
+            </div>
+          } @else {
+            <p class="invite-desc">Genera un codi d'invitació per afegir clients.</p>
+            <button class="btn-primary" (click)="generateInvite()" [disabled]="generatingInvite()">
+              @if (generatingInvite()) {
+                <span class="material-symbols-outlined spin">sync</span>
+              } @else {
+                <span class="material-symbols-outlined">add</span>
+              }
+              Genera invitació
+            </button>
+          }
+        </div>
       }
 
     </div>
