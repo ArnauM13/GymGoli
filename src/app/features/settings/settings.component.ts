@@ -7,7 +7,6 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { AuthService } from '../../core/services/auth.service';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { FitnessMetricsService } from '../../core/services/fitness-metrics.service';
-import { OfflineService } from '../../core/services/offline.service';
 import { SportService } from '../../core/services/sport.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
@@ -276,17 +275,6 @@ import {
           />
         </div>
 
-        <div class="setting-row setting-row--top">
-          <div class="setting-info">
-            <span class="setting-label">Mode sense connexió</span>
-            <span class="setting-desc">Força la vista mínima d'entrenament, sense xarxa ni sincronització activa.</span>
-          </div>
-          <mat-slide-toggle
-            [checked]="offlineService.forceOffline()"
-            (change)="offlineService.toggleForceOffline()"
-            color="primary"
-          />
-        </div>
       </div>
 
       <!-- ── Bloc 3: Mode entrenador ── -->
@@ -777,7 +765,6 @@ export class SettingsComponent {
   readonly authService     = inject(AuthService);
   readonly settingsService = inject(UserSettingsService);
   readonly metricsService  = inject(FitnessMetricsService);
-  readonly offlineService  = inject(OfflineService);
   readonly trainerService  = inject(TrainerService);
   private exerciseService  = inject(ExerciseService);
   private sportService     = inject(SportService);
