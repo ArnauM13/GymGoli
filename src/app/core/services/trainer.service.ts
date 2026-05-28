@@ -299,7 +299,7 @@ export class TrainerService {
     return (data ?? []).map(r => this._mapProposal(r));
   }
 
-  async createProposal(p: Omit<TrainerProposal, 'id' | 'trainerId' | 'createdAt'>): Promise<TrainerProposal> {
+  async createProposal(p: Omit<TrainerProposal, 'id' | 'trainerId' | 'createdAt' | 'status'>): Promise<TrainerProposal> {
     const uid = this.auth.uid();
     if (!uid) throw new Error('Not authenticated');
 

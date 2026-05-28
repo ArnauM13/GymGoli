@@ -49,7 +49,7 @@ export interface TrainerProposal {
   weekday:      number | null;    // 0 = Dl … 6 = Dg (weekly proposals)
   entries:      WorkoutEntry[];
   notes:        string | null;
-  status:       ProposalStatus;
+  status:       ProposalStatus;  // DB default: 'pending'
   createdAt:    Date;
 }
 
