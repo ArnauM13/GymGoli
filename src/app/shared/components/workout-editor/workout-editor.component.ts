@@ -367,6 +367,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     .we-entry-footer {
       display: flex; align-items: center; justify-content: flex-end; gap: 8px;
       padding: 10px 14px 14px; border-top: 1px solid var(--c-border-2);
+      background: color-mix(in srgb, var(--cat) 9%, var(--c-card));
     }
     .we-footer-stats-btn {
       width: 36px; height: 36px; border-radius: 10px;
