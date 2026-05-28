@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Confirma el teu registre — GymGoli</title>
+</head>
+<body style="margin:0;padding:0;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f7;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table width="100%" style="max-width:480px;" cellpadding="0" cellspacing="0">
+
+          <!-- Logo / cap de pàgina -->
+          <tr>
+            <td align="center" style="padding-bottom:24px;">
+              <span style="display:inline-block;background:#006874;color:#ffffff;font-size:22px;font-weight:800;letter-spacing:-0.5px;padding:10px 20px;border-radius:12px;">
+                GymGoli
+              </span>
+            </td>
+          </tr>
+
+          <!-- Targeta principal -->
+          <tr>
+            <td style="background:#ffffff;border-radius:16px;box-shadow:0 2px 8px rgba(0,0,0,0.08);overflow:hidden;">
+
+              <!-- Accent bar superior -->
+              <div style="height:5px;background:#006874;"></div>
+
+              <!-- Contingut -->
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="padding:32px 32px 8px;">
+                    <p style="margin:0 0 8px;font-size:22px;font-weight:700;color:#1a1a1a;letter-spacing:-0.2px;">
+                      Benvingut/da a GymGoli 👋
+                    </p>
+                    <p style="margin:0;font-size:14px;color:#555;line-height:1.5;">
+                      Ja gairebé hi ets. Confirma el teu correu electrònic per activar el compte i començar a entrenar.
+                    </p>
+                  </td>
+                </tr>
+
+                <!-- Botó de confirmació -->
+                <tr>
+                  <td style="padding:28px 32px;">
+                    <a href="{{ .ConfirmationURL }}"
+                       style="display:inline-block;background:#006874;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 28px;border-radius:10px;letter-spacing:0.1px;">
+                      Confirma el correu
+                    </a>
+                  </td>
+                </tr>
+
+                <!-- Nota d'expiració -->
+                <tr>
+                  <td style="padding:0 32px 28px;">
+                    <p style="margin:0;font-size:12px;color:#888;line-height:1.5;">
+                      L'enllaç caduca en 24 hores. Si no t'has registrat tu, pots ignorar aquest missatge.
+                    </p>
+                  </td>
+                </tr>
+
+                <!-- Divisor -->
+                <tr>
+                  <td style="padding:0 32px;">
+                    <div style="height:1px;background:#efefef;"></div>
+                  </td>
+                </tr>
+
+                <!-- URL de text per si el botó no funciona -->
+                <tr>
+                  <td style="padding:20px 32px 28px;">
+                    <p style="margin:0 0 6px;font-size:12px;color:#888;">
+                      Si el botó no funciona, copia aquest enllaç al navegador:
+                    </p>
+                    <p style="margin:0;font-size:11px;color:#006874;word-break:break-all;">
+                      {{ .ConfirmationURL }}
+                    </p>
+                  </td>
+                </tr>
+
+              </table>
+            </td>
+          </tr>
+
+          <!-- Peu de pàgina -->
+          <tr>
+            <td style="padding:20px 0 0;text-align:center;">
+              <p style="margin:0;font-size:11px;color:#999;">
+                Has rebut aquest correu perquè algú ha creat un compte a GymGoli amb aquesta adreça.<br/>
+                Si no ets tu, ignora'l.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>
