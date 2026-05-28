@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { Router, RouterOutlet } from '@angular/router';
 
@@ -20,19 +20,24 @@ import { OnboardingComponent } from './shared/components/onboarding/onboarding.c
       <app-onboarding (done)="onOnboardingDone()" />
     }
 
-    @if (offlineService.isOffline()) {
-      <div class="offline-banner" role="status" aria-live="polite">
-        <span class="material-symbols-outlined">wifi_off</span>
-        <span>Sense connexió · Mode offline</span>
-      </div>
-    }
-
       <main class="app-content">
         <router-outlet />
         @if (offlineService.isOffline() && !isTrainRoute()) {
           <div class="offline-page-overlay">
             <span class="material-symbols-outlined">wifi_off</span>
             <p>Disponible només amb connexió</p>
+          </div>
+        }
+        @if (showOfflineToast()) {
+          <div class="offline-toast" role="status" aria-live="polite">
+            <span class="offline-toast-icon material-symbols-outlined">wifi_off</span>
+            <div class="offline-toast-text">
+              <strong>Sense connexió</strong>
+              <span>Continua entrenant tranquil·lament — tot es guardarà i sincronitzarà quan tornis a tenir internet.</span>
+            </div>
+            <button class="offline-toast-close" (click)="dismissOfflineToast()" aria-label="Tancar">
+              <span class="material-symbols-outlined">close</span>
+            </button>
           </div>
         }
       </main>
@@ -52,13 +57,35 @@ import { OnboardingComponent } from './shared/components/onboarding/onboarding.c
       padding-top: env(safe-area-inset-top, 0);
     }
 
-    /* ── Offline banner ── */
-    .offline-banner {
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      padding: 9px 16px; flex-shrink: 0;
-      background: #455a64; color: white;
-      font-size: 13px; font-weight: 600; line-height: 1.3; text-align: center;
-      .material-symbols-outlined { font-size: 17px; flex-shrink: 0; }
+    /* ── Offline toast ── */
+    .offline-toast {
+      position: absolute; bottom: 16px; left: 16px; right: 16px;
+      display: flex; align-items: flex-start; gap: 12px;
+      background: #37474f; color: white;
+      border-radius: 16px; padding: 14px 12px 14px 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+      animation: toast-in 0.3s cubic-bezier(0.34, 1.15, 0.64, 1);
+      z-index: 100;
+    }
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .offline-toast-icon {
+      font-size: 22px; flex-shrink: 0; margin-top: 1px; opacity: 0.9;
+    }
+    .offline-toast-text {
+      flex: 1; display: flex; flex-direction: column; gap: 3px;
+      strong { font-size: 14px; font-weight: 700; }
+      span   { font-size: 13px; line-height: 1.5; opacity: 0.85; }
+    }
+    .offline-toast-close {
+      display: flex; align-items: center; justify-content: center;
+      width: 28px; height: 28px; flex-shrink: 0; margin-top: -2px;
+      border: none; background: transparent; color: white; opacity: 0.7;
+      cursor: pointer; border-radius: 50%; transition: opacity 0.15s;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { opacity: 1; }
     }
 
     .app-content {
@@ -102,6 +129,13 @@ export class AppComponent {
     return !!user && loaded && !settings.onboardingDone;
   });
 
+  private _toastDismissed = signal(false);
+  readonly showOfflineToast = computed(() =>
+    this.offlineService.isOffline() && !this._toastDismissed()
+  );
+
+  dismissOfflineToast(): void { this._toastDismissed.set(true); }
+
   isTrainRoute(): boolean {
     return this.router.url === '/train' || this.router.url.startsWith('/train?');
   }
@@ -121,6 +155,11 @@ export class AppComponent {
 
     effect(() => {
       this.doc.documentElement.classList.toggle('dark', this.settingsService.darkMode());
+    });
+
+    // Reset toast when connection is restored so it shows again next time offline
+    effect(() => {
+      if (!this.offlineService.isOffline()) this._toastDismissed.set(false);
     });
   }
 
