@@ -395,7 +395,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     /* ── Last session banner ── */
     .we-last-session-banner {
       display: flex; align-items: center; gap: 10px;
-      margin: 4px 14px 6px; padding: 20px 14px;
+      margin: 10px 14px; padding: 10px 14px;
       background: rgba(var(--c-brand-rgb), 0.07); border: 1px solid rgba(var(--c-brand-rgb), 0.15);
       border-radius: 10px; cursor: pointer; transition: background 0.15s;
       &:hover { background: rgba(var(--c-brand-rgb), 0.13); }
