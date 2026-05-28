@@ -17,7 +17,7 @@ import { ConfirmDialogService } from '../../shared/services/confirm-dialog.servi
 describe('SettingsComponent', () => {
   let component: SettingsComponent;
   let mockEnabled:       ReturnType<typeof signal<boolean>>;
-  let mockDarkMode:      ReturnType<typeof signal<boolean>>;
+  let mockThemeMode:     ReturnType<typeof signal<'light' | 'dark' | 'system'>>;
   let mockWeightUnit:    ReturnType<typeof signal<'kg' | 'lb'>>;
   let mockRestTimer:     ReturnType<typeof signal<number>>;
   let mockGoalMode:      ReturnType<typeof signal<'combined' | 'separate'>>;
@@ -33,7 +33,7 @@ describe('SettingsComponent', () => {
 
   beforeEach(async () => {
     mockEnabled    = signal(false);
-    mockDarkMode   = signal(false);
+    mockThemeMode  = signal<'light' | 'dark' | 'system'>('system');
     mockWeightUnit = signal<'kg' | 'lb'>('kg');
     mockRestTimer  = signal(90);
     mockGoalMode   = signal<'combined' | 'separate'>('combined');
@@ -54,7 +54,8 @@ describe('SettingsComponent', () => {
           provide: UserSettingsService,
           useValue: {
             metricsEnabled:     mockEnabled,
-            darkMode:           mockDarkMode,
+            themeMode:          mockThemeMode,
+            darkMode:           signal(false),
             weightUnit:         mockWeightUnit,
             restTimerSeconds:   mockRestTimer,
             goalMode:           mockGoalMode,
@@ -64,7 +65,7 @@ describe('SettingsComponent', () => {
             loaded:             signal(true),
             settings:           signal({
               metricsEnabled: false,
-              darkMode: false,
+              themeMode: 'system',
               weightUnit: 'kg',
               restTimerSeconds: 90,
               weeklyActivityGoal: null,
@@ -145,19 +146,22 @@ describe('SettingsComponent', () => {
     });
   });
 
-  // ── toggleDarkMode() ─────────────────────────────────────────────────────
+  // ── setThemeMode() ───────────────────────────────────────────────────────
 
-  describe('toggleDarkMode()', () => {
-    it('enables dark mode when currently disabled', () => {
-      mockDarkMode.set(false);
-      component.toggleDarkMode();
-      expect(mockUpdate).toHaveBeenCalledWith({ darkMode: true });
+  describe('setThemeMode()', () => {
+    it('sets theme to light', () => {
+      component.setThemeMode('light');
+      expect(mockUpdate).toHaveBeenCalledWith({ themeMode: 'light' });
     });
 
-    it('disables dark mode when currently enabled', () => {
-      mockDarkMode.set(true);
-      component.toggleDarkMode();
-      expect(mockUpdate).toHaveBeenCalledWith({ darkMode: false });
+    it('sets theme to dark', () => {
+      component.setThemeMode('dark');
+      expect(mockUpdate).toHaveBeenCalledWith({ themeMode: 'dark' });
+    });
+
+    it('sets theme to system', () => {
+      component.setThemeMode('system');
+      expect(mockUpdate).toHaveBeenCalledWith({ themeMode: 'system' });
     });
   });
 

@@ -1,5 +1,6 @@
 export type GoalMode = 'combined' | 'separate';
 export type WeightUnit = 'kg' | 'lb';
+export type ThemeMode = 'light' | 'dark' | 'system';
 export type FitnessGoal = 'strength' | 'fitness' | 'weight' | 'sport';
 
 export const FITNESS_GOAL_LABELS: Record<FitnessGoal, string> = {
@@ -29,7 +30,7 @@ export interface UserSettings {
   weeklyGymGoal: number | null;
   weeklySportGoal: number | null;
   goalMode: GoalMode;
-  darkMode: boolean;
+  themeMode: ThemeMode;
   weightUnit: WeightUnit;
   restTimerSeconds: number;
   onboardingDone: boolean;
@@ -42,7 +43,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   weeklyGymGoal: null,
   weeklySportGoal: null,
   goalMode: 'combined',
-  darkMode: false,
+  themeMode: 'system',
   weightUnit: 'kg',
   restTimerSeconds: 90,
   onboardingDone: false,

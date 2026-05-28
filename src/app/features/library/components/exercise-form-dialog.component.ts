@@ -36,9 +36,12 @@ const MUSCLE_GROUPS: { label: string; values: string[] }[] = [
         <div class="field">
           <label class="field-label" for="ex-name">Nom de l'exercici</label>
           <input id="ex-name" class="field-input" type="text" formControlName="name"
-                 placeholder="Ex: Press banca" autocomplete="off">
+                 placeholder="Ex: Press banca" autocomplete="off" maxlength="50">
           @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
             <span class="field-error">El nom és obligatori</span>
+          }
+          @if (form.get('name')?.hasError('maxlength')) {
+            <span class="field-error">El nom no pot superar els 50 caràcters</span>
           }
         </div>
 
@@ -337,7 +340,7 @@ export class ExerciseFormDialogComponent {
   });
 
   readonly form = this.fb.group({
-    name:        [this.data.exercise?.name ?? '', Validators.required],
+    name:        [this.data.exercise?.name ?? '', [Validators.required, Validators.maxLength(50)]],
     subcategory: [this.data.exercise?.subcategory ?? ''],
     description: [this.data.exercise?.description ?? ''],
     notes:       [this.data.exercise?.notes ?? ''],
