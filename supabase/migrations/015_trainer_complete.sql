@@ -2,8 +2,12 @@
 -- Tables: user_profiles, trainer_invites, trainer_clients, trainer_proposals
 -- Policies on: workouts, user_settings
 -- Functions: generate_trainer_invite, accept_trainer_invite, accept_trainer_invite_by_token
+--
+-- All tables are created first so cross-table policies don't fail with
+-- "relation does not exist". Policies are applied after all CREATE TABLEs.
 
--- ── user_profiles ──────────────────────────────────────────────────────────────
+-- ── Tables ─────────────────────────────────────────────────────────────────────
+
 CREATE TABLE IF NOT EXISTS user_profiles (
   id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id      uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -13,30 +17,6 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   UNIQUE (user_id)
 );
 
-ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "profiles_own"     ON user_profiles;
-DROP POLICY IF EXISTS "profiles_related" ON user_profiles;
-
-CREATE POLICY "profiles_own" ON user_profiles
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
-
--- Trainers and clients can read each other's profile (for display names)
-CREATE POLICY "profiles_related" ON user_profiles FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM trainer_clients tc
-      WHERE tc.status = 'active'
-        AND (
-          (tc.trainer_id = auth.uid() AND tc.client_id  = user_profiles.user_id)
-          OR
-          (tc.client_id  = auth.uid() AND tc.trainer_id = user_profiles.user_id)
-        )
-    )
-  );
-
--- ── trainer_invites ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS trainer_invites (
   id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   trainer_id uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -49,16 +29,6 @@ CREATE TABLE IF NOT EXISTS trainer_invites (
   UNIQUE (code)
 );
 
-ALTER TABLE trainer_invites ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "invites_trainer_all" ON trainer_invites;
-
-CREATE POLICY "invites_trainer_all" ON trainer_invites
-  FOR ALL
-  USING (auth.uid() = trainer_id)
-  WITH CHECK (auth.uid() = trainer_id);
-
--- ── trainer_clients ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS trainer_clients (
   id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   trainer_id uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -68,24 +38,6 @@ CREATE TABLE IF NOT EXISTS trainer_clients (
   UNIQUE (trainer_id, client_id)
 );
 
-ALTER TABLE trainer_clients ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "clients_trainer_all"    ON trainer_clients;
-DROP POLICY IF EXISTS "clients_client_select"  ON trainer_clients;
-DROP POLICY IF EXISTS "clients_client_update"  ON trainer_clients;
-
-CREATE POLICY "clients_trainer_all" ON trainer_clients
-  FOR ALL
-  USING (auth.uid() = trainer_id)
-  WITH CHECK (auth.uid() = trainer_id);
-
-CREATE POLICY "clients_client_select" ON trainer_clients
-  FOR SELECT USING (auth.uid() = client_id);
-
-CREATE POLICY "clients_client_update" ON trainer_clients
-  FOR UPDATE USING (auth.uid() = client_id);
-
--- ── trainer_proposals ──────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS trainer_proposals (
   id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   trainer_id    uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -104,7 +56,70 @@ CREATE TABLE IF NOT EXISTS trainer_proposals (
   )
 );
 
+-- ── Extend workouts ────────────────────────────────────────────────────────────
+
+ALTER TABLE workouts
+  ADD COLUMN IF NOT EXISTS source_proposal_id uuid
+    REFERENCES trainer_proposals(id) ON DELETE SET NULL;
+
+-- ── Enable RLS on new tables ───────────────────────────────────────────────────
+
+ALTER TABLE user_profiles    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE trainer_invites  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE trainer_clients  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trainer_proposals ENABLE ROW LEVEL SECURITY;
+
+-- ── user_profiles policies ─────────────────────────────────────────────────────
+
+DROP POLICY IF EXISTS "profiles_own"     ON user_profiles;
+DROP POLICY IF EXISTS "profiles_related" ON user_profiles;
+
+CREATE POLICY "profiles_own" ON user_profiles
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+-- Trainers and clients can read each other's profile (for display names).
+-- trainer_clients exists by this point so the subquery is valid.
+CREATE POLICY "profiles_related" ON user_profiles FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM trainer_clients tc
+      WHERE tc.status = 'active'
+        AND (
+          (tc.trainer_id = auth.uid() AND tc.client_id  = user_profiles.user_id)
+          OR
+          (tc.client_id  = auth.uid() AND tc.trainer_id = user_profiles.user_id)
+        )
+    )
+  );
+
+-- ── trainer_invites policies ───────────────────────────────────────────────────
+
+DROP POLICY IF EXISTS "invites_trainer_all" ON trainer_invites;
+
+CREATE POLICY "invites_trainer_all" ON trainer_invites
+  FOR ALL
+  USING (auth.uid() = trainer_id)
+  WITH CHECK (auth.uid() = trainer_id);
+
+-- ── trainer_clients policies ───────────────────────────────────────────────────
+
+DROP POLICY IF EXISTS "clients_trainer_all"   ON trainer_clients;
+DROP POLICY IF EXISTS "clients_client_select" ON trainer_clients;
+DROP POLICY IF EXISTS "clients_client_update" ON trainer_clients;
+
+CREATE POLICY "clients_trainer_all" ON trainer_clients
+  FOR ALL
+  USING (auth.uid() = trainer_id)
+  WITH CHECK (auth.uid() = trainer_id);
+
+CREATE POLICY "clients_client_select" ON trainer_clients
+  FOR SELECT USING (auth.uid() = client_id);
+
+CREATE POLICY "clients_client_update" ON trainer_clients
+  FOR UPDATE USING (auth.uid() = client_id);
+
+-- ── trainer_proposals policies ─────────────────────────────────────────────────
 
 DROP POLICY IF EXISTS "proposals_trainer_all"   ON trainer_proposals;
 DROP POLICY IF EXISTS "proposals_client_select" ON trainer_proposals;
@@ -122,12 +137,8 @@ CREATE POLICY "proposals_client_select" ON trainer_proposals
 CREATE POLICY "proposals_client_update" ON trainer_proposals
   FOR UPDATE USING (auth.uid() = client_id);
 
--- ── workouts: add source_proposal_id ──────────────────────────────────────────
-ALTER TABLE workouts
-  ADD COLUMN IF NOT EXISTS source_proposal_id uuid
-    REFERENCES trainer_proposals(id) ON DELETE SET NULL;
-
 -- ── workouts: trainer read policy ─────────────────────────────────────────────
+
 DROP POLICY IF EXISTS "workouts_trainer_read_clients" ON workouts;
 
 CREATE POLICY "workouts_trainer_read_clients" ON workouts FOR SELECT
@@ -140,7 +151,8 @@ CREATE POLICY "workouts_trainer_read_clients" ON workouts FOR SELECT
     )
   );
 
--- ── user_settings: trainer read policy ───────────────────────────────────────
+-- ── user_settings: trainer read policy ────────────────────────────────────────
+
 DROP POLICY IF EXISTS "trainer_read_client_settings" ON user_settings;
 
 CREATE POLICY "trainer_read_client_settings" ON user_settings FOR SELECT
@@ -199,8 +211,8 @@ DECLARE
 BEGIN
   SELECT * INTO v_invite
   FROM trainer_invites
-  WHERE code     = upper(p_code)
-    AND used_at  IS NULL
+  WHERE code      = upper(p_code)
+    AND used_at   IS NULL
     AND expires_at > now()
     AND client_id IS NULL;
 
@@ -226,7 +238,6 @@ BEGIN
   VALUES (v_invite.trainer_id, auth.uid(), 'active')
   ON CONFLICT (trainer_id, client_id) DO UPDATE SET status = 'active';
 
-  -- Ensure the client has a user_profile entry
   INSERT INTO user_profiles (user_id, role)
   VALUES (auth.uid(), 'user')
   ON CONFLICT (user_id) DO NOTHING;
@@ -245,8 +256,8 @@ DECLARE
 BEGIN
   SELECT * INTO v_invite
   FROM trainer_invites
-  WHERE token    = p_token
-    AND used_at  IS NULL
+  WHERE token     = p_token
+    AND used_at   IS NULL
     AND expires_at > now()
     AND client_id IS NULL;
 
@@ -272,7 +283,6 @@ BEGIN
   VALUES (v_invite.trainer_id, auth.uid(), 'active')
   ON CONFLICT (trainer_id, client_id) DO UPDATE SET status = 'active';
 
-  -- Ensure the client has a user_profile entry
   INSERT INTO user_profiles (user_id, role)
   VALUES (auth.uid(), 'user')
   ON CONFLICT (user_id) DO NOTHING;
