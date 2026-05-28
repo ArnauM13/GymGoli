@@ -73,7 +73,7 @@ export class WorkoutService {
 
   readonly exercisesWithData = computed((): Set<string> =>
     new Set(
-      this.workouts()
+      this.doneWorkouts()
         .flatMap(w => w.entries.filter(e => e.sets.length > 0).map(e => e.exerciseId))
     )
   );
@@ -238,7 +238,7 @@ export class WorkoutService {
   }
 
   getWorkoutsForExercise(exerciseId: string): Workout[] {
-    return this.workouts()
+    return this.doneWorkouts()
       .filter(w => w.entries.some(e => e.exerciseId === exerciseId))
       .sort((a, b) => a.date.localeCompare(b.date));
   }
