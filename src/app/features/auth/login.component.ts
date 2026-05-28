@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, HostListener, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -368,16 +368,27 @@ export class LoginComponent {
     }
   }
 
+  @HostListener('document:visibilitychange')
+  onVisibilityChange(): void {
+    // When the user returns after the OAuth SDK/browser opened externally without
+    // completing the flow, the page becomes visible again with the button stuck.
+    if (document.visibilityState === 'visible' && this.loadingGoogle()) {
+      this.loadingGoogle.set(false);
+    }
+  }
+
   async loginGoogle(): Promise<void> {
     this.loadingGoogle.set(true);
     try {
-      // This redirects the browser — no need to handle post-login here
       await this.authService.loginWithGoogle();
+      // On web the page navigates away so this line is never reached.
+      // On mobile/SDK flows the OAuth opens externally and the promise
+      // resolves immediately — reset so the user can retry if they come back.
+      this.loadingGoogle.set(false);
     } catch (err: unknown) {
       this.loadingGoogle.set(false);
       this.snackBar.open('Error en iniciar sessió amb Google', '', { duration: 3000 });
     }
-    // loadingGoogle stays true until redirect completes
   }
 
   private async _handlePostLogin(): Promise<void> {
