@@ -215,9 +215,9 @@ import {
             <span class="setting-desc">Clar, fosc, o automàtic segons el sistema.</span>
           </div>
           <div class="unit-toggle">
-            <button class="unit-btn" [class.unit-btn--active]="settingsService.themeMode() === 'light'"  (click)="setThemeMode('light')">Clar</button>
-            <button class="unit-btn" [class.unit-btn--active]="settingsService.themeMode() === 'system'" (click)="setThemeMode('system')">Auto</button>
-            <button class="unit-btn" [class.unit-btn--active]="settingsService.themeMode() === 'dark'"   (click)="setThemeMode('dark')">Fosc</button>
+            <button class="unit-btn" [class.unit-btn--active]="settingsService.themeMode() === 'light'"  (click)="setThemeMode('light')">☀️</button>
+            <button class="unit-btn" [class.unit-btn--active]="settingsService.themeMode() === 'system'" (click)="setThemeMode('system')">🌗</button>
+            <button class="unit-btn" [class.unit-btn--active]="settingsService.themeMode() === 'dark'"   (click)="setThemeMode('dark')">🌙</button>
           </div>
         </div>
 

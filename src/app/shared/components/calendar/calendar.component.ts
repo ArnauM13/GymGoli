@@ -2,6 +2,7 @@ import { Component, computed, effect, inject, input, output, signal, booleanAttr
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 import { WorkoutService } from '../../../core/services/workout.service';
+import { Workout } from '../../../core/models/workout.model';
 import { SportService } from '../../../core/services/sport.service';
 import { CATEGORY_COLORS, ExerciseCategory } from '../../../core/models/exercise.model';
 import {
@@ -528,9 +529,12 @@ export class CalendarComponent {
     const monday = this.weekStart();
     const today  = this.workoutService.todayDateString();
     const sel    = this.selectedDate() ?? this.dialogData?.selectedDate ?? null;
-    const doneByDate    = new Map(
-      this.workoutService.workouts().filter(w => (w.status ?? 'done') !== 'planned').map(w => [w.date, w])
-    );
+    const doneByDate    = new Map<string, Workout[]>();
+    for (const w of this.workoutService.workouts().filter(w => (w.status ?? 'done') !== 'planned')) {
+      const bucket = doneByDate.get(w.date) ?? [];
+      bucket.push(w);
+      doneByDate.set(w.date, bucket);
+    }
     const plannedByDate = this.workoutService.plannedByDate();
     const _s = this.sportService.sessions();
     const _p = this.sportService.sports();
@@ -539,14 +543,14 @@ export class CalendarComponent {
     for (let i = 0; i < 7; i++) {
       const dateStr       = addDays(monday, i);
       const d             = new Date(dateStr + 'T12:00:00');
-      const w             = doneByDate.get(dateStr);
+      const ws            = doneByDate.get(dateStr) ?? [];
       const planned       = plannedByDate.get(dateStr) ?? [];
       const sports        = this.sportService.getSportsForDate(dateStr);
       const plannedSports = this.sportService.getPlannedSportSessionsForDate(dateStr);
       days.push({
         date: dateStr, day: d.getDate(),
-        hasWorkout: !!w,
-        workoutCategories: w?.categories ?? (w?.category ? [w.category] : []),
+        hasWorkout: ws.length > 0,
+        workoutCategories: ws.flatMap(w => w.categories ?? (w.category ? [w.category] : [])),
         hasSport: sports.length > 0,
         sportColors: sports.map(s => s.color),
         sportIcons:  sports.map(s => s.icon),
@@ -568,9 +572,12 @@ export class CalendarComponent {
     const y = this.calYear(), m = this.calMonth();
     const today = this.workoutService.todayDateString();
     const sel   = this.selectedDate() ?? this.dialogData?.selectedDate ?? null;
-    const doneByDate    = new Map(
-      this.workoutService.workouts().filter(w => (w.status ?? 'done') !== 'planned').map(w => [w.date, w])
-    );
+    const doneByDate    = new Map<string, Workout[]>();
+    for (const w of this.workoutService.workouts().filter(w => (w.status ?? 'done') !== 'planned')) {
+      const bucket = doneByDate.get(w.date) ?? [];
+      bucket.push(w);
+      doneByDate.set(w.date, bucket);
+    }
     const plannedByDate = this.workoutService.plannedByDate();
     const _s = this.sportService.sessions();
     const _p = this.sportService.sports();
@@ -583,14 +590,14 @@ export class CalendarComponent {
     for (let i = 0; i < startPad; i++) cells.push(null);
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr       = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const w             = doneByDate.get(dateStr);
+      const ws            = doneByDate.get(dateStr) ?? [];
       const planned       = plannedByDate.get(dateStr) ?? [];
       const sports        = this.sportService.getSportsForDate(dateStr);
       const plannedSports = this.sportService.getPlannedSportSessionsForDate(dateStr);
       cells.push({
         date: dateStr, day: d,
-        hasWorkout: !!w,
-        workoutCategories: w?.categories ?? (w?.category ? [w.category] : []),
+        hasWorkout: ws.length > 0,
+        workoutCategories: ws.flatMap(w => w.categories ?? (w.category ? [w.category] : [])),
         hasSport: sports.length > 0,
         sportColors: sports.map(s => s.color),
         sportIcons:  sports.map(s => s.icon),
