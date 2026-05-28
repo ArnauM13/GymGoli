@@ -93,7 +93,8 @@ export const METRIC_CATALOGUE: SportMetricDef[] = [
     { value: 'empat',   label: 'Empat' },
     { value: 'perdut',  label: 'Perdut' },
   ]},
-  { key: 'goals',       label: 'Gols marcats',  type: 'number', min: 0, max: 20, step: 1 },
+  { key: 'goals',       label: 'Gols marcats',  type: 'number', min: 0, max: 20,  step: 1 },
+  { key: 'points',      label: 'Punts marcats', type: 'number', min: 0, max: 150, step: 1 },
   { key: 'sets_won',    label: 'Sets guanyats', type: 'number', min: 0, max: 4,  step: 1 },
   { key: 'sets_lost',   label: 'Sets perduts',  type: 'number', min: 0, max: 4,  step: 1 },
   { key: 'style_swim',  label: 'Estil',         type: 'select', options: [
@@ -150,5 +151,9 @@ export const DEFAULT_SPORTS: Pick<Sport, 'name' | 'icon' | 'color' | 'subtypes' 
   {
     name: 'Natació', icon: 'pool', color: '#00ACC1', subtypes: [],
     metricDefs: [_m('distance_m'), _m('style_swim'), _m('environment')],
+  },
+  {
+    name: 'Bàsquet', icon: 'sports_basketball', color: '#EF6C00', subtypes: [],
+    metricDefs: [_m('match_type'), _m('result'), _m('points')],
   },
 ];
