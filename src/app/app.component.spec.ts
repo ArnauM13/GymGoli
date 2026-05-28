@@ -6,6 +6,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { AppComponent } from './app.component';
 import { AuthService } from './core/services/auth.service';
+import { OfflineService } from './core/services/offline.service';
 import { UserSettingsService } from './core/services/user-settings.service';
 import { DEFAULT_USER_SETTINGS } from './core/models/user-settings.model';
 
@@ -98,25 +99,25 @@ describe('AppComponent', () => {
 
   describe('isOffline', () => {
     it('starts as false in the test environment (JSDOM is online)', () => {
-      const fixture = TestBed.createComponent(AppComponent);
-      const app = fixture.componentInstance;
+      TestBed.createComponent(AppComponent);
+      const offlineService = TestBed.inject(OfflineService);
       // JSDOM reports navigator.onLine as true by default
-      expect(app.isOffline()).toBeFalse();
+      expect(offlineService.isOffline()).toBeFalse();
     });
 
     it('becomes true when the offline event fires', () => {
-      const fixture = TestBed.createComponent(AppComponent);
-      const app = fixture.componentInstance;
+      TestBed.createComponent(AppComponent);
+      const offlineService = TestBed.inject(OfflineService);
       window.dispatchEvent(new Event('offline'));
-      expect(app.isOffline()).toBeTrue();
+      expect(offlineService.isOffline()).toBeTrue();
     });
 
     it('becomes false again when the online event fires', () => {
-      const fixture = TestBed.createComponent(AppComponent);
-      const app = fixture.componentInstance;
+      TestBed.createComponent(AppComponent);
+      const offlineService = TestBed.inject(OfflineService);
       window.dispatchEvent(new Event('offline'));
       window.dispatchEvent(new Event('online'));
-      expect(app.isOffline()).toBeFalse();
+      expect(offlineService.isOffline()).toBeFalse();
     });
   });
 });
