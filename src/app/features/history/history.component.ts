@@ -143,7 +143,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                     @if ((workout.categories ?? (workout.category ? [workout.category] : [])).length > 0) {
                       <div class="wh-badges">
                         @for (cat of (workout.categories ?? (workout.category ? [workout.category] : [])); track cat) {
-                          <span class="wh-badge" [style.background]="getCatColor(cat)">{{ getCatLabel(cat) }}</span>
+                          <span class="wh-badge wh-badge--{{ cat }}">{{ getCatLabel(cat) }}</span>
                         }
                         @if ((workout.categories ?? []).length > 1) {
                           <span class="wh-badge wh-badge--hybrid">Híbrid</span>
@@ -428,7 +428,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
       }
       .wh-day { font-size: 22px; font-weight: 800; color: var(--c-text); line-height: 1.1; }
       .wh-month {
-        font-size: 9px; color: var(--c-text-3);
+        font-size: 9px; color: var(--c-text-2);
         text-transform: uppercase; letter-spacing: 0.04em; margin-top: 1px;
       }
     }
@@ -440,12 +440,19 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
     .wh-badges { display: flex; flex-wrap: wrap; gap: 4px; }
     .wh-badge {
       display: inline-block; padding: 2px 8px; border-radius: 8px;
-      font-size: 10px; font-weight: 700; color: white; letter-spacing: 0.2px;
-      line-height: 1.4;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.2px; line-height: 1.4;
     }
+    .wh-badge--push  { background: rgba(229,115,115,0.15); color: #b71c1c; }
+    .wh-badge--pull  { background: rgba(100,181,246,0.15); color: #0d47a1; }
+    .wh-badge--legs  { background: rgba(129,199,132,0.15); color: #1b5e20; }
     .wh-badge--hybrid {
-      background: linear-gradient(90deg, #ef5350 0%, #9c27b0 50%, #2196f3 100%) !important;
+      background: linear-gradient(90deg, rgba(239,83,80,0.18) 0%, rgba(156,39,176,0.18) 50%, rgba(33,150,243,0.18) 100%);
+      color: var(--c-text-2);
     }
+    html.dark .wh-badge--push  { background: rgba(229,115,115,0.18); color: #ef9a9a; }
+    html.dark .wh-badge--pull  { background: rgba(100,181,246,0.18); color: #90caf9; }
+    html.dark .wh-badge--legs  { background: rgba(129,199,132,0.18); color: #a5d6a7; }
+    html.dark .wh-badge--hybrid { background: rgba(180,180,180,0.1); }
     .wh-exercises {
       font-size: 13px; font-weight: 700; color: var(--c-text);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -453,7 +460,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
     }
     .wh-stats {
       display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-      font-size: 11px; color: var(--c-text-3); font-weight: 500;
+      font-size: 11px; color: var(--c-text-2); font-weight: 500;
       margin-top: 1px;
     }
     .wh-stat {
