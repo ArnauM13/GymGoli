@@ -3,8 +3,8 @@ import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import {
-  ClientGoals, ClientStatus, ProposalType, TrainerClient, TrainerInvite,
-  TrainerProposal, UserProfile, UserRole,
+  ClientGoals, ClientStatus, ProposalStatus, ProposalType,
+  TrainerClient, TrainerInvite, TrainerProposal, UserProfile, UserRole,
 } from '../models/trainer.model';
 import { FitnessGoal, GoalMode } from '../models/user-settings.model';
 import { Workout } from '../models/workout.model';
@@ -299,7 +299,7 @@ export class TrainerService {
     return (data ?? []).map(r => this._mapProposal(r));
   }
 
-  async createProposal(p: Omit<TrainerProposal, 'id' | 'trainerId' | 'createdAt'>): Promise<TrainerProposal> {
+  async createProposal(p: Omit<TrainerProposal, 'id' | 'trainerId' | 'createdAt' | 'status'>): Promise<TrainerProposal> {
     const uid = this.auth.uid();
     if (!uid) throw new Error('Not authenticated');
 
@@ -346,6 +346,17 @@ export class TrainerService {
     if (error) throw error;
   }
 
+  async updateProposalStatus(id: string, status: ProposalStatus): Promise<void> {
+    const { error } = await this.supabase
+      .from('trainer_proposals')
+      .update({ status })
+      .eq('id', id);
+    if (error) throw error;
+    this._myProposals.update(list =>
+      list.map(p => p.id === id ? { ...p, status } : p)
+    );
+  }
+
   // ── Proposal helpers (client side) ───────────────────────────────────────
 
   getProposalForDate(date: string): TrainerProposal | null {
@@ -383,6 +394,7 @@ export class TrainerService {
       weekday:      r['weekday'] as number | null,
       entries:      (r['entries'] ?? []) as TrainerProposal['entries'],
       notes:        r['notes'] as string | null,
+      status:       (r['status'] as ProposalStatus | undefined) ?? 'pending',
       createdAt:    new Date(r['created_at'] as string),
     };
   }

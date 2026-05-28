@@ -3,6 +3,7 @@ import { FitnessGoal, GoalMode } from './user-settings.model';
 
 export type UserRole = 'user' | 'trainer';
 export type ProposalType = 'specific' | 'weekly';
+export type ProposalStatus = 'pending' | 'accepted' | 'rejected';
 export type ClientStatus = 'active' | 'removed';
 
 export const WEEKDAY_LABELS = ['Dl', 'Dm', 'Dc', 'Dj', 'Dv', 'Ds', 'Dg'] as const;
@@ -48,6 +49,7 @@ export interface TrainerProposal {
   weekday:      number | null;    // 0 = Dl … 6 = Dg (weekly proposals)
   entries:      WorkoutEntry[];
   notes:        string | null;
+  status:       ProposalStatus;  // DB default: 'pending'
   createdAt:    Date;
 }
 
