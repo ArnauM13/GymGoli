@@ -187,17 +187,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       } @else {
 
         <!-- ══ DASHBOARD MODE ══ -->
-        <app-page-header title="Entrenament">
-          <button class="ph-offline-btn"
-                  [class.ph-offline-btn--active]="offlineService.forceOffline()"
-                  (click)="offlineService.toggleForceOffline()"
-                  [attr.aria-label]="offlineService.forceOffline() ? 'Desactivar mode offline' : 'Activar mode offline'"
-                  [title]="offlineService.forceOffline() ? 'Mode sense connexió actiu' : 'Mode sense connexió'">
-            <span class="material-symbols-outlined">
-              {{ offlineService.forceOffline() ? 'wifi_off' : 'wifi' }}
-            </span>
-          </button>
-        </app-page-header>
+        <app-page-header title="Entrenament" />
 
         @if (!offlineService.isOffline()) {
           <div class="calendar-wrap">
@@ -733,19 +723,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
   `,
   styles: [`
     .page { padding: 0; }
-
-    /* ── Offline toggle button (dashboard header) ── */
-    .ph-offline-btn {
-      display: flex; align-items: center; justify-content: center;
-      width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
-      border: none; background: transparent; color: var(--c-text-3);
-      cursor: pointer; transition: color 0.15s, opacity 0.15s; touch-action: manipulation;
-      opacity: 0.35;
-      .material-symbols-outlined { font-size: 18px; }
-      &:hover { opacity: 0.65; }
-      &.ph-offline-btn--active { opacity: 1; color: #455a64; }
-      html.dark &.ph-offline-btn--active { color: #90a4ae; }
-    }
 
     /* ── Page header ── */
     .page-header--aw {

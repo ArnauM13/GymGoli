@@ -31,6 +31,11 @@ const SLIDES: OnboardingSlide[] = [
     body: 'Crea plantilles amb exercicis, sèries i repeticions. Guarda qualsevol entrenament com a plantilla i comença el següent en un tap.',
   },
   {
+    emoji: '📶',
+    title: 'Funciona sense connexió',
+    body: 'Entrena sense internet. Els canvis es guarden al dispositiu i es sincronitzen automàticament quan recuperis connexió.',
+  },
+  {
     emoji: '🎯',
     title: 'Personalitzat per a tu',
     body: 'Diga\'ns quin és el teu objectiu i l\'app t\'acompanyarà al teu ritme, sense alarmes ni pressions.',
