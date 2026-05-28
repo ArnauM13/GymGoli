@@ -8,6 +8,7 @@ import { CATEGORY_COLORS, CATEGORY_LABELS, SUBCATEGORY_LABELS } from '../../../c
 import { FEELING_EMOJI, FEELING_LABEL, FeelingLevel, Workout, WorkoutEntry, WorkoutSet } from '../../../core/models/workout.model';
 import { FitnessGoal, FITNESS_GOAL_LABELS } from '../../../core/models/user-settings.model';
 import { ExerciseService } from '../../../core/services/exercise.service';
+import { OfflineService } from '../../../core/services/offline.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component';
@@ -229,9 +230,11 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                 </button>
               }
               <div class="we-footer-actions">
-                <button class="we-footer-stats-btn" (click)="openStats(entry)">
-                  <span class="material-symbols-outlined">bar_chart</span>
-                </button>
+                @if (!offlineService.isOffline()) {
+                  <button class="we-footer-stats-btn" (click)="openStats(entry)">
+                    <span class="material-symbols-outlined">bar_chart</span>
+                  </button>
+                }
                 @if (alwaysEditable() || editMode()) {
                   <button class="we-footer-delete-btn" (click)="removeEntry(entry.exerciseId)">
                     <span class="material-symbols-outlined">delete</span>
@@ -703,6 +706,7 @@ export class WorkoutEditorComponent implements OnDestroy {
   private workoutService   = inject(WorkoutService);
   private exerciseService  = inject(ExerciseService);
   private settingsService  = inject(UserSettingsService);
+  readonly offlineService  = inject(OfflineService);
   private snackBar         = inject(MatSnackBar);
   private fb               = inject(FormBuilder);
   private dialog           = inject(MatDialog);

@@ -21,6 +21,7 @@ import { TemplateService } from '../../core/services/template.service';
 import { SportService } from '../../core/services/sport.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { WorkoutService } from '../../core/services/workout.service';
+import { OfflineService } from '../../core/services/offline.service';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
 import { FitnessInsightsComponent } from '../../shared/components/fitness-insights/fitness-insights.component';
@@ -142,10 +143,12 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         @if (workoutMenuOpen()) {
           <div class="aw-menu-backdrop" (click)="workoutMenuOpen.set(false)"></div>
           <div class="aw-menu-dropdown">
-            <button class="aw-menu-item" (click)="openSaveAsTemplate(w)">
-              <span class="material-symbols-outlined">bookmark_add</span>
-              Guardar com a plantilla
-            </button>
+            @if (!offlineService.isOffline()) {
+              <button class="aw-menu-item" (click)="openSaveAsTemplate(w)">
+                <span class="material-symbols-outlined">bookmark_add</span>
+                Guardar com a plantilla
+              </button>
+            }
             <button class="aw-menu-item aw-menu-item--danger" (click)="workoutMenuOpen.set(false); deleteActiveWorkout()">
               <span class="material-symbols-outlined">delete</span>
               Eliminar entrenament
@@ -186,14 +189,16 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         <!-- ══ DASHBOARD MODE ══ -->
         <app-page-header title="Entrenament" />
 
-        <div class="calendar-wrap">
-          <app-calendar
-            [allowFuturePlanning]="true"
-            [selectedDate]="selectedDate()"
-            (dateSelected)="selectedDate.set($event)"
-          />
-          <app-weekly-summary [weekDate]="selectedDate()" />
-        </div>
+        @if (!offlineService.isOffline()) {
+          <div class="calendar-wrap">
+            <app-calendar
+              [allowFuturePlanning]="true"
+              [selectedDate]="selectedDate()"
+              (dateSelected)="selectedDate.set($event)"
+            />
+            <app-weekly-summary [weekDate]="selectedDate()" />
+          </div>
+        }
 
         @if (isSelectedFuture()) {
           <div class="plan-pill">
@@ -244,7 +249,9 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
         @if ((!workoutService.isLoading() || dateWorkouts().length > 0) && !creating()) {
 
-          <app-fitness-insights />
+          @if (!offlineService.isOffline()) {
+            <app-fitness-insights />
+          }
 
           <!-- ── Trainer proposal card ── -->
           @if (activeProposal(); as prop) {
@@ -1558,6 +1565,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 export class TrainComponent {
   readonly workoutService  = inject(WorkoutService);
   readonly sportService    = inject(SportService);
+  readonly offlineService  = inject(OfflineService);
   readonly trainerService  = inject(TrainerService);
   private settingsService  = inject(UserSettingsService);
   private exerciseService  = inject(ExerciseService);

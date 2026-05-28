@@ -4,9 +4,10 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 import { ExerciseService } from './exercise.service';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
+import { SyncService } from './sync.service';
 import { FeelingLevel, PlannedSource, Workout, WorkoutEntry, WorkoutSet, WorkoutStatus } from '../models/workout.model';
 
-// ── Supabase row → typed Workout ────────────────────────────────────────────
+// ── Supabase row → typed Workout (snake_case keys) ──────────────────────────
 function toWorkout(row: Record<string, unknown>): Workout {
   return {
     id:               row['id'] as string,
@@ -23,11 +24,29 @@ function toWorkout(row: Record<string, unknown>): Workout {
   };
 }
 
+// ── localStorage cache row → typed Workout (camelCase keys) ─────────────────
+function workoutFromCache(raw: Record<string, unknown>): Workout {
+  return {
+    id:               raw['id'] as string,
+    date:             raw['date'] as string,
+    category:         (raw['category'] as string | undefined) ?? undefined,
+    categories:       (raw['categories'] as string[] | undefined) ?? [],
+    entries:          (raw['entries'] as WorkoutEntry[] | undefined) ?? [],
+    notes:            (raw['notes'] as string | undefined) ?? undefined,
+    feeling:          (raw['feeling'] as FeelingLevel | undefined) ?? undefined,
+    sourceProposalId: (raw['sourceProposalId'] as string | null | undefined) ?? undefined,
+    createdAt:        new Date(raw['createdAt'] as string),
+    status:           (raw['status'] as WorkoutStatus | undefined) ?? 'done',
+    plannedSource:    (raw['plannedSource'] as PlannedSource | undefined) ?? undefined,
+  };
+}
+
 @Injectable({ providedIn: 'root' })
 export class WorkoutService {
   private supabase        = inject(SupabaseService).client;
   private auth            = inject(AuthService);
   private exerciseService = inject(ExerciseService);
+  private syncService     = inject(SyncService);
 
   private readonly _todayStr = new Date().toISOString().split('T')[0];
 
@@ -118,10 +137,15 @@ export class WorkoutService {
       .eq('user_id', uid)
       .eq('date', this._todayStr);
 
-    const fresh = (data ?? []).map(r => toWorkout(r as Record<string, unknown>));
-    const key   = this._todayStr.substring(0, 7);
+    const fresh    = (data ?? []).map(r => toWorkout(r as Record<string, unknown>));
+    const key      = this._todayStr.substring(0, 7);
     const existing = (this._monthCache.get(key) ?? []).filter(w => w.date !== this._todayStr);
-    this._monthCache.set(key, [...fresh, ...existing]);
+    // Keep local dirty versions — don't overwrite unsent changes with stale server data
+    const dirtyIds = new Set(this.syncService.pendingIds());
+    const inCache  = this._monthCache.get(key) ?? [];
+    const dirtyLocal = inCache.filter(w => dirtyIds.has(w.id) && w.date === this._todayStr);
+    const freshClean = fresh.filter(w => !dirtyIds.has(w.id));
+    this._monthCache.set(key, [...freshClean, ...dirtyLocal, ...existing]);
     this._rebuildHistorical();
   }
 
@@ -139,9 +163,28 @@ export class WorkoutService {
     const key = this._monthKey(year, month);
     if (this._monthCache.has(key) || this._allLoaded) return;
 
-    // Mark as in-flight so concurrent calls skip the fetch.
-    this._monthCache.set(key, []);
-    this.isLoading.set(true);
+    const uid = this._uid();
+
+    // ── Step 1: serve from localStorage immediately (no spinner if cached) ──
+    const lsCached = this._readMonthFromStorage(uid, key);
+    const dirtySnaps = this.syncService.pendingIds()
+      .map(id => this.syncService.getSnapshot(id))
+      .filter((w): w is Workout => w !== null && w.date.substring(0, 7) === key);
+    const dirtyMap = new Map(dirtySnaps.map(w => [w.id, w]));
+
+    if (lsCached) {
+      const merged = lsCached.map(w => dirtyMap.get(w.id) ?? w);
+      for (const [id, snap] of dirtyMap) {
+        if (!lsCached.find(w => w.id === id)) merged.push(snap);
+      }
+      this._monthCache.set(key, merged);
+      this._rebuildHistorical();
+    } else {
+      this._monthCache.set(key, [...dirtySnaps]); // show locally-created offline workouts
+      this.isLoading.set(true);
+    }
+
+    // ── Step 2: background refresh from Supabase ────────────────────────────
     try {
       const start   = `${key}-01`;
       const lastDay = new Date(year, month + 1, 0).getDate();
@@ -150,18 +193,23 @@ export class WorkoutService {
       const { data } = await this.supabase
         .from('workouts')
         .select('*')
-        .eq('user_id', this._uid())
+        .eq('user_id', uid)
         .gte('date', start)
         .lte('date', end)
         .order('date', { ascending: false });
 
       const fetched  = (data ?? []).map(r => toWorkout(r as Record<string, unknown>));
-      // Preserve any workouts added locally while the fetch was in-flight.
-      const inFlight    = this._monthCache.get(key) ?? [];
-      const fetchedIds  = new Set(fetched.map(w => w.id));
-      const localOnly   = inFlight.filter(w => !fetchedIds.has(w.id));
-      this._monthCache.set(key, [...fetched, ...localOnly]);
+      const inFlight = this._monthCache.get(key) ?? [];
+      const freshDirtyIds = new Set(this.syncService.pendingIds());
+      const dirtyLocal    = inFlight.filter(w => freshDirtyIds.has(w.id));
+      const fetchedClean  = fetched.filter(w => !freshDirtyIds.has(w.id));
+      const localOnly     = inFlight.filter(w => !fetched.find(f => f.id === w.id) && !freshDirtyIds.has(w.id));
+      const final         = [...fetchedClean, ...dirtyLocal, ...localOnly];
+      this._monthCache.set(key, final);
       this._rebuildHistorical();
+      this._writeMonthToStorage(uid, key, fetched); // persist clean server data
+    } catch {
+      // Network failure — keep whatever we have from localStorage/local state
     } finally {
       this.isLoading.set(false);
     }
@@ -275,22 +323,20 @@ export class WorkoutService {
 
   // ── Create ───────────────────────────────────────────────────────────────
   async createWorkoutForDate(date: string, category?: string): Promise<string> {
-    const uid = this._uid();
-    const row: Record<string, unknown> = {
-      user_id: uid, date, entries: [], categories: category ? [category] : [],
+    const id         = crypto.randomUUID();
+    const newWorkout: Workout = {
+      id, date,
+      entries:    [],
+      categories: category ? [category] : [],
+      category,
+      createdAt:  new Date(),
+      status:     'done',
     };
-    if (category) row['category'] = category;
-
-    const { data, error } = await this.supabase.from('workouts').insert(row).select().single();
-    if (error) throw error;
-
-    const newWorkout = toWorkout(data as Record<string, unknown>);
-    const monthKey   = newWorkout.date.substring(0, 7);
-    const existing   = this._monthCache.get(monthKey) ?? [];
-    this._monthCache.set(monthKey, [newWorkout, ...existing]);
+    const monthKey = date.substring(0, 7);
+    this._monthCache.set(monthKey, [newWorkout, ...(this._monthCache.get(monthKey) ?? [])]);
     this._rebuildHistorical();
-
-    return data['id'] as string;
+    this.syncService.markDirty(id, newWorkout, true);
+    return id;
   }
 
   async createTodayWorkout(category?: string): Promise<string> {
@@ -298,62 +344,56 @@ export class WorkoutService {
   }
 
   async createWorkoutFromProposal(date: string, proposalId: string, entries: WorkoutEntry[]): Promise<string> {
-    const uid = this._uid();
-    const row: Record<string, unknown> = {
-      user_id:            uid,
-      date,
-      entries:            entries.map(e => ({ exerciseId: e.exerciseId, exerciseName: e.exerciseName, sets: [] })),
-      categories:         [],
-      source_proposal_id: proposalId,
+    const id         = crypto.randomUUID();
+    const newWorkout: Workout = {
+      id, date,
+      entries:         entries.map(e => ({ exerciseId: e.exerciseId, exerciseName: e.exerciseName, sets: [] })),
+      categories:      [],
+      sourceProposalId: proposalId,
+      createdAt:       new Date(),
+      status:          'done',
     };
-    const { data, error } = await this.supabase.from('workouts').insert(row).select().single();
-    if (error) throw error;
-    const newWorkout = toWorkout(data as Record<string, unknown>);
-    const monthKey   = newWorkout.date.substring(0, 7);
-    const existing   = this._monthCache.get(monthKey) ?? [];
-    this._monthCache.set(monthKey, [newWorkout, ...existing]);
+    const monthKey = date.substring(0, 7);
+    this._monthCache.set(monthKey, [newWorkout, ...(this._monthCache.get(monthKey) ?? [])]);
     this._rebuildHistorical();
-    return data['id'] as string;
+    this.syncService.markDirty(id, newWorkout, true);
+    return id;
   }
 
   async createPlannedWorkout(date: string, category?: string, entries: WorkoutEntry[] = []): Promise<string> {
-    const uid = this._uid();
-    const row: Record<string, unknown> = {
-      user_id: uid, date,
-      entries: entries.map(e => ({ exerciseId: e.exerciseId, exerciseName: e.exerciseName, sets: [] })),
-      categories: category ? [category] : [],
-      status: 'planned',
-      planned_source: 'self',
+    const id         = crypto.randomUUID();
+    const newWorkout: Workout = {
+      id, date,
+      entries:       entries.map(e => ({ exerciseId: e.exerciseId, exerciseName: e.exerciseName, sets: [] })),
+      categories:    category ? [category] : [],
+      category,
+      createdAt:     new Date(),
+      status:        'planned',
+      plannedSource: 'self',
     };
-    if (category) row['category'] = category;
-    const { data, error } = await this.supabase.from('workouts').insert(row).select().single();
-    if (error) throw error;
-    const newWorkout = toWorkout(data as Record<string, unknown>);
-    const monthKey = newWorkout.date.substring(0, 7);
-    const existing = this._monthCache.get(monthKey) ?? [];
-    this._monthCache.set(monthKey, [newWorkout, ...existing]);
+    const monthKey = date.substring(0, 7);
+    this._monthCache.set(monthKey, [newWorkout, ...(this._monthCache.get(monthKey) ?? [])]);
     this._rebuildHistorical();
-    return data['id'] as string;
+    this.syncService.markDirty(id, newWorkout, true);
+    return id;
   }
 
   async createPlannedFromProposal(date: string, proposalId: string, entries: WorkoutEntry[]): Promise<string> {
-    const uid = this._uid();
-    const row: Record<string, unknown> = {
-      user_id: uid, date,
-      entries: entries.map(e => ({ exerciseId: e.exerciseId, exerciseName: e.exerciseName, sets: [] })),
-      categories: [],
-      status: 'planned',
-      planned_source: 'trainer',
-      source_proposal_id: proposalId,
+    const id         = crypto.randomUUID();
+    const newWorkout: Workout = {
+      id, date,
+      entries:         entries.map(e => ({ exerciseId: e.exerciseId, exerciseName: e.exerciseName, sets: [] })),
+      categories:      [],
+      sourceProposalId: proposalId,
+      createdAt:       new Date(),
+      status:          'planned',
+      plannedSource:   'trainer',
     };
-    const { data, error } = await this.supabase.from('workouts').insert(row).select().single();
-    if (error) throw error;
-    const newWorkout = toWorkout(data as Record<string, unknown>);
-    const monthKey = newWorkout.date.substring(0, 7);
-    const existing = this._monthCache.get(monthKey) ?? [];
-    this._monthCache.set(monthKey, [newWorkout, ...existing]);
+    const monthKey = date.substring(0, 7);
+    this._monthCache.set(monthKey, [newWorkout, ...(this._monthCache.get(monthKey) ?? [])]);
     this._rebuildHistorical();
-    return data['id'] as string;
+    this.syncService.markDirty(id, newWorkout, true);
+    return id;
   }
 
   async startPlannedWorkout(workoutId: string): Promise<void> {
@@ -442,13 +482,16 @@ export class WorkoutService {
   }
 
   async deleteWorkout(id: string): Promise<void> {
+    const wasPendingInsert = this.syncService.isInsert(id);
+    this.syncService.cancelDirty(id);
+    this._removeFromCache(id);
+    if (wasPendingInsert) return; // never reached Supabase, nothing to delete
     const { error } = await this.supabase
       .from('workouts')
       .delete()
       .eq('id', id)
       .eq('user_id', this._uid());
     if (error) throw error;
-    this._removeFromCache(id);
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────
@@ -458,24 +501,10 @@ export class WorkoutService {
     return uid;
   }
 
-  private async _updateWorkout(id: string, changes: Partial<Workout>): Promise<void> {
-    const uid = this._uid();
-    const patch: Record<string, unknown> = {};
-    if (changes.entries        !== undefined) patch['entries']        = changes.entries;
-    if (changes.categories     !== undefined) patch['categories']     = changes.categories;
-    if (changes.category       !== undefined) patch['category']       = changes.category;
-    if (changes.notes          !== undefined) patch['notes']          = changes.notes;
-    if ('feeling' in changes) patch['feeling'] = changes.feeling ?? null;
-    if (changes.status         !== undefined) patch['status']         = changes.status;
-    if (changes.plannedSource  !== undefined) patch['planned_source'] = changes.plannedSource;
-
-    const { error } = await this.supabase
-      .from('workouts')
-      .update(patch)
-      .eq('id', id)
-      .eq('user_id', uid);
-    if (error) throw error;
+  private _updateWorkout(id: string, changes: Partial<Workout>): void {
     this._patch(id, changes);
+    const snap = this._find(id);
+    if (snap) this.syncService.markDirty(id, snap);
   }
 
   private _mergeCategories(existing: string[], newCat?: string): string[] {
@@ -527,5 +556,24 @@ export class WorkoutService {
         return;
       }
     }
+  }
+
+  // ── localStorage month cache ──────────────────────────────────────────────
+  private _lsMonthKey(uid: string, monthKey: string): string {
+    return `gymgoli_month_${uid}_${monthKey}`;
+  }
+
+  private _writeMonthToStorage(uid: string, monthKey: string, workouts: Workout[]): void {
+    try {
+      localStorage.setItem(this._lsMonthKey(uid, monthKey), JSON.stringify(workouts));
+    } catch { /* quota exceeded — non-fatal */ }
+  }
+
+  private _readMonthFromStorage(uid: string, monthKey: string): Workout[] | null {
+    try {
+      const raw = localStorage.getItem(this._lsMonthKey(uid, monthKey));
+      if (!raw) return null;
+      return (JSON.parse(raw) as Record<string, unknown>[]).map(workoutFromCache);
+    } catch { return null; }
   }
 }
