@@ -102,7 +102,7 @@ export const METRIC_CATALOGUE: SportMetricDef[] = [
     { value: 'brassa',    label: 'Braça' },
     { value: 'esquena',   label: 'Esquena' },
     { value: 'papallona', label: 'Papallona' },
-    { value: 'llure',     label: 'Lliure' },
+    { value: 'lliure',    label: 'Lliure' },
   ]},
   { key: 'environment', label: 'Entorn',          type: 'select', options: [
     { value: 'piscina', label: 'Piscina' },
