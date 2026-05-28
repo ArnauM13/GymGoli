@@ -266,6 +266,12 @@ import {
       &.is-future-plan:hover { opacity: 1; }
     }
 
+    /* In dark mode the brand teal (#00838f) on dark card (#1e1e1e) is only 3.68:1.
+       Use a lighter teal (#26c6da) that clears 4.5:1 on dark backgrounds. */
+    html.dark .cal-week-day.is-today:not(.is-selected) { color: #26c6da; }
+    html.dark .is-today:not(.is-selected) .week-dow { color: #26c6da; }
+    html.dark .is-today:not(.is-selected) .week-num { color: #26c6da; }
+
     .week-dow {
       font-size: 10px; font-weight: 600; color: var(--c-text-3);
       text-transform: uppercase; line-height: 1;

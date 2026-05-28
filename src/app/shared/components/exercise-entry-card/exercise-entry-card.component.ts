@@ -95,13 +95,13 @@ import { kgToDisplay } from '../../utils/weight.utils';
       flex: 1; min-width: 0;
       border-radius: 12px; overflow: hidden;
       border: 1.5px solid color-mix(in srgb, var(--cat) 25%, var(--c-border-2));
-      background: color-mix(in srgb, var(--cat) 5%, var(--c-card));
+      background: var(--c-card);
       box-shadow: 0 2px 8px var(--c-shadow);
       transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
     }
     .eec-card--open {
       border-color: color-mix(in srgb, var(--cat) 55%, var(--c-border));
-      background: color-mix(in srgb, var(--cat) 9%, var(--c-card));
+      background: var(--c-card);
       box-shadow: 0 3px 12px color-mix(in srgb, var(--cat) 18%, var(--c-shadow));
     }
     :host(.cdk-drag-preview) .eec-card {
@@ -114,6 +114,7 @@ import { kgToDisplay } from '../../utils/weight.utils';
       cursor: pointer; touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
       user-select: none;
+      background: color-mix(in srgb, var(--cat) 9%, var(--c-card));
     }
 
     .eec-bar {

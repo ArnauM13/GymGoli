@@ -98,21 +98,21 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                       <form [formGroup]="editSetForm" (ngSubmit)="saveEditSet()" class="we-inline-edit">
                         <div class="we-inline-inputs">
                           <div class="we-inline-group">
-                            <label>Pes</label>
+                            <label for="edit-weight">Pes</label>
                             <div class="we-number-input compact">
-                              <button type="button" (click)="adjustEditWeight(-1)">−</button>
-                              <input type="number" formControlName="weight" min="0" step="2.5"
+                              <button type="button" (click)="adjustEditWeight(-1)" aria-label="Menys pes">−</button>
+                              <input id="edit-weight" type="number" formControlName="weight" min="0" step="2.5"
                                      (focus)="$any($event.target).select()">
-                              <button type="button" (click)="adjustEditWeight(1)">+</button>
+                              <button type="button" (click)="adjustEditWeight(1)" aria-label="Més pes">+</button>
                             </div>
                           </div>
                           <div class="we-inline-group">
-                            <label>Reps</label>
+                            <label for="edit-reps">Reps</label>
                             <div class="we-number-input compact">
-                              <button type="button" (click)="adjustEditReps(-1)">−</button>
-                              <input type="number" formControlName="reps" min="1" step="1"
+                              <button type="button" (click)="adjustEditReps(-1)" aria-label="Menys repeticions">−</button>
+                              <input id="edit-reps" type="number" formControlName="reps" min="1" step="1"
                                      (focus)="$any($event.target).select()">
-                              <button type="button" (click)="adjustEditReps(1)">+</button>
+                              <button type="button" (click)="adjustEditReps(1)" aria-label="Més repeticions">+</button>
                             </div>
                           </div>
                         </div>
@@ -156,21 +156,21 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                 <form [formGroup]="setForm" class="we-set-form">
                   <div class="we-set-inputs">
                     <div class="we-input-group">
-                      <label>Pes ({{ unit() }})</label>
+                      <label for="add-weight">Pes ({{ unit() }})</label>
                       <div class="we-number-input">
-                        <button type="button" (click)="adjustWeight(-1)">−</button>
-                        <input type="number" formControlName="weight" min="0" step="2.5"
+                        <button type="button" (click)="adjustWeight(-1)" aria-label="Menys pes">−</button>
+                        <input id="add-weight" type="number" formControlName="weight" min="0" step="2.5"
                                (focus)="$any($event.target).select()">
-                        <button type="button" (click)="adjustWeight(1)">+</button>
+                        <button type="button" (click)="adjustWeight(1)" aria-label="Més pes">+</button>
                       </div>
                     </div>
                     <div class="we-input-group">
-                      <label>Repeticions</label>
+                      <label for="add-reps">Repeticions</label>
                       <div class="we-number-input">
-                        <button type="button" (click)="adjustReps(-1)">−</button>
-                        <input type="number" formControlName="reps" min="1" step="1"
+                        <button type="button" (click)="adjustReps(-1)" aria-label="Menys repeticions">−</button>
+                        <input id="add-reps" type="number" formControlName="reps" min="1" step="1"
                                (focus)="$any($event.target).select()">
-                        <button type="button" (click)="adjustReps(1)">+</button>
+                        <button type="button" (click)="adjustReps(1)" aria-label="Més repeticions">+</button>
                       </div>
                     </div>
                   </div>

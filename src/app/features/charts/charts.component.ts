@@ -116,9 +116,9 @@ interface ChartPoint {
 
       <!-- Exercise selector -->
       <div class="section">
-        <label class="select-label">Exercici</label>
+        <label class="select-label" for="exercise-select">Exercici</label>
         <div class="select-wrap">
-          <select class="exercise-select" [(ngModel)]="selectedExerciseId" (ngModelChange)="onExerciseChange()">
+          <select id="exercise-select" class="exercise-select" [(ngModel)]="selectedExerciseId" (ngModelChange)="onExerciseChange()">
             <option value="">Selecciona un exercici...</option>
             @for (group of exercisesByCategory(); track group.cat) {
               <optgroup [label]="group.label">
@@ -134,7 +134,7 @@ interface ChartPoint {
             </span>
           }
           @if (selectedExerciseId) {
-            <button class="clear-exercise-btn" (click)="clearExercise()" title="Canviar exercici">
+            <button class="clear-exercise-btn" (click)="clearExercise()" aria-label="Canviar exercici">
               <span class="material-symbols-outlined">close</span>
             </button>
           }
