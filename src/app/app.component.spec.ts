@@ -101,7 +101,6 @@ describe('AppComponent', () => {
     it('starts as false in the test environment (JSDOM is online)', () => {
       TestBed.createComponent(AppComponent);
       const offlineService = TestBed.inject(OfflineService);
-      // JSDOM reports navigator.onLine as true by default
       expect(offlineService.isOffline()).toBeFalse();
     });
 
