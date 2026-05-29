@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">GymGoli</string>
+    <string name="title_activity_main">GymGoli</string>
+    <string name="package_name">com.gymgoli.app</string>
+    <string name="custom_url_scheme">com.gymgoli.app</string>
+</resources>

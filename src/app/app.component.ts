@@ -1,8 +1,13 @@
 import { Component, computed, effect, inject } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { Router, RouterOutlet } from '@angular/router';
+import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
+import { StatusBar, Style } from '@capacitor/status-bar';
+import { SplashScreen } from '@capacitor/splash-screen';
 
 import { AuthService } from './core/services/auth.service';
+import { SupabaseService } from './core/services/supabase.service';
 import { UserSettingsService } from './core/services/user-settings.service';
 import { OfflineService } from './core/services/offline.service';
 import { NavBarComponent } from './shared/components/nav-bar/nav-bar.component';
@@ -76,6 +81,7 @@ export class AppComponent {
   readonly auth           = inject(AuthService);
   readonly offlineService = inject(OfflineService);
   private settingsService = inject(UserSettingsService);
+  private supabaseService = inject(SupabaseService);
   private router          = inject(Router);
   private doc             = inject(DOCUMENT);
 
@@ -104,7 +110,42 @@ export class AppComponent {
     });
 
     effect(() => {
-      this.doc.documentElement.classList.toggle('dark', this.settingsService.darkMode());
+      const isDark = this.settingsService.darkMode();
+      this.doc.documentElement.classList.toggle('dark', isDark);
+      if (Capacitor.isNativePlatform()) {
+        StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light }).catch(() => {});
+      }
+    });
+
+    if (Capacitor.isNativePlatform()) {
+      this.initNative();
+    }
+  }
+
+  private initNative(): void {
+    SplashScreen.hide({ fadeOutDuration: 300 }).catch(() => {});
+
+    // Handle deep links for OAuth callbacks (com.gymgoli.app://...)
+    App.addListener('appUrlOpen', ({ url }) => {
+      const uri = new URL(url);
+      // Supabase sends tokens as hash fragment: #access_token=...&refresh_token=...
+      if (uri.hash) {
+        const params = new URLSearchParams(uri.hash.replace('#', ''));
+        const accessToken  = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+        if (accessToken && refreshToken) {
+          this.supabaseService.client.auth
+            .setSession({ access_token: accessToken, refresh_token: refreshToken })
+            .then(() => this.router.navigateByUrl('/train'))
+            .catch(() => {});
+          return;
+        }
+        // Password recovery
+        const type = params.get('type');
+        if (type === 'recovery') {
+          this.router.navigateByUrl('/reset-password');
+        }
+      }
     });
   }
 

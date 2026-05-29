@@ -1,5 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Session, User } from '@supabase/supabase-js';
+import { Capacitor } from '@capacitor/core';
 
 import { environment } from '../../../environments/environment';
 import { SupabaseService } from './supabase.service';
@@ -60,11 +61,17 @@ export class AuthService {
     return this._user()?.email ?? '';
   }
 
+  private getRedirectBase(): string {
+    return Capacitor.isNativePlatform()
+      ? 'com.gymgoli.app://login-callback'
+      : `${window.location.origin}/`;
+  }
+
   async loginWithGoogle(): Promise<void> {
     const { error } = await this.supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/`,
+        redirectTo: this.getRedirectBase(),
       },
     });
     if (error) throw error;
@@ -85,8 +92,11 @@ export class AuthService {
   }
 
   async resetPasswordForEmail(email: string): Promise<void> {
+    const resetRedirect = Capacitor.isNativePlatform()
+      ? 'com.gymgoli.app://reset-password'
+      : `${window.location.origin}/reset-password`;
     const { error } = await this.supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: resetRedirect,
     });
     if (error) throw error;
   }

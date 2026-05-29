@@ -6,8 +6,11 @@
     "start": "ng serve",
     "build": "ng build",
     "build:ci": "node scripts/set-env.js && ng build",
+    "build:android": "node scripts/set-env.js && ng build && npx cap sync android",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "cap:sync": "npx cap sync",
+    "cap:open:android": "npx cap open android"
   },
   "private": true,
   "dependencies": {
@@ -21,6 +24,12 @@
     "@angular/platform-browser": "^19.0.0",
     "@angular/router": "^19.0.0",
     "@angular/service-worker": "^19.2.19",
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/core": "^8.3.4",
+    "@capacitor/keyboard": "^8.0.3",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.2",
     "@supabase/supabase-js": "^2.103.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
@@ -35,6 +44,7 @@
     "@angular/cli": "^19.0.0",
     "@angular/compiler-cli": "^19.0.0",
     "@angular/platform-browser-dynamic": "^19.2.19",
+    "@capacitor/cli": "^8.3.4",
     "@types/jasmine": "~5.1.0",
     "@types/uuid": "^9.0.8",
     "jasmine-core": "~5.1.0",
