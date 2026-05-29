@@ -131,14 +131,20 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                     <!-- Set row: tap to edit when entry is editable -->
                     <div class="we-set-row"
                          [class.we-set-row-tappable]="isEntryEditable(entry.exerciseId)"
-                         (click)="isEntryEditable(entry.exerciseId) && startEditSet(entry.exerciseId, $index, set)">
+                         (click)="isEntryEditable(entry.exerciseId) && startEditSet(entry.exerciseId, $index, set, 'weight')">
                       <span class="we-set-num">{{ $index + 1 }}</span>
                       <div class="we-set-pills">
                         <span class="we-set-pill weight"
-                          [class.we-set-pill--pr]="prExerciseIds().has(entry.exerciseId) && set.weight > 0 && set.weight === entryMaxWeight(entry)">
+                          [class.we-set-pill--pr]="prExerciseIds().has(entry.exerciseId) && set.weight > 0 && set.weight === entryMaxWeight(entry)"
+                          [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
+                          (click)="isEntryEditable(entry.exerciseId) && ($event.stopPropagation(), startEditSet(entry.exerciseId, $index, set, 'weight'))">
                           {{ dispW(set.weight) }}<small>{{ unit() }}</small>
                         </span>
-                        <span class="we-set-pill reps">{{ set.reps }}<small>r</small></span>
+                        <span class="we-set-pill reps"
+                          [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
+                          (click)="isEntryEditable(entry.exerciseId) && ($event.stopPropagation(), startEditSet(entry.exerciseId, $index, set, 'reps'))">
+                          {{ set.reps }}<small>r</small>
+                        </span>
                       </div>
                       @if (isEntryEditable(entry.exerciseId)) {
                         <button class="we-icon-btn-sm danger"
@@ -482,6 +488,11 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       small { font-size: 11px; font-weight: 500; opacity: 0.7; }
       &.weight { background: rgba(var(--c-brand-rgb), 0.1); color: var(--c-brand); }
       &.reps   { background: var(--c-border-2); color: var(--c-text-2); }
+      &.we-set-pill--tap {
+        cursor: pointer; transition: filter 0.12s;
+        &:hover { filter: brightness(0.93); }
+        &:active { filter: brightness(0.85); }
+      }
     }
 
     /* ── Icon buttons ── */
@@ -1004,10 +1015,15 @@ export class WorkoutEditorComponent implements OnDestroy {
     return es?.exerciseId === exerciseId && es?.index === index;
   }
 
-  startEditSet(exerciseId: string, index: number, set: WorkoutSet): void {
+  startEditSet(exerciseId: string, index: number, set: WorkoutSet, focus: 'weight' | 'reps' = 'weight'): void {
     this.addingFor.set(null);
     this.editingSet.set({ exerciseId, index });
     this.editSetForm.setValue({ weight: kgToDisplay(set.weight, this.unit()), reps: set.reps });
+    setTimeout(() => {
+      const el = document.getElementById(focus === 'weight' ? 'edit-weight' : 'edit-reps') as HTMLInputElement | null;
+      el?.focus();
+      el?.select();
+    }, 30);
   }
 
   cancelEditSet(): void { this.editingSet.set(null); }
