@@ -240,7 +240,10 @@ export class WorkoutService {
         .filter('entries::text', 'ilike', `%"exerciseId":"${exerciseId}"%`)
         .order('date', { ascending: true });
 
-      if (error) return;
+      if (error) {
+        this._exLoadedIds.add(exerciseId); // prevent retry storm on repeated Supabase errors
+        return;
+      }
 
       const fetched = (data ?? [])
         .map(r => toWorkout(r as Record<string, unknown>))
@@ -256,7 +259,9 @@ export class WorkoutService {
       }
       this._rebuildHistorical();
       this._exLoadedIds.add(exerciseId);
-    } catch { /* network failure — components handle the empty state */ }
+    } catch {
+      this._exLoadedIds.add(exerciseId); // prevent retry storm; will refresh on next app session
+    }
   }
 
   async loadAllWorkouts(): Promise<void> {
@@ -305,7 +310,10 @@ export class WorkoutService {
 
     if (category) q = q.contains('categories', [category]);
     if (date)     q = q.eq('date', date);
-    if (search)   q = q.filter('entries::text', 'ilike', `%${search}%`);
+    if (search) {
+      const escaped = search.replace(/%/g, '\\%').replace(/_/g, '\\_');
+      q = q.filter('entries::text', 'ilike', `%${escaped}%`);
+    }
 
     const { data, count, error } = await q.range(from, to);
     if (error) throw error;

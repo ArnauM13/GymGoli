@@ -547,6 +547,9 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
     this._selectedExerciseId.set(exerciseId);
     this.chart?.destroy();
     this.chart = null;
+    this.isLoadingExercise.set(true);
+    this.workoutService.loadWorkoutsForExercise(exerciseId)
+      .finally(() => this.isLoadingExercise.set(false));
   }
 
   clearExercise(): void {

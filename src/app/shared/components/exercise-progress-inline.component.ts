@@ -188,7 +188,7 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
       if (!id) return;
       this.isLoading.set(true);
       this.workoutService.loadWorkoutsForExercise(id)
-        .finally(() => this.isLoading.set(false));
+        .finally(() => { if (this.exerciseId() === id) this.isLoading.set(false); });
     });
 
     effect(() => {

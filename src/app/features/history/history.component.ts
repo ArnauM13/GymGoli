@@ -14,6 +14,7 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
+import { AuthService } from '../../core/services/auth.service';
 import { kgToDisplay } from '../../shared/utils/weight.utils';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
@@ -638,6 +639,7 @@ export class HistoryComponent implements OnDestroy {
   private exerciseService = inject(ExerciseService);
   private sportService    = inject(SportService);
   private settingsService = inject(UserSettingsService);
+  private authService     = inject(AuthService);
 
   readonly unit = this.settingsService.weightUnit;
   dispW(kg: number): number { return kgToDisplay(kg, this.unit()); }
@@ -679,9 +681,12 @@ export class HistoryComponent implements OnDestroy {
     this.exerciseService.ensureLoaded();
     this.sportService.ensureLoaded();
 
-    // Reload from page 0 whenever any filter or sort changes
+    // Reload from page 0 whenever any filter, sort, or auth state changes.
+    // Tracking uid() ensures the first load fires once auth resolves on cold start.
     effect(() => {
+      const uid = this.authService.uid();
       this.filterCat(); this.selectedDate(); this.searchQuery(); this.sortDesc();
+      if (!uid) return;
       this._resetAndLoad();
     });
 
