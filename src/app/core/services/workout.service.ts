@@ -56,6 +56,10 @@ export class WorkoutService {
   private _allLoaded = false;
   private _realtimeChannel: RealtimeChannel | null = null;
 
+  // Per-exercise load tracking (for progress/charts lazy loading)
+  private readonly _exLoadedIds      = new Set<string>();
+  private readonly _exLoadPromises   = new Map<string, Promise<void>>();
+
   readonly isLoading = signal(false);
 
   // ── Public signals ───────────────────────────────────────────────────────
@@ -107,6 +111,8 @@ export class WorkoutService {
       this._monthCache.clear();
       this._allLoaded = false;
       this._historical.set([]);
+      this._exLoadedIds.clear();
+      this._exLoadPromises.clear();
 
       if (uid) {
         this._subscribeToday(uid);
@@ -208,6 +214,49 @@ export class WorkoutService {
     } finally {
       this.isLoading.set(false);
     }
+  }
+
+  // Loads only the workouts that contain a specific exercise, merging them
+  // into the month cache so getWorkoutsForExercise() and exercisesWithData()
+  // stay consistent.
+  async loadWorkoutsForExercise(exerciseId: string): Promise<void> {
+    if (this._allLoaded || this._exLoadedIds.has(exerciseId)) return;
+    const inFlight = this._exLoadPromises.get(exerciseId);
+    if (inFlight) return inFlight;
+    const p = this._fetchForExercise(exerciseId).finally(() =>
+      this._exLoadPromises.delete(exerciseId)
+    );
+    this._exLoadPromises.set(exerciseId, p);
+    return p;
+  }
+
+  private async _fetchForExercise(exerciseId: string): Promise<void> {
+    try {
+      const { data, error } = await this.supabase
+        .from('workouts')
+        .select('*')
+        .eq('user_id', this._uid())
+        .neq('status', 'planned')
+        .filter('entries::text', 'ilike', `%"exerciseId":"${exerciseId}"%`)
+        .order('date', { ascending: true });
+
+      if (error) return;
+
+      const fetched = (data ?? [])
+        .map(r => toWorkout(r as Record<string, unknown>))
+        .filter(w => w.entries.some(e => e.exerciseId === exerciseId));
+
+      for (const w of fetched) {
+        const key    = w.date.substring(0, 7);
+        const bucket = this._monthCache.get(key) ?? [];
+        if (!bucket.find(x => x.id === w.id)) {
+          bucket.push(w);
+          this._monthCache.set(key, bucket);
+        }
+      }
+      this._rebuildHistorical();
+      this._exLoadedIds.add(exerciseId);
+    } catch { /* network failure — components handle the empty state */ }
   }
 
   async loadAllWorkouts(): Promise<void> {

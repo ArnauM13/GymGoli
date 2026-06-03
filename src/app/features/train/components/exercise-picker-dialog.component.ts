@@ -50,37 +50,49 @@ export interface ExercisePickerData {
       </div>
 
       <mat-dialog-content class="exercise-list">
-        @if (filtered().length === 0) {
-          <div class="empty">
-            <p class="empty-msg">Cap exercici trobat</p>
-            <button class="empty-create-btn" type="button" (click)="startCreate()">
-              <span class="material-symbols-outlined">add_circle</span>
-              Crear "{{ searchTerm || 'exercici nou' }}"
-            </button>
-          </div>
-        }
-        @for (ex of filtered(); track ex.id) {
-          <button class="exercise-item" (click)="select(ex)">
-            <span class="category-dot" [style.background]="getCategoryColor(ex.category)"></span>
-            <div class="info">
-              <span class="name">{{ ex.name }}</span>
-              @if (ex.muscles?.length || ex.setsRange) {
-                <div class="ex-meta">
-                  @if (ex.setsRange && ex.repsRange) {
-                    <span class="ex-guide">{{ formatRange(ex.setsRange) }} × {{ formatRange(ex.repsRange) }}</span>
-                  }
-                  @for (m of (ex.muscles ?? []); track m; let i = $index) {
-                    @if (i < 2) {
-                      <span class="ex-muscle">{{ getMuscleLabel(m) }}</span>
-                    }
-                  }
-                </div>
-              } @else if (ex.subcategory) {
-                <span class="sub">{{ getSubLabel(ex.subcategory) }} · {{ getCategoryLabel(ex.category) }}</span>
-              }
+        @if (!isLoaded()) {
+          @for (sk of skeletonRows; track sk) {
+            <div class="skeleton-item">
+              <div class="sk-dot"></div>
+              <div class="sk-info">
+                <div class="sk-line sk-name"></div>
+                <div class="sk-line sk-sub"></div>
+              </div>
             </div>
-            <span class="material-symbols-outlined arrow">chevron_right</span>
-          </button>
+          }
+        } @else {
+          @if (filtered().length === 0) {
+            <div class="empty">
+              <p class="empty-msg">Cap exercici trobat</p>
+              <button class="empty-create-btn" type="button" (click)="startCreate()">
+                <span class="material-symbols-outlined">add_circle</span>
+                Crear "{{ searchTerm || 'exercici nou' }}"
+              </button>
+            </div>
+          }
+          @for (ex of filtered(); track ex.id) {
+            <button class="exercise-item" (click)="select(ex)">
+              <span class="category-dot" [style.background]="getCategoryColor(ex.category)"></span>
+              <div class="info">
+                <span class="name">{{ ex.name }}</span>
+                @if (ex.muscles?.length || ex.setsRange) {
+                  <div class="ex-meta">
+                    @if (ex.setsRange && ex.repsRange) {
+                      <span class="ex-guide">{{ formatRange(ex.setsRange) }} × {{ formatRange(ex.repsRange) }}</span>
+                    }
+                    @for (m of (ex.muscles ?? []); track m; let i = $index) {
+                      @if (i < 2) {
+                        <span class="ex-muscle">{{ getMuscleLabel(m) }}</span>
+                      }
+                    }
+                  </div>
+                } @else if (ex.subcategory) {
+                  <span class="sub">{{ getSubLabel(ex.subcategory) }} · {{ getCategoryLabel(ex.category) }}</span>
+                }
+              </div>
+              <span class="material-symbols-outlined arrow">chevron_right</span>
+            </button>
+          }
         }
       </mat-dialog-content>
 
@@ -413,6 +425,24 @@ export interface ExercisePickerData {
 
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     .spin { animation: spin 1s linear infinite; }
+
+    /* ── Skeleton ── */
+    @keyframes sk-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .skeleton-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 24px;
+    }
+    .sk-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+      background: var(--c-border-2); animation: sk-pulse 1.4s ease-in-out infinite;
+    }
+    .sk-info { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+    .sk-line {
+      background: var(--c-border-2); border-radius: 6px;
+      animation: sk-pulse 1.4s ease-in-out infinite;
+    }
+    .sk-name { height: 13px; width: 55%; }
+    .sk-sub  { height: 10px; width: 35%; }
   `],
 })
 export class ExercisePickerDialogComponent {
@@ -420,6 +450,9 @@ export class ExercisePickerDialogComponent {
   private exerciseService = inject(ExerciseService);
   private snackBar        = inject(MatSnackBar);
   readonly data: ExercisePickerData = inject(MAT_DIALOG_DATA);
+
+  readonly isLoaded    = this.exerciseService.isLoaded;
+  readonly skeletonRows = [1, 2, 3, 4, 5];
 
   constructor() { this.exerciseService.ensureLoaded(); }
 

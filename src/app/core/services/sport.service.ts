@@ -43,7 +43,9 @@ export class SportService {
 
   // ── Sport definitions ────────────────────────────────────────────────────
   private readonly _sports = signal<Sport[]>([]);
-  readonly sports = this._sports.asReadonly();
+  readonly sports  = this._sports.asReadonly();
+  readonly isLoaded = signal(false);
+  private _loadPromise: Promise<void> | null = null;
 
   // ── Sessions cache ────────────────────────────────────────────────────────
   private readonly _monthCache = new Map<string, SportSession[]>();
@@ -69,11 +71,27 @@ export class SportService {
       this._sports.set([]);
       this._monthCache.clear();
       this._sessions.set([]);
+      this.isLoaded.set(false);
+      this._loadPromise = null;
       if (uid) {
-        this._loadSports(uid);
-        this._preloadCurrentMonth();
+        this._preloadCurrentMonth(); // sessions still preload eagerly
       }
     });
+  }
+
+  // ── Lazy initialisation — call once per feature that needs sport definitions
+  ensureLoaded(): Promise<void> {
+    if (this.isLoaded()) return Promise.resolve();
+    if (this._loadPromise)  return this._loadPromise;
+    this._loadPromise = this._initLoad().finally(() => { this._loadPromise = null; });
+    return this._loadPromise;
+  }
+
+  private async _initLoad(): Promise<void> {
+    const uid = this.auth.uid();
+    if (!uid) return;
+    await this._loadSports(uid);
+    this.isLoaded.set(true);
   }
 
   // ── Sport CRUD ────────────────────────────────────────────────────────────

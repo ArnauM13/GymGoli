@@ -677,6 +677,7 @@ export class HistoryComponent implements OnDestroy {
 
   constructor() {
     this.exerciseService.ensureLoaded();
+    this.sportService.ensureLoaded();
 
     // Reload from page 0 whenever any filter or sort changes
     effect(() => {

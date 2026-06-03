@@ -180,8 +180,16 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
     return { total: data.length, max, last, trend };
   });
 
+  readonly isLoading = signal(false);
+
   constructor() {
-    this.workoutService.loadAllWorkouts();
+    effect(() => {
+      const id = this.exerciseId();
+      if (!id) return;
+      this.isLoading.set(true);
+      this.workoutService.loadWorkoutsForExercise(id)
+        .finally(() => this.isLoading.set(false));
+    });
 
     effect(() => {
       const data   = this.chartData();
