@@ -783,6 +783,8 @@ export class WorkoutEditorComponent implements OnDestroy {
   });
 
   constructor() {
+    this.exerciseService.ensureLoaded();
+
     // Restore collapsed/done state; collapse all entries when first opening a template-loaded workout.
     effect(() => {
       const w = this.workout();

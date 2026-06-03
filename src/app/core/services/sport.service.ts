@@ -71,7 +71,7 @@ export class SportService {
       this._sessions.set([]);
       if (uid) {
         this._loadSports(uid);
-        this._preloadRecentMonths();
+        this._preloadCurrentMonth();
       }
     });
   }
@@ -148,11 +148,9 @@ export class SportService {
 
   // ── Sessions load ─────────────────────────────────────────────────────────
 
-  private _preloadRecentMonths(): void {
-    const now  = new Date();
+  private _preloadCurrentMonth(): void {
+    const now = new Date();
     this.ensureMonthLoaded(now.getFullYear(), now.getMonth());
-    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    this.ensureMonthLoaded(prev.getFullYear(), prev.getMonth());
   }
 
   async ensureMonthLoaded(year: number, month: number): Promise<void> {

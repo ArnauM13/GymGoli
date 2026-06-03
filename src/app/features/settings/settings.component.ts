@@ -956,7 +956,8 @@ export class SettingsComponent {
 
   // ── Data export ──────────────────────────────────────────────────────────
 
-  exportData(): void {
+  async exportData(): Promise<void> {
+    await this.exerciseService.ensureLoaded();
     const payload = {
       exportDate:   new Date().toISOString(),
       version:      1,

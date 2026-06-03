@@ -15,7 +15,6 @@ import {
   SUBCATEGORY_LABELS,
 } from '../../core/models/exercise.model';
 import { Sport } from '../../core/models/sport.model';
-import { AuthService } from '../../core/services/auth.service';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
 import { ExerciseFormDialogComponent } from './components/exercise-form-dialog.component';
@@ -398,10 +397,11 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 export class LibraryComponent {
   private exerciseService = inject(ExerciseService);
   private sportService    = inject(SportService);
-  private authService     = inject(AuthService);
   private dialog          = inject(MatDialog);
   private snackBar        = inject(MatSnackBar);
   private confirmDialog   = inject(ConfirmDialogService);
+
+  constructor() { this.exerciseService.ensureLoaded(); }
 
   readonly sports = this.sportService.sports;
 
@@ -492,8 +492,7 @@ export class LibraryComponent {
   }
 
   async seed(): Promise<void> {
-    const uid = this.authService.uid();
-    if (uid) await this.exerciseService.seedIfEmpty(uid);
+    await this.exerciseService.ensureLoaded();
     this.snackBar.open('Exercicis carregats', '', { duration: 2000 });
   }
 

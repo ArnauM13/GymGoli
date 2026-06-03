@@ -421,6 +421,8 @@ export class ExercisePickerDialogComponent {
   private snackBar        = inject(MatSnackBar);
   readonly data: ExercisePickerData = inject(MAT_DIALOG_DATA);
 
+  constructor() { this.exerciseService.ensureLoaded(); }
+
   // ── List mode ─────────────────────────────────────────────────────────────
 
   searchTerm = '';

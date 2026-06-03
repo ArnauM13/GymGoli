@@ -676,6 +676,8 @@ export class HistoryComponent implements OnDestroy {
   private _observer: IntersectionObserver | null = null;
 
   constructor() {
+    this.exerciseService.ensureLoaded();
+
     // Reload from page 0 whenever any filter or sort changes
     effect(() => {
       this.filterCat(); this.selectedDate(); this.searchQuery(); this.sortDesc();
