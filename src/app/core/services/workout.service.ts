@@ -244,20 +244,26 @@ export class WorkoutService {
     page: number;
     pageSize: number;
     category?: string;
+    date?: string;
+    search?: string;
     ascending?: boolean;
   }): Promise<{ workouts: Workout[]; total: number }> {
-    const { page, pageSize, category, ascending = false } = opts;
+    const { page, pageSize, category, date, search, ascending = false } = opts;
     const from = page * pageSize;
     const to   = from + pageSize - 1;
 
-    const base = this.supabase
+    let q = this.supabase
       .from('workouts')
       .select('*', { count: 'exact' })
       .eq('user_id', this._uid())
+      .neq('status', 'planned')
       .order('date', { ascending });
 
-    const q = category ? base.contains('categories', [category]) : base;
-    const { data, count, error } = await (q as typeof base).range(from, to);
+    if (category) q = q.contains('categories', [category]);
+    if (date)     q = q.eq('date', date);
+    if (search)   q = q.filter('entries::text', 'ilike', `%${search}%`);
+
+    const { data, count, error } = await q.range(from, to);
     if (error) throw error;
 
     return {
