@@ -776,7 +776,8 @@ export class HistoryComponent implements OnDestroy {
     const next = this.selectedDate() === date ? null : date;
     this.selectedDate.set(next);
     if (next) {
-      const found = this._items().find(w => w.date === date);
+      const found = this._items().find(w => w.date === date)
+                 ?? this.workoutService.getWorkoutForDate(date);
       this.expandedId.set(found?.id ?? null);
     } else {
       this.expandedId.set(null);

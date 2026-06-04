@@ -12,6 +12,7 @@ import { FitnessMetricsService } from '../../core/services/fitness-metrics.servi
 import { WorkoutService } from '../../core/services/workout.service';
 import { SportService } from '../../core/services/sport.service';
 import { ExerciseService } from '../../core/services/exercise.service';
+import { TrainerService } from '../../core/services/trainer.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 
 describe('SettingsComponent', () => {
@@ -62,6 +63,7 @@ describe('SettingsComponent', () => {
             weeklyActivityGoal: mockGoal,
             weeklyGymGoal:      mockGymGoal,
             weeklySportGoal:    mockSportGoal,
+            fitnessGoal:        signal(null),
             loaded:             signal(true),
             settings:           signal({
               metricsEnabled: false,
@@ -83,7 +85,7 @@ describe('SettingsComponent', () => {
         },
         {
           provide: AuthService,
-          useValue: { logout: mockLogout, deleteAccount: mockDeleteAccount },
+          useValue: { user: signal(null), logout: mockLogout, deleteAccount: mockDeleteAccount },
         },
         {
           provide: WorkoutService,
@@ -95,7 +97,7 @@ describe('SettingsComponent', () => {
         },
         {
           provide: ExerciseService,
-          useValue: { exercises: signal([]) },
+          useValue: { exercises: signal([]), ensureLoaded: jasmine.createSpy().and.resolveTo(undefined) },
         },
         {
           provide: Router,
@@ -104,6 +106,18 @@ describe('SettingsComponent', () => {
         {
           provide: MatSnackBar,
           useValue: { open: mockSnackBarOpen },
+        },
+        {
+          provide: TrainerService,
+          useValue: {
+            myTrainer:              signal(null),
+            activeInvite:           signal(null),
+            isTrainer:              jasmine.createSpy().and.returnValue(false),
+            hasTrainer:             jasmine.createSpy().and.returnValue(false),
+            activateTrainerMode:    jasmine.createSpy().and.resolveTo(undefined),
+            deactivateTrainerMode:  jasmine.createSpy().and.resolveTo(undefined),
+            loadActiveInvite:       jasmine.createSpy().and.resolveTo(undefined),
+          },
         },
         {
           provide: ConfirmDialogService,
@@ -440,32 +454,38 @@ describe('SettingsComponent', () => {
   // ── deleteAccount() ──────────────────────────────────────────────────────
 
   describe('deleteAccount()', () => {
+    let confirmSpy: jasmine.Spy;
+
+    beforeEach(() => {
+      confirmSpy = TestBed.inject(ConfirmDialogService).confirm as jasmine.Spy;
+    });
+
     it('does nothing when user cancels the confirm dialog', async () => {
-      spyOn(window, 'confirm').and.returnValue(false);
+      confirmSpy.and.resolveTo(false);
       await component.deleteAccount();
       expect(mockDeleteAccount).not.toHaveBeenCalled();
     });
 
     it('calls authService.deleteAccount() when user confirms', async () => {
-      spyOn(window, 'confirm').and.returnValue(true);
+      confirmSpy.and.resolveTo(true);
       await component.deleteAccount();
       expect(mockDeleteAccount).toHaveBeenCalled();
     });
 
     it('navigates to /login after successful deletion', async () => {
-      spyOn(window, 'confirm').and.returnValue(true);
+      confirmSpy.and.resolveTo(true);
       await component.deleteAccount();
       expect(mockNavigate).toHaveBeenCalledWith(['/login']);
     });
 
     it('resets deletingAccount to false after success', async () => {
-      spyOn(window, 'confirm').and.returnValue(true);
+      confirmSpy.and.resolveTo(true);
       await component.deleteAccount();
       expect(component.deletingAccount()).toBeFalse();
     });
 
     it('shows snackbar and resets flag on error', async () => {
-      spyOn(window, 'confirm').and.returnValue(true);
+      confirmSpy.and.resolveTo(true);
       mockDeleteAccount.and.returnValue(Promise.reject(new Error('fail')));
       await component.deleteAccount();
       expect(mockSnackBarOpen).toHaveBeenCalled();
@@ -486,19 +506,19 @@ describe('SettingsComponent', () => {
       spyOn(URL, 'revokeObjectURL');
     });
 
-    it('triggers a file download', () => {
-      component.exportData();
+    it('triggers a file download', async () => {
+      await component.exportData();
       expect(mockAnchor.click).toHaveBeenCalled();
     });
 
-    it('sets a .json filename with today\'s date', () => {
-      component.exportData();
+    it('sets a .json filename with today\'s date', async () => {
+      await component.exportData();
       expect(mockAnchor.download).toMatch(/^gymgoli-\d{4}-\d{2}-\d{2}\.json$/);
     });
 
-    it('creates a JSON blob with the expected top-level keys', () => {
+    it('creates a JSON blob with the expected top-level keys', async () => {
       const blobSpy = spyOn(window, 'Blob').and.callThrough();
-      component.exportData();
+      await component.exportData();
       const [args] = blobSpy.calls.mostRecent().args as [BlobPart[], BlobPropertyBag];
       const parsed = JSON.parse(args[0] as string);
       expect(parsed).toEqual(jasmine.objectContaining({
@@ -512,8 +532,8 @@ describe('SettingsComponent', () => {
       }));
     });
 
-    it('revokes the object URL after download', () => {
-      component.exportData();
+    it('revokes the object URL after download', async () => {
+      await component.exportData();
       expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:fake-url');
     });
   });
