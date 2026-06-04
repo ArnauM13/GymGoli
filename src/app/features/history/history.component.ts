@@ -1,16 +1,25 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import {
+  Component, computed, effect, ElementRef, inject,
+  OnDestroy, signal, viewChild,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, SUBCATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
+import {
+  CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, SUBCATEGORY_LABELS,
+  ExerciseCategory,
+} from '../../core/models/exercise.model';
 import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry, WorkoutSet } from '../../core/models/workout.model';
 import { Sport, SportSubtype } from '../../core/models/sport.model';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
+import { AuthService } from '../../core/services/auth.service';
 import { kgToDisplay } from '../../shared/utils/weight.utils';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+
+const PAGE_SIZE = 20;
 
 @Component({
   selector: 'app-history',
@@ -40,36 +49,36 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
         </div>
       </div>
 
-      @if (isLoading() && allWorkouts().length === 0) {
-          <!-- ── Skeleton (initial data load) ── -->
-          <div class="sk-list">
-            @for (_ of [1,2,3,4,5]; track $index) {
-              <div class="sk-workout-card">
-                <div class="sk sk-stripe"></div>
-                <div class="sk-card-row">
-                  <div class="sk-date">
-                    <div class="sk sk-day"></div>
-                    <div class="sk sk-month"></div>
-                  </div>
-                  <div class="sk-summary">
-                    <div class="sk sk-badge"></div>
-                    <div class="sk sk-text"></div>
-                  </div>
-                  <div class="sk sk-chevron-ph"></div>
+      @if (isInitialLoading()) {
+        <!-- ── Skeleton (primer càrrega) ── -->
+        <div class="sk-list">
+          @for (_ of [1,2,3,4,5]; track $index) {
+            <div class="sk-workout-card">
+              <div class="sk sk-stripe"></div>
+              <div class="sk-card-row">
+                <div class="sk-date">
+                  <div class="sk sk-day"></div>
+                  <div class="sk sk-month"></div>
                 </div>
+                <div class="sk-summary">
+                  <div class="sk sk-badge"></div>
+                  <div class="sk sk-text"></div>
+                </div>
+                <div class="sk sk-chevron-ph"></div>
               </div>
-            }
-          </div>
-        } @else {
+            </div>
+          }
+        </div>
+      } @else {
 
         <!-- ── Cerca ── -->
         <div class="search-wrap">
           <span class="material-symbols-outlined search-icon">search</span>
-          <input class="search-input" type="search" [(ngModel)]="searchQueryValue"
+          <input class="search-input" type="search" [(ngModel)]="searchInputValue"
                  placeholder="Cerca per exercici..." autocomplete="off"
                  aria-label="Cerca per exercici">
           @if (searchQuery()) {
-            <button class="search-clear" (click)="searchQuery.set('')" aria-label="Esborrar cerca">
+            <button class="search-clear" (click)="clearSearch()" aria-label="Esborrar cerca">
               <span class="material-symbols-outlined">close</span>
             </button>
           }
@@ -77,7 +86,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 
         <!-- ── Filtres i ordenació ── -->
         <div class="filter-bar">
-          <button class="sort-btn" (click)="sortDesc.set(!sortDesc())" aria-label="Canviar ordre">
+          <button class="sort-btn" (click)="toggleSort()" aria-label="Canviar ordre">
             <span class="material-symbols-outlined">{{ sortDesc() ? 'arrow_downward' : 'arrow_upward' }}</span>
           </button>
           <div class="filter-divider"></div>
@@ -90,14 +99,14 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
             <div class="filter-divider"></div>
           }
           <button class="filter-icon" [class.active]="filterCat() === null"
-                  (click)="filterCat.set(null)" aria-label="Tots" title="Tots">
+                  (click)="setCategory(null)" aria-label="Tots" title="Tots">
             <span class="material-symbols-outlined">apps</span>
           </button>
           @for (cat of ['push','pull','legs']; track cat) {
             <button class="filter-icon" [class.active]="filterCat() === cat"
                     [style.--cat]="getCatColor(cat)"
                     [attr.aria-label]="getCatLabel(cat)" [attr.title]="getCatLabel(cat)"
-                    (click)="filterCat.set(filterCat() === cat ? null : cat)">
+                    (click)="setCategory(filterCat() === cat ? null : cat)">
               <span class="material-symbols-outlined">{{ getCatIcon(cat) }}</span>
             </button>
           }
@@ -124,9 +133,9 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
           </div>
         }
 
-        @if (filteredWorkouts().length > 0) {
+        @if (items().length > 0) {
           <div class="workout-list-wrap">
-            @for (workout of filteredWorkouts(); track workout.id) {
+            @for (workout of items(); track workout.id) {
               <div class="workout-card" [class.expanded]="expandedId() === workout.id"
                    [style.--wc]="getWorkoutPrimaryColor(workout)">
 
@@ -231,21 +240,52 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
               </div>
             }
           </div>
-        } @else if (allWorkouts().length > 0) {
-          <!-- Filtre actiu sense resultats -->
-          <div class="filter-empty">
-            <span class="material-symbols-outlined">filter_list_off</span>
-            <p>Cap entrenament amb aquest filtre</p>
-          </div>
-        } @else {
-          <div class="empty-state">
-            <span class="material-symbols-outlined empty-icon">calendar_month</span>
-            <h2>Cap entrenament</h2>
-            <p>Encara no hi ha cap entrenament registrat</p>
-          </div>
+
+          <!-- ── Sentinel per a l'infinite scroll ── -->
+          <div #sentinel class="scroll-sentinel"></div>
+
+          <!-- ── Skeleton de "carregant més" ── -->
+          @if (isLoadingMore()) {
+            <div class="load-more-sk">
+              @for (_ of [1,2,3]; track $index) {
+                <div class="sk-workout-card">
+                  <div class="sk sk-stripe"></div>
+                  <div class="sk-card-row">
+                    <div class="sk-date">
+                      <div class="sk sk-day"></div>
+                      <div class="sk sk-month"></div>
+                    </div>
+                    <div class="sk-summary">
+                      <div class="sk sk-badge"></div>
+                      <div class="sk sk-text"></div>
+                    </div>
+                    <div class="sk sk-chevron-ph"></div>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
+          @if (!hasMore() && items().length > 0) {
+            <p class="end-of-list">· {{ items().length }} entrenament{{ items().length !== 1 ? 's' : '' }} ·</p>
+          }
+
+        } @else if (!isLoadingMore()) {
+          @if (hasActiveFilter()) {
+            <div class="filter-empty">
+              <span class="material-symbols-outlined">filter_list_off</span>
+              <p>Cap entrenament amb aquest filtre</p>
+            </div>
+          } @else {
+            <div class="empty-state">
+              <span class="material-symbols-outlined empty-icon">calendar_month</span>
+              <h2>Cap entrenament</h2>
+              <p>Encara no hi ha cap entrenament registrat</p>
+            </div>
+          }
         }
 
-        } <!-- end @else (not loading) -->
+      } <!-- end @else (not initial loading) -->
 
     </div>
   `,
@@ -311,9 +351,6 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
     .sport-tag-icon { font-size: 14px; font-variation-settings: 'FILL' 1; }
     .sport-tag-subtype { font-weight: 400; opacity: 0.85; }
 
-    /* ════════════════════════════════
-       LIST MODE
-    ════════════════════════════════ */
     /* ── Search ── */
     .search-wrap {
       position: relative; margin: 0 16px 10px;
@@ -546,6 +583,16 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
       .wvf-sep { color: var(--c-border-2); }
     }
 
+    /* ── Infinite scroll ── */
+    .scroll-sentinel { height: 1px; }
+    .load-more-sk {
+      margin: 0 16px; display: flex; flex-direction: column; gap: 8px; padding-top: 4px;
+    }
+    .end-of-list {
+      text-align: center; font-size: 12px; color: var(--c-text-3);
+      margin: 12px 0 4px; letter-spacing: 0.5px;
+    }
+
     /* ── Empty state ── */
     .empty-state {
       display: flex; flex-direction: column; align-items: center;
@@ -587,48 +634,123 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
     .sk-chevron-ph { width: 22px; height: 22px; border-radius: 4px; flex-shrink: 0; }
   `],
 })
-export class HistoryComponent {
+export class HistoryComponent implements OnDestroy {
   private workoutService  = inject(WorkoutService);
   private exerciseService = inject(ExerciseService);
   private sportService    = inject(SportService);
   private settingsService = inject(UserSettingsService);
+  private authService     = inject(AuthService);
 
-  readonly isLoading = computed(() => this.workoutService.isLoading());
   readonly unit = this.settingsService.weightUnit;
   dispW(kg: number): number { return kgToDisplay(kg, this.unit()); }
 
-  readonly calendarOpen = signal(true);
-  readonly selectedDate = signal<string | null>(null);
-  readonly expandedId   = signal<string | null>(null);
+  readonly calendarOpen  = signal(true);
+  readonly selectedDate  = signal<string | null>(null);
+  readonly expandedId    = signal<string | null>(null);
+  readonly sortDesc      = signal(true);
+  readonly filterCat     = signal<string | null>(null);
+  readonly searchQuery   = signal('');
 
-  readonly sortDesc    = signal(true);
-  readonly filterCat   = signal<string | null>(null);
-  readonly searchQuery = signal('');
-  get searchQueryValue(): string { return this.searchQuery(); }
-  set searchQueryValue(v: string) { this.searchQuery.set(v); }
+  // ── Pagination state ────────────────────────────────────────────────────
+  private readonly _items    = signal<Workout[]>([]);
+  private readonly _total    = signal(0);
+  private readonly _page     = signal(0);
+  readonly isInitialLoading  = signal(true);
+  readonly isLoadingMore     = signal(false);
 
-  readonly allWorkouts = this.workoutService.doneWorkouts;
+  readonly items   = this._items.asReadonly();
+  readonly hasMore = computed(() => this._items().length < this._total());
 
-  readonly filteredWorkouts = computed(() => {
-    const cat   = this.filterCat();
-    const query = this.searchQuery().trim().toLowerCase();
-    const date  = this.selectedDate();
-    let list = this.allWorkouts();
-    if (date) {
-      list = list.filter(w => w.date === date);
-    }
-    if (cat) {
-      list = list.filter(w => {
-        const cats = w.categories?.length ? w.categories : (w.category ? [w.category] : []);
-        return cats.includes(cat);
+  readonly hasActiveFilter = computed(
+    () => !!this.filterCat() || !!this.searchQuery() || !!this.selectedDate()
+  );
+
+  // ── Search input binding with debounce ──────────────────────────────────
+  private _searchTimer: ReturnType<typeof setTimeout> | null = null;
+  get searchInputValue(): string { return this.searchQuery(); }
+  set searchInputValue(v: string) {
+    if (this._searchTimer) clearTimeout(this._searchTimer);
+    this._searchTimer = setTimeout(() => this.searchQuery.set(v), 300);
+  }
+
+  // ── IntersectionObserver sentinel ───────────────────────────────────────
+  readonly sentinelRef = viewChild<ElementRef<HTMLElement>>('sentinel');
+  private _observer: IntersectionObserver | null = null;
+
+  constructor() {
+    this.exerciseService.ensureLoaded();
+    this.sportService.ensureLoaded();
+
+    // Reload from page 0 whenever any filter, sort, or auth state changes.
+    // Tracking uid() ensures the first load fires once auth resolves on cold start.
+    effect(() => {
+      const uid = this.authService.uid();
+      this.filterCat(); this.selectedDate(); this.searchQuery(); this.sortDesc();
+      if (!uid) return;
+      this._resetAndLoad();
+    });
+
+    // Re-attach observer whenever the sentinel element appears
+    effect(() => {
+      const el = this.sentinelRef()?.nativeElement;
+      this._observer?.disconnect();
+      if (!el) return;
+      this._observer = new IntersectionObserver(
+        entries => { if (entries[0].isIntersecting && this.hasMore() && !this.isLoadingMore()) this._loadNextPage(); },
+        { rootMargin: '200px' }
+      );
+      this._observer.observe(el);
+    });
+  }
+
+  ngOnDestroy(): void {
+    this._observer?.disconnect();
+    if (this._searchTimer) clearTimeout(this._searchTimer);
+  }
+
+  // ── Data loading ─────────────────────────────────────────────────────────
+  private _resetAndLoad(): void {
+    this._items.set([]);
+    this._total.set(0);
+    this._page.set(0);
+    this.isInitialLoading.set(true);
+    this._fetchPage(0).finally(() => this.isInitialLoading.set(false));
+  }
+
+  private _loadNextPage(): void {
+    if (!this.hasMore() || this.isLoadingMore()) return;
+    const next = this._page() + 1;
+    this._page.set(next);
+    this.isLoadingMore.set(true);
+    this._fetchPage(next).finally(() => this.isLoadingMore.set(false));
+  }
+
+  private async _fetchPage(page: number): Promise<void> {
+    try {
+      const { workouts, total } = await this.workoutService.loadWorkoutPage({
+        page,
+        pageSize: PAGE_SIZE,
+        category: this.filterCat() ?? undefined,
+        date:     this.selectedDate() ?? undefined,
+        search:   this.searchQuery().trim() || undefined,
+        ascending: !this.sortDesc(),
       });
+      this._total.set(total);
+      this._items.update(prev => page === 0 ? workouts : [...prev, ...workouts]);
+    } catch {
+      // Network failure — keep current state
     }
-    if (query) {
-      list = list.filter(w => w.entries.some(e => e.exerciseName.toLowerCase().includes(query)));
-    }
-    return this.sortDesc() ? list : [...list].reverse();
-  });
+  }
 
+  // ── Filter actions ───────────────────────────────────────────────────────
+  setCategory(cat: string | null): void { this.filterCat.set(cat); }
+  toggleSort(): void { this.sortDesc.update(v => !v); }
+  clearSearch(): void {
+    this.searchQuery.set('');
+    if (this._searchTimer) { clearTimeout(this._searchTimer); this._searchTimer = null; }
+  }
+
+  // ── Calendar ─────────────────────────────────────────────────────────────
   readonly selectedDateSports = computed(() => {
     const d = this.selectedDate();
     return d ? this.sportService.getSportSessionsForDate(d) : [];
@@ -650,6 +772,23 @@ export class HistoryComponent {
     return label.charAt(0).toUpperCase() + label.slice(1);
   });
 
+  selectDate(date: string): void {
+    const next = this.selectedDate() === date ? null : date;
+    this.selectedDate.set(next);
+    if (next) {
+      const found = this._items().find(w => w.date === date)
+                 ?? this.workoutService.getWorkoutForDate(date);
+      this.expandedId.set(found?.id ?? null);
+    } else {
+      this.expandedId.set(null);
+    }
+  }
+
+  toggleExpanded(id: string): void {
+    this.expandedId.set(this.expandedId() === id ? null : id);
+  }
+
+  // ── Visual helpers ───────────────────────────────────────────────────────
   getWorkoutStripe(workout: Workout): string {
     const cats = workout.categories?.length ? workout.categories : (workout.category ? [workout.category] : []);
     if (cats.length === 0) return '#e0e0e0';
@@ -710,7 +849,6 @@ export class HistoryComponent {
       t + e.sets.reduce((s, set) => s + set.weight * set.reps, 0), 0
     ));
   }
-
   volumeFmt(workout: Workout): string {
     const vol = this.dispW(this.totalVolume(workout));
     if (vol <= 0) return '';
@@ -729,20 +867,5 @@ export class HistoryComponent {
     const max = this.getMaxWeight(entry);
     if (max === 0) return false;
     return entry.sets.some(s => s.weight !== max) && set.weight === max;
-  }
-
-  selectDate(date: string): void {
-    const next = this.selectedDate() === date ? null : date;
-    this.selectedDate.set(next);
-    if (next) {
-      const w = this.workoutService.getWorkoutForDate(next);
-      this.expandedId.set(w?.id ?? null);
-    } else {
-      this.expandedId.set(null);
-    }
-  }
-
-  toggleExpanded(id: string): void {
-    this.expandedId.set(this.expandedId() === id ? null : id);
   }
 }

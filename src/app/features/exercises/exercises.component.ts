@@ -15,7 +15,6 @@ import {
   MUSCLE_LABELS,
   SUBCATEGORY_LABELS,
 } from '../../core/models/exercise.model';
-import { AuthService } from '../../core/services/auth.service';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { ExerciseFormDialogComponent } from '../library/components/exercise-form-dialog.component';
 
@@ -280,11 +279,12 @@ import { ExerciseFormDialogComponent } from '../library/components/exercise-form
 })
 export class ExercisesComponent {
   private exerciseService = inject(ExerciseService);
-  private authService     = inject(AuthService);
   private dialog          = inject(MatDialog);
   private snackBar        = inject(MatSnackBar);
   private confirmDialog   = inject(ConfirmDialogService);
   private router          = inject(Router);
+
+  constructor() { this.exerciseService.ensureLoaded(); }
 
   readonly searchQuery  = signal('');
   readonly activeFilter = signal<ExerciseCategory | null>(null);
@@ -370,8 +370,7 @@ export class ExercisesComponent {
   }
 
   async seed(): Promise<void> {
-    const uid = this.authService.uid();
-    if (uid) await this.exerciseService.seedIfEmpty(uid);
+    await this.exerciseService.ensureLoaded();
     this.snackBar.open('Exercicis carregats', '', { duration: 2000 });
   }
 }

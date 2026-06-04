@@ -137,12 +137,12 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                         <span class="we-set-pill weight"
                           [class.we-set-pill--pr]="prExerciseIds().has(entry.exerciseId) && set.weight > 0 && set.weight === entryMaxWeight(entry)"
                           [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
-                          (click)="isEntryEditable(entry.exerciseId) && ($event.stopPropagation(), startEditSet(entry.exerciseId, $index, set, 'weight'))">
+                          (click)="tapSetPill($event, entry.exerciseId, $index, set, 'weight')">
                           {{ dispW(set.weight) }}<small>{{ unit() }}</small>
                         </span>
                         <span class="we-set-pill reps"
                           [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
-                          (click)="isEntryEditable(entry.exerciseId) && ($event.stopPropagation(), startEditSet(entry.exerciseId, $index, set, 'reps'))">
+                          (click)="tapSetPill($event, entry.exerciseId, $index, set, 'reps')">
                           {{ set.reps }}<small>r</small>
                         </span>
                       </div>
@@ -783,6 +783,8 @@ export class WorkoutEditorComponent implements OnDestroy {
   });
 
   constructor() {
+    this.exerciseService.ensureLoaded();
+
     // Restore collapsed/done state; collapse all entries when first opening a template-loaded workout.
     effect(() => {
       const w = this.workout();
@@ -1013,6 +1015,12 @@ export class WorkoutEditorComponent implements OnDestroy {
   isEditingSet(exerciseId: string, index: number): boolean {
     const es = this.editingSet();
     return es?.exerciseId === exerciseId && es?.index === index;
+  }
+
+  tapSetPill(event: Event, exerciseId: string, index: number, set: WorkoutSet, focus: 'weight' | 'reps'): void {
+    if (!this.isEntryEditable(exerciseId)) return;
+    event.stopPropagation();
+    this.startEditSet(exerciseId, index, set, focus);
   }
 
   startEditSet(exerciseId: string, index: number, set: WorkoutSet, focus: 'weight' | 'reps' = 'weight'): void {

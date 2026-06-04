@@ -1,4 +1,4 @@
-import { Component, computed, inject, input } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 
@@ -209,7 +209,7 @@ export class ExerciseStatsDialogComponent {
 
   readonly isInline = computed(() => !this.data);
 
-  readonly isLoading = this.workoutService.isLoading;
+  readonly isLoading = signal(false);
 
   readonly sessions = computed((): SessionPoint[] => {
     const id = this.resolvedId();
@@ -241,8 +241,11 @@ export class ExerciseStatsDialogComponent {
   });
 
   constructor() {
-    if (!this.data) return; // inline mode — parent loads data
-    this.workoutService.loadAllWorkouts();
+    const id = this.data?.exerciseId;
+    if (!id) return; // inline mode — parent loads data
+    this.isLoading.set(true);
+    this.workoutService.loadWorkoutsForExercise(id)
+      .finally(() => this.isLoading.set(false));
   }
 
   close(): void { this.dialogRef?.close(); }

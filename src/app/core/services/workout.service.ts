@@ -56,6 +56,10 @@ export class WorkoutService {
   private _allLoaded = false;
   private _realtimeChannel: RealtimeChannel | null = null;
 
+  // Per-exercise load tracking (for progress/charts lazy loading)
+  private readonly _exLoadedIds      = new Set<string>();
+  private readonly _exLoadPromises   = new Map<string, Promise<void>>();
+
   readonly isLoading = signal(false);
 
   // ── Public signals ───────────────────────────────────────────────────────
@@ -107,11 +111,12 @@ export class WorkoutService {
       this._monthCache.clear();
       this._allLoaded = false;
       this._historical.set([]);
+      this._exLoadedIds.clear();
+      this._exLoadPromises.clear();
 
       if (uid) {
         this._subscribeToday(uid);
-        this._preloadRecentMonths();
-        this.exerciseService.seedIfEmpty(uid);
+        this._preloadCurrentMonth();
       }
     });
   }
@@ -150,13 +155,9 @@ export class WorkoutService {
   }
 
   // ── Load API ─────────────────────────────────────────────────────────────
-  private _preloadRecentMonths(): void {
-    const now  = new Date();
+  private _preloadCurrentMonth(): void {
+    const now = new Date();
     this.ensureMonthLoaded(now.getFullYear(), now.getMonth());
-    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    this.ensureMonthLoaded(prev.getFullYear(), prev.getMonth());
-    const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    this.ensureMonthLoaded(next.getFullYear(), next.getMonth());
   }
 
   async ensureMonthLoaded(year: number, month: number): Promise<void> {
@@ -215,6 +216,54 @@ export class WorkoutService {
     }
   }
 
+  // Loads only the workouts that contain a specific exercise, merging them
+  // into the month cache so getWorkoutsForExercise() and exercisesWithData()
+  // stay consistent.
+  async loadWorkoutsForExercise(exerciseId: string): Promise<void> {
+    if (this._allLoaded || this._exLoadedIds.has(exerciseId)) return;
+    const inFlight = this._exLoadPromises.get(exerciseId);
+    if (inFlight) return inFlight;
+    const p = this._fetchForExercise(exerciseId).finally(() =>
+      this._exLoadPromises.delete(exerciseId)
+    );
+    this._exLoadPromises.set(exerciseId, p);
+    return p;
+  }
+
+  private async _fetchForExercise(exerciseId: string): Promise<void> {
+    try {
+      const { data, error } = await this.supabase
+        .from('workouts')
+        .select('*')
+        .eq('user_id', this._uid())
+        .neq('status', 'planned')
+        .filter('entries::text', 'ilike', `%"exerciseId":"${exerciseId}"%`)
+        .order('date', { ascending: true });
+
+      if (error) {
+        this._exLoadedIds.add(exerciseId); // prevent retry storm on repeated Supabase errors
+        return;
+      }
+
+      const fetched = (data ?? [])
+        .map(r => toWorkout(r as Record<string, unknown>))
+        .filter(w => w.entries.some(e => e.exerciseId === exerciseId));
+
+      for (const w of fetched) {
+        const key    = w.date.substring(0, 7);
+        const bucket = this._monthCache.get(key) ?? [];
+        if (!bucket.find(x => x.id === w.id)) {
+          bucket.push(w);
+          this._monthCache.set(key, bucket);
+        }
+      }
+      this._rebuildHistorical();
+      this._exLoadedIds.add(exerciseId);
+    } catch {
+      this._exLoadedIds.add(exerciseId); // prevent retry storm; will refresh on next app session
+    }
+  }
+
   async loadAllWorkouts(): Promise<void> {
     if (this._allLoaded) return;
     this.isLoading.set(true);
@@ -244,20 +293,29 @@ export class WorkoutService {
     page: number;
     pageSize: number;
     category?: string;
+    date?: string;
+    search?: string;
     ascending?: boolean;
   }): Promise<{ workouts: Workout[]; total: number }> {
-    const { page, pageSize, category, ascending = false } = opts;
+    const { page, pageSize, category, date, search, ascending = false } = opts;
     const from = page * pageSize;
     const to   = from + pageSize - 1;
 
-    const base = this.supabase
+    let q = this.supabase
       .from('workouts')
       .select('*', { count: 'exact' })
       .eq('user_id', this._uid())
+      .neq('status', 'planned')
       .order('date', { ascending });
 
-    const q = category ? base.contains('categories', [category]) : base;
-    const { data, count, error } = await (q as typeof base).range(from, to);
+    if (category) q = q.contains('categories', [category]);
+    if (date)     q = q.eq('date', date);
+    if (search) {
+      const escaped = search.replace(/%/g, '\\%').replace(/_/g, '\\_');
+      q = q.filter('entries::text', 'ilike', `%${escaped}%`);
+    }
+
+    const { data, count, error } = await q.range(from, to);
     if (error) throw error;
 
     return {

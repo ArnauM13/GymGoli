@@ -188,14 +188,14 @@ interface ChartPoint {
             </div>
           </div>
         }
-      } @else if (isLoading()) {
-        <!-- Loading skeleton -->
+      } @else if (isLoadingExercise()) {
+        <!-- Loading exercise history -->
         <div class="empty-state">
           <span class="material-symbols-outlined empty-icon loading-icon">bar_chart</span>
-          <p style="color:var(--c-text-2)">Carregant historial...</p>
+          <p style="color:var(--c-text-2)">Carregant historial de l'exercici...</p>
         </div>
-      } @else if (!isLoading() && personalRecordGroups().length > 0) {
-        <!-- Personal records grouped -->
+      } @else if (personalRecordGroups().length > 0) {
+        <!-- Personal records grouped (from loaded months) -->
         @for (group of personalRecordGroups(); track group.cat) {
           <div class="pr-section" [style.--pr-g]="group.color">
             <h3 class="pr-title">{{ group.label }}</h3>
@@ -209,13 +209,24 @@ interface ChartPoint {
             }
           </div>
         }
-      } @else {
+        @if (!isLoadingRecords()) {
+          <button class="load-all-btn" (click)="loadAllRecords()">
+            <span class="material-symbols-outlined">history</span>
+            Carrega tot l'historial de records
+          </button>
+        }
+      } @else if (!isLoadingRecords()) {
         <!-- New user empty state -->
         <div class="empty-state">
           <span class="material-symbols-outlined empty-icon">fitness_center</span>
           <h2>Comença a entrenar</h2>
           <p>Registra els teus primers entrenaments per veure aquí les gràfiques de progrés</p>
           <a class="btn-cta" routerLink="/train">Anar a Entrena</a>
+        </div>
+      } @else {
+        <div class="empty-state">
+          <span class="material-symbols-outlined empty-icon loading-icon">bar_chart</span>
+          <p style="color:var(--c-text-2)">Carregant records...</p>
         </div>
       }
     </div>
@@ -382,6 +393,16 @@ interface ChartPoint {
       display: inline-block;
       &:active { opacity: 0.85; }
     }
+    .load-all-btn {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      width: calc(100% - 32px); margin: 4px 16px 0;
+      padding: 10px 16px; border-radius: 10px;
+      border: 1.5px dashed var(--c-border); background: transparent;
+      color: var(--c-text-3); font-size: 13px; font-weight: 500;
+      cursor: pointer; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover { background: var(--c-subtle); color: var(--c-text-2); }
+    }
   `],
 })
 export class ChartsComponent implements AfterViewInit, OnDestroy {
@@ -409,7 +430,9 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
       }))
       .filter(g => g.exercises.length > 0);
   });
-  readonly isLoading  = this.workoutService.isLoading;
+  readonly isLoadingRecords = this.workoutService.isLoading;
+  readonly isLoadingExercise = signal(false);
+  readonly isLoading = computed(() => this.isLoadingExercise() || this.isLoadingRecords());
 
   private _selectedExerciseId = signal('');
   get selectedExerciseId(): string { return this._selectedExerciseId(); }
@@ -524,6 +547,9 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
     this._selectedExerciseId.set(exerciseId);
     this.chart?.destroy();
     this.chart = null;
+    this.isLoadingExercise.set(true);
+    this.workoutService.loadWorkoutsForExercise(exerciseId)
+      .finally(() => this.isLoadingExercise.set(false));
   }
 
   clearExercise(): void {
@@ -559,7 +585,8 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
   });
 
   constructor() {
-    this.workoutService.loadAllWorkouts();
+    this.exerciseService.ensureLoaded();
+    this.sportService.ensureLoaded();
 
     effect(() => {
       const data   = this.chartData();
@@ -582,6 +609,15 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
   onExerciseChange(): void {
     this.chart?.destroy();
     this.chart = null;
+    const id = this._selectedExerciseId();
+    if (!id) return;
+    this.isLoadingExercise.set(true);
+    this.workoutService.loadWorkoutsForExercise(id)
+      .finally(() => this.isLoadingExercise.set(false));
+  }
+
+  loadAllRecords(): void {
+    this.workoutService.loadAllWorkouts();
   }
 
   private extractMetric(workout: Workout, exerciseId: string, metric: Metric): number {

@@ -15,7 +15,6 @@ import {
   SUBCATEGORY_LABELS,
 } from '../../core/models/exercise.model';
 import { Sport } from '../../core/models/sport.model';
-import { AuthService } from '../../core/services/auth.service';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
 import { ExerciseFormDialogComponent } from './components/exercise-form-dialog.component';
@@ -49,63 +48,83 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
         }
       </div>
 
-      <!-- Empty state -->
-      @if (exercises().length === 0) {
-        <div class="card-section">
-          <div class="empty-state">
-            <span class="material-symbols-outlined empty-icon">fitness_center</span>
-            <p>Cap exercici encara</p>
-            <div class="empty-actions">
-              <button class="btn-primary" (click)="openForm()">Crea el primer</button>
-              <button class="btn-secondary" (click)="seed()">Carrega per defecte</button>
-            </div>
-          </div>
-        </div>
-      }
-
-      @for (cat of visibleCategories(); track cat.value) {
+      @if (!exercisesLoaded()) {
+        <!-- Exercise skeleton -->
         <div class="card-section">
           <div class="section-header">
-            <span class="material-symbols-outlined section-icon" [style.color]="getCategoryColor(cat.value)">
-              {{ getCategoryIcon(cat.value) }}
-            </span>
-            <h2 class="section-title">{{ getCategoryLabel(cat.value) }}</h2>
-            <span class="section-count">{{ exercisesByCategory(cat.value).length }}</span>
+            <div class="sk-icon"></div>
+            <div class="sk-title"></div>
+            <div class="sk-count"></div>
           </div>
-
-          @for (exercise of exercisesByCategory(cat.value); track exercise.id) {
-            <div class="item-card">
-              <div class="ic-bar" [style.background]="getCategoryColor(cat.value)"></div>
+          @for (sk of [1,2,3,4]; track sk) {
+            <div class="item-card sk-card">
+              <div class="ic-bar sk-bar"></div>
               <div class="ic-info">
-                <span class="ic-name">{{ exercise.name }}</span>
-                @if (exercise.muscles?.length || exercise.setsRange) {
-                  <div class="ic-meta">
-                    @if (exercise.setsRange && exercise.repsRange) {
-                      <span class="ic-guide">{{ formatGuidance(exercise) }}</span>
-                    }
-                    @for (m of (exercise.muscles ?? []); track m; let i = $index) {
-                      @if (i < 3) {
-                        <span class="ic-muscle">{{ getMuscleLabel(m) }}</span>
-                      }
-                    }
-                  </div>
-                } @else {
-                  <span class="ic-detail">
-                    @if (exercise.subcategory) { {{ getSubcategoryLabel(exercise.subcategory) }} }
-                    @if (exercise.subcategory && exercise.notes) { · }
-                    @if (exercise.notes) { {{ exercise.notes }} }
-                  </span>
-                }
+                <div class="sk-line sk-name"></div>
+                <div class="sk-line sk-sub"></div>
               </div>
-              <button class="ic-action" (click)="openForm(exercise)" aria-label="Editar">
-                <span class="material-symbols-outlined">edit</span>
-              </button>
-              <button class="ic-action ic-action--danger" (click)="deleteExercise(exercise)" aria-label="Eliminar">
-                <span class="material-symbols-outlined">delete</span>
-              </button>
             </div>
           }
         </div>
+      } @else {
+        <!-- Empty state -->
+        @if (exercises().length === 0) {
+          <div class="card-section">
+            <div class="empty-state">
+              <span class="material-symbols-outlined empty-icon">fitness_center</span>
+              <p>Cap exercici encara</p>
+              <div class="empty-actions">
+                <button class="btn-primary" (click)="openForm()">Crea el primer</button>
+                <button class="btn-secondary" (click)="seed()">Carrega per defecte</button>
+              </div>
+            </div>
+          </div>
+        }
+
+        @for (cat of visibleCategories(); track cat.value) {
+          <div class="card-section">
+            <div class="section-header">
+              <span class="material-symbols-outlined section-icon" [style.color]="getCategoryColor(cat.value)">
+                {{ getCategoryIcon(cat.value) }}
+              </span>
+              <h2 class="section-title">{{ getCategoryLabel(cat.value) }}</h2>
+              <span class="section-count">{{ exercisesByCategory(cat.value).length }}</span>
+            </div>
+
+            @for (exercise of exercisesByCategory(cat.value); track exercise.id) {
+              <div class="item-card">
+                <div class="ic-bar" [style.background]="getCategoryColor(cat.value)"></div>
+                <div class="ic-info">
+                  <span class="ic-name">{{ exercise.name }}</span>
+                  @if (exercise.muscles?.length || exercise.setsRange) {
+                    <div class="ic-meta">
+                      @if (exercise.setsRange && exercise.repsRange) {
+                        <span class="ic-guide">{{ formatGuidance(exercise) }}</span>
+                      }
+                      @for (m of (exercise.muscles ?? []); track m; let i = $index) {
+                        @if (i < 3) {
+                          <span class="ic-muscle">{{ getMuscleLabel(m) }}</span>
+                        }
+                      }
+                    </div>
+                  } @else {
+                    <span class="ic-detail">
+                      @if (exercise.subcategory) { {{ getSubcategoryLabel(exercise.subcategory) }} }
+                      @if (exercise.subcategory && exercise.notes) { · }
+                      @if (exercise.notes) { {{ exercise.notes }} }
+                    </span>
+                  }
+                </div>
+                <button class="ic-action" (click)="openForm(exercise)" aria-label="Editar">
+                  <span class="material-symbols-outlined">edit</span>
+                </button>
+                <button class="ic-action ic-action--danger" (click)="deleteExercise(exercise)" aria-label="Eliminar">
+                  <span class="material-symbols-outlined">delete</span>
+                </button>
+              </div>
+            }
+          </div>
+        }
       }
 
       <!-- ══ Secció Esports ══ -->
@@ -113,7 +132,24 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
         <h2>Esports</h2>
       </div>
 
-      @if (sports().length === 0) {
+      @if (!sportsLoaded()) {
+        <!-- Sports skeleton -->
+        <div class="card-section">
+          <div class="section-header">
+            <div class="sk-icon"></div>
+            <div class="sk-title"></div>
+          </div>
+          @for (sk of [1,2]; track sk) {
+            <div class="item-card sk-card">
+              <div class="ic-bar sk-bar"></div>
+              <div class="ic-info">
+                <div class="sk-line sk-name"></div>
+                <div class="sk-line sk-sub"></div>
+              </div>
+            </div>
+          }
+        </div>
+      } @else if (sports().length === 0) {
         <div class="card-section">
           <div class="empty-state">
             <span class="material-symbols-outlined empty-icon">sports_soccer</span>
@@ -379,6 +415,29 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
       p { margin: 0; font-size: 14px; font-weight: 500; }
     }
     .empty-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+
+    /* ── Skeleton ── */
+    @keyframes sk-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .sk-icon {
+      width: 18px; height: 18px; border-radius: 4px;
+      background: var(--c-border-2); animation: sk-pulse 1.4s ease-in-out infinite;
+    }
+    .sk-title {
+      flex: 1; height: 13px; max-width: 120px; border-radius: 6px;
+      background: var(--c-border-2); animation: sk-pulse 1.4s ease-in-out infinite;
+    }
+    .sk-count {
+      width: 28px; height: 18px; border-radius: 10px;
+      background: var(--c-border-2); animation: sk-pulse 1.4s ease-in-out infinite;
+    }
+    .sk-card { pointer-events: none; }
+    .sk-bar { background: var(--c-border-2) !important; animation: sk-pulse 1.4s ease-in-out infinite; }
+    .sk-line {
+      background: var(--c-border-2); border-radius: 6px;
+      animation: sk-pulse 1.4s ease-in-out infinite;
+    }
+    .sk-name { height: 13px; width: 52%; margin-bottom: 4px; }
+    .sk-sub  { height: 10px; width: 34%; }
     .btn-primary {
       padding: 8px 16px; border: none; border-radius: 10px;
       background: var(--c-brand); color: white;
@@ -398,11 +457,17 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 export class LibraryComponent {
   private exerciseService = inject(ExerciseService);
   private sportService    = inject(SportService);
-  private authService     = inject(AuthService);
   private dialog          = inject(MatDialog);
   private snackBar        = inject(MatSnackBar);
   private confirmDialog   = inject(ConfirmDialogService);
 
+  constructor() {
+    this.exerciseService.ensureLoaded();
+    this.sportService.ensureLoaded();
+  }
+
+  readonly exercisesLoaded = this.exerciseService.isLoaded;
+  readonly sportsLoaded    = this.sportService.isLoaded;
   readonly sports = this.sportService.sports;
 
   readonly speedDialOpen = signal(false);
@@ -492,8 +557,7 @@ export class LibraryComponent {
   }
 
   async seed(): Promise<void> {
-    const uid = this.authService.uid();
-    if (uid) await this.exerciseService.seedIfEmpty(uid);
+    await this.exerciseService.ensureLoaded();
     this.snackBar.open('Exercicis carregats', '', { duration: 2000 });
   }
 

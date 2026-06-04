@@ -2,12 +2,20 @@ import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { LowerCasePipe } from '@angular/common';
+import { provideRouter } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { TrainComponent } from './train.component';
 import { WorkoutService } from '../../core/services/workout.service';
 import { SportService } from '../../core/services/sport.service';
+import { ExerciseService } from '../../core/services/exercise.service';
+import { AuthService } from '../../core/services/auth.service';
+import { UserSettingsService } from '../../core/services/user-settings.service';
+import { OfflineService } from '../../core/services/offline.service';
+import { TrainerService } from '../../core/services/trainer.service';
+import { TemplateService } from '../../core/services/template.service';
+import { WorkoutProfileService } from '../../core/services/workout-profile.service';
 import { Workout, WorkoutEntry } from '../../core/models/workout.model';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 
@@ -17,14 +25,18 @@ function makeWorkout(overrides: Partial<Workout> = {}): Workout {
   return { id: '1', date: TODAY, entries: [], createdAt: new Date(), ...overrides };
 }
 
+const EMPTY_CATEGORY_PROFILE = { daysSinceLast: 99, typicalGapDays: 4, overdueScore: 0 };
+
 describe('TrainComponent', () => {
   let component: TrainComponent;
 
   beforeEach(async () => {
     const mockWorkoutService = {
-      workouts:   signal<Workout[]>([]),
-      isLoading:  signal(false),
+      workouts:                   signal<Workout[]>([]),
+      isLoading:                  signal(false),
       getWorkoutsForDate:         jasmine.createSpy().and.returnValue([]),
+      getDoneWorkoutsForDate:     jasmine.createSpy().and.returnValue([]),
+      getPlannedForDate:          jasmine.createSpy().and.returnValue([]),
       getLastWorkoutByCategory:   jasmine.createSpy().and.returnValue(null),
       ensureMonthLoaded:          jasmine.createSpy(),
       createWorkoutForDate:       jasmine.createSpy().and.resolveTo('new-id'),
@@ -34,22 +46,35 @@ describe('TrainComponent', () => {
     };
 
     const mockSportService = {
-      sports:               signal<any[]>([]),
-      hasSportOnDate:       jasmine.createSpy().and.returnValue(false),
-      getSessionForDate:    jasmine.createSpy().and.returnValue(null),
-      ensureMonthLoaded:    jasmine.createSpy(),
-      toggleSport:          jasmine.createSpy().and.resolveTo(undefined),
-      setSessionSubtype:    jasmine.createSpy().and.resolveTo(undefined),
+      sports:                  signal<any[]>([]),
+      sessions:                signal<any[]>([]),
+      isLoaded:                signal(true),
+      hasSportOnDate:          jasmine.createSpy().and.returnValue(false),
+      getSessionForDate:       jasmine.createSpy().and.returnValue(null),
+      getSportSessionsForDate:        jasmine.createSpy().and.returnValue([]),
+      getPlannedSportSessionsForDate: jasmine.createSpy().and.returnValue([]),
+      ensureMonthLoaded:       jasmine.createSpy(),
+      ensureLoaded:            jasmine.createSpy().and.resolveTo(undefined),
+      toggleSport:             jasmine.createSpy().and.resolveTo(undefined),
+      setSessionSubtype:       jasmine.createSpy().and.resolveTo(undefined),
     };
 
     await TestBed.configureTestingModule({
       imports:   [TrainComponent],
       providers: [
-        { provide: WorkoutService, useValue: mockWorkoutService },
-        { provide: SportService,   useValue: mockSportService },
-        { provide: MatDialog,         useValue: { open: jasmine.createSpy() } },
-        { provide: MatSnackBar,       useValue: { open: jasmine.createSpy() } },
-        { provide: ConfirmDialogService, useValue: { confirm: jasmine.createSpy('confirm').and.resolveTo(false) } },
+        provideRouter([]),
+        { provide: WorkoutService,      useValue: mockWorkoutService },
+        { provide: SportService,        useValue: mockSportService },
+        { provide: ExerciseService,     useValue: { exercises: signal([]), isLoaded: signal(true), ensureLoaded: jasmine.createSpy().and.resolveTo(undefined) } },
+        { provide: AuthService,         useValue: { uid: signal('user-1') } },
+        { provide: UserSettingsService, useValue: { weightUnit: signal<'kg' | 'lb'>('kg'), fitnessGoal: signal(null) } },
+        { provide: OfflineService,      useValue: { isOffline: signal(false), forceOffline: signal(false), toggleForceOffline: jasmine.createSpy() } },
+        { provide: TrainerService,      useValue: { myTrainer: signal(null), hasTrainer: jasmine.createSpy().and.returnValue(false), getProposalForDate: jasmine.createSpy().and.returnValue(null) } },
+        { provide: TemplateService,     useValue: { forCategory: jasmine.createSpy().and.returnValue([]), create: jasmine.createSpy(), recordUse: jasmine.createSpy() } },
+        { provide: WorkoutProfileService, useValue: { profile: signal({ gym: { push: EMPTY_CATEGORY_PROFILE, pull: EMPTY_CATEGORY_PROFILE, legs: EMPTY_CATEGORY_PROFILE }, favoriteSport: null, recentSport: null, minRecovery: 2 }) } },
+        { provide: MatDialog,              useValue: { open: jasmine.createSpy() } },
+        { provide: MatSnackBar,            useValue: { open: jasmine.createSpy() } },
+        { provide: ConfirmDialogService,   useValue: { confirm: jasmine.createSpy('confirm').and.resolveTo(false) } },
       ],
     })
       .overrideComponent(TrainComponent, {
