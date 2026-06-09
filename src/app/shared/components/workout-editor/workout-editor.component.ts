@@ -934,8 +934,12 @@ export class WorkoutEditorComponent implements OnDestroy {
     const w = this.workout();
     if (!w) return;
     const newFeeling = entry.feeling === level ? undefined : level;
+    const hadWorkoutFeeling = w.feeling != null;
     try {
       await this.workoutService.updateEntryFeeling(w.id, entry.exerciseId, newFeeling);
+      if (!hadWorkoutFeeling && this.workout()?.feeling != null) {
+        this.snackBar.open('Sensació general calculada automàticament', '', { duration: 2500 });
+      }
     } catch {
       this.snackBar.open('Error en actualitzar la fatiga', '', { duration: 2000 });
     }

@@ -462,6 +462,9 @@ export class WorkoutService {
   async updateEntryFeeling(workoutId: string, exerciseId: string, feeling: FeelingLevel | undefined): Promise<void> {
     const workout = this._find(workoutId);
     if (!workout) return;
+
+    const allHadFeelingBefore = workout.entries.length > 0 && workout.entries.every(e => e.feeling != null);
+
     const entries = workout.entries.map(e => {
       if (e.exerciseId !== exerciseId) return e;
       if (feeling === undefined) {
@@ -470,7 +473,17 @@ export class WorkoutService {
       }
       return { ...e, feeling };
     });
-    await this._updateWorkout(workoutId, { entries });
+
+    const allHaveFeelingNow = entries.length > 0 && entries.every(e => e.feeling != null);
+    const updates: Partial<Workout> = { entries };
+
+    // Auto-set workout feeling when the last entry gets its feeling and no feeling is set yet
+    if (!allHadFeelingBefore && allHaveFeelingNow && workout.feeling == null) {
+      const total = entries.reduce((sum, e) => sum + (e.feeling as number), 0);
+      updates.feeling = Math.min(5, Math.max(1, Math.round(total / entries.length))) as FeelingLevel;
+    }
+
+    await this._updateWorkout(workoutId, updates);
   }
 
   async updateWorkoutFeeling(workoutId: string, feeling: FeelingLevel | undefined): Promise<void> {
