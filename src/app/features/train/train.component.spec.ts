@@ -35,6 +35,7 @@ describe('TrainComponent', () => {
 
     const mockSportService = {
       sports:               signal<any[]>([]),
+      sportsLoaded:         signal(true),
       hasSportOnDate:       jasmine.createSpy().and.returnValue(false),
       getSessionForDate:    jasmine.createSpy().and.returnValue(null),
       ensureMonthLoaded:    jasmine.createSpy(),
