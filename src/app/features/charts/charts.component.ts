@@ -10,7 +10,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import {
   CategoryScale,
   Chart,
@@ -391,6 +391,7 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
   private workoutService  = inject(WorkoutService);
   private settingsService = inject(UserSettingsService);
   private sportService    = inject(SportService);
+  private route           = inject(ActivatedRoute);
 
   readonly unit = this.settingsService.weightUnit;
 
@@ -566,6 +567,16 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
       const metric = this.selectedMetric();
       this.settingsService.darkMode();
       this.updateChart(data, metric);
+    });
+
+    // Pre-select exercise when navigated from popup via ?exerciseId=
+    effect(() => {
+      const exId = this.route.snapshot.queryParamMap.get('exerciseId');
+      if (!exId) return;
+      const available = this.exercises();
+      if (available.length > 0 && available.some(e => e.id === exId)) {
+        this._selectedExerciseId.set(exId);
+      }
     });
   }
 
