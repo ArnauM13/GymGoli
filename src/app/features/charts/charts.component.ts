@@ -9,8 +9,10 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { map } from 'rxjs';
 import {
   CategoryScale,
   Chart,
@@ -393,6 +395,11 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
   private sportService    = inject(SportService);
   private route           = inject(ActivatedRoute);
 
+  private readonly queryExerciseId = toSignal(
+    this.route.queryParams.pipe(map(p => (p['exerciseId'] as string) ?? '')),
+    { initialValue: '' },
+  );
+
   readonly unit = this.settingsService.weightUnit;
 
   readonly exercises = computed(() => {
@@ -570,11 +577,11 @@ export class ChartsComponent implements AfterViewInit, OnDestroy {
     });
 
     // Pre-select exercise when navigated from popup via ?exerciseId=
+    // Uses a reactive signal so it fires once exercises finish loading
     effect(() => {
-      const exId = this.route.snapshot.queryParamMap.get('exerciseId');
-      if (!exId) return;
+      const exId     = this.queryExerciseId();
       const available = this.exercises();
-      if (available.length > 0 && available.some(e => e.id === exId)) {
+      if (exId && available.some(e => e.id === exId)) {
         this._selectedExerciseId.set(exId);
       }
     });
