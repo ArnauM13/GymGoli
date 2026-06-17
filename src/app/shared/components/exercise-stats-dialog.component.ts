@@ -1,4 +1,5 @@
 import { Component, computed, inject, input } from '@angular/core';
+import { Router } from '@angular/router';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 
@@ -71,7 +72,14 @@ interface SessionPoint {
           </div>
         </div>
 
-        <!-- Session bars (newest first) -->
+        <!-- Section label: últims N entrenaments -->
+        <div class="esd-section-label">
+          <span class="material-symbols-outlined esd-section-icon">history</span>
+          <span class="esd-section-text">Últims entrenaments</span>
+          <span class="esd-section-chip">{{ sessionsDesc().length }} de {{ summary().total }}</span>
+        </div>
+
+        <!-- Session bars (newest first, max 5) -->
         <div class="esd-sessions">
           @for (s of sessionsDesc(); track s.date) {
             <div class="esd-session-row">
@@ -89,6 +97,14 @@ interface SessionPoint {
               </div>
             </div>
           }
+        </div>
+
+        <!-- Footer CTA -->
+        <div class="esd-footer">
+          <button class="esd-btn-charts" type="button" (click)="goToCharts()">
+            <span class="material-symbols-outlined">insights</span>
+            Veure gràfiques avançades
+          </button>
         </div>
       }
     </div>
@@ -162,17 +178,32 @@ interface SessionPoint {
     .positive { color: #4caf50 !important; }
     .negative { color: #ef5350 !important; }
 
+    /* ── Section label ── */
+    .esd-section-label {
+      display: flex; align-items: center; gap: 6px;
+      padding: 0 16px 8px;
+    }
+    .esd-inline .esd-section-label { padding: 0 12px 8px; }
+    .esd-section-icon {
+      font-size: 15px; color: #888;
+      font-variation-settings: 'FILL' 0, 'wght' 300;
+    }
+    .esd-section-text {
+      flex: 1; font-size: 12px; font-weight: 700; color: #888;
+      text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .esd-section-chip {
+      font-size: 11px; font-weight: 700; color: #999;
+      background: #f0f0f0; border-radius: 10px; padding: 2px 8px;
+    }
+
     /* ── Session bars ── */
     .esd-sessions {
-      overflow-y: auto; padding: 0 16px 16px;
+      overflow-y: auto; padding: 0 16px 12px;
       display: flex; flex-direction: column; gap: 8px;
     }
-    .esd-inline .esd-sessions {
-      padding: 0 12px 12px;
-    }
-    .esd-session-row {
-      display: flex; align-items: center; gap: 10px;
-    }
+    .esd-inline .esd-sessions { padding: 0 12px 12px; }
+    .esd-session-row { display: flex; align-items: center; gap: 10px; }
     .esd-session-date {
       font-size: 12px; color: var(--c-text-3); width: 52px; flex-shrink: 0; text-align: right;
     }
@@ -183,13 +214,27 @@ interface SessionPoint {
       height: 100%; background: var(--c-brand); border-radius: 5px;
       transition: width 0.3s ease;
     }
-    .esd-session-right {
-      display: flex; align-items: center; gap: 4px; min-width: 70px;
-    }
+    .esd-session-right { display: flex; align-items: center; gap: 4px; min-width: 70px; }
     .esd-session-weight {
       font-size: 13px; font-weight: 700; color: var(--c-brand); min-width: 44px;
     }
     .esd-session-feeling { font-size: 16px; line-height: 1; }
+
+    /* ── Footer CTA ── */
+    .esd-footer {
+      padding: 4px 16px 20px;
+    }
+    .esd-inline .esd-footer { padding: 4px 12px 16px; }
+    .esd-btn-charts {
+      width: 100%; display: flex; align-items: center; justify-content: center; gap: 7px;
+      padding: 11px 16px; border: none; border-radius: 12px;
+      background: #006874; color: white;
+      font-size: 13px; font-weight: 700; cursor: pointer;
+      transition: background 0.15s, transform 0.1s; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 17px; }
+      &:hover { background: #005a63; }
+      &:active { transform: scale(0.97); }
+    }
   `],
 })
 export class ExerciseStatsDialogComponent {
@@ -197,6 +242,7 @@ export class ExerciseStatsDialogComponent {
   readonly data: { exerciseId: string; exerciseName: string } | null = inject(MAT_DIALOG_DATA, { optional: true });
   private workoutService  = inject(WorkoutService);
   private settingsService = inject(UserSettingsService);
+  private router          = inject(Router);
 
   readonly unit = this.settingsService.weightUnit;
   dispW(kg: number): number { return kgToDisplay(kg, this.unit()); }
@@ -246,6 +292,11 @@ export class ExerciseStatsDialogComponent {
   }
 
   close(): void { this.dialogRef?.close(); }
+
+  goToCharts(): void {
+    this.dialogRef?.close();
+    this.router.navigate(['/charts'], { queryParams: { exerciseId: this.resolvedId() } });
+  }
 
   getFeelingEmoji(level: FeelingLevel): string { return FEELING_EMOJI[level]; }
   getFeelingLabel(level: FeelingLevel): string  { return FEELING_LABEL[level]; }
