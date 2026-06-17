@@ -218,7 +218,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         }
 
         <!-- ── Skeleton (initial data load) ── -->
-        @if (workoutService.isLoading() && dateWorkouts().length === 0 && !creating()) {
+        @if ((workoutService.isLoading() || !sportService.sportsLoaded()) && dateWorkouts().length === 0 && !creating()) {
           <div class="sk-workout-section">
             <div class="sk-section-header">
               <div class="sk sk-icon-ph"></div>
@@ -257,7 +257,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           </div>
         }
 
-        @if ((!workoutService.isLoading() || dateWorkouts().length > 0) && !creating()) {
+        @if ((!workoutService.isLoading() && sportService.sportsLoaded() || dateWorkouts().length > 0) && !creating()) {
 
           @if (!offlineService.isOffline()) {
             <app-fitness-insights />
@@ -441,7 +441,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
                     </div>
                   }
 
-                  @if (sportService.sports().length === 0 && datePlannedSports().length === 0) {
+                  @if (sportService.sportsLoaded() && sportService.sports().length === 0 && datePlannedSports().length === 0) {
                     <div class="es-empty">
                       <span class="material-symbols-outlined es-empty-icon">sports_soccer</span>
                       <span class="es-empty-msg">Afegeix els esports que practiques</span>

@@ -137,12 +137,12 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                         <span class="we-set-pill weight"
                           [class.we-set-pill--pr]="prExerciseIds().has(entry.exerciseId) && set.weight > 0 && set.weight === entryMaxWeight(entry)"
                           [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
-                          (click)="isEntryEditable(entry.exerciseId) && ($event.stopPropagation(), startEditSet(entry.exerciseId, $index, set, 'weight'))">
+                          (click)="tapSetPill($event, entry.exerciseId, $index, set, 'weight')">
                           {{ dispW(set.weight) }}<small>{{ unit() }}</small>
                         </span>
                         <span class="we-set-pill reps"
                           [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
-                          (click)="isEntryEditable(entry.exerciseId) && ($event.stopPropagation(), startEditSet(entry.exerciseId, $index, set, 'reps'))">
+                          (click)="tapSetPill($event, entry.exerciseId, $index, set, 'reps')">
                           {{ set.reps }}<small>r</small>
                         </span>
                       </div>
@@ -934,8 +934,12 @@ export class WorkoutEditorComponent implements OnDestroy {
     const w = this.workout();
     if (!w) return;
     const newFeeling = entry.feeling === level ? undefined : level;
+    const hadWorkoutFeeling = w.feeling != null;
     try {
       await this.workoutService.updateEntryFeeling(w.id, entry.exerciseId, newFeeling);
+      if (!hadWorkoutFeeling && this.workout()?.feeling != null) {
+        this.snackBar.open('Sensació general calculada automàticament', '', { duration: 2500 });
+      }
     } catch {
       this.snackBar.open('Error en actualitzar la fatiga', '', { duration: 2000 });
     }
@@ -1013,6 +1017,12 @@ export class WorkoutEditorComponent implements OnDestroy {
   isEditingSet(exerciseId: string, index: number): boolean {
     const es = this.editingSet();
     return es?.exerciseId === exerciseId && es?.index === index;
+  }
+
+  tapSetPill(event: Event, exerciseId: string, setIndex: number, set: WorkoutSet, field: 'weight' | 'reps'): void {
+    if (!this.isEntryEditable(exerciseId)) return;
+    event.stopPropagation();
+    this.startEditSet(exerciseId, setIndex, set, field);
   }
 
   startEditSet(exerciseId: string, index: number, set: WorkoutSet, focus: 'weight' | 'reps' = 'weight'): void {
