@@ -20,52 +20,53 @@ interface SessionDetail {
   template: `
     <div class="esd-wrap" [class.esd-inline]="isInline()">
 
-      <!-- Header: title only, no close button -->
+      <!-- Title -->
       <div class="esd-header">
-        <span class="material-symbols-outlined esd-title-icon">bar_chart</span>
+        <span class="material-symbols-outlined esd-header-icon">bar_chart</span>
         <h2 class="esd-title">{{ resolvedName() }}</h2>
       </div>
 
       @if (isLoading()) {
-        <div class="esd-loading-bar-wrap">
+        <div class="esd-loading-wrap">
           <span class="esd-loading-bar"></span>
         </div>
       }
 
       @if (!isLoading() && recentSessions().length === 0) {
         <div class="esd-empty">
-          <span class="material-symbols-outlined">show_chart</span>
+          <span class="material-symbols-outlined esd-empty-icon">show_chart</span>
           <p>Sense dades per a aquest exercici</p>
         </div>
       }
 
       @if (recentSessions().length > 0) {
-        <div class="esd-sessions">
+        <div class="esd-list">
           @for (s of recentSessions(); track s.date) {
-            <div class="esd-session-card">
-              <!-- Subtitle: date + feeling -->
-              <div class="esd-session-header">
-                <span class="esd-session-date">{{ formatDate(s.date) }}</span>
-                @if (s.feeling) {
-                  <span class="esd-session-feeling" [title]="getFeelingLabel(s.feeling)">
-                    {{ getFeelingEmoji(s.feeling) }}
-                  </span>
-                  <span class="esd-session-feeling-label">{{ getFeelingLabel(s.feeling) }}</span>
-                }
-              </div>
-              <!-- Sets in horizontal scroll -->
-              <div class="esd-sets-row">
-                @for (set of s.sets; track $index) {
-                  <span class="esd-set-pill">
-                    {{ dispW(set.weight) }}{{ unit() }}<span class="esd-set-reps"> × {{ set.reps }}</span>
-                  </span>
-                }
+            <div class="esd-item">
+              <div class="esd-item-bar"></div>
+              <div class="esd-item-body">
+                <!-- Subtitle row: date + feeling -->
+                <div class="esd-item-head">
+                  <span class="esd-item-date">{{ formatDate(s.date) }}</span>
+                  @if (s.feeling) {
+                    <span class="esd-item-feeling">
+                      {{ getFeelingEmoji(s.feeling) }} {{ getFeelingLabel(s.feeling) }}
+                    </span>
+                  }
+                </div>
+                <!-- Sets horizontal -->
+                <div class="esd-sets">
+                  @for (set of s.sets; track $index) {
+                    <span class="esd-set-pill">
+                      {{ dispW(set.weight) }}{{ unit() }}<span class="esd-set-reps">&nbsp;×&nbsp;{{ set.reps }}</span>
+                    </span>
+                  }
+                </div>
               </div>
             </div>
           }
         </div>
 
-        <!-- Footer CTA -->
         <div class="esd-footer">
           <button class="esd-btn-charts" type="button" (click)="goToCharts()">
             <span class="material-symbols-outlined">insights</span>
@@ -77,30 +78,34 @@ interface SessionDetail {
   `,
   styles: [`
     .esd-wrap {
-      display: flex; flex-direction: column;
+      padding: 0; display: flex; flex-direction: column;
       max-height: 80vh; overflow: hidden;
     }
-    .esd-wrap:not(.esd-inline) { min-width: min(340px, 90vw); }
-    .esd-inline { padding: 0; }
+    .esd-wrap:not(.esd-inline) { min-width: min(320px, 90vw); }
 
     /* ── Header ── */
     .esd-header {
       display: flex; align-items: center; gap: 8px;
-      padding: 20px 20px 14px;
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid var(--c-border-2);
     }
-    .esd-title-icon {
-      font-size: 20px; color: var(--c-brand);
+    .esd-header-icon {
+      font-size: 18px; color: var(--c-brand);
       font-variation-settings: 'FILL' 0, 'wght' 300;
     }
-    .esd-title { margin: 0; font-size: 17px; font-weight: 700; color: var(--c-text); }
+    .esd-title {
+      margin: 0; font-size: 16px; font-weight: 700; color: var(--c-text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
 
-    /* ── Loading bar ── */
-    .esd-loading-bar-wrap {
-      height: 3px; margin: 0 20px 12px; border-radius: 2px;
-      background: rgba(var(--c-brand-rgb), 0.1); overflow: hidden;
+    /* ── Loading ── */
+    .esd-loading-wrap {
+      height: 3px; margin: 12px 20px; border-radius: 2px;
+      background: color-mix(in srgb, var(--c-brand) 12%, transparent); overflow: hidden;
     }
     .esd-loading-bar {
-      display: block; height: 100%; width: 40%; background: var(--c-brand); border-radius: 2px;
+      display: block; height: 100%; width: 40%;
+      background: var(--c-brand); border-radius: 2px;
       animation: esd-slide 1.2s ease-in-out infinite;
     }
     @keyframes esd-slide {
@@ -108,61 +113,69 @@ interface SessionDetail {
       100% { transform: translateX(350%); }
     }
 
-    /* ── Empty state ── */
+    /* ── Empty ── */
     .esd-empty {
       display: flex; flex-direction: column; align-items: center;
-      gap: 10px; padding: 36px 24px; color: var(--c-text-3); text-align: center;
-      .material-symbols-outlined { font-size: 44px; font-variation-settings: 'FILL' 0, 'wght' 200; }
-      p { margin: 0; font-size: 14px; }
+      gap: 8px; padding: 36px 24px; text-align: center; color: var(--c-text-3);
+    }
+    .esd-empty-icon {
+      font-size: 44px;
+      font-variation-settings: 'FILL' 0, 'wght' 200;
+    }
+    .esd-empty p { margin: 0; font-size: 14px; }
+
+    /* ── Session list ── */
+    .esd-list {
+      overflow-y: auto; padding: 14px 14px 6px;
+      display: flex; flex-direction: column; gap: 8px;
     }
 
-    /* ── Sessions list ── */
-    .esd-sessions {
-      overflow-y: auto; padding: 0 16px 4px;
-      display: flex; flex-direction: column; gap: 10px;
+    /* ── Session item card (item-card pattern) ── */
+    .esd-item {
+      display: flex; align-items: stretch;
+      border: 1.5px solid var(--c-border-2); border-radius: 14px;
+      background: var(--c-card); overflow: hidden;
     }
-    .esd-inline .esd-sessions { padding: 0 12px 4px; }
+    .esd-item-bar {
+      width: 5px; flex-shrink: 0;
+      background: var(--c-brand); opacity: 0.7;
+    }
+    .esd-item-body {
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column; gap: 7px;
+      padding: 10px 12px;
+    }
 
-    /* ── Session card ── */
-    .esd-session-card {
-      border: 1.5px solid #efefef; border-radius: 14px;
-      background: white; padding: 10px 12px 12px; overflow: hidden;
-    }
-    .esd-session-header {
-      display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
-    }
-    .esd-session-date {
+    /* Date + feeling row */
+    .esd-item-head { display: flex; align-items: center; gap: 8px; }
+    .esd-item-date {
       font-size: 13px; font-weight: 700; color: var(--c-text);
     }
-    .esd-session-feeling { font-size: 15px; line-height: 1; }
-    .esd-session-feeling-label {
-      font-size: 11px; color: var(--c-text-3); font-weight: 500;
+    .esd-item-feeling {
+      font-size: 11px; font-weight: 500; color: var(--c-text-3);
     }
 
-    /* ── Sets row ── */
-    .esd-sets-row {
-      display: flex; flex-wrap: wrap; gap: 5px;
-    }
+    /* Sets row */
+    .esd-sets { display: flex; flex-wrap: wrap; gap: 5px; }
     .esd-set-pill {
-      display: inline-flex; align-items: baseline; gap: 1px;
-      padding: 4px 9px; border-radius: 20px;
-      background: color-mix(in srgb, var(--c-brand) 10%, white);
-      font-size: 13px; font-weight: 700; color: var(--c-brand);
+      display: inline-flex; align-items: baseline;
+      padding: 3px 9px; border-radius: 20px;
+      background: color-mix(in srgb, var(--c-brand) 10%, var(--c-card));
+      font-size: 12px; font-weight: 700; color: var(--c-brand);
       white-space: nowrap;
     }
-    .esd-set-reps { font-size: 11px; font-weight: 600; color: var(--c-text-3); }
+    .esd-set-reps { font-size: 11px; font-weight: 500; color: var(--c-text-3); }
 
-    /* ── Footer CTA ── */
-    .esd-footer { padding: 10px 16px 20px; }
-    .esd-inline .esd-footer { padding: 10px 12px 16px; }
+    /* ── Footer ── */
+    .esd-footer { padding: 10px 14px 18px; }
     .esd-btn-charts {
-      width: 100%; display: flex; align-items: center; justify-content: center; gap: 7px;
+      width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;
       padding: 11px 16px; border: none; border-radius: 12px;
-      background: #006874; color: white;
+      background: var(--c-brand); color: #fff;
       font-size: 13px; font-weight: 700; cursor: pointer;
       transition: background 0.15s, transform 0.1s; touch-action: manipulation;
       .material-symbols-outlined { font-size: 17px; }
-      &:hover { background: #005a63; }
+      &:hover  { background: var(--c-brand-dk); }
       &:active { transform: scale(0.97); }
     }
   `],
@@ -183,10 +196,10 @@ export class ExerciseStatsDialogComponent {
   readonly resolvedId   = computed(() => this.data?.exerciseId   ?? this.inlineExerciseId()   ?? '');
   readonly resolvedName = computed(() => this.data?.exerciseName ?? this.inlineExerciseName() ?? '');
 
-  readonly isInline = computed(() => !this.data);
+  readonly isInline  = computed(() => !this.data);
   readonly isLoading = this.workoutService.isLoading;
 
-  /** Last 3 sessions, newest first, with full sets data */
+  /** Last 3 sessions with full sets, newest first */
   readonly recentSessions = computed((): SessionDetail[] => {
     const id = this.resolvedId();
     if (!id) return [];
@@ -218,6 +231,6 @@ export class ExerciseStatsDialogComponent {
 
   formatDate(dateStr: string): string {
     const d = new Date(dateStr + 'T12:00:00');
-    return d.toLocaleDateString('ca-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+    return d.toLocaleDateString('ca-ES', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 }
