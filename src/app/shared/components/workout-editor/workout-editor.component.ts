@@ -1,4 +1,4 @@
-import { Component, OnDestroy, ViewEncapsulation, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { Component, ElementRef, OnDestroy, ViewChild, ViewEncapsulation, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { MatDialog } from '@angular/material/dialog';
@@ -31,6 +31,9 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
   imports: [ReactiveFormsModule, DragDropModule, ExerciseEntryCardComponent],
   encapsulation: ViewEncapsulation.None,
   template: `
+    <input #focusTrap class="we-focus-trap" type="text" readonly
+           tabindex="-1" aria-hidden="true" autocomplete="off">
+
     @if (workout(); as w) {
       <div class="we-entries" cdkDropList (cdkDropListDropped)="onDrop($event)">
 
@@ -310,6 +313,12 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     }
   `,
   styles: [`
+    .we-focus-trap {
+      position: fixed; top: -9999px; left: -9999px;
+      width: 1px; height: 1px; opacity: 0;
+      pointer-events: none; border: none; padding: 0;
+    }
+
     .we-entries {
       padding: 10px 16px 0;
       display: flex;
@@ -731,6 +740,8 @@ export class WorkoutEditorComponent implements OnDestroy {
 
   readonly requestAddExercise = output<void>();
 
+  @ViewChild('focusTrap') private focusTrapRef!: ElementRef<HTMLInputElement>;
+
   readonly addingFor        = signal<string | null>(null);
   readonly setQty           = signal(1);
   readonly setQtyOptions    = [1, 2, 3, 4, 5];
@@ -946,6 +957,7 @@ export class WorkoutEditorComponent implements OnDestroy {
   }
 
   startAddSet(entry: WorkoutEntry): void {
+    this.claimKeyboard();
     this._expandEntry(entry.exerciseId);
     this.editingSet.set(null);
     this.addingFor.set(entry.exerciseId);
@@ -980,6 +992,9 @@ export class WorkoutEditorComponent implements OnDestroy {
       const last = entry.sets.at(-1);
       if (last) this.setForm.patchValue({ weight: kgToDisplay(last.weight, u), reps: last.reps });
     }
+    requestAnimationFrame(() => {
+      (document.getElementById('add-weight') as HTMLInputElement | null)?.focus();
+    });
   }
 
   applyRecCustomize(): void {
@@ -1026,14 +1041,24 @@ export class WorkoutEditorComponent implements OnDestroy {
   }
 
   startEditSet(exerciseId: string, index: number, set: WorkoutSet, focus: 'weight' | 'reps' = 'weight'): void {
+    this.claimKeyboard();
     this.addingFor.set(null);
     this.editingSet.set({ exerciseId, index });
     this.editSetForm.setValue({ weight: kgToDisplay(set.weight, this.unit()), reps: set.reps });
-    setTimeout(() => {
+    requestAnimationFrame(() => {
       const el = document.getElementById(focus === 'weight' ? 'edit-weight' : 'edit-reps') as HTMLInputElement | null;
       el?.focus();
       el?.select();
-    }, 30);
+    });
+  }
+
+  /** Foca un input invisible síncronament dins del gesture per reservar el teclat a iOS. */
+  private claimKeyboard(): void {
+    const trap = this.focusTrapRef?.nativeElement;
+    if (!trap) return;
+    trap.removeAttribute('readonly');
+    trap.focus();
+    trap.setAttribute('readonly', '');
   }
 
   cancelEditSet(): void { this.editingSet.set(null); }
