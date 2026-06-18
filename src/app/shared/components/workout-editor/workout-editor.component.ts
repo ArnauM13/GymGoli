@@ -76,7 +76,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
             }
 
             <!-- ── Last session info banner ── -->
-            @if (lastSessionData()?.exerciseId === entry.exerciseId && entry.sets.length === 0 && addingFor() === entry.exerciseId) {
+            @if (lastSessionData()?.exerciseId === entry.exerciseId && entry.sets.length === 0 && addingFor() === entry.exerciseId && !recData()) {
               <div class="we-last-session-banner" role="button" tabindex="0"
                 (click)="applyLastSession(entry.exerciseId)"
                 (keydown.enter)="applyLastSession(entry.exerciseId)"
@@ -965,17 +965,25 @@ export class WorkoutEditorComponent implements OnDestroy {
     const u = this.unit();
     if (entry.sets.length === 0 && w) {
       const info = this.workoutService.getLastSessionInfo(entry.exerciseId, w.id);
+      const goal = this.settingsService.fitnessGoal();
       if (info) {
         const lastEntry = this.workoutService.workouts()
           .filter(wk => wk.id !== w.id && wk.entries.some(e => e.exerciseId === entry.exerciseId && e.sets.length > 0))
           .sort((a, b) => b.date.localeCompare(a.date))[0]
           ?.entries.find(e => e.exerciseId === entry.exerciseId);
         this.lastSessionData.set({ exerciseId: entry.exerciseId, ...info, sets: lastEntry?.sets ?? [] });
-        this.recData.set(null);
-        this.setForm.patchValue({ weight: kgToDisplay(info.maxWeight, u), reps: 8 });
+        if (goal) {
+          // Mostra la rec primer; l'última sessió apareixerà quan l'usuari la tanqui
+          const rec = GOAL_REC[goal];
+          const goalLabel = FITNESS_GOAL_LABELS[goal];
+          this.recData.set({ exerciseId: entry.exerciseId, sets: rec.sets, reps: rec.reps, goalLabel });
+          this.setForm.reset({ weight: kgToDisplay(info.maxWeight, u), reps: rec.reps });
+        } else {
+          this.recData.set(null);
+          this.setForm.patchValue({ weight: kgToDisplay(info.maxWeight, u), reps: 8 });
+        }
       } else {
         this.lastSessionData.set(null);
-        const goal = this.settingsService.fitnessGoal();
         if (goal) {
           const rec = GOAL_REC[goal];
           const goalLabel = FITNESS_GOAL_LABELS[goal];
