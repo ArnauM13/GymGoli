@@ -210,6 +210,12 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
                         } @else {
                           <span class="no-sets">Cap sèrie registrada</span>
                         }
+                        @if (entry.notes) {
+                          <div class="entry-note">
+                            <span class="material-symbols-outlined entry-note-icon">sticky_note_2</span>
+                            <span class="entry-note-text">{{ entry.notes }}</span>
+                          </div>
+                        }
                       </div>
                     }
                     @if (workout.notes) {
@@ -532,6 +538,13 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
       color: color-mix(in srgb, var(--ec, var(--c-brand)) 75%, var(--c-text));
     }
     .no-sets { font-size: 12px; color: var(--c-text-3); font-style: italic; padding-left: 12px; }
+    .entry-note {
+      display: flex; align-items: flex-start; gap: 5px;
+      margin-top: 4px; padding: 5px 8px; border-radius: 7px;
+      background: rgba(var(--c-brand-rgb), 0.06);
+    }
+    .entry-note-icon { font-size: 13px; color: var(--c-brand); flex-shrink: 0; margin-top: 1px; }
+    .entry-note-text { font-size: 12px; color: var(--c-text-2); font-style: italic; line-height: 1.4; }
     .workout-notes {
       display: flex; align-items: flex-start; gap: 6px;
       font-size: 12px; color: var(--c-text-2); font-style: italic;

@@ -28,7 +28,8 @@ export interface WorkoutEntry {
   exerciseId:   string;
   exerciseName: string;
   sets:         WorkoutSet[];
-  feeling?:     FeelingLevel; // general feeling for this exercise session
+  feeling?:     FeelingLevel;
+  notes?:       string;
 }
 
 export interface Workout {

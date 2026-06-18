@@ -259,7 +259,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
         @if ((!workoutService.isLoading() && sportService.sportsLoaded() || dateWorkouts().length > 0) && !creating()) {
 
-          @if (!offlineService.isOffline()) {
+          @if (!offlineService.isOffline() && dateWorkouts().length === 0 && dateSportSessions().length === 0 && isToday()) {
             <app-fitness-insights />
           }
 

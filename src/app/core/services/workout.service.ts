@@ -486,6 +486,17 @@ export class WorkoutService {
     await this._updateWorkout(workoutId, updates);
   }
 
+  async updateEntryNotes(workoutId: string, exerciseId: string, notes: string | undefined): Promise<void> {
+    const workout = this._find(workoutId);
+    if (!workout) return;
+    const entries = workout.entries.map(e => {
+      if (e.exerciseId !== exerciseId) return e;
+      const { notes: _n, ...rest } = e as WorkoutEntry & { notes?: string };
+      return notes ? { ...rest, notes } : rest as WorkoutEntry;
+    });
+    await this._updateWorkout(workoutId, { entries });
+  }
+
   async updateWorkoutFeeling(workoutId: string, feeling: FeelingLevel | undefined): Promise<void> {
     await this._updateWorkout(workoutId, { feeling });
   }
