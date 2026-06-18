@@ -1,4 +1,4 @@
-import { Component, input, output } from '@angular/core';
+import { Component, computed, input, output } from '@angular/core';
 import { DragDropModule } from '@angular/cdk/drag-drop';
 
 import { FEELING_EMOJI, FeelingLevel, WorkoutEntry } from '../../../core/models/workout.model';
@@ -36,6 +36,8 @@ import { kgToDisplay } from '../../utils/weight.utils';
             }
             @if (maxWeight() > 0) {
               <span class="eec-max">{{ dispW(maxWeight()) }}<small>{{ unit() }}</small></span>
+            } @else if (totalReps() > 0) {
+              <span class="eec-max">{{ totalReps() }}<small>r</small></span>
             }
             @if (entry().sets.length > 0 && showSetsBadge()) {
               <span class="eec-sets-badge">{{ entry().sets.length }} sèr</span>
@@ -214,6 +216,8 @@ export class ExerciseEntryCardComponent {
   readonly headerClick  = output<void>();
   readonly menuClick    = output<void>();
   readonly feelingClick = output<void>();
+
+  readonly totalReps = computed(() => this.entry().sets.reduce((s, set) => s + set.reps, 0));
 
   emoji(l: FeelingLevel): string { return FEELING_EMOJI[l]; }
   dispW(v: number): number { return kgToDisplay(v, this.unit() as 'kg' | 'lb'); }
