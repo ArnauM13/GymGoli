@@ -51,7 +51,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
               <span class="we-section-spacer" aria-hidden="true"></span>
               <span class="material-symbols-outlined we-section-chevron" aria-hidden="true"
                     [class.we-section-chevron--collapsed]="isSectionCollapsed(sec.id)">
-                expand_less
+                expand_more
               </span>
             </button>
           }
@@ -430,7 +430,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       font-size: 18px; color: var(--c-brand); flex-shrink: 0;
       transition: transform 0.2s ease;
     }
-    .we-section-chevron--collapsed { transform: rotate(90deg); }
+    .we-section-chevron--collapsed { transform: rotate(-90deg); }
 
 
 
