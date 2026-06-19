@@ -40,7 +40,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
         @for (entry of w.entries; track entry.exerciseId) {
 
           <!-- ── Section header (non-draggable, recalculates when entries reorder) ── -->
-          @if (showSections() && sectionBreaks().get($index); as sec) {
+          @if (showSections() && !isDragging() && sectionBreaks().get($index); as sec) {
             <button type="button" class="we-section-header"
                     [attr.aria-expanded]="!isSectionCollapsed(sec.id)"
                     [attr.aria-label]="sec.label + ', ' + sectionCount(sec.id) + ' exercicis. ' + (isSectionCollapsed(sec.id) ? 'Desplega secció' : 'Plega secció')"
@@ -59,6 +59,8 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
           @if (!isEntryHidden($index)) {
           <app-exercise-entry-card
             cdkDrag [cdkDragDisabled]="!editMode() && !alwaysEditable()"
+            (cdkDragStarted)="isDragging.set(true)"
+            (cdkDragEnded)="isDragging.set(false)"
             [entry]="entry"
             [catColor]="getCatColor(entry)"
             [collapsed]="isCollapsed(entry.exerciseId)"
@@ -926,6 +928,7 @@ export class WorkoutEditorComponent implements OnDestroy {
   readonly prevNoteData    = signal<{ exerciseId: string; notes: string } | null>(null);
   readonly collapsedEntries  = signal<Set<string>>(new Set());
   readonly collapsedSections = signal<Set<string>>(new Set());
+  readonly isDragging        = signal(false);
   // ── Rest timer ─────────────────────────────────────────────────────────────
   readonly timerActive    = signal(false);
   readonly timerRemaining = signal(0);
