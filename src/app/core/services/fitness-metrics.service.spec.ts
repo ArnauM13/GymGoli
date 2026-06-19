@@ -5,9 +5,16 @@ import { FitnessMetricsService } from './fitness-metrics.service';
 import { WorkoutService } from './workout.service';
 import { SportService } from './sport.service';
 import { UserSettingsService } from './user-settings.service';
+import { WorkoutProfileService } from './workout-profile.service';
 import { DEFAULT_USER_SETTINGS, UserSettings } from '../models/user-settings.model';
 import { Workout } from '../models/workout.model';
 import { Sport, SportSession } from '../models/sport.model';
+
+const NEUTRAL_CAT = { daysSinceLast: 2, typicalGapDays: 4, overdueScore: 0.5 };
+const NEUTRAL_PROFILE = {
+  gym: { push: NEUTRAL_CAT, pull: NEUTRAL_CAT, legs: NEUTRAL_CAT },
+  favoriteSport: null, recentSport: null, minRecovery: 2,
+};
 
 // Fixed Wednesday so all date-relative assertions are deterministic
 const MOCK_DATE = '2025-04-23';
@@ -54,9 +61,10 @@ describe('FitnessMetricsService', () => {
     TestBed.configureTestingModule({
       providers: [
         FitnessMetricsService,
-        { provide: WorkoutService,     useValue: { workouts: mockWorkouts } },
-        { provide: SportService,       useValue: { sessions: mockSessions, sports: mockSports } },
-        { provide: UserSettingsService, useValue: { settings: mockSettings } },
+        { provide: WorkoutService,        useValue: { doneWorkouts: mockWorkouts, getPlannedForDate: jasmine.createSpy().and.returnValue([]) } },
+        { provide: SportService,          useValue: { sessions: mockSessions, sports: mockSports, getPlannedSportSessionsForDate: jasmine.createSpy().and.returnValue([]) } },
+        { provide: UserSettingsService,   useValue: { settings: mockSettings, fitnessGoal: signal(null) } },
+        { provide: WorkoutProfileService, useValue: { profile: signal(NEUTRAL_PROFILE) } },
       ],
     });
 
@@ -157,7 +165,8 @@ describe('FitnessMetricsService', () => {
   // ── setmana_fluixa ───────────────────────────────────────────────────────
 
   describe('setmana_fluixa', () => {
-    it('triggers on Wednesday with 0 gym workouts and 0 sport sessions', () => {
+    it('triggers on Thursday with 0 gym workouts and 0 sport sessions', () => {
+      jasmine.clock().mockDate(new Date('2025-04-24T12:00:00')); // Thursday, dow=4
       mockWorkouts.set([]);
       mockSessions.set([]);
       mockSports.set([]);
@@ -532,9 +541,10 @@ describe('FitnessMetricsService', () => {
   // ── camino_objectiu ──────────────────────────────────────────────────────
 
   describe('camino_objectiu', () => {
-    // MOCK_DATE is Wed Apr 23 (dow=3), so camino_objectiu conditions apply
+    // camino_objectiu fires on dow >= 4 (Thursday+), not Wednesday
 
-    it('triggers on Wednesday with some progress toward goal', () => {
+    it('triggers on Thursday with some progress toward goal', () => {
+      jasmine.clock().mockDate(new Date('2025-04-24T12:00:00')); // Thursday, dow=4
       mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 4 });
       mockWorkouts.set([makeWorkout(d(-1))]);  // 1 workout this week, goal is 4
       mockSessions.set([]);
@@ -571,6 +581,7 @@ describe('FitnessMetricsService', () => {
     });
 
     it('message includes current and goal counts', () => {
+      jasmine.clock().mockDate(new Date('2025-04-24T12:00:00')); // Thursday, dow=4
       mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 4 });
       mockWorkouts.set([makeWorkout(d(-1))]);
 

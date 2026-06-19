@@ -38,8 +38,8 @@ describe('OnboardingComponent', () => {
     expect(component.step()).toBe(0);
   });
 
-  it('has 3 slides', () => {
-    expect(component.slides.length).toBe(3);
+  it('has 5 slides', () => {
+    expect(component.slides.length).toBe(5);
   });
 
   // ── next() ───────────────────────────────────────────────────────────────
@@ -56,10 +56,10 @@ describe('OnboardingComponent', () => {
       expect(component.step()).toBe(2);
     });
 
-    it('does not go past the last slide', () => {
-      component.step.set(component.slides.length - 1);
+    it('does not go past the goal step', () => {
+      component.step.set(component.TOTAL_STEPS - 1);
       component.next();
-      expect(component.step()).toBe(component.slides.length - 1);
+      expect(component.step()).toBe(component.TOTAL_STEPS - 1);
     });
   });
 
@@ -81,9 +81,11 @@ describe('OnboardingComponent', () => {
   // ── finish() ─────────────────────────────────────────────────────────────
 
   describe('finish()', () => {
+    beforeEach(() => component.selectedGoal.set('strength' as any));
+
     it('calls settingsService.update with onboardingDone: true', () => {
       component.finish();
-      expect(mockUpdate).toHaveBeenCalledWith({ onboardingDone: true });
+      expect(mockUpdate).toHaveBeenCalledWith(jasmine.objectContaining({ onboardingDone: true }));
     });
 
     it('emits the done output event', () => {

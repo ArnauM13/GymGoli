@@ -6,6 +6,8 @@ import { HistoryComponent } from './history.component';
 import { WorkoutService } from '../../core/services/workout.service';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
+import { AuthService } from '../../core/services/auth.service';
+import { UserSettingsService } from '../../core/services/user-settings.service';
 import { FeelingLevel, Workout, WorkoutEntry } from '../../core/models/workout.model';
 
 const TODAY = new Date().toISOString().split('T')[0];
@@ -16,36 +18,37 @@ function makeWorkout(overrides: Partial<Workout> = {}): Workout {
 
 describe('HistoryComponent', () => {
   let component: HistoryComponent;
-  let mockWorkouts: ReturnType<typeof signal<Workout[]>>;
 
   beforeEach(async () => {
-    mockWorkouts = signal<Workout[]>([]);
-
     const mockWorkoutService = {
-      workouts:         mockWorkouts,
-      doneWorkouts:     mockWorkouts,
-      isLoading:        signal(false),
-      getWorkoutForDate:  jasmine.createSpy().and.returnValue(null),
-      todayDateString:    jasmine.createSpy().and.returnValue(TODAY),
-      loadAllWorkouts:    jasmine.createSpy(),
+      isLoading:         signal(false),
+      getWorkoutForDate: jasmine.createSpy().and.returnValue(null),
+      todayDateString:   jasmine.createSpy().and.returnValue(TODAY),
+      loadWorkoutPage:   jasmine.createSpy().and.resolveTo({ workouts: [], total: 0 }),
     };
 
     const mockExerciseService = {
-      exercises: signal<any[]>([]),
-      getById:   jasmine.createSpy().and.returnValue(null),
+      exercises:    signal<any[]>([]),
+      isLoaded:     signal(true),
+      getById:      jasmine.createSpy().and.returnValue(null),
+      ensureLoaded: jasmine.createSpy().and.resolveTo(undefined),
     };
 
     const mockSportService = {
-      sports:                   signal<any[]>([]),
-      getSportSessionsForDate:  jasmine.createSpy().and.returnValue([]),
+      sports:                  signal<any[]>([]),
+      isLoaded:                signal(true),
+      getSportSessionsForDate: jasmine.createSpy().and.returnValue([]),
+      ensureLoaded:            jasmine.createSpy().and.resolveTo(undefined),
     };
 
     await TestBed.configureTestingModule({
       imports:   [HistoryComponent],
       providers: [
-        { provide: WorkoutService,  useValue: mockWorkoutService },
-        { provide: ExerciseService, useValue: mockExerciseService },
-        { provide: SportService,    useValue: mockSportService },
+        { provide: WorkoutService,      useValue: mockWorkoutService },
+        { provide: ExerciseService,     useValue: mockExerciseService },
+        { provide: SportService,        useValue: mockSportService },
+        { provide: AuthService,         useValue: { uid: signal('user-1') } },
+        { provide: UserSettingsService, useValue: { weightUnit: signal<'kg' | 'lb'>('kg') } },
       ],
     })
       .overrideComponent(HistoryComponent, {
@@ -233,40 +236,41 @@ describe('HistoryComponent', () => {
     });
   });
 
-  // ── filteredWorkouts() ───────────────────────────────────────────────────
+  // ── hasActiveFilter() ────────────────────────────────────────────────────
 
-  describe('filteredWorkouts()', () => {
-    beforeEach(() => {
-      // WorkoutService returns workouts sorted newest-first, matching real service behaviour
-      mockWorkouts.set([
-        makeWorkout({ id: '3', date: '2024-03-03', categories: ['push', 'pull'] }),
-        makeWorkout({ id: '2', date: '2024-03-02', categories: ['pull'] }),
-        makeWorkout({ id: '1', date: '2024-03-01', categories: ['push'] }),
-      ]);
+  describe('hasActiveFilter()', () => {
+    it('is false when no filter is set', () => {
+      expect(component.hasActiveFilter()).toBeFalse();
     });
 
-    it('returns all workouts when no filter is active', () => {
+    it('is true when a category filter is set', () => {
+      component.filterCat.set('push');
+      expect(component.hasActiveFilter()).toBeTrue();
+    });
+
+    it('is true when a date is selected', () => {
+      component.selectedDate.set('2024-03-15');
+      expect(component.hasActiveFilter()).toBeTrue();
+    });
+
+    it('is false after all filters are cleared', () => {
+      component.filterCat.set('push');
       component.filterCat.set(null);
-      expect(component.filteredWorkouts().length).toBe(3);
+      expect(component.hasActiveFilter()).toBeFalse();
     });
+  });
 
-    it('filters to only workouts containing the selected category', () => {
-      component.filterCat.set('pull');
-      const results = component.filteredWorkouts();
-      expect(results.length).toBe(2);
-      expect(results.every(w => (w.categories ?? []).includes('pull'))).toBeTrue();
+  // ── items() + pagination state ───────────────────────────────────────────
+
+  describe('items()', () => {
+    it('starts as an empty array', () => {
+      expect(component.items()).toEqual([]);
     });
+  });
 
-    it('reverses order when sortDesc is false', () => {
-      component.sortDesc.set(false);
-      const ids = component.filteredWorkouts().map(w => w.id);
-      expect(ids).toEqual(['1', '2', '3']);
-    });
-
-    it('filters to a single day when a date is selected', () => {
-      component.selectDate('2024-03-02');
-      const ids = component.filteredWorkouts().map(w => w.id);
-      expect(ids).toEqual(['2']);
+  describe('hasMore()', () => {
+    it('is false when items equals total (both zero)', () => {
+      expect(component.hasMore()).toBeFalse();
     });
   });
 
@@ -280,20 +284,6 @@ describe('HistoryComponent', () => {
     it('can be collapsed', () => {
       component.calendarOpen.set(false);
       expect(component.calendarOpen()).toBeFalse();
-    });
-  });
-
-  // ── isLoading computed ───────────────────────────────────────────────────
-
-  describe('isLoading', () => {
-    it('reflects false when the service is not loading', () => {
-      expect(component.isLoading()).toBeFalse();
-    });
-
-    it('reflects true when the service is loading', () => {
-      const svc = TestBed.inject(WorkoutService) as { isLoading: ReturnType<typeof signal<boolean>> };
-      (svc.isLoading as ReturnType<typeof signal<boolean>>).set(true);
-      expect(component.isLoading()).toBeTrue();
     });
   });
 });

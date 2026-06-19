@@ -23,6 +23,8 @@ describe('FitnessInsightsComponent', () => {
   let mockLoaded:   ReturnType<typeof signal<boolean>>;
   let mockInsights: ReturnType<typeof signal<FitnessInsight[]>>;
 
+  beforeEach(() => sessionStorage.removeItem('gymgoli_dismissed_insights'));
+
   beforeEach(async () => {
     mockEnabled  = signal(true);
     mockLoaded   = signal(true);

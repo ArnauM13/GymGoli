@@ -1,4 +1,4 @@
-import { Component, computed, inject, input } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
@@ -197,7 +197,7 @@ export class ExerciseStatsDialogComponent {
   readonly resolvedName = computed(() => this.data?.exerciseName ?? this.inlineExerciseName() ?? '');
 
   readonly isInline  = computed(() => !this.data);
-  readonly isLoading = this.workoutService.isLoading;
+  readonly isLoading = signal(false);
 
   /** Last 3 sessions with full sets, newest first */
   readonly recentSessions = computed((): SessionDetail[] => {
@@ -215,8 +215,11 @@ export class ExerciseStatsDialogComponent {
   });
 
   constructor() {
-    if (!this.data) return;
-    this.workoutService.loadAllWorkouts();
+    const id = this.data?.exerciseId;
+    if (!id) return;
+    this.isLoading.set(true);
+    this.workoutService.loadWorkoutsForExercise(id)
+      .finally(() => this.isLoading.set(false));
   }
 
   close(): void { this.dialogRef?.close(); }

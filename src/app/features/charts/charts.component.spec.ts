@@ -1,10 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { provideRouter } from '@angular/router';
 
 import { ChartsComponent } from './charts.component';
 import { WorkoutService } from '../../core/services/workout.service';
 import { ExerciseService } from '../../core/services/exercise.service';
+import { SportService } from '../../core/services/sport.service';
+import { UserSettingsService } from '../../core/services/user-settings.service';
 import { Exercise } from '../../core/models/exercise.model';
 import { Workout } from '../../core/models/workout.model';
 
@@ -34,20 +37,43 @@ describe('ChartsComponent', () => {
 
     const mockWorkoutService = {
       isLoading:              signal(false),
+      doneWorkouts:           jasmine.createSpy().and.returnValue([]),
       exercisesWithData:      jasmine.createSpy().and.returnValue(new Set<string>()),
       getWorkoutsForExercise: mockGetWorkoutsForExercise,
       loadAllWorkouts:        jasmine.createSpy(),
+      loadWorkoutsForExercise: jasmine.createSpy().and.resolveTo(undefined),
     };
 
     const mockExerciseService = {
-      exercises: signal<Exercise[]>([]),
+      exercises:    signal<Exercise[]>([]),
+      isLoaded:     signal(true),
+      ensureLoaded: jasmine.createSpy().and.resolveTo(undefined),
+    };
+
+    const mockSportService = {
+      sports:       signal<any[]>([]),
+      sessions:     jasmine.createSpy().and.returnValue([]),
+      isLoaded:     signal(true),
+      ensureLoaded: jasmine.createSpy().and.resolveTo(undefined),
+    };
+
+    const mockSettingsService = {
+      weightUnit:         signal<'kg' | 'lb'>('kg'),
+      darkMode:           signal(false),
+      goalMode:           signal('gym'),
+      weeklyActivityGoal: signal(3),
+      weeklyGymGoal:      signal(3),
+      weeklySportGoal:    signal(2),
     };
 
     await TestBed.configureTestingModule({
       imports:   [ChartsComponent],
       providers: [
-        { provide: WorkoutService,  useValue: mockWorkoutService },
-        { provide: ExerciseService, useValue: mockExerciseService },
+        provideRouter([]),
+        { provide: WorkoutService,      useValue: mockWorkoutService },
+        { provide: ExerciseService,     useValue: mockExerciseService },
+        { provide: SportService,        useValue: mockSportService },
+        { provide: UserSettingsService, useValue: mockSettingsService },
       ],
     }).compileComponents();
 
@@ -129,7 +155,7 @@ describe('ChartsComponent', () => {
 
     it('filters out zero-value points when metric is feeling', () => {
       mockGetWorkoutsForExercise.and.returnValue([
-        makeWorkout('2024-03-01', 'ex1', { sets: [{ weight: 60, reps: 10 }] }),          // no feeling → 0
+        makeWorkout('2024-03-01', 'ex1', { sets: [{ weight: 60, reps: 10 }] }),      // no feeling → 0
         makeWorkout('2024-03-08', 'ex1', { sets: [{ weight: 60, reps: 10 }], feeling: 4 }),
       ]);
       component.selectedExerciseId = 'ex1';
@@ -237,6 +263,35 @@ describe('ChartsComponent', () => {
   describe('onExerciseChange()', () => {
     it('does not throw when called with no active chart', () => {
       expect(() => component.onExerciseChange()).not.toThrow();
+    });
+
+    it('calls loadWorkoutsForExercise when an exercise is selected', () => {
+      const svc = TestBed.inject(WorkoutService) as any;
+      component.selectedExerciseId = 'ex1';
+      component.onExerciseChange();
+      expect(svc.loadWorkoutsForExercise).toHaveBeenCalledWith('ex1');
+    });
+
+    it('does not call loadWorkoutsForExercise when selection is cleared', () => {
+      const svc = TestBed.inject(WorkoutService) as any;
+      component.selectedExerciseId = '';
+      component.onExerciseChange();
+      expect(svc.loadWorkoutsForExercise).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── selectRecord() ───────────────────────────────────────────────────────
+
+  describe('selectRecord()', () => {
+    it('sets selectedExerciseId to the given exercise', () => {
+      component.selectRecord('ex-abc');
+      expect(component.selectedExerciseId).toBe('ex-abc');
+    });
+
+    it('triggers loadWorkoutsForExercise for the selected exercise', () => {
+      const svc = TestBed.inject(WorkoutService) as any;
+      component.selectRecord('ex-abc');
+      expect(svc.loadWorkoutsForExercise).toHaveBeenCalledWith('ex-abc');
     });
   });
 });

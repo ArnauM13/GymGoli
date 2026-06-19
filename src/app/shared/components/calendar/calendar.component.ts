@@ -391,7 +391,9 @@ export class CalendarComponent {
   readonly weekStart = signal<string>(mondayOf(new Date().toISOString().split('T')[0]));
 
   readonly dayNames = ['dl', 'dm', 'dc', 'dj', 'dv', 'ds', 'dg'];
-  readonly isLoading = this.workoutService.isLoading;
+  readonly isLoading = computed(() =>
+    this.workoutService.isLoading() || !this.sportService.isLoaded()
+  );
   readonly isDialog  = !!this.dialogRef;
   readonly todayStr  = new Date().toISOString().split('T')[0];
 
@@ -412,6 +414,7 @@ export class CalendarComponent {
 
     // Ensure data loaded for visible period
     effect(() => {
+      this.sportService.ensureLoaded(); // sport definitions load on first calendar render
       if (this.view() === 'month') {
         this.workoutService.ensureMonthLoaded(this.calYear(), this.calMonth());
         this.sportService.ensureMonthLoaded(this.calYear(), this.calMonth());

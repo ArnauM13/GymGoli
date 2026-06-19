@@ -23,17 +23,20 @@ describe('LibraryComponent', () => {
 
     const mockExerciseService = {
       exercises:    mockExercises,
+      isLoaded:     signal(true),
       create:       jasmine.createSpy().and.resolveTo(undefined),
       update:       jasmine.createSpy().and.resolveTo(undefined),
       delete:       jasmine.createSpy().and.resolveTo(undefined),
-      seedIfEmpty:  jasmine.createSpy().and.resolveTo(undefined),
+      ensureLoaded: jasmine.createSpy().and.resolveTo(undefined),
     };
 
     const mockSportService = {
       sports:       signal<any[]>([]),
+      isLoaded:     signal(true),
       createSport:  jasmine.createSpy().and.resolveTo(undefined),
       updateSport:  jasmine.createSpy().and.resolveTo(undefined),
       deleteSport:  jasmine.createSpy().and.resolveTo(undefined),
+      ensureLoaded: jasmine.createSpy().and.resolveTo(undefined),
     };
 
     await TestBed.configureTestingModule({

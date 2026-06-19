@@ -33,20 +33,42 @@ export class ExerciseService {
   private supabase = inject(SupabaseService).client;
   private auth     = inject(AuthService);
 
-  private _exercises = signal<Exercise[]>([]);
+  private _exercises  = signal<Exercise[]>([]);
   readonly exercises: Signal<Exercise[]> = this._exercises.asReadonly();
 
+  // Exposed so components can show a loading state while exercises are fetching
+  readonly isLoaded = signal(false);
+  private _loadPromise: Promise<void> | null = null;
+
   constructor() {
+    // Clear cache on logout — don't auto-reload on login (lazy)
     effect(() => {
-      const uid = this.auth.uid();
-      if (uid) this._load(uid);
-      else     this._exercises.set([]);
+      if (!this.auth.uid()) {
+        this._exercises.set([]);
+        this.isLoaded.set(false);
+        this._loadPromise = null;
+      }
     });
   }
 
-  // ── Load ──────────────────────────────────────────────────────
+  // ── Lazy initialisation — call once per feature that needs exercises ──────
 
-  private async _load(uid: string): Promise<void> {
+  ensureLoaded(): Promise<void> {
+    if (this.isLoaded()) return Promise.resolve();
+    if (this._loadPromise)  return this._loadPromise;
+    this._loadPromise = this._initLoad().finally(() => { this._loadPromise = null; });
+    return this._loadPromise;
+  }
+
+  private async _initLoad(): Promise<void> {
+    const uid = this.auth.uid();
+    if (!uid) return;
+    await this._seedIfNeeded(uid);
+    await this._fetch(uid);
+    this.isLoaded.set(true);
+  }
+
+  private async _fetch(uid: string): Promise<void> {
     const { data, error } = await this.supabase
       .from('exercises')
       .select('*')
@@ -55,6 +77,19 @@ export class ExerciseService {
 
     if (error) return;
     this._exercises.set((data ?? []).map(r => toExercise(r as Record<string, unknown>)));
+  }
+
+  // Inserts default exercises the very first time a user has none
+  private async _seedIfNeeded(uid: string): Promise<void> {
+    const { count, error } = await this.supabase
+      .from('exercises')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', uid);
+
+    if (error || (count ?? 0) > 0) return;
+
+    const rows = DEFAULT_EXERCISES.map(e => this._toRow(uid, e));
+    await this.supabase.from('exercises').insert(rows);
   }
 
   // ── Public API ────────────────────────────────────────────────
@@ -129,19 +164,6 @@ export class ExerciseService {
 
     if (error) throw error;
     this._exercises.set(this._exercises().filter(e => e.id !== id));
-  }
-
-  async seedIfEmpty(uid: string): Promise<void> {
-    const { count, error } = await this.supabase
-      .from('exercises')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', uid);
-
-    if (error || (count ?? 0) > 0) return;
-
-    const rows = DEFAULT_EXERCISES.map(e => this._toRow(uid, e));
-    await this.supabase.from('exercises').insert(rows);
-    await this._load(uid);
   }
 
   private _toRow(uid: string, e: Omit<Exercise, 'id' | 'createdAt'>): Record<string, unknown> {

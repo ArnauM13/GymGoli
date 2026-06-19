@@ -43,7 +43,9 @@ export class SportService {
 
   // ── Sport definitions ────────────────────────────────────────────────────
   private readonly _sports = signal<Sport[]>([]);
-  readonly sports = this._sports.asReadonly();
+  readonly sports  = this._sports.asReadonly();
+  readonly isLoaded = signal(false);
+  private _loadPromise: Promise<void> | null = null;
 
   // ── Sessions cache ────────────────────────────────────────────────────────
   private readonly _monthCache = new Map<string, SportSession[]>();
@@ -74,6 +76,8 @@ export class SportService {
       this._sportsLoaded.set(false);
       this._monthCache.clear();
       this._sessions.set([]);
+      this.isLoaded.set(false);
+      this._loadPromise = null;
       if (uid) {
         const cached = this._readSportsFromStorage(uid);
         if (cached) {
@@ -81,9 +85,24 @@ export class SportService {
           this._sportsLoaded.set(true);
         }
         this._loadSports(uid);
-        this._preloadRecentMonths();
+        this._preloadCurrentMonth();
       }
     });
+  }
+
+  // ── Lazy initialisation — call once per feature that needs sport definitions
+  ensureLoaded(): Promise<void> {
+    if (this.isLoaded()) return Promise.resolve();
+    if (this._loadPromise)  return this._loadPromise;
+    this._loadPromise = this._initLoad().finally(() => { this._loadPromise = null; });
+    return this._loadPromise;
+  }
+
+  private async _initLoad(): Promise<void> {
+    const uid = this.auth.uid();
+    if (!uid) return;
+    await this._loadSports(uid);
+    this.isLoaded.set(true);
   }
 
   // ── Sport CRUD ────────────────────────────────────────────────────────────
@@ -167,11 +186,9 @@ export class SportService {
 
   // ── Sessions load ─────────────────────────────────────────────────────────
 
-  private _preloadRecentMonths(): void {
-    const now  = new Date();
+  private _preloadCurrentMonth(): void {
+    const now = new Date();
     this.ensureMonthLoaded(now.getFullYear(), now.getMonth());
-    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    this.ensureMonthLoaded(prev.getFullYear(), prev.getMonth());
   }
 
   async ensureMonthLoaded(year: number, month: number): Promise<void> {

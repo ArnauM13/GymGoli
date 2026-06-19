@@ -1912,6 +1912,8 @@ export class TrainComponent {
   });
 
   constructor() {
+    this.sportService.ensureLoaded();
+
     effect(() => {
       const date = this.selectedDate();
       const [yearStr, monthStr] = date.split('-');
