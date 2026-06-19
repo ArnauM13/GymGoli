@@ -35,7 +35,8 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
            tabindex="-1" aria-hidden="true" autocomplete="off">
 
     @if (workout(); as w) {
-      <div class="we-entries" cdkDropList (cdkDropListDropped)="onDrop($event)">
+      <div class="we-entries" [class.we-entries--dragging]="isDragging()"
+           cdkDropList (cdkDropListDropped)="onDrop($event)">
 
         @for (entry of w.entries; track entry.exerciseId) {
 
@@ -389,9 +390,19 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       flex-direction: column;
       gap: 12px;
     }
+    /* Extra drop space while dragging so an item can be placed after the last one */
+    .we-entries--dragging { padding-bottom: 72px; }
 
     /* ── Entry drag animation ── */
     .cdk-drag-animating app-exercise-entry-card { transition: transform 200ms ease; }
+
+    /* ── Drop placeholder (skeleton slot) ── */
+    app-exercise-entry-card.cdk-drag-placeholder {
+      border-radius: 14px;
+      border: 2px dashed color-mix(in srgb, var(--c-brand) 55%, var(--c-border-2));
+      background: color-mix(in srgb, var(--c-brand) 8%, var(--c-card));
+    }
+    app-exercise-entry-card.cdk-drag-placeholder > * { visibility: hidden; }
 
     /* ── Section headers ── */
     .we-section-header {
