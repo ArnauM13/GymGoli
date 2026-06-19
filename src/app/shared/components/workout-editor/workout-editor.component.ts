@@ -40,13 +40,13 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
         @for (entry of w.entries; track entry.exerciseId) {
 
           <!-- ── Section header (non-draggable, recalculates when entries reorder) ── -->
-          @if (showSections() && sectionBreaks().has($index)) {
-            <div class="we-section-header" (click)="toggleSection(sectionBreaks().get($index)!)">
+          @if (showSections() && sectionBreaks().get($index); as sec) {
+            <div class="we-section-header" (click)="toggleSection(sec.id)">
               <div class="we-section-line"></div>
-              <span class="we-section-title">{{ sectionBreaks().get($index) }}</span>
-              <span class="we-section-count">{{ sectionCount(sectionBreaks().get($index)!) }}</span>
+              <span class="we-section-title">{{ sec.label }}</span>
+              <span class="we-section-count">{{ sectionCount(sec.id) }}</span>
               <span class="material-symbols-outlined we-section-chevron"
-                    [class.we-section-chevron--collapsed]="isSectionCollapsed(sectionBreaks().get($index)!)">
+                    [class.we-section-chevron--collapsed]="isSectionCollapsed(sec.id)">
                 expand_less
               </span>
             </div>
@@ -931,39 +931,43 @@ export class WorkoutEditorComponent implements OnDestroy {
   });
 
   // ── Section grouping (pure frontend, no DB changes) ────────────────────────
-  /** Section label for each entry (by position), tracks consecutive subcategory runs */
-  readonly entrySections = computed((): string[] => {
+  /**
+   * Section id for each entry (by position). Each consecutive run of the same
+   * subcategory is its own section, keyed by the run's start index — so two
+   * separate "esquena" runs are independent sections.
+   */
+  readonly entrySectionIds = computed((): string[] => {
     const w = this.workout();
     if (!w) return [];
-    const result: string[] = [];
-    let cur = '';
-    for (const entry of w.entries) {
-      const sub = this.getSubLabel(entry);
-      if (sub !== cur) cur = sub;
-      result.push(cur);
-    }
-    return result;
-  });
-
-  /** entry index → section label, only at the start of each new section */
-  readonly sectionBreaks = computed((): Map<number, string> => {
-    const w = this.workout();
-    if (!w) return new Map();
-    const map = new Map<number, string>();
-    let prev = '';
+    const ids: string[] = [];
+    let prevSub: string | null = null;
+    let runStart = 0;
     for (let i = 0; i < w.entries.length; i++) {
       const sub = this.getSubLabel(w.entries[i]);
-      if (sub !== prev) { map.set(i, sub); prev = sub; }
+      if (sub !== prevSub) { runStart = i; prevSub = sub; }
+      ids.push(String(runStart));
+    }
+    return ids;
+  });
+
+  /** entry index → { id, label } at the start of each consecutive run */
+  readonly sectionBreaks = computed((): Map<number, { id: string; label: string }> => {
+    const w = this.workout();
+    if (!w) return new Map();
+    const map = new Map<number, { id: string; label: string }>();
+    let prevSub: string | null = null;
+    for (let i = 0; i < w.entries.length; i++) {
+      const sub = this.getSubLabel(w.entries[i]);
+      if (sub !== prevSub) { map.set(i, { id: String(i), label: sub }); prevSub = sub; }
     }
     return map;
   });
 
-  /** Show section headers only when the workout spans 2+ distinct subcategories */
+  /** Show section headers only when the workout has 2+ consecutive runs */
   readonly showSections = computed((): boolean => {
     const w = this.workout();
     if (!w || w.entries.length < 2) return false;
-    const subs = new Set(w.entries.map(e => this.getSubLabel(e)));
-    return subs.size > 1;
+    return this.sectionBreaks().size > 1;
   });
 
   /** Maps CDK drag-index → flat entries index (accounts for collapsed sections hiding entries from CDK) */
@@ -972,8 +976,8 @@ export class WorkoutEditorComponent implements OnDestroy {
     if (!w) return [];
     if (!this.showSections()) return w.entries.map((_, i) => i);
     const collapsed = this.collapsedSections();
-    const sections  = this.entrySections();
-    return w.entries.map((_, i) => i).filter(i => !collapsed.has(sections[i]));
+    const ids       = this.entrySectionIds();
+    return w.entries.map((_, i) => i).filter(i => !collapsed.has(ids[i]));
   });
 
   readonly feelingLevels3: FeelingLevel[] = [1, 3, 5];
@@ -1030,21 +1034,21 @@ export class WorkoutEditorComponent implements OnDestroy {
     if (wid) _collapsedByWorkout.set(wid, new Set(s));
   }
 
-  isSectionCollapsed(label: string): boolean { return this.collapsedSections().has(label); }
+  isSectionCollapsed(id: string): boolean { return this.collapsedSections().has(id); }
 
-  toggleSection(label: string): void {
+  toggleSection(id: string): void {
     const s = new Set(this.collapsedSections());
-    s.has(label) ? s.delete(label) : s.add(label);
+    s.has(id) ? s.delete(id) : s.add(id);
     this.collapsedSections.set(s);
   }
 
   isEntryHidden(index: number): boolean {
     if (!this.showSections()) return false;
-    return this.collapsedSections().has(this.entrySections()[index]);
+    return this.collapsedSections().has(this.entrySectionIds()[index]);
   }
 
-  sectionCount(label: string): number {
-    return this.entrySections().filter(s => s === label).length;
+  sectionCount(id: string): number {
+    return this.entrySectionIds().filter(s => s === id).length;
   }
 
   private _expandEntry(id: string): void {
