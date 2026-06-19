@@ -41,15 +41,19 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
           <!-- ── Section header (non-draggable, recalculates when entries reorder) ── -->
           @if (showSections() && sectionBreaks().get($index); as sec) {
-            <div class="we-section-header" (click)="toggleSection(sec.id)">
-              <div class="we-section-line"></div>
+            <button type="button" class="we-section-header"
+                    [attr.aria-expanded]="!isSectionCollapsed(sec.id)"
+                    [attr.aria-label]="sec.label + ', ' + sectionCount(sec.id) + ' exercicis. ' + (isSectionCollapsed(sec.id) ? 'Desplega secció' : 'Plega secció')"
+                    (click)="toggleSection(sec.id)">
+              <span class="we-section-accent" aria-hidden="true"></span>
               <span class="we-section-title">{{ sec.label }}</span>
               <span class="we-section-count">{{ sectionCount(sec.id) }}</span>
-              <span class="material-symbols-outlined we-section-chevron"
+              <span class="we-section-spacer" aria-hidden="true"></span>
+              <span class="material-symbols-outlined we-section-chevron" aria-hidden="true"
                     [class.we-section-chevron--collapsed]="isSectionCollapsed(sec.id)">
                 expand_less
               </span>
-            </div>
+            </button>
           }
 
           @if (!isEntryHidden($index)) {
@@ -389,26 +393,41 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
     /* ── Section headers ── */
     .we-section-header {
-      display: flex; align-items: center; gap: 8px;
-      padding: 4px 2px 2px; cursor: pointer; user-select: none;
+      display: flex; align-items: center; gap: 9px;
+      width: 100%; margin: 6px 0 2px; padding: 8px 12px;
+      font: inherit; text-align: left; appearance: none;
+      border: 1.5px solid color-mix(in srgb, var(--c-brand) 32%, var(--c-border-2));
+      border-radius: 10px;
+      background: color-mix(in srgb, var(--c-brand) 13%, var(--c-card));
+      cursor: pointer; user-select: none;
       -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+      transition: background 0.15s, border-color 0.15s;
     }
-    .we-section-line {
-      flex: 1; height: 1px;
-      background: var(--c-border-2);
+    .we-section-header:hover {
+      background: color-mix(in srgb, var(--c-brand) 20%, var(--c-card));
+      border-color: color-mix(in srgb, var(--c-brand) 45%, var(--c-border-2));
+    }
+    .we-section-header:focus-visible {
+      outline: 2px solid var(--c-brand); outline-offset: 2px;
+    }
+    .we-section-accent {
+      width: 4px; align-self: stretch; min-height: 16px; border-radius: 4px;
+      background: var(--c-brand); flex-shrink: 0;
     }
     .we-section-title {
-      font-size: 10px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.6px; color: var(--c-text-3); white-space: nowrap;
+      font-size: 12px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 0.5px; color: var(--c-text); white-space: nowrap;
       flex-shrink: 0;
     }
     .we-section-count {
-      font-size: 10px; font-weight: 600; color: var(--c-text-3);
-      background: var(--c-border-2); border-radius: 20px;
-      padding: 1px 6px; flex-shrink: 0;
+      font-size: 11px; font-weight: 700; color: #fff;
+      background: var(--c-brand); border-radius: 20px;
+      padding: 2px 8px; min-width: 20px; text-align: center; flex-shrink: 0;
+      line-height: 1.3;
     }
+    .we-section-spacer { flex: 1; }
     .we-section-chevron {
-      font-size: 16px; color: var(--c-text-3); flex-shrink: 0;
+      font-size: 20px; color: var(--c-brand); flex-shrink: 0;
       transition: transform 0.2s ease;
     }
     .we-section-chevron--collapsed { transform: rotate(-90deg); }
