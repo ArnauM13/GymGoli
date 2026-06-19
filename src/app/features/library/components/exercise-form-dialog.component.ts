@@ -25,167 +25,197 @@ const MUSCLE_GROUPS: { label: string; values: string[] }[] = [
 @Component({
   selector: 'app-exercise-form-dialog',
   standalone: true,
-  imports: [ReactiveFormsModule, MatDialogModule],
+  imports: [ReactiveFormsModule],
   template: `
-    <h2 mat-dialog-title class="dlg-title">{{ isEdit ? 'Editar exercici' : 'Nou exercici' }}</h2>
+    <div class="dlg-wrap">
 
-    <mat-dialog-content class="dlg-content">
-      <form [formGroup]="form" class="form">
+      <!-- Títol -->
+      <div class="dlg-header">
+        <h2 class="dlg-title">{{ isEdit ? 'Editar exercici' : 'Nou exercici' }}</h2>
+      </div>
 
-        <!-- Nom -->
-        <div class="field">
-          <label class="field-label" for="ex-name">Nom de l'exercici</label>
-          <input id="ex-name" class="field-input" type="text" formControlName="name"
-                 placeholder="Ex: Press banca" autocomplete="off" maxlength="50">
-          @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
-            <span class="field-error">El nom és obligatori</span>
-          }
-          @if (form.get('name')?.hasError('maxlength')) {
-            <span class="field-error">El nom no pot superar els 50 caràcters</span>
-          }
-        </div>
+      <!-- Contingut desplaçable -->
+      <div class="dlg-body">
+        <form [formGroup]="form" class="form">
 
-        <!-- Tipus -->
-        <div class="field">
-          <span class="field-label">Tipus</span>
-          <div class="cat-grid">
-            @for (cat of categories; track cat.value) {
-              <button type="button" class="cat-btn"
-                      [class.selected]="selectedCategory() === cat.value"
-                      [style.--cat-color]="cat.color"
-                      (click)="selectCategory(cat.value)">
-                <span class="material-symbols-outlined">{{ cat.icon }}</span>
-                <span class="cat-btn-label">{{ cat.label }}</span>
-              </button>
+          <!-- Nom -->
+          <div class="field">
+            <label class="field-label" for="ex-name">Nom de l'exercici</label>
+            <input id="ex-name" class="field-input" type="text" formControlName="name"
+                   placeholder="Ex: Press banca" autocomplete="off" maxlength="50">
+            @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
+              <span class="field-error">El nom és obligatori</span>
+            }
+            @if (form.get('name')?.hasError('maxlength')) {
+              <span class="field-error">El nom no pot superar els 50 caràcters</span>
             }
           </div>
-        </div>
 
-        <!-- Grup muscular principal -->
-        @if (subcategoryOptions().length > 0) {
+          <!-- Tipus -->
           <div class="field">
-            <span class="field-label">Grup muscular principal</span>
-            <div class="chips-row">
-              @for (sub of subcategoryOptions(); track sub.value) {
-                <button type="button" class="chip"
-                        [class.selected]="form.get('subcategory')?.value === sub.value"
-                        (click)="selectSubcategory(sub.value)">
-                  {{ sub.label }}
+            <span class="field-label">Tipus</span>
+            <div class="cat-grid">
+              @for (cat of categories; track cat.value) {
+                <button type="button" class="cat-btn"
+                        [class.selected]="selectedCategory() === cat.value"
+                        [style.--cat-color]="cat.color"
+                        (click)="selectCategory(cat.value)">
+                  <span class="material-symbols-outlined">{{ cat.icon }}</span>
+                  <span class="cat-btn-label">{{ cat.label }}</span>
                 </button>
               }
             </div>
           </div>
-        }
 
-        <!-- Músculs -->
-        <div class="field">
-          <span class="field-label">Músculs implicats <span class="optional-hint">(opcional)</span></span>
-          <div class="muscle-groups">
-            @for (group of muscleGroups; track group.label) {
-              <div class="muscle-group">
-                <span class="muscle-group-title">{{ group.label }}</span>
-                <div class="chips-row">
-                  @for (v of group.values; track v) {
-                    <button type="button" class="chip"
-                            [class.selected]="hasMuscle(v)"
-                            (click)="toggleMuscle(v)">
-                      {{ muscleLabel(v) }}
+          <!-- Grup muscular principal -->
+          @if (subcategoryOptions().length > 0) {
+            <div class="field">
+              <span class="field-label">Grup muscular principal</span>
+              <div class="chips-row">
+                @for (sub of subcategoryOptions(); track sub.value) {
+                  <button type="button" class="chip"
+                          [class.selected]="form.get('subcategory')?.value === sub.value"
+                          (click)="selectSubcategory(sub.value)">
+                    {{ sub.label }}
+                  </button>
+                }
+              </div>
+            </div>
+          }
+
+          <!-- Músculs -->
+          <div class="field">
+            <span class="field-label">Músculs implicats <span class="optional-hint">(opcional)</span></span>
+            <div class="muscle-groups">
+              @for (group of muscleGroups; track group.label) {
+                <div class="muscle-group">
+                  <span class="muscle-group-title">{{ group.label }}</span>
+                  <div class="chips-row">
+                    @for (v of group.values; track v) {
+                      <button type="button" class="chip"
+                              [class.selected]="hasMuscle(v)"
+                              (click)="toggleMuscle(v)">
+                        {{ muscleLabel(v) }}
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- Guia sèries i reps -->
+          <div class="field">
+            <span class="field-label">Guia de sèries i reps <span class="optional-hint">(opcional)</span></span>
+            <div class="guide-row">
+              <div class="guide-group">
+                <span class="guide-group-label">Sèries</span>
+                <div class="guide-inputs">
+                  <input class="guide-input" type="number" min="1" max="10" inputmode="numeric"
+                         [value]="setsMin() || null" placeholder="—"
+                         (input)="setsMin.set(numFromEvent($event))">
+                  @if (setsRange()) {
+                    <span class="guide-sep">–</span>
+                    <input class="guide-input" type="number" min="1" max="10" inputmode="numeric"
+                           [value]="setsMax() || null" placeholder="—"
+                           (input)="setsMax.set(numFromEvent($event))">
+                    <button type="button" class="guide-toggle" (click)="setsRange.set(false)" title="Treure rang">
+                      <span class="material-symbols-outlined">remove</span>
+                    </button>
+                  } @else {
+                    <button type="button" class="guide-toggle" (click)="setsRange.set(true)" title="Afegir rang">
+                      <span class="material-symbols-outlined">add</span>
+                      <span class="guide-toggle-label">rang</span>
                     </button>
                   }
                 </div>
               </div>
-            }
-          </div>
-        </div>
-
-        <!-- Guia sèries i reps -->
-        <div class="field">
-          <span class="field-label">Guia de sèries i reps <span class="optional-hint">(opcional)</span></span>
-          <div class="guide-row">
-            <div class="guide-group">
-              <span class="guide-group-label">Sèries</span>
-              <div class="guide-inputs">
-                <input class="guide-input" type="number" min="1" max="10" inputmode="numeric"
-                       [value]="setsMin() || null" placeholder="—"
-                       (input)="setsMin.set(numFromEvent($event))">
-                @if (setsRange()) {
-                  <span class="guide-sep">–</span>
-                  <input class="guide-input" type="number" min="1" max="10" inputmode="numeric"
-                         [value]="setsMax() || null" placeholder="—"
-                         (input)="setsMax.set(numFromEvent($event))">
-                  <button type="button" class="guide-toggle" (click)="setsRange.set(false)" title="Treure rang">
-                    <span class="material-symbols-outlined">remove</span>
-                  </button>
-                } @else {
-                  <button type="button" class="guide-toggle" (click)="setsRange.set(true)" title="Afegir rang">
-                    <span class="material-symbols-outlined">add</span>
-                    <span class="guide-toggle-label">rang</span>
-                  </button>
-                }
-              </div>
-            </div>
-            <div class="guide-group">
-              <span class="guide-group-label">Reps</span>
-              <div class="guide-inputs">
-                <input class="guide-input" type="number" min="1" max="100" inputmode="numeric"
-                       [value]="repsMin() || null" placeholder="—"
-                       (input)="repsMin.set(numFromEvent($event))">
-                @if (repsRange()) {
-                  <span class="guide-sep">–</span>
+              <div class="guide-group">
+                <span class="guide-group-label">Reps</span>
+                <div class="guide-inputs">
                   <input class="guide-input" type="number" min="1" max="100" inputmode="numeric"
-                         [value]="repsMax() || null" placeholder="—"
-                         (input)="repsMax.set(numFromEvent($event))">
-                  <button type="button" class="guide-toggle" (click)="repsRange.set(false)" title="Treure rang">
-                    <span class="material-symbols-outlined">remove</span>
-                  </button>
-                } @else {
-                  <button type="button" class="guide-toggle" (click)="repsRange.set(true)" title="Afegir rang">
-                    <span class="material-symbols-outlined">add</span>
-                    <span class="guide-toggle-label">rang</span>
-                  </button>
-                }
+                         [value]="repsMin() || null" placeholder="—"
+                         (input)="repsMin.set(numFromEvent($event))">
+                  @if (repsRange()) {
+                    <span class="guide-sep">–</span>
+                    <input class="guide-input" type="number" min="1" max="100" inputmode="numeric"
+                           [value]="repsMax() || null" placeholder="—"
+                           (input)="repsMax.set(numFromEvent($event))">
+                    <button type="button" class="guide-toggle" (click)="repsRange.set(false)" title="Treure rang">
+                      <span class="material-symbols-outlined">remove</span>
+                    </button>
+                  } @else {
+                    <button type="button" class="guide-toggle" (click)="repsRange.set(true)" title="Afegir rang">
+                      <span class="material-symbols-outlined">add</span>
+                      <span class="guide-toggle-label">rang</span>
+                    </button>
+                  }
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Descripció -->
-        <div class="field">
-          <label class="field-label" for="ex-desc">
-            Descripció de tècnica <span class="optional-hint">(opcional)</span>
-          </label>
-          <textarea id="ex-desc" class="field-input field-textarea" rows="3" formControlName="description"
-                    placeholder="Com fer l'exercici, consells de tècnica..."></textarea>
-        </div>
+          <!-- Descripció -->
+          <div class="field">
+            <label class="field-label" for="ex-desc">
+              Descripció de tècnica <span class="optional-hint">(opcional)</span>
+            </label>
+            <textarea id="ex-desc" class="field-input field-textarea" rows="3" formControlName="description"
+                      placeholder="Com fer l'exercici, consells de tècnica..."></textarea>
+          </div>
 
-        <!-- Notes -->
-        <div class="field">
-          <label class="field-label" for="ex-notes">
-            Notes personals <span class="optional-hint">(opcional)</span>
-          </label>
-          <textarea id="ex-notes" class="field-input field-textarea" rows="2" formControlName="notes"
-                    placeholder="Variants, equipament..."></textarea>
-        </div>
+          <!-- Notes -->
+          <div class="field">
+            <label class="field-label" for="ex-notes">
+              Notes personals <span class="optional-hint">(opcional)</span>
+            </label>
+            <textarea id="ex-notes" class="field-input field-textarea" rows="2" formControlName="notes"
+                      placeholder="Variants, equipament..."></textarea>
+          </div>
 
-      </form>
-    </mat-dialog-content>
+        </form>
+      </div>
 
-    <mat-dialog-actions align="end" class="dlg-actions">
-      <button class="dlg-btn dlg-btn--cancel" type="button" (click)="close()">Cancel·lar</button>
-      <button class="dlg-btn dlg-btn--save" type="button" (click)="save()"
-              [disabled]="form.invalid || !selectedCategory()">
-        {{ isEdit ? 'Desar' : 'Crear' }}
-      </button>
-    </mat-dialog-actions>
+      <!-- Accions -->
+      <div class="dlg-actions">
+        <button class="dlg-btn dlg-btn--cancel" type="button" (click)="close()">Cancel·lar</button>
+        <button class="dlg-btn dlg-btn--save" type="button" (click)="save()"
+                [disabled]="form.invalid || !selectedCategory()">
+          {{ isEdit ? 'Desar' : 'Crear' }}
+        </button>
+      </div>
+
+    </div>
   `,
   styles: [`
     :host { display: block; }
 
-    .dlg-title { margin: 0 0 4px; font-size: 17px; font-weight: 800; color: var(--c-text); padding: 16px 20px 8px; }
-    .dlg-content { padding: 0 20px !important; }
-    .dlg-actions { padding: 12px 20px 16px !important; gap: 8px; }
+    /* ── Wrapper ── */
+    .dlg-wrap {
+      display: flex; flex-direction: column;
+      max-height: 85vh; overflow: hidden;
+    }
 
-    .form { display: flex; flex-direction: column; gap: 18px; padding: 4px 0 8px; }
+    /* ── Títol ── */
+    .dlg-header {
+      padding: 20px 16px 14px;
+      border-bottom: 1px solid var(--c-border-2);
+      flex-shrink: 0;
+    }
+    .dlg-title { margin: 0; font-size: 17px; font-weight: 700; color: var(--c-text); }
+
+    /* ── Cos desplaçable ── */
+    .dlg-body { overflow-y: auto; padding: 16px; flex: 1; }
+
+    /* ── Accions ── */
+    .dlg-actions {
+      display: flex; justify-content: flex-end; gap: 10px;
+      padding: 14px 16px 18px;
+      border-top: 1px solid var(--c-border-2);
+      flex-shrink: 0;
+    }
+
+    .form { display: flex; flex-direction: column; gap: 18px; }
 
     /* ── Field (label + control) ── */
     .field { display: flex; flex-direction: column; gap: 8px; }

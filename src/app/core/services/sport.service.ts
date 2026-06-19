@@ -52,6 +52,10 @@ export class SportService {
   private readonly _sessions   = signal<SportSession[]>([]);
   readonly isLoading = signal(false);
 
+  private readonly _sportsLoaded = signal(false);
+  /** True once the user's sport definitions have been fetched at least once. */
+  readonly sportsLoaded = this._sportsLoaded.asReadonly();
+
   /** Public sessions are DONE-only so stats/charts/calendar never count plans. */
   readonly sessions = computed(() =>
     this._sessions().filter(s => (s.status ?? 'done') !== 'planned')
@@ -69,12 +73,19 @@ export class SportService {
     effect(() => {
       const uid = this.auth.uid();
       this._sports.set([]);
+      this._sportsLoaded.set(false);
       this._monthCache.clear();
       this._sessions.set([]);
       this.isLoaded.set(false);
       this._loadPromise = null;
       if (uid) {
-        this._preloadCurrentMonth(); // sessions still preload eagerly
+        const cached = this._readSportsFromStorage(uid);
+        if (cached) {
+          this._sports.set(cached);
+          this._sportsLoaded.set(true);
+        }
+        this._loadSports(uid);
+        this._preloadCurrentMonth();
       }
     });
   }
@@ -97,17 +108,22 @@ export class SportService {
   // ── Sport CRUD ────────────────────────────────────────────────────────────
 
   private async _loadSports(uid: string): Promise<void> {
-    const { data } = await this.supabase
-      .from('sports')
-      .select('*')
-      .eq('user_id', uid)
-      .order('created_at');
+    try {
+      const { data } = await this.supabase
+        .from('sports')
+        .select('*')
+        .eq('user_id', uid)
+        .order('created_at');
 
-    const sports = (data ?? []).map(r => toSport(r as Record<string, unknown>));
-    if (sports.length === 0) {
-      await this._seedDefaults(uid);
-    } else {
-      this._sports.set(sports);
+      const sports = (data ?? []).map(r => toSport(r as Record<string, unknown>));
+      if (sports.length === 0) {
+        await this._seedDefaults(uid);
+      } else {
+        this._sports.set(sports);
+        this._writeSportsToStorage(uid, sports);
+      }
+    } finally {
+      this._sportsLoaded.set(true);
     }
   }
 
@@ -120,7 +136,9 @@ export class SportService {
     }
     const { data } = await this.supabase
       .from('sports').select('*').eq('user_id', uid).order('created_at');
-    this._sports.set((data ?? []).map(r => toSport(r as Record<string, unknown>)));
+    const sports = (data ?? []).map(r => toSport(r as Record<string, unknown>));
+    this._sports.set(sports);
+    this._writeSportsToStorage(uid, sports);
   }
 
   async createSport(payload: Pick<Sport, 'name' | 'icon' | 'color' | 'subtypes' | 'metricDefs'>): Promise<void> {
@@ -157,7 +175,9 @@ export class SportService {
       .eq('id', id)
       .eq('user_id', uid);
     if (error) throw error;
-    this._sports.set(this._sports().filter(s => s.id !== id));
+    const updated = this._sports().filter(s => s.id !== id);
+    this._sports.set(updated);
+    this._writeSportsToStorage(uid, updated);
     for (const [key, sessions] of this._monthCache) {
       this._monthCache.set(key, sessions.filter(s => s.sportId !== id));
     }
@@ -372,6 +392,22 @@ export class SportService {
     const bucket = this._monthCache.get(key) ?? [];
     this._monthCache.set(key, bucket.filter(s => s.id !== id));
     this._rebuild();
+  }
+
+  // ── localStorage cache ────────────────────────────────────────────────────
+
+  private _lsSportsKey(uid: string): string { return `gymgoli_sports_${uid}`; }
+
+  private _writeSportsToStorage(uid: string, sports: Sport[]): void {
+    try { localStorage.setItem(this._lsSportsKey(uid), JSON.stringify(sports)); } catch { }
+  }
+
+  private _readSportsFromStorage(uid: string): Sport[] | null {
+    try {
+      const raw = localStorage.getItem(this._lsSportsKey(uid));
+      if (!raw) return null;
+      return (JSON.parse(raw) as Record<string, unknown>[]).map(r => toSport(r));
+    } catch { return null; }
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────

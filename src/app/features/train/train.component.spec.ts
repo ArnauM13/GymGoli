@@ -49,6 +49,7 @@ describe('TrainComponent', () => {
       sports:                  signal<any[]>([]),
       sessions:                signal<any[]>([]),
       isLoaded:                signal(true),
+      sportsLoaded:            signal(true),
       hasSportOnDate:          jasmine.createSpy().and.returnValue(false),
       getSessionForDate:       jasmine.createSpy().and.returnValue(null),
       getSportSessionsForDate:        jasmine.createSpy().and.returnValue([]),

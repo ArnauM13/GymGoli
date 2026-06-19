@@ -1,4 +1,4 @@
-import { Component, OnDestroy, ViewEncapsulation, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { Component, ElementRef, OnDestroy, ViewChild, ViewEncapsulation, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { MatDialog } from '@angular/material/dialog';
@@ -31,10 +31,28 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
   imports: [ReactiveFormsModule, DragDropModule, ExerciseEntryCardComponent],
   encapsulation: ViewEncapsulation.None,
   template: `
+    <input #focusTrap class="we-focus-trap" type="text" readonly
+           tabindex="-1" aria-hidden="true" autocomplete="off">
+
     @if (workout(); as w) {
       <div class="we-entries" cdkDropList (cdkDropListDropped)="onDrop($event)">
 
         @for (entry of w.entries; track entry.exerciseId) {
+
+          <!-- ── Section header (non-draggable, recalculates when entries reorder) ── -->
+          @if (showSections() && sectionBreaks().has($index)) {
+            <div class="we-section-header" (click)="toggleSection(sectionBreaks().get($index)!)">
+              <div class="we-section-line"></div>
+              <span class="we-section-title">{{ sectionBreaks().get($index) }}</span>
+              <span class="we-section-count">{{ sectionCount(sectionBreaks().get($index)!) }}</span>
+              <span class="material-symbols-outlined we-section-chevron"
+                    [class.we-section-chevron--collapsed]="isSectionCollapsed(sectionBreaks().get($index)!)">
+                expand_less
+              </span>
+            </div>
+          }
+
+          @if (!isEntryHidden($index)) {
           <app-exercise-entry-card
             cdkDrag [cdkDragDisabled]="!editMode() && !alwaysEditable()"
             [entry]="entry"
@@ -73,7 +91,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
             }
 
             <!-- ── Last session info banner ── -->
-            @if (lastSessionData()?.exerciseId === entry.exerciseId && entry.sets.length === 0 && addingFor() === entry.exerciseId) {
+            @if (lastSessionData()?.exerciseId === entry.exerciseId && entry.sets.length === 0 && addingFor() === entry.exerciseId && !recData()) {
               <div class="we-last-session-banner" role="button" tabindex="0"
                 (click)="applyLastSession(entry.exerciseId)"
                 (keydown.enter)="applyLastSession(entry.exerciseId)"
@@ -89,6 +107,20 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                     <span class="we-lsb-feeling">{{ getFeelingEmoji(lastSessionData()!.feeling!) }}</span>
                   }
                 </div>
+              </div>
+            }
+
+            <!-- ── Previous session note banner ── -->
+            @if (prevNoteData()?.exerciseId === entry.exerciseId && addingFor() === entry.exerciseId) {
+              <div class="we-prev-note-banner">
+                <span class="material-symbols-outlined we-pnb-icon">sticky_note_2</span>
+                <div class="we-pnb-info">
+                  <span class="we-pnb-label">Nota de l'última sessió</span>
+                  <span class="we-pnb-text">{{ prevNoteData()!.notes }}</span>
+                </div>
+                <button type="button" class="we-pnb-dismiss" (click)="prevNoteData.set(null)">
+                  <span class="material-symbols-outlined">close</span>
+                </button>
               </div>
             }
 
@@ -242,6 +274,10 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                   </button>
                 }
                 @if (alwaysEditable() || editMode()) {
+                  <button class="we-footer-notes-btn" [class.we-footer-notes-btn--set]="entry.notes"
+                    (click)="openNotesPopup(entry.exerciseId)" title="Nota de l'exercici">
+                    <span class="material-symbols-outlined">{{ entry.notes ? 'sticky_note_2' : 'note_add' }}</span>
+                  </button>
                   <button class="we-footer-delete-btn" (click)="removeEntry(entry.exerciseId)">
                     <span class="material-symbols-outlined">delete</span>
                   </button>
@@ -251,6 +287,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
             <!-- end projected body -->
           </app-exercise-entry-card>
+          } <!-- end @if (!isEntryHidden) -->
         }
 
         @if (alwaysEditable() || editMode()) {
@@ -307,9 +344,39 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
         </div>
       }
 
+      <!-- ── Notes popup ── -->
+      @if (notesPopupFor()) {
+        <div class="we-fatiga-backdrop" (click)="closeNotesPopup()"></div>
+        <div class="we-notes-popup">
+          <div class="we-notes-popup-header">
+            <span class="material-symbols-outlined we-notes-popup-icon">sticky_note_2</span>
+            <span class="we-notes-popup-title">Nota de l'exercici</span>
+            @if (notesText()) {
+              <button class="we-notes-clear-btn" (click)="notesText.set('')" title="Esborrar nota">
+                <span class="material-symbols-outlined">close</span>
+              </button>
+            }
+          </div>
+          <textarea class="we-notes-textarea" rows="4"
+            [value]="notesText()"
+            (input)="notesText.set($any($event.target).value)"
+            placeholder="Afegeix una nota per recordar a la propera sessió…"></textarea>
+          <div class="we-notes-actions">
+            <button type="button" class="we-inline-cancel" (click)="closeNotesPopup()">Cancel·lar</button>
+            <button type="button" class="we-inline-save" (click)="saveNotes()">Desar</button>
+          </div>
+        </div>
+      }
+
     }
   `,
   styles: [`
+    .we-focus-trap {
+      position: fixed; top: -9999px; left: -9999px;
+      width: 1px; height: 1px; opacity: 0;
+      pointer-events: none; border: none; padding: 0;
+    }
+
     .we-entries {
       padding: 10px 16px 0;
       display: flex;
@@ -319,6 +386,32 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
     /* ── Entry drag animation ── */
     .cdk-drag-animating app-exercise-entry-card { transition: transform 200ms ease; }
+
+    /* ── Section headers ── */
+    .we-section-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 4px 2px 2px; cursor: pointer; user-select: none;
+      -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+    }
+    .we-section-line {
+      flex: 1; height: 1px;
+      background: var(--c-border-2);
+    }
+    .we-section-title {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.6px; color: var(--c-text-3); white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .we-section-count {
+      font-size: 10px; font-weight: 600; color: var(--c-text-3);
+      background: var(--c-border-2); border-radius: 20px;
+      padding: 1px 6px; flex-shrink: 0;
+    }
+    .we-section-chevron {
+      font-size: 16px; color: var(--c-text-3); flex-shrink: 0;
+      transition: transform 0.2s ease;
+    }
+    .we-section-chevron--collapsed { transform: rotate(-90deg); }
 
 
 
@@ -416,6 +509,75 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     .we-lsb-stats { display: flex; align-items: center; gap: 6px; }
     .we-lsb-weight { font-size: 16px; font-weight: 700; color: var(--c-brand); }
     .we-lsb-feeling { font-size: 20px; line-height: 1; }
+
+    /* ── Notes footer button ── */
+    .we-footer-notes-btn {
+      width: 36px; height: 36px; border-radius: 10px;
+      border: 1.5px solid var(--c-border); background: transparent;
+      color: var(--c-text-3);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { background: var(--c-subtle); color: var(--c-text-2); }
+      &.we-footer-notes-btn--set {
+        border-color: rgba(var(--c-brand-rgb), 0.35);
+        color: var(--c-brand);
+        background: rgba(var(--c-brand-rgb), 0.07);
+      }
+    }
+
+    /* ── Previous-note banner ── */
+    .we-prev-note-banner {
+      display: flex; align-items: flex-start; gap: 10px;
+      margin: 6px 14px; padding: 10px 12px;
+      background: rgba(var(--c-brand-rgb), 0.06); border: 1px solid rgba(var(--c-brand-rgb), 0.13);
+      border-radius: 10px;
+    }
+    .we-pnb-icon { font-size: 18px; color: var(--c-brand); flex-shrink: 0; margin-top: 1px; }
+    .we-pnb-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+    .we-pnb-label { font-size: 10px; font-weight: 700; color: var(--c-text-3); text-transform: uppercase; letter-spacing: 0.4px; }
+    .we-pnb-text { font-size: 13px; color: var(--c-text-2); font-style: italic; line-height: 1.4; word-break: break-word; }
+    .we-pnb-dismiss {
+      display: flex; align-items: center; justify-content: center;
+      width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+      border: none; background: transparent; cursor: pointer; color: var(--c-text-3);
+      touch-action: manipulation; transition: background 0.12s;
+      .material-symbols-outlined { font-size: 14px; }
+      &:hover { background: var(--c-hover); }
+    }
+
+    /* ── Notes popup ── */
+    .we-notes-popup {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 201;
+      background: var(--c-card); border-radius: 20px 20px 0 0;
+      padding: 20px 20px 32px;
+      box-shadow: 0 -4px 24px var(--c-shadow-md);
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .we-notes-popup-header {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .we-notes-popup-icon { font-size: 18px; color: var(--c-brand); }
+    .we-notes-popup-title { font-size: 17px; font-weight: 700; color: var(--c-text); flex: 1; }
+    .we-notes-clear-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 30px; height: 30px; border-radius: 50%;
+      border: 1.5px solid rgba(239,83,80,0.3); background: rgba(239,83,80,0.07);
+      color: #ef5350; cursor: pointer; touch-action: manipulation; transition: background 0.15s;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover { background: rgba(239,83,80,0.16); }
+    }
+    .we-notes-textarea {
+      width: 100%; box-sizing: border-box;
+      border: 1.5px solid var(--c-border); border-radius: 10px;
+      background: var(--c-subtle); color: var(--c-text);
+      font-size: 14px; line-height: 1.5; padding: 10px 12px;
+      resize: none; font-family: inherit; outline: none;
+      transition: border-color 0.15s;
+      &:focus { border-color: var(--c-brand); }
+      &::placeholder { color: var(--c-text-3); }
+    }
+    .we-notes-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
     /* ── Goal recommendation banner ── */
     .we-rec-banner {
@@ -731,6 +893,8 @@ export class WorkoutEditorComponent implements OnDestroy {
 
   readonly requestAddExercise = output<void>();
 
+  @ViewChild('focusTrap') private focusTrapRef!: ElementRef<HTMLInputElement>;
+
   readonly addingFor        = signal<string | null>(null);
   readonly setQty           = signal(1);
   readonly setQtyOptions    = [1, 2, 3, 4, 5];
@@ -738,7 +902,11 @@ export class WorkoutEditorComponent implements OnDestroy {
   readonly lastSessionData  = signal<{ exerciseId: string; date: string; maxWeight: number; feeling?: FeelingLevel; sets: WorkoutSet[] } | null>(null);
   readonly recData          = signal<{ exerciseId: string; sets: number; reps: number; goalLabel: string } | null>(null);
   readonly feelingPickerFor = signal<string | null>(null);
-  readonly collapsedEntries = signal<Set<string>>(new Set());
+  readonly notesPopupFor   = signal<string | null>(null);
+  readonly notesText       = signal<string>('');
+  readonly prevNoteData    = signal<{ exerciseId: string; notes: string } | null>(null);
+  readonly collapsedEntries  = signal<Set<string>>(new Set());
+  readonly collapsedSections = signal<Set<string>>(new Set());
   // ── Rest timer ─────────────────────────────────────────────────────────────
   readonly timerActive    = signal(false);
   readonly timerRemaining = signal(0);
@@ -760,6 +928,52 @@ export class WorkoutEditorComponent implements OnDestroy {
       if (prevMax > 0 && maxInEntry > prevMax) ids.add(entry.exerciseId);
     }
     return ids;
+  });
+
+  // ── Section grouping (pure frontend, no DB changes) ────────────────────────
+  /** Section label for each entry (by position), tracks consecutive subcategory runs */
+  readonly entrySections = computed((): string[] => {
+    const w = this.workout();
+    if (!w) return [];
+    const result: string[] = [];
+    let cur = '';
+    for (const entry of w.entries) {
+      const sub = this.getSubLabel(entry);
+      if (sub !== cur) cur = sub;
+      result.push(cur);
+    }
+    return result;
+  });
+
+  /** entry index → section label, only at the start of each new section */
+  readonly sectionBreaks = computed((): Map<number, string> => {
+    const w = this.workout();
+    if (!w) return new Map();
+    const map = new Map<number, string>();
+    let prev = '';
+    for (let i = 0; i < w.entries.length; i++) {
+      const sub = this.getSubLabel(w.entries[i]);
+      if (sub !== prev) { map.set(i, sub); prev = sub; }
+    }
+    return map;
+  });
+
+  /** Show section headers only when the workout spans 2+ distinct subcategories */
+  readonly showSections = computed((): boolean => {
+    const w = this.workout();
+    if (!w || w.entries.length < 2) return false;
+    const subs = new Set(w.entries.map(e => this.getSubLabel(e)));
+    return subs.size > 1;
+  });
+
+  /** Maps CDK drag-index → flat entries index (accounts for collapsed sections hiding entries from CDK) */
+  readonly visibleEntryIndices = computed((): number[] => {
+    const w = this.workout();
+    if (!w) return [];
+    if (!this.showSections()) return w.entries.map((_, i) => i);
+    const collapsed = this.collapsedSections();
+    const sections  = this.entrySections();
+    return w.entries.map((_, i) => i).filter(i => !collapsed.has(sections[i]));
   });
 
   readonly feelingLevels3: FeelingLevel[] = [1, 3, 5];
@@ -816,6 +1030,23 @@ export class WorkoutEditorComponent implements OnDestroy {
     if (wid) _collapsedByWorkout.set(wid, new Set(s));
   }
 
+  isSectionCollapsed(label: string): boolean { return this.collapsedSections().has(label); }
+
+  toggleSection(label: string): void {
+    const s = new Set(this.collapsedSections());
+    s.has(label) ? s.delete(label) : s.add(label);
+    this.collapsedSections.set(s);
+  }
+
+  isEntryHidden(index: number): boolean {
+    if (!this.showSections()) return false;
+    return this.collapsedSections().has(this.entrySections()[index]);
+  }
+
+  sectionCount(label: string): number {
+    return this.entrySections().filter(s => s === label).length;
+  }
+
   private _expandEntry(id: string): void {
     if (!this.collapsedEntries().has(id)) return;
     const s = new Set(this.collapsedEntries());
@@ -829,6 +1060,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     this._resetForm();
     this.lastSessionData.set(null);
     this.recData.set(null);
+    this.prevNoteData.set(null);
   }
 
   private _resetForm(): void {
@@ -864,6 +1096,28 @@ export class WorkoutEditorComponent implements OnDestroy {
     this.closeFatigaPicker();
   }
 
+  openNotesPopup(exerciseId: string): void {
+    const w = this.workout();
+    const current = w?.entries.find(e => e.exerciseId === exerciseId)?.notes ?? '';
+    this.notesText.set(current);
+    this.notesPopupFor.set(exerciseId);
+  }
+
+  closeNotesPopup(): void { this.notesPopupFor.set(null); }
+
+  async saveNotes(): Promise<void> {
+    const exerciseId = this.notesPopupFor();
+    const w = this.workout();
+    if (!exerciseId || !w) return;
+    const notes = this.notesText().trim();
+    try {
+      await this.workoutService.updateEntryNotes(w.id, exerciseId, notes || undefined);
+    } catch {
+      this.snackBar.open('Error en desar la nota', '', { duration: 2000 });
+    }
+    this.closeNotesPopup();
+  }
+
   getCatColor(entry: WorkoutEntry): string {
     const ex = this.exerciseService.getById(entry.exerciseId);
     return ex ? CATEGORY_COLORS[ex.category] : '#bbb';
@@ -897,8 +1151,11 @@ export class WorkoutEditorComponent implements OnDestroy {
     if (event.previousIndex === event.currentIndex) return;
     const w = this.workout();
     if (!w) return;
+    const visIndices = this.visibleEntryIndices();
+    const fromFlat = visIndices[event.previousIndex] ?? event.previousIndex;
+    const toFlat   = visIndices[event.currentIndex]   ?? event.currentIndex;
     const entries = [...w.entries];
-    moveItemInArray(entries, event.previousIndex, event.currentIndex);
+    moveItemInArray(entries, fromFlat, toFlat);
     try {
       await this.workoutService.reorderEntries(w.id, entries);
     } catch {
@@ -936,36 +1193,49 @@ export class WorkoutEditorComponent implements OnDestroy {
     const w = this.workout();
     if (!w) return;
     const newFeeling = entry.feeling === level ? undefined : level;
+    const hadWorkoutFeeling = w.feeling != null;
     try {
       await this.workoutService.updateEntryFeeling(w.id, entry.exerciseId, newFeeling);
+      if (!hadWorkoutFeeling && this.workout()?.feeling != null) {
+        this.snackBar.open('Sensació general calculada automàticament', '', { duration: 2500 });
+      }
     } catch {
       this.snackBar.open('Error en actualitzar la fatiga', '', { duration: 2000 });
     }
   }
 
   startAddSet(entry: WorkoutEntry): void {
+    this.claimKeyboard();
     this._expandEntry(entry.exerciseId);
     this.editingSet.set(null);
     this.addingFor.set(entry.exerciseId);
-    const w = this.workout();
-    const u = this.unit();
+    const w    = this.workout();
+    const u    = this.unit();
+    const goal = this.settingsService.fitnessGoal();
     if (entry.sets.length === 0 && w) {
       const info = this.workoutService.getLastSessionInfo(entry.exerciseId, w.id);
+      const goal = this.settingsService.fitnessGoal();
       if (info) {
         const lastEntry = this.workoutService.workouts()
           .filter(wk => wk.id !== w.id && wk.entries.some(e => e.exerciseId === entry.exerciseId && e.sets.length > 0))
           .sort((a, b) => b.date.localeCompare(a.date))[0]
           ?.entries.find(e => e.exerciseId === entry.exerciseId);
         this.lastSessionData.set({ exerciseId: entry.exerciseId, ...info, sets: lastEntry?.sets ?? [] });
-        this.recData.set(null);
-        this.setForm.patchValue({ weight: kgToDisplay(info.maxWeight, u), reps: 8 });
-      } else {
-        this.lastSessionData.set(null);
-        const goal = this.settingsService.fitnessGoal();
+        this.prevNoteData.set(lastEntry?.notes ? { exerciseId: entry.exerciseId, notes: lastEntry.notes } : null);
         if (goal) {
           const rec = GOAL_REC[goal];
-          const goalLabel = FITNESS_GOAL_LABELS[goal];
-          this.recData.set({ exerciseId: entry.exerciseId, sets: rec.sets, reps: rec.reps, goalLabel });
+          this.recData.set({ exerciseId: entry.exerciseId, sets: rec.sets, reps: rec.reps, goalLabel: FITNESS_GOAL_LABELS[goal] });
+          this.setForm.reset({ weight: kgToDisplay(info.maxWeight, u), reps: rec.reps });
+        } else {
+          this.recData.set(null);
+          this.setForm.patchValue({ weight: kgToDisplay(info.maxWeight, u), reps: 8 });
+        }
+      } else {
+        this.lastSessionData.set(null);
+        this.prevNoteData.set(null);
+        if (goal) {
+          const rec = GOAL_REC[goal];
+          this.recData.set({ exerciseId: entry.exerciseId, sets: rec.sets, reps: rec.reps, goalLabel: FITNESS_GOAL_LABELS[goal] });
           this.setForm.reset({ weight: 0, reps: rec.reps });
         } else {
           this.recData.set(null);
@@ -975,9 +1245,13 @@ export class WorkoutEditorComponent implements OnDestroy {
     } else {
       this.lastSessionData.set(null);
       this.recData.set(null);
+      this.prevNoteData.set(null);
       const last = entry.sets.at(-1);
       if (last) this.setForm.patchValue({ weight: kgToDisplay(last.weight, u), reps: last.reps });
     }
+    requestAnimationFrame(() => {
+      (document.getElementById('add-weight') as HTMLInputElement | null)?.focus();
+    });
   }
 
   applyRecCustomize(): void {
@@ -999,6 +1273,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     this._resetForm();
     this.lastSessionData.set(null);
     this.recData.set(null);
+    this.prevNoteData.set(null);
   }
 
   async repeatLastSet(entry: WorkoutEntry): Promise<void> {
@@ -1017,21 +1292,31 @@ export class WorkoutEditorComponent implements OnDestroy {
     return es?.exerciseId === exerciseId && es?.index === index;
   }
 
-  tapSetPill(event: Event, exerciseId: string, index: number, set: WorkoutSet, focus: 'weight' | 'reps'): void {
+  tapSetPill(event: Event, exerciseId: string, setIndex: number, set: WorkoutSet, field: 'weight' | 'reps'): void {
     if (!this.isEntryEditable(exerciseId)) return;
     event.stopPropagation();
-    this.startEditSet(exerciseId, index, set, focus);
+    this.startEditSet(exerciseId, setIndex, set, field);
   }
 
   startEditSet(exerciseId: string, index: number, set: WorkoutSet, focus: 'weight' | 'reps' = 'weight'): void {
+    this.claimKeyboard();
     this.addingFor.set(null);
     this.editingSet.set({ exerciseId, index });
     this.editSetForm.setValue({ weight: kgToDisplay(set.weight, this.unit()), reps: set.reps });
-    setTimeout(() => {
+    requestAnimationFrame(() => {
       const el = document.getElementById(focus === 'weight' ? 'edit-weight' : 'edit-reps') as HTMLInputElement | null;
       el?.focus();
       el?.select();
-    }, 30);
+    });
+  }
+
+  /** Foca un input invisible síncronament dins del gesture per reservar el teclat a iOS. */
+  private claimKeyboard(): void {
+    const trap = this.focusTrapRef?.nativeElement;
+    if (!trap) return;
+    trap.removeAttribute('readonly');
+    trap.focus();
+    trap.setAttribute('readonly', '');
   }
 
   cancelEditSet(): void { this.editingSet.set(null); }
