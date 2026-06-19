@@ -297,7 +297,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
           } <!-- end @if (!isEntryHidden) -->
         }
 
-        @if (alwaysEditable() || editMode()) {
+        @if ((alwaysEditable() || editMode()) && !isDragging()) {
           <button class="we-add-exercise-btn" (click)="requestAddExercise.emit()">
             <span class="material-symbols-outlined">add</span>
             Afegir exercici
