@@ -393,11 +393,11 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
     /* ── Section headers ── */
     .we-section-header {
-      display: flex; align-items: center; gap: 9px;
-      width: 100%; margin: 6px 0 2px; padding: 8px 12px;
+      display: flex; align-items: center; gap: 7px;
+      width: 100%; margin: 5px 0 2px; padding: 6px 10px;
       font: inherit; text-align: left; appearance: none;
       border: 1.5px solid color-mix(in srgb, var(--c-brand) 32%, var(--c-border-2));
-      border-radius: 10px;
+      border-radius: 9px;
       background: color-mix(in srgb, var(--c-brand) 13%, var(--c-card));
       cursor: pointer; user-select: none;
       -webkit-tap-highlight-color: transparent; touch-action: manipulation;
@@ -411,26 +411,26 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       outline: 2px solid var(--c-brand); outline-offset: 2px;
     }
     .we-section-accent {
-      width: 4px; align-self: stretch; min-height: 16px; border-radius: 4px;
+      width: 3px; align-self: stretch; min-height: 13px; border-radius: 3px;
       background: var(--c-brand); flex-shrink: 0;
     }
     .we-section-title {
-      font-size: 12px; font-weight: 800; text-transform: uppercase;
-      letter-spacing: 0.5px; color: var(--c-text); white-space: nowrap;
+      font-size: 10px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 0.4px; color: var(--c-text); white-space: nowrap;
       flex-shrink: 0;
     }
     .we-section-count {
-      font-size: 11px; font-weight: 700; color: #fff;
+      font-size: 10px; font-weight: 700; color: #fff;
       background: var(--c-brand); border-radius: 20px;
-      padding: 2px 8px; min-width: 20px; text-align: center; flex-shrink: 0;
+      padding: 1px 7px; min-width: 18px; text-align: center; flex-shrink: 0;
       line-height: 1.3;
     }
     .we-section-spacer { flex: 1; }
     .we-section-chevron {
-      font-size: 20px; color: var(--c-brand); flex-shrink: 0;
+      font-size: 18px; color: var(--c-brand); flex-shrink: 0;
       transition: transform 0.2s ease;
     }
-    .we-section-chevron--collapsed { transform: rotate(-90deg); }
+    .we-section-chevron--collapsed { transform: rotate(90deg); }
 
 
 
