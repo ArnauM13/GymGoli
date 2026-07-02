@@ -621,7 +621,7 @@ const PAGE_SIZE = 20;
       to   { background-position: calc(300px + 100%) 0; }
     }
     .sk {
-      background: linear-gradient(90deg, #f0f0f0 0%, #e8e8e8 40%, #f0f0f0 80%);
+      background: linear-gradient(90deg, var(--c-border-2) 0%, var(--c-border) 40%, var(--c-border-2) 80%);
       background-size: 600px 100%;
       animation: sk-shimmer 1.5s ease-in-out infinite;
       border-radius: 8px;
