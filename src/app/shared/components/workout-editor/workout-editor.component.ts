@@ -382,6 +382,9 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       position: fixed; top: -9999px; left: -9999px;
       width: 1px; height: 1px; opacity: 0;
       pointer-events: none; border: none; padding: 0;
+      /* Must stay >=16px — iOS Safari auto-zooms the viewport on focus of any
+         input under 16px, even one that's off-screen like this one. */
+      font-size: 16px;
     }
 
     .we-entries {
