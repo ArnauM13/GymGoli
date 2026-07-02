@@ -43,7 +43,7 @@ const CAT_LABEL: Record<EditorCat, string> = {
       <app-page-header title="Plantilles" [showBack]="true" />
 
       <!-- Empty state -->
-      @if (sortedTemplates().length === 0 && !editorOpen()) {
+      @if (sortedTemplates().length === 0 && !editorOpen() && templateService.isLoaded()) {
         <div class="empty-state">
           <span class="material-symbols-outlined empty-icon">bookmark_border</span>
           <p class="empty-title">Sense plantilles</p>
@@ -457,25 +457,33 @@ export class TemplatesComponent {
     this.editorEntries = entries;
   }
 
-  saveTemplate(): void {
+  async saveTemplate(): Promise<void> {
     if (!this.editorName.trim()) return;
     const id = this.editingId();
-    if (id) {
-      this.templateService.update(id, {
-        name: this.editorName.trim(),
-        category: this.editorCat,
-        entries: this.editorEntries,
-      });
-      this.snackBar.open('Plantilla actualitzada', '', { duration: 2000 });
-    } else {
-      this.templateService.create(this.editorName.trim(), this.editorCat, this.editorEntries);
-      this.snackBar.open('Plantilla creada', '', { duration: 2000 });
+    try {
+      if (id) {
+        await this.templateService.update(id, {
+          name: this.editorName.trim(),
+          category: this.editorCat,
+          entries: this.editorEntries,
+        });
+        this.snackBar.open('Plantilla actualitzada', '', { duration: 2000 });
+      } else {
+        await this.templateService.create(this.editorName.trim(), this.editorCat, this.editorEntries);
+        this.snackBar.open('Plantilla creada', '', { duration: 2000 });
+      }
+      this.closeEditor();
+    } catch {
+      this.snackBar.open('Error en desar la plantilla', '', { duration: 3000 });
     }
-    this.closeEditor();
   }
 
-  deleteTemplate(id: string): void {
-    this.templateService.delete(id);
-    this.snackBar.open('Plantilla eliminada', '', { duration: 2000 });
+  async deleteTemplate(id: string): Promise<void> {
+    try {
+      await this.templateService.delete(id);
+      this.snackBar.open('Plantilla eliminada', '', { duration: 2000 });
+    } catch {
+      this.snackBar.open('Error en eliminar', '', { duration: 3000 });
+    }
   }
 }

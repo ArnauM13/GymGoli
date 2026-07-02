@@ -2105,7 +2105,7 @@ export class TrainComponent {
     this.saveTemplateOpen.set(true);
   }
 
-  confirmSaveAsTemplate(): void {
+  async confirmSaveAsTemplate(): Promise<void> {
     const name = this.saveTemplateName.trim();
     const w = this.activeWorkout();
     if (!name || !w) return;
@@ -2114,10 +2114,14 @@ export class TrainComponent {
       ? cats[0] as ExerciseCategory
       : 'mixed';
     const entries = w.entries.map(e => ({ exerciseId: e.exerciseId, exerciseName: e.exerciseName }));
-    this.templateService.create(name, cat, entries);
-    this.saveTemplateOpen.set(false);
-    this.saveTemplateName = '';
-    this.snackBar.open('Plantilla guardada', '', { duration: 2000 });
+    try {
+      await this.templateService.create(name, cat, entries);
+      this.saveTemplateOpen.set(false);
+      this.saveTemplateName = '';
+      this.snackBar.open('Plantilla guardada', '', { duration: 2000 });
+    } catch {
+      this.snackBar.open('Error en guardar la plantilla', '', { duration: 3000 });
+    }
   }
 
   async deleteActiveWorkout(): Promise<void> {
@@ -2210,7 +2214,7 @@ export class TrainComponent {
     if (!cat) return;
     this.closePicker();
     this.creating.set(true);
-    this.templateService.recordUse(t.id);
+    this.templateService.recordUse(t.id).catch(() => {});
     try {
       const useCat = t.category === 'mixed' ? cat : t.category as ExerciseCategory;
       const entries: WorkoutEntry[] = t.entries.map(e => ({
