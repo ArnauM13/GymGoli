@@ -87,7 +87,8 @@ export class AppComponent {
   });
 
   isTrainRoute(): boolean {
-    return this.router.url === '/train' || this.router.url.startsWith('/train?');
+    const path = this.router.url.split('?')[0];
+    return path === '/train' || path.startsWith('/train/');
   }
 
   constructor() {
