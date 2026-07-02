@@ -15,6 +15,7 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
 import { OfflineService } from '../../core/services/offline.service';
 import { TrainerService } from '../../core/services/trainer.service';
 import { TemplateService } from '../../core/services/template.service';
+import { SharedWorkoutService } from '../../core/services/shared-workout.service';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
 import { WeeklyPlanService } from '../../core/services/weekly-plan.service';
 import { Workout, WorkoutEntry } from '../../core/models/workout.model';
@@ -77,6 +78,7 @@ describe('TrainComponent', () => {
         { provide: OfflineService,      useValue: { isOffline: signal(false), forceOffline, toggleForceOffline: jasmine.createSpy() } },
         { provide: TrainerService,      useValue: { myTrainer: signal(null), hasTrainer: jasmine.createSpy().and.returnValue(false), getProposalForDate: jasmine.createSpy().and.returnValue(null) } },
         { provide: TemplateService,     useValue: { forCategory: jasmine.createSpy().and.returnValue([]), create: jasmine.createSpy().and.resolveTo(undefined), recordUse: jasmine.createSpy().and.resolveTo(undefined) } },
+        { provide: SharedWorkoutService, useValue: { share: jasmine.createSpy().and.resolveTo('share-id') } },
         { provide: WorkoutProfileService, useValue: { profile: signal({ gym: { push: EMPTY_CATEGORY_PROFILE, pull: EMPTY_CATEGORY_PROFILE, legs: EMPTY_CATEGORY_PROFILE }, favoriteSport: null, recentSport: null, minRecovery: 2 }) } },
         { provide: MatDialog,              useValue: { open: jasmine.createSpy() } },
         { provide: MatSnackBar,            useValue: { open: jasmine.createSpy() } },
@@ -231,6 +233,51 @@ describe('TrainComponent', () => {
       const chip = (fixture.nativeElement as HTMLElement).querySelector('.qa-chip:not(.qa-chip--plan)');
       expect(chip?.textContent?.trim()).toContain('En línia');
       expect(chip?.textContent?.trim()).not.toContain('Sense connexió');
+    });
+  });
+
+  // ── shareWorkout() ───────────────────────────────────────────────────────
+
+  describe('shareWorkout()', () => {
+    let originalShare: unknown;
+    let originalClipboard: unknown;
+    let sharedWorkoutService: { share: jasmine.Spy };
+
+    beforeEach(() => {
+      sharedWorkoutService = TestBed.inject(SharedWorkoutService) as unknown as { share: jasmine.Spy };
+      originalShare = (navigator as unknown as Record<string, unknown>)['share'];
+      originalClipboard = (navigator as unknown as Record<string, unknown>)['clipboard'];
+    });
+
+    afterEach(() => {
+      Object.defineProperty(navigator, 'share', { value: originalShare, configurable: true });
+      Object.defineProperty(navigator, 'clipboard', { value: originalClipboard, configurable: true });
+    });
+
+    it('shares the workout and copies the link when the Web Share API is unavailable', async () => {
+      Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+      const writeText = jasmine.createSpy('writeText').and.resolveTo(undefined);
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+
+      const w = makeWorkout({ categories: ['push'], entries: [{ exerciseId: 'e1', exerciseName: 'Press banca', sets: [] }] });
+      await component.shareWorkout(w);
+
+      expect(sharedWorkoutService.share).toHaveBeenCalledWith('Empenta', 'push', w.entries);
+      expect(writeText).toHaveBeenCalled();
+    });
+
+    it('uses the Web Share API when available instead of copying to the clipboard', async () => {
+      const share = jasmine.createSpy('share').and.resolveTo(undefined);
+      Object.defineProperty(navigator, 'share', { value: share, configurable: true });
+      const writeText = jasmine.createSpy('writeText').and.resolveTo(undefined);
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+
+      const w = makeWorkout({ categories: ['push', 'pull'], entries: [] });
+      await component.shareWorkout(w);
+
+      expect(share).toHaveBeenCalled();
+      expect(writeText).not.toHaveBeenCalled();
+      expect(sharedWorkoutService.share).toHaveBeenCalledWith(jasmine.any(String), 'mixed', w.entries);
     });
   });
 });

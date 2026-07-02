@@ -87,5 +87,10 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/trainer/join/join.component').then(m => m.JoinComponent),
   },
+  {
+    path: 'share/:id',
+    loadComponent: () =>
+      import('./features/share/share-import.component').then(m => m.ShareImportComponent),
+  },
   { path: '**', redirectTo: 'train' },
 ];

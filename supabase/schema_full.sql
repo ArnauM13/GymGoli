@@ -1,5 +1,5 @@
 -- GymGoli – Schema complet i idempotent
--- Consolida totes les migracions (001–016).
+-- Consolida totes les migracions (001–017).
 -- Segur de re-executar: usa IF NOT EXISTS, DROP … IF EXISTS i OR REPLACE.
 -- Executa a: Supabase Dashboard → SQL Editor → New query
 
@@ -140,6 +140,15 @@ CREATE TABLE IF NOT EXISTS templates (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS shared_workouts (
+  id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id   uuid        NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  name       text        NOT NULL,
+  category   text        NOT NULL CHECK (category IN ('push', 'pull', 'legs', 'mixed')),
+  entries    jsonb       NOT NULL DEFAULT '[]',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 2. COLUMNES QUE PODRIEN FALTAR (taules creades abans de les migracions)
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -239,6 +248,7 @@ ALTER TABLE sport_sessions   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_settings    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE goal_history     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE templates        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE shared_workouts  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_profiles    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trainer_invites  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trainer_clients  ENABLE ROW LEVEL SECURITY;
@@ -306,6 +316,15 @@ CREATE POLICY goal_history_own ON goal_history FOR ALL
 DROP POLICY IF EXISTS "users own templates"         ON templates;
 CREATE POLICY "users own templates" ON templates FOR ALL
   USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+
+-- shared_workouts (owner creates, any authenticated user reads by id to import)
+DROP POLICY IF EXISTS "owners create shared workouts" ON shared_workouts;
+CREATE POLICY "owners create shared workouts" ON shared_workouts FOR INSERT
+  WITH CHECK (owner_id = auth.uid());
+
+DROP POLICY IF EXISTS "authenticated users read shared workouts by id" ON shared_workouts;
+CREATE POLICY "authenticated users read shared workouts by id" ON shared_workouts FOR SELECT
+  USING (auth.uid() IS NOT NULL);
 
 -- user_profiles (propi)
 DROP POLICY IF EXISTS "profiles_own"                ON user_profiles;
@@ -381,6 +400,9 @@ CREATE INDEX IF NOT EXISTS user_settings_user_id_idx
 
 CREATE UNIQUE INDEX IF NOT EXISTS goal_history_user_date_idx
   ON goal_history (user_id, effective_from);
+
+CREATE INDEX IF NOT EXISTS shared_workouts_owner_id_idx
+  ON shared_workouts (owner_id);
 
 CREATE INDEX IF NOT EXISTS templates_user_id_idx
   ON templates (user_id);

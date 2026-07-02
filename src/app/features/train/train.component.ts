@@ -18,6 +18,7 @@ import { BUILT_IN_TEMPLATES, BuiltInTemplate, WorkoutTemplate } from '../../core
 import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry } from '../../core/models/workout.model';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { TemplateService } from '../../core/services/template.service';
+import { SharedWorkoutService } from '../../core/services/shared-workout.service';
 import { SportService } from '../../core/services/sport.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { WorkoutService } from '../../core/services/workout.service';
@@ -148,6 +149,10 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               <button class="aw-menu-item" (click)="openSaveAsTemplate(w)">
                 <span class="material-symbols-outlined">bookmark_add</span>
                 Guardar com a plantilla
+              </button>
+              <button class="aw-menu-item" (click)="shareWorkout(w)">
+                <span class="material-symbols-outlined">share</span>
+                Compartir entrenament
               </button>
             }
             <button class="aw-menu-item aw-menu-item--danger" (click)="workoutMenuOpen.set(false); deleteActiveWorkout()">
@@ -1613,6 +1618,7 @@ export class TrainComponent {
   private settingsService  = inject(UserSettingsService);
   private exerciseService  = inject(ExerciseService);
   private templateService  = inject(TemplateService);
+  private sharedWorkoutService = inject(SharedWorkoutService);
   private profileService   = inject(WorkoutProfileService);
   private weeklyPlanService = inject(WeeklyPlanService);
   readonly router          = inject(Router);
@@ -2121,6 +2127,25 @@ export class TrainComponent {
       this.snackBar.open('Plantilla guardada', '', { duration: 2000 });
     } catch {
       this.snackBar.open('Error en guardar la plantilla', '', { duration: 3000 });
+    }
+  }
+
+  async shareWorkout(w: Workout): Promise<void> {
+    this.workoutMenuOpen.set(false);
+    try {
+      const cats = w.categories ?? (w.category ? [w.category] : []);
+      const cat: ExerciseCategory | 'mixed' = cats.length === 1 ? cats[0] as ExerciseCategory : 'mixed';
+      const id  = await this.sharedWorkoutService.share(this.workoutLabel(w), cat, w.entries);
+      const url = `${window.location.origin}/share/${id}`;
+
+      if (navigator.share) {
+        await navigator.share({ title: this.workoutLabel(w), text: 'T\'he compartit un entrenament!', url }).catch(() => {});
+      } else {
+        await navigator.clipboard.writeText(url);
+        this.snackBar.open('Enllaç copiat', '', { duration: 1800 });
+      }
+    } catch {
+      this.snackBar.open('Error en compartir l\'entrenament', '', { duration: 3000 });
     }
   }
 
