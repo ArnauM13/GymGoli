@@ -1,7 +1,7 @@
 import { ExerciseCategory } from './exercise.model';
 
 export type WeeklyPlanItem =
-  | { type: 'gym'; category: ExerciseCategory }
+  | { type: 'gym'; category: ExerciseCategory; templateId?: string }
   | { type: 'sport'; sportId: string };
 
 export interface WeeklyPlan {

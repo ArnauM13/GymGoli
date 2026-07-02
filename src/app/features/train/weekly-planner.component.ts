@@ -6,9 +6,11 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { SportService } from '../../core/services/sport.service';
 import { WeeklyPlanService, WEEKS_RECURRING, WEEKS_SINGLE } from '../../core/services/weekly-plan.service';
+import { TemplateService } from '../../core/services/template.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
 import { EMPTY_WEEKLY_PLAN, WEEKDAY_LABELS, WeeklyPlan, WeeklyPlanItem } from '../../core/models/weekly-plan.model';
+import { WorkoutTemplate } from '../../core/models/template.model';
 
 const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
 
@@ -68,6 +70,29 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
               </button>
             }
           </div>
+
+          @for (cat of gymCategories; track cat) {
+            @if (isGymSelected(day.index, cat) && templatesFor(cat).length > 0) {
+              <div class="tpl-row">
+                <span class="tpl-row-label">{{ categoryLabel(cat) }}, en detall</span>
+                <div class="filter-bar tpl-chips">
+                  <button class="filter-chip tpl-chip"
+                          [class.active]="!gymTemplate(day.index, cat)"
+                          (click)="setGymTemplate(day.index, cat, undefined)">
+                    Buit
+                  </button>
+                  @for (t of templatesFor(cat); track t.id) {
+                    <button class="filter-chip tpl-chip"
+                            [class.active]="gymTemplate(day.index, cat) === t.id"
+                            (click)="setGymTemplate(day.index, cat, t.id)">
+                      <span class="material-symbols-outlined">bookmark</span>
+                      {{ t.name }}
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+          }
 
           @if (sportService.sports().length > 0) {
             <div class="chip-group-label">Esport</div>
@@ -148,6 +173,17 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
       &.active { background: var(--cat-color, var(--c-brand)); border-color: var(--cat-color, var(--c-brand)); color: white; }
     }
 
+    .tpl-row { margin: -2px 0 12px; padding-left: 4px; }
+    .tpl-row-label {
+      display: block; font-size: 10.5px; font-weight: 600; color: var(--c-text-3);
+      margin-bottom: 6px;
+    }
+    .tpl-chips { padding: 0; }
+    .tpl-chip {
+      padding: 4px 10px; font-size: 11px;
+      .material-symbols-outlined { font-size: 13px; }
+    }
+
     .rest-hint {
       display: block; font-size: 11px; font-weight: 600; color: var(--c-text-3);
       font-style: italic; margin-top: 2px;
@@ -157,6 +193,13 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
       position: fixed; left: 16px; right: 16px;
       bottom: calc(var(--nav-height) + 16px);
       z-index: 89;
+    }
+    .btn-primary {
+      padding: 8px 16px; border: none; border-radius: 10px;
+      background: var(--c-brand); color: white;
+      font-size: 13px; font-weight: 700; cursor: pointer;
+      transition: background 0.15s; touch-action: manipulation;
+      &:hover { background: var(--c-brand-dk); }
     }
     .save-btn {
       width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;
@@ -183,6 +226,7 @@ export class WeeklyPlannerComponent {
   private settingsService  = inject(UserSettingsService);
   private weeklyPlanService = inject(WeeklyPlanService);
   readonly sportService    = inject(SportService);
+  private templateService  = inject(TemplateService);
   private snackBar         = inject(MatSnackBar);
   private confirmDialog    = inject(ConfirmDialogService);
 
@@ -220,6 +264,25 @@ export class WeeklyPlannerComponent {
 
   isSportSelected(dayIndex: number, sportId: string): boolean {
     return this.plan().days[dayIndex].some(i => i.type === 'sport' && i.sportId === sportId);
+  }
+
+  templatesFor(cat: ExerciseCategory): WorkoutTemplate[] {
+    return this.templateService.forCategory(cat);
+  }
+
+  gymTemplate(dayIndex: number, cat: ExerciseCategory): string | undefined {
+    const item = this.plan().days[dayIndex].find(i => i.type === 'gym' && i.category === cat);
+    return item?.type === 'gym' ? item.templateId : undefined;
+  }
+
+  setGymTemplate(dayIndex: number, cat: ExerciseCategory, templateId: string | undefined): void {
+    this.plan.update(p => {
+      const days = p.days.map((items, i) => {
+        if (i !== dayIndex) return items;
+        return items.map(it => (it.type === 'gym' && it.category === cat) ? { ...it, templateId } : it);
+      });
+      return { ...p, days };
+    });
   }
 
   setRecurring(recurring: boolean): void {

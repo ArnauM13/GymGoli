@@ -4,8 +4,10 @@ import { AuthService } from './auth.service';
 import { UserSettingsService } from './user-settings.service';
 import { WorkoutService } from './workout.service';
 import { SportService } from './sport.service';
+import { TemplateService } from './template.service';
 import { addDays, mondayOf, workoutCategories } from '../../shared/utils/calendar-utils';
 import { WeeklyPlan } from '../models/weekly-plan.model';
+import { WorkoutEntry } from '../models/workout.model';
 
 export const WEEKS_SINGLE    = 1;
 export const WEEKS_RECURRING = 8;
@@ -24,6 +26,7 @@ export class WeeklyPlanService {
   private settingsService = inject(UserSettingsService);
   private workoutService  = inject(WorkoutService);
   private sportService    = inject(SportService);
+  private templateService = inject(TemplateService);
 
   private _toppedUpForUid: string | null = null;
 
@@ -56,7 +59,10 @@ export class WeeklyPlanService {
               const already =
                 this.workoutService.getPlannedForDate(date).some(x => workoutCategories(x).includes(item.category)) ||
                 this.workoutService.getDoneWorkoutsForDate(date).some(x => workoutCategories(x).includes(item.category));
-              if (!already) await this.workoutService.createPlannedWorkout(date, item.category, []);
+              if (!already) {
+                const entries = this._templateEntries(item.templateId);
+                await this.workoutService.createPlannedWorkout(date, item.category, entries);
+              }
             } else {
               const existing = this.sportService.getSessionForDate(date, item.sportId);
               if (!existing) await this.sportService.logSession(date, item.sportId, {}, 'planned');
@@ -68,6 +74,21 @@ export class WeeklyPlanService {
         }
       }
     }
+  }
+
+  /** Resolves a template's saved entries into WorkoutEntry[], same mapping
+   *  used when starting a workout from a template on the Train page. */
+  private _templateEntries(templateId: string | undefined): WorkoutEntry[] {
+    if (!templateId) return [];
+    const t = this.templateService.templates().find(x => x.id === templateId);
+    if (!t) return [];
+    return t.entries.map(e => ({
+      exerciseId: e.exerciseId,
+      exerciseName: e.exerciseName,
+      sets: (e.sets && e.reps && e.sets > 0 && e.reps > 0)
+        ? Array.from({ length: e.sets }, () => ({ weight: e.weight ?? 0, reps: e.reps! }))
+        : [],
+    }));
   }
 
   /**

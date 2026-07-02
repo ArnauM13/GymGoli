@@ -6,19 +6,21 @@ import { AuthService } from './auth.service';
 import { UserSettingsService } from './user-settings.service';
 import { WorkoutService } from './workout.service';
 import { SportService } from './sport.service';
+import { TemplateService } from './template.service';
 import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../models/weekly-plan.model';
 import { Workout } from '../models/workout.model';
 import { SportSession } from '../models/sport.model';
+import { WorkoutTemplate } from '../models/template.model';
 
 function emptyPlan(): WeeklyPlan {
   return { recurring: false, days: [[], [], [], [], [], [], []] };
 }
 
 /** Monday-indexed (0=Mon..6=Sun) plan with a single item on the given day. */
-function planWithGymOn(dayIndex: number, category: 'push' | 'pull' | 'legs' = 'push', recurring = false): WeeklyPlan {
+function planWithGymOn(dayIndex: number, category: 'push' | 'pull' | 'legs' = 'push', recurring = false, templateId?: string): WeeklyPlan {
   const p = emptyPlan();
   p.recurring = recurring;
-  p.days[dayIndex] = [{ type: 'gym', category }];
+  p.days[dayIndex] = [{ type: 'gym', category, templateId }];
   return p;
 }
 
@@ -39,6 +41,7 @@ describe('WeeklyPlanService', () => {
   let createPlannedWorkout: jasmine.Spy;
   let getSessionForDate: jasmine.Spy;
   let logSession: jasmine.Spy;
+  let templates: WorkoutTemplate[];
   let service: WeeklyPlanService;
 
   beforeEach(() => {
@@ -55,6 +58,7 @@ describe('WeeklyPlanService', () => {
     createPlannedWorkout      = jasmine.createSpy().and.resolveTo('new-id');
     getSessionForDate         = jasmine.createSpy().and.returnValue(undefined);
     logSession                = jasmine.createSpy().and.resolveTo(undefined);
+    templates                 = [];
 
     TestBed.configureTestingModule({
       providers: [
@@ -76,6 +80,10 @@ describe('WeeklyPlanService', () => {
             getSessionForDate,
             logSession,
           },
+        },
+        {
+          provide: TemplateService,
+          useValue: { templates: () => templates },
         },
       ],
     });
@@ -159,6 +167,28 @@ describe('WeeklyPlanService', () => {
 
       await expectAsync(service.apply(plan, 1)).toBeResolved();
       expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-06', 'legs', []);
+    });
+
+    it('materializes a template\'s exercises when the gym item references one (plan in detail)', async () => {
+      templates = [{
+        id: 'tpl-1', name: 'Push A', category: 'push', createdAt: '2024-01-01',
+        entries: [
+          { exerciseId: 'ex1', exerciseName: 'Press banca', sets: 3, reps: 8, weight: 60 },
+          { exerciseId: 'ex2', exerciseName: 'Press militar' },
+        ],
+      }];
+      await service.apply(planWithGymOn(4, 'push', false, 'tpl-1'), 1);
+
+      expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-08', 'push', [
+        { exerciseId: 'ex1', exerciseName: 'Press banca', sets: [{ weight: 60, reps: 8 }, { weight: 60, reps: 8 }, { weight: 60, reps: 8 }] },
+        { exerciseId: 'ex2', exerciseName: 'Press militar', sets: [] },
+      ]);
+    });
+
+    it('falls back to an empty workout if the referenced template no longer exists', async () => {
+      templates = [];
+      await service.apply(planWithGymOn(4, 'push', false, 'missing-tpl'), 1);
+      expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-08', 'push', []);
     });
   });
 
