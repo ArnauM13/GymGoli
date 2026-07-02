@@ -21,6 +21,7 @@ import { TemplateService } from '../../core/services/template.service';
 import { SportService } from '../../core/services/sport.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { WorkoutService } from '../../core/services/workout.service';
+import { WeeklyPlanService } from '../../core/services/weekly-plan.service';
 import { OfflineService } from '../../core/services/offline.service';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
@@ -1602,6 +1603,7 @@ export class TrainComponent {
   private exerciseService  = inject(ExerciseService);
   private templateService  = inject(TemplateService);
   private profileService   = inject(WorkoutProfileService);
+  private weeklyPlanService = inject(WeeklyPlanService);
   readonly router          = inject(Router);
   private dialog           = inject(MatDialog);
   private snackBar         = inject(MatSnackBar);
@@ -1919,6 +1921,13 @@ export class TrainComponent {
 
   constructor() {
     this.sportService.ensureLoaded();
+
+    // Keep a recurring weekly plan's horizon topped up once settings have loaded.
+    effect(() => {
+      if (this.settingsService.loaded()) {
+        untracked(() => this.weeklyPlanService.ensureRecurringApplied());
+      }
+    });
 
     effect(() => {
       const date = this.selectedDate();
