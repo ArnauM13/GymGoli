@@ -311,8 +311,11 @@ export class WeeklyPlannerComponent {
     this.saving.set(true);
     try {
       const plan = this.plan();
+      const previousWeeks = this.settingsService.weeklyPlan().recurring ? WEEKS_RECURRING : WEEKS_SINGLE;
+      const weeks = plan.recurring ? WEEKS_RECURRING : WEEKS_SINGLE;
       await this.settingsService.updateWeeklyPlan(plan);
-      await this.weeklyPlanService.apply(plan, plan.recurring ? WEEKS_RECURRING : WEEKS_SINGLE);
+      await this.weeklyPlanService.retractRemoved(plan, Math.max(previousWeeks, weeks));
+      await this.weeklyPlanService.apply(plan, weeks);
       this.snackBar.open('Planificació desada', '', { duration: 2000 });
     } catch {
       this.snackBar.open('Error en desar la planificació', '', { duration: 3000 });
@@ -323,14 +326,16 @@ export class WeeklyPlannerComponent {
 
   async deletePlan(): Promise<void> {
     const ok = await this.confirmDialog.confirm(
-      'Eliminar la planificació setmanal? Els entrenaments que ja s\'hagin planificat al calendari no s\'esborraran; pots eliminar-los individualment des del calendari.',
+      'Eliminar la planificació setmanal? Els entrenaments futurs que encara no has fet s\'eliminaran del calendari; els que ja has completat es mantindran.',
       { variant: 'danger', confirmLabel: 'Eliminar' },
     );
     if (!ok) return;
 
+    const previousWeeks = this.settingsService.weeklyPlan().recurring ? WEEKS_RECURRING : WEEKS_SINGLE;
     this.plan.set(this._clone(EMPTY_WEEKLY_PLAN));
     try {
       await this.settingsService.updateWeeklyPlan(EMPTY_WEEKLY_PLAN);
+      await this.weeklyPlanService.retractRemoved(EMPTY_WEEKLY_PLAN, previousWeeks);
       this.snackBar.open('Planificació eliminada', '', { duration: 2000 });
     } catch {
       this.snackBar.open('Error en eliminar la planificació', '', { duration: 3000 });

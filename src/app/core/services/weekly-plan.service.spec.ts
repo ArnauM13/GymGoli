@@ -39,8 +39,11 @@ describe('WeeklyPlanService', () => {
   let getPlannedForDate: jasmine.Spy;
   let getDoneWorkoutsForDate: jasmine.Spy;
   let createPlannedWorkout: jasmine.Spy;
+  let deleteWorkout: jasmine.Spy;
   let getSessionForDate: jasmine.Spy;
+  let getPlannedSportSessionsForDate: jasmine.Spy;
   let logSession: jasmine.Spy;
+  let deleteSession: jasmine.Spy;
   let templates: WorkoutTemplate[];
   let service: WeeklyPlanService;
 
@@ -56,8 +59,11 @@ describe('WeeklyPlanService', () => {
     getPlannedForDate         = jasmine.createSpy().and.returnValue([]);
     getDoneWorkoutsForDate    = jasmine.createSpy().and.returnValue([]);
     createPlannedWorkout      = jasmine.createSpy().and.resolveTo('new-id');
+    deleteWorkout             = jasmine.createSpy().and.resolveTo(undefined);
     getSessionForDate         = jasmine.createSpy().and.returnValue(undefined);
+    getPlannedSportSessionsForDate = jasmine.createSpy().and.returnValue([]);
     logSession                = jasmine.createSpy().and.resolveTo(undefined);
+    deleteSession             = jasmine.createSpy().and.resolveTo(undefined);
     templates                 = [];
 
     TestBed.configureTestingModule({
@@ -71,6 +77,7 @@ describe('WeeklyPlanService', () => {
             getPlannedForDate,
             getDoneWorkoutsForDate,
             createPlannedWorkout,
+            deleteWorkout,
           },
         },
         {
@@ -78,7 +85,9 @@ describe('WeeklyPlanService', () => {
           useValue: {
             ensureMonthLoaded: ensureMonthLoadedSport,
             getSessionForDate,
+            getPlannedSportSessionsForDate,
             logSession,
+            deleteSession,
           },
         },
         {
@@ -189,6 +198,63 @@ describe('WeeklyPlanService', () => {
       templates = [];
       await service.apply(planWithGymOn(4, 'push', false, 'missing-tpl'), 1);
       expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-08', 'push', []);
+    });
+  });
+
+  describe('retractRemoved()', () => {
+    it('deletes a future self-planned workout whose category is no longer wanted', async () => {
+      getPlannedForDate.and.returnValue([
+        { id: 'w1', categories: ['push'], plannedSource: 'self' } as unknown as Workout,
+      ]);
+      await service.retractRemoved(emptyPlan(), 1); // nothing wanted on any day
+      expect(deleteWorkout).toHaveBeenCalledWith('w1');
+    });
+
+    it('keeps a workout whose category is still in the plan', async () => {
+      getPlannedForDate.and.callFake((date: string) =>
+        date === '2024-03-06' ? [{ id: 'w1', categories: ['push'], plannedSource: 'self' } as unknown as Workout] : []);
+      await service.retractRemoved(planWithGymOn(2 /* Wednesday, today */, 'push'), 1);
+      expect(deleteWorkout).not.toHaveBeenCalled();
+    });
+
+    it('never touches a workout not sourced from the planner itself', async () => {
+      getPlannedForDate.and.returnValue([
+        { id: 'w1', categories: ['push'], plannedSource: 'trainer' } as unknown as Workout,
+      ]);
+      await service.retractRemoved(emptyPlan(), 1);
+      expect(deleteWorkout).not.toHaveBeenCalled();
+    });
+
+    it('skips days that already passed this week', async () => {
+      getPlannedForDate.and.returnValue([
+        { id: 'w1', categories: ['push'], plannedSource: 'self' } as unknown as Workout,
+      ]);
+      await service.retractRemoved(emptyPlan(), 1);
+      // Monday (2024-03-04) is in the past relative to mocked "today" (2024-03-06)
+      expect(getPlannedForDate).not.toHaveBeenCalledWith('2024-03-04');
+    });
+
+    it('deletes a planned sport session whose sport is no longer wanted', async () => {
+      getPlannedSportSessionsForDate.and.returnValue([
+        { sport: { id: 'running' }, session: { id: 's1' } },
+      ]);
+      await service.retractRemoved(emptyPlan(), 1);
+      expect(deleteSession).toHaveBeenCalledWith('s1', jasmine.any(String));
+    });
+
+    it('keeps a planned sport session whose sport is still in the plan', async () => {
+      getPlannedSportSessionsForDate.and.callFake((date: string) =>
+        date === '2024-03-06' ? [{ sport: { id: 'running' }, session: { id: 's1' } }] : []);
+      await service.retractRemoved(planWithSportOn(2, 'running'), 1);
+      expect(deleteSession).not.toHaveBeenCalled();
+    });
+
+    it('keeps going when one deletion fails', async () => {
+      getPlannedForDate.and.returnValue([
+        { id: 'w1', categories: ['push'], plannedSource: 'self' } as unknown as Workout,
+      ]);
+      deleteWorkout.and.rejectWith(new Error('network error'));
+      await expectAsync(service.retractRemoved(emptyPlan(), 1)).toBeResolved();
     });
   });
 

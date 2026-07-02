@@ -4,11 +4,11 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { WeeklyPlannerComponent } from './weekly-planner.component';
 import { UserSettingsService } from '../../core/services/user-settings.service';
-import { WeeklyPlanService } from '../../core/services/weekly-plan.service';
+import { WeeklyPlanService, WEEKS_RECURRING, WEEKS_SINGLE } from '../../core/services/weekly-plan.service';
 import { SportService } from '../../core/services/sport.service';
 import { TemplateService } from '../../core/services/template.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
-import { EMPTY_WEEKLY_PLAN } from '../../core/models/weekly-plan.model';
+import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../../core/models/weekly-plan.model';
 import { WorkoutTemplate } from '../../core/models/template.model';
 
 function template(overrides: Partial<WorkoutTemplate> = {}): WorkoutTemplate {
@@ -18,18 +18,26 @@ function template(overrides: Partial<WorkoutTemplate> = {}): WorkoutTemplate {
 describe('WeeklyPlannerComponent', () => {
   let component: WeeklyPlannerComponent;
   let forCategory: jasmine.Spy;
+  let savedPlan: ReturnType<typeof signal<WeeklyPlan>>;
+  let retractRemoved: jasmine.Spy;
+  let applyPlan: jasmine.Spy;
+  let confirm: jasmine.Spy;
 
   function setup(): void {
     forCategory = jasmine.createSpy('forCategory').and.returnValue([]);
+    savedPlan = signal(EMPTY_WEEKLY_PLAN);
+    retractRemoved = jasmine.createSpy('retractRemoved').and.resolveTo(undefined);
+    applyPlan = jasmine.createSpy('apply').and.resolveTo(undefined);
+    confirm = jasmine.createSpy('confirm').and.resolveTo(true);
 
     TestBed.configureTestingModule({
       providers: [
-        { provide: UserSettingsService, useValue: { weeklyPlan: signal(EMPTY_WEEKLY_PLAN), updateWeeklyPlan: jasmine.createSpy().and.resolveTo(undefined) } },
-        { provide: WeeklyPlanService,   useValue: { apply: jasmine.createSpy().and.resolveTo(undefined) } },
+        { provide: UserSettingsService, useValue: { weeklyPlan: savedPlan, updateWeeklyPlan: jasmine.createSpy().and.resolveTo(undefined) } },
+        { provide: WeeklyPlanService,   useValue: { apply: applyPlan, retractRemoved } },
         { provide: SportService,        useValue: { sports: signal([]), ensureLoaded: jasmine.createSpy() } },
         { provide: TemplateService,     useValue: { forCategory } },
         { provide: MatSnackBar,         useValue: { open: jasmine.createSpy() } },
-        { provide: ConfirmDialogService, useValue: { confirm: jasmine.createSpy().and.resolveTo(false) } },
+        { provide: ConfirmDialogService, useValue: { confirm } },
       ],
     });
     component = TestBed.runInInjectionContext(() => new WeeklyPlannerComponent());
@@ -79,6 +87,45 @@ describe('WeeklyPlannerComponent', () => {
 
       expect(component.gymTemplate(0, 'push')).toBe('t1');
       expect(component.gymTemplate(1, 'push')).toBeUndefined();
+    });
+  });
+
+  describe('save()', () => {
+    it('retracts stale items before applying the new plan, using the wider of the two horizons', async () => {
+      savedPlan.set({ recurring: true, days: [[], [], [], [], [], [], []] }); // previously recurring (8 weeks)
+      component.toggleGym(0, 'push');
+      component.setRecurring(false); // new plan is single-week
+
+      await component.save();
+
+      expect(retractRemoved).toHaveBeenCalledWith(component.plan(), WEEKS_RECURRING);
+      expect(applyPlan).toHaveBeenCalledWith(component.plan(), WEEKS_SINGLE);
+    });
+
+    it('uses the new plan\'s horizon when it is wider than the previous one', async () => {
+      savedPlan.set({ recurring: false, days: [[], [], [], [], [], [], []] });
+      component.toggleGym(0, 'push');
+      component.setRecurring(true);
+
+      await component.save();
+
+      expect(retractRemoved).toHaveBeenCalledWith(component.plan(), WEEKS_RECURRING);
+    });
+  });
+
+  describe('deletePlan()', () => {
+    it('does nothing when the confirmation is declined', async () => {
+      confirm.and.resolveTo(false);
+      await component.deletePlan();
+      expect(retractRemoved).not.toHaveBeenCalled();
+    });
+
+    it('clears the plan and retracts stale items across the previous horizon once confirmed', async () => {
+      savedPlan.set({ recurring: true, days: [[], [], [], [], [], [], []] });
+      await component.deletePlan();
+
+      expect(retractRemoved).toHaveBeenCalledWith(EMPTY_WEEKLY_PLAN, WEEKS_RECURRING);
+      expect(component.plan().days.every(items => items.length === 0)).toBeTrue();
     });
   });
 });

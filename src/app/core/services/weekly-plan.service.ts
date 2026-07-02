@@ -8,6 +8,7 @@ import { TemplateService } from './template.service';
 import { addDays, mondayOf, workoutCategories } from '../../shared/utils/calendar-utils';
 import { WeeklyPlan } from '../models/weekly-plan.model';
 import { WorkoutEntry } from '../models/workout.model';
+import { ExerciseCategory } from '../models/exercise.model';
 
 export const WEEKS_SINGLE    = 1;
 export const WEEKS_RECURRING = 8;
@@ -70,6 +71,45 @@ export class WeeklyPlanService {
           } catch {
             // One item's creation failing (e.g. transient network error) shouldn't
             // abort the rest of the plan — gym/sport creation are already local-first.
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Removes future, still-`planned` workouts/sessions that this service
+   * created but that the plan no longer wants for their weekday — e.g. the
+   * user unchecked a category/sport, or deleted the whole plan. Only ever
+   * touches items still in `planned` status (never a completed workout),
+   * and only `plannedSource: 'self'` workouts, so anything the user
+   * actually started, or a trainer proposed, is left untouched.
+   */
+  async retractRemoved(plan: WeeklyPlan, weeks: number): Promise<void> {
+    const today  = TODAY();
+    const monday = mondayOf(today);
+
+    for (let w = 0; w < weeks; w++) {
+      for (let dow = 0; dow < 7; dow++) {
+        const date = addDays(monday, w * 7 + dow);
+        if (date < today) continue;
+
+        const desiredCats = new Set(
+          plan.days[dow].filter(i => i.type === 'gym').map(i => (i as { category: ExerciseCategory }).category));
+        const desiredSportIds = new Set(
+          plan.days[dow].filter(i => i.type === 'sport').map(i => (i as { sportId: string }).sportId));
+
+        for (const workout of this.workoutService.getPlannedForDate(date)) {
+          if (workout.plannedSource !== 'self') continue;
+          const stillWanted = workoutCategories(workout).some(c => desiredCats.has(c as ExerciseCategory));
+          if (!stillWanted) {
+            try { await this.workoutService.deleteWorkout(workout.id); } catch { /* retried on next save */ }
+          }
+        }
+
+        for (const { sport, session } of this.sportService.getPlannedSportSessionsForDate(date)) {
+          if (!desiredSportIds.has(sport.id)) {
+            try { await this.sportService.deleteSession(session.id, date); } catch { /* retried on next save */ }
           }
         }
       }
