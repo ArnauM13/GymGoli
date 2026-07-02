@@ -1,8 +1,6 @@
 import { Component, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatInputModule } from '@angular/material/input';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import {
@@ -11,6 +9,7 @@ import {
   MUSCLE_LABELS, SUBCATEGORY_LABELS, SUBCATEGORY_OPTIONS,
 } from '../../../core/models/exercise.model';
 import { ExerciseService } from '../../../core/services/exercise.service';
+import { FilterBarComponent } from '../../../shared/components/filter-bar/filter-bar.component';
 
 export interface ExercisePickerData {
   excludeIds?: string[];
@@ -24,30 +23,18 @@ export interface ExercisePickerData {
 @Component({
   selector: 'app-exercise-picker-dialog',
   standalone: true,
-  imports: [FormsModule, MatDialogModule, MatInputModule, MatFormFieldModule],
+  imports: [FormsModule, MatDialogModule, FilterBarComponent],
   template: `
     @if (mode() === 'list') {
 
       <!-- ── LIST MODE ── -->
       <h2 mat-dialog-title>Selecciona exercici</h2>
 
-      <div class="search-bar">
-        <mat-form-field appearance="outline" class="search-field">
-          <mat-label>Cerca...</mat-label>
-          <input matInput [(ngModel)]="searchTerm" autocomplete="off">
-        </mat-form-field>
-      </div>
-
-      <div class="filter-bar">
-        <button class="chip" [class.active]="!catFilter()" (click)="catFilter.set(null)">Tots</button>
-        @for (cat of categories; track cat.value) {
-          <button class="chip" [class.active]="catFilter() === cat.value"
-                  [style.--cat-c]="cat.color"
-                  (click)="catFilter.set(cat.value)">
-            {{ cat.label }}
-          </button>
-        }
-      </div>
+      <app-filter-bar
+        searchPlaceholder="Cerca exercici..."
+        [showSort]="false"
+        [(searchQuery)]="searchTerm"
+        [(category)]="catFilter" />
 
       <mat-dialog-content class="exercise-list">
         @if (!isLoaded()) {
@@ -66,7 +53,7 @@ export interface ExercisePickerData {
               <p class="empty-msg">Cap exercici trobat</p>
               <button class="empty-create-btn" type="button" (click)="startCreate()">
                 <span class="material-symbols-outlined">add_circle</span>
-                Crear "{{ searchTerm || 'exercici nou' }}"
+                Crear "{{ searchTerm() || 'exercici nou' }}"
               </button>
             </div>
           }
@@ -146,7 +133,7 @@ export interface ExercisePickerData {
               <span class="field-label">Grup principal <span class="optional-hint">(opcional)</span></span>
               <div class="chips-row">
                 @for (sub of createSubcatOptions(); track sub.value) {
-                  <button type="button" class="chip"
+                  <button type="button" class="subcat-chip"
                           [class.selected]="createSubcat() === sub.value"
                           (click)="toggleSubcat(sub.value)">
                     {{ sub.label }}
@@ -230,25 +217,7 @@ export interface ExercisePickerData {
   styles: [`
     h2[mat-dialog-title] { margin-bottom: 0; }
 
-    .search-bar { padding: 0 24px 4px; }
-    .search-field { width: 100%; }
-
-    .filter-bar {
-      display: flex; gap: 6px;
-      padding: 0 24px 8px;
-      overflow-x: auto; scrollbar-width: none;
-      &::-webkit-scrollbar { display: none; }
-    }
-
-    .chip {
-      padding: 5px 12px;
-      border: 1.5px solid var(--c-border-2); border-radius: 16px;
-      background: var(--c-card); font-size: 12px; font-weight: 500;
-      cursor: pointer; white-space: nowrap; transition: all 0.15s;
-      color: var(--c-text-2); touch-action: manipulation;
-      &.active { background: var(--cat-c, var(--c-brand)); color: var(--c-card); border-color: var(--cat-c, var(--c-brand)); }
-      &:hover:not(.active) { border-color: var(--c-brand); color: var(--c-brand); }
-    }
+    app-filter-bar { display: block; margin-top: 4px; }
 
     .exercise-list { padding: 0 !important; min-height: 200px; max-height: 50vh; }
 
@@ -293,7 +262,8 @@ export interface ExercisePickerData {
       &:hover { background: rgba(var(--c-brand-rgb), 0.06); border-style: solid; }
     }
 
-    /* ── List actions ── */
+    /* ── Actions ── */
+    mat-dialog-actions { gap: 10px; }
     .dlg-btn {
       padding: 9px 18px; border-radius: 10px; font-size: 13px; font-weight: 600;
       cursor: pointer; border: none; transition: background 0.15s, color 0.15s;
@@ -373,13 +343,13 @@ export interface ExercisePickerData {
       }
       &.selected {
         border-color: var(--cat-color, var(--c-brand));
-        background: color-mix(in srgb, var(--cat-color, var(--c-brand)) 14%, var(--c-card));
-        color: color-mix(in srgb, var(--cat-color, var(--c-brand)) 80%, var(--c-text));
+        background: var(--cat-color, var(--c-brand));
+        color: #fff;
       }
     }
 
     .chips-row { display: flex; flex-wrap: wrap; gap: 6px; }
-    .chip {
+    .subcat-chip {
       padding: 6px 12px; border-radius: 16px;
       border: 1.5px solid var(--c-border-2); background: var(--c-card);
       font-size: 12px; font-weight: 600; color: var(--c-text-2);
@@ -458,7 +428,7 @@ export class ExercisePickerDialogComponent {
 
   // ── List mode ─────────────────────────────────────────────────────────────
 
-  searchTerm = '';
+  readonly searchTerm = signal('');
   readonly catFilter = signal<ExerciseCategory | null>(this.data.defaultCategory ?? null);
   readonly mode = signal<'list' | 'create'>('list');
 
@@ -470,7 +440,7 @@ export class ExercisePickerDialogComponent {
   }));
 
   readonly filtered = computed(() => {
-    const term     = this.searchTerm.toLowerCase();
+    const term     = this.searchTerm().toLowerCase();
     const cat      = this.catFilter();
     const excluded = this.data.excludeIds ?? [];
     return this.exerciseService
@@ -511,7 +481,7 @@ export class ExercisePickerDialogComponent {
   });
 
   startCreate(): void {
-    this.createName = this.searchTerm;
+    this.createName = this.searchTerm();
     this.createCategory.set(this.catFilter());
     this.createSubcat.set('');
     this.createSetsMin.set(0);

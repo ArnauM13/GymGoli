@@ -212,7 +212,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             <span class="material-symbols-outlined">
               {{ offlineService.forceOffline() ? 'wifi_off' : 'wifi' }}
             </span>
-            Mode sense connexió
+            {{ offlineService.forceOffline() ? 'Mode en línia' : 'Mode sense connexió' }}
           </button>
         </div>
 

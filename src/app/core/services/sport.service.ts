@@ -102,8 +102,13 @@ export class SportService {
         }
         this._loadSports(uid);
         this._preloadCurrentMonth();
+        this._flushPending();
       }
     });
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', () => this._flushPending());
+    }
   }
 
   // ── Lazy initialisation — call once per feature that needs sport definitions
@@ -301,30 +306,48 @@ export class SportService {
 
   // ── Session log / toggle ────────────────────────────────────────────────
 
-  /** Full session create with all metrics. Used by the session logger UI. */
+  /** Full session create with all metrics. Used by the session logger UI and
+   *  by weekly routine planning — writes locally first so it works offline,
+   *  then syncs to Supabase in the background (queued for retry if offline). */
   async logSession(
     date: string, sportId: string,
     data: { subtypeId?: string; duration?: number; feeling?: FeelingLevel; metrics?: Record<string, string | number>; notes?: string },
     status: SportSessionStatus = 'done',
   ): Promise<void> {
     const uid = this._uid();
-    const { data: row, error } = await this.supabase.from('sport_sessions').insert({
-      user_id: uid, date, sport_id: sportId,
+    const id  = crypto.randomUUID();
+    const session: SportSession = {
+      id, date, sportId,
+      subtypeId: data.subtypeId,
+      duration:  data.duration,
+      feeling:   data.feeling,
+      metrics:   data.metrics,
+      notes:     data.notes,
+      status,
+      createdAt: new Date(),
+    };
+
+    const key    = date.substring(0, 7);
+    const bucket = this._monthCache.get(key) ?? [];
+    this._monthCache.set(key, [...bucket, session]);
+    this._rebuild();
+    this._writeSessionsToStorage(uid, key, this._monthCache.get(key)!);
+
+    const row = {
+      id, user_id: uid, date, sport_id: sportId,
       subtype_id: data.subtypeId ?? null,
       duration:   data.duration  ?? null,
       feeling:    data.feeling   ?? null,
       metrics:    data.metrics   ?? null,
       notes:      data.notes     ?? null,
       status,
-    }).select().single();
-    if (error) throw error;
-
-    const session = toSportSession(row as Record<string, unknown>);
-    const key     = date.substring(0, 7);
-    const bucket  = this._monthCache.get(key) ?? [];
-    this._monthCache.set(key, [...bucket, session]);
-    this._rebuild();
-    this._writeSessionsToStorage(uid, key, this._monthCache.get(key)!);
+    };
+    try {
+      const { error } = await this.supabase.from('sport_sessions').insert(row);
+      if (error) throw error;
+    } catch {
+      this._queuePending(uid, row);
+    }
   }
 
   /** Convert a planned sport session into a done one. */
@@ -460,6 +483,42 @@ export class SportService {
       if (!raw) return null;
       return (JSON.parse(raw) as Record<string, unknown>[]).map(sportSessionFromCache);
     } catch { return null; }
+  }
+
+  // ── Offline sync queue (logSession writes locally first, retried here) ─────
+
+  private _lsPendingKey(uid: string): string { return `gymgoli_sport_pending_${uid}`; }
+
+  private _readPending(uid: string): Record<string, unknown>[] {
+    try { return JSON.parse(localStorage.getItem(this._lsPendingKey(uid)) ?? '[]'); } catch { return []; }
+  }
+
+  private _writePending(uid: string, rows: Record<string, unknown>[]): void {
+    try { localStorage.setItem(this._lsPendingKey(uid), JSON.stringify(rows)); } catch { }
+  }
+
+  private _queuePending(uid: string, row: Record<string, unknown>): void {
+    const rows = this._readPending(uid);
+    rows.push(row);
+    this._writePending(uid, rows);
+  }
+
+  private async _flushPending(): Promise<void> {
+    const uid = this.auth.uid();
+    if (!uid || typeof navigator === 'undefined' || !navigator.onLine) return;
+    const rows = this._readPending(uid);
+    if (rows.length === 0) return;
+
+    const remaining: Record<string, unknown>[] = [];
+    for (const row of rows) {
+      try {
+        const { error } = await this.supabase.from('sport_sessions').insert(row);
+        if (error) throw error;
+      } catch {
+        remaining.push(row);
+      }
+    }
+    this._writePending(uid, remaining);
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────

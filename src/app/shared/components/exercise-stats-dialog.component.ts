@@ -167,10 +167,10 @@ interface SessionDetail {
     .esd-set-reps { font-size: 11px; font-weight: 500; color: var(--c-text-3); }
 
     /* ── Footer ── */
-    .esd-footer { padding: 10px 14px 18px; }
+    .esd-footer { padding: 10px 14px 18px; display: flex; justify-content: center; }
     .esd-btn-charts {
-      width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;
-      padding: 11px 16px; border: none; border-radius: 12px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 9px 16px; border: none; border-radius: 12px;
       background: var(--c-brand); color: #fff;
       font-size: 13px; font-weight: 700; cursor: pointer;
       transition: background 0.15s, transform 0.1s; touch-action: manipulation;

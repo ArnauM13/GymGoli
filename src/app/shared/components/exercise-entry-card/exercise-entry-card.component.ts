@@ -47,6 +47,20 @@ import { kgToDisplay } from '../../utils/weight.utils';
             }
           </div>
           <div class="eec-actions">
+            @if (collapsed() && entry().sets.length === 0) {
+              @if (showStatsAction()) {
+                <button type="button" class="eec-header-action-btn" aria-label="Estadístiques"
+                  (click)="$event.stopPropagation(); statsClick.emit()">
+                  <span class="material-symbols-outlined">bar_chart</span>
+                </button>
+              }
+              @if (showDeleteAction()) {
+                <button type="button" class="eec-header-action-btn eec-header-action-btn--danger" aria-label="Eliminar"
+                  (click)="$event.stopPropagation(); deleteClick.emit()">
+                  <span class="material-symbols-outlined">delete</span>
+                </button>
+              }
+            }
             @if (showMenu() && (!collapsed() || !hideMetaWhenCollapsed())) {
               <button type="button" class="eec-menu-btn" aria-label="Opcions"
                 (click)="$event.stopPropagation(); menuClick.emit()">
@@ -190,6 +204,16 @@ import { kgToDisplay } from '../../utils/weight.utils';
       &:hover { background: var(--c-hover); color: var(--c-text-2); }
     }
 
+    .eec-header-action-btn {
+      width: 34px; height: 34px; border: none; background: transparent;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: var(--c-text-3); border-radius: 8px;
+      touch-action: manipulation; transition: background 0.1s, color 0.1s;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { background: var(--c-hover); color: var(--c-text-2); }
+      &.eec-header-action-btn--danger:hover { background: rgba(239, 83, 80, 0.1); color: #ef5350; }
+    }
+
     .eec-chevron {
       font-size: 20px; color: var(--c-text-3);
       align-self: center; transition: color 0.15s, font-size 0.15s;
@@ -222,10 +246,16 @@ export class ExerciseEntryCardComponent {
   readonly feelingEditable       = input<boolean>(false);
   readonly showSetsBadge         = input<boolean>(true);
   readonly hideMetaWhenCollapsed = input<boolean>(false);
+  /** Stats/delete buttons shown in the header instead of the (hidden) footer
+   *  when the card is collapsed and has no sets yet. */
+  readonly showStatsAction  = input<boolean>(false);
+  readonly showDeleteAction = input<boolean>(false);
 
   readonly headerClick  = output<void>();
   readonly menuClick    = output<void>();
   readonly feelingClick = output<void>();
+  readonly statsClick   = output<void>();
+  readonly deleteClick  = output<void>();
 
   readonly totalReps = computed(() => this.entry().sets.reduce((s, set) => s + set.reps, 0));
 
