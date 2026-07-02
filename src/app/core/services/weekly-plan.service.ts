@@ -37,7 +37,7 @@ export class WeeklyPlanService {
     const months = new Set<string>();
     for (let i = 0; i < weeks * 7; i++) months.add(addDays(monday, i).substring(0, 7));
 
-    await Promise.all([...months].flatMap(key => {
+    await Promise.allSettled([...months].flatMap(key => {
       const [year, month] = key.split('-').map(Number);
       return [
         this.workoutService.ensureMonthLoaded(year, month - 1),
@@ -51,14 +51,19 @@ export class WeeklyPlanService {
         if (date < today) continue;
 
         for (const item of plan.days[dow]) {
-          if (item.type === 'gym') {
-            const already =
-              this.workoutService.getPlannedForDate(date).some(x => workoutCategories(x).includes(item.category)) ||
-              this.workoutService.getDoneWorkoutsForDate(date).some(x => workoutCategories(x).includes(item.category));
-            if (!already) await this.workoutService.createPlannedWorkout(date, item.category, []);
-          } else {
-            const existing = this.sportService.getSessionForDate(date, item.sportId);
-            if (!existing) await this.sportService.logSession(date, item.sportId, {}, 'planned');
+          try {
+            if (item.type === 'gym') {
+              const already =
+                this.workoutService.getPlannedForDate(date).some(x => workoutCategories(x).includes(item.category)) ||
+                this.workoutService.getDoneWorkoutsForDate(date).some(x => workoutCategories(x).includes(item.category));
+              if (!already) await this.workoutService.createPlannedWorkout(date, item.category, []);
+            } else {
+              const existing = this.sportService.getSessionForDate(date, item.sportId);
+              if (!existing) await this.sportService.logSession(date, item.sportId, {}, 'planned');
+            }
+          } catch {
+            // One item's creation failing (e.g. transient network error) shouldn't
+            // abort the rest of the plan — gym/sport creation are already local-first.
           }
         }
       }

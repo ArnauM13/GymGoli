@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnDestroy, ViewChild, ViewEncapsulation, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { Component, OnDestroy, ViewEncapsulation, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { MatDialog } from '@angular/material/dialog';
@@ -31,9 +31,6 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
   imports: [ReactiveFormsModule, DragDropModule, ExerciseEntryCardComponent],
   encapsulation: ViewEncapsulation.None,
   template: `
-    <input #focusTrap class="we-focus-trap" type="text" readonly
-           tabindex="-1" aria-hidden="true" autocomplete="off">
-
     @if (workout(); as w) {
       <div class="we-entries" [class.we-entries--dragging]="isDragging()"
            cdkDropList (cdkDropListDropped)="onDrop($event)">
@@ -41,8 +38,9 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
         @for (entry of w.entries; track entry.exerciseId) {
 
           <!-- ── Section header (non-draggable, recalculates when entries reorder) ── -->
-          @if (showSections() && !isDragging() && sectionBreaks().get($index); as sec) {
+          @if (showSections() && sectionBreaks().get($index); as sec) {
             <button type="button" class="we-section-header"
+                    [class.we-section-header--dragging]="isDragging()"
                     [attr.aria-expanded]="!isSectionCollapsed(sec.id)"
                     [attr.aria-label]="sec.label + ', ' + sectionCount(sec.id) + ' exercicis. ' + (isSectionCollapsed(sec.id) ? 'Desplega secció' : 'Plega secció')"
                     (click)="toggleSection(sec.id)">
@@ -72,6 +70,10 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
             [unit]="unit()"
             [feelingLevel]="entry.feeling"
             [prBadge]="prExerciseIds().has(entry.exerciseId)"
+            [showStatsAction]="!offlineService.isOffline()"
+            [showDeleteAction]="alwaysEditable() || editMode()"
+            (statsClick)="openStats(entry)"
+            (deleteClick)="removeEntry(entry.exerciseId)"
             (headerClick)="toggleCollapse(entry.exerciseId)">
 
             <!-- ── Projected body content ──
@@ -171,18 +173,18 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                     <!-- Set row: tap to edit when entry is editable -->
                     <div class="we-set-row"
                          [class.we-set-row-tappable]="isEntryEditable(entry.exerciseId)"
-                         (click)="isEntryEditable(entry.exerciseId) && startEditSet(entry.exerciseId, $index, set, 'weight')">
+                         (click)="isEntryEditable(entry.exerciseId) && startEditSet(entry.exerciseId, $index, set)">
                       <span class="we-set-num">{{ $index + 1 }}</span>
                       <div class="we-set-pills">
                         <span class="we-set-pill weight"
                           [class.we-set-pill--pr]="prExerciseIds().has(entry.exerciseId) && set.weight > 0 && set.weight === entryMaxWeight(entry)"
                           [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
-                          (click)="tapSetPill($event, entry.exerciseId, $index, set, 'weight')">
+                          (click)="tapSetPill($event, entry.exerciseId, $index, set)">
                           {{ dispW(set.weight) }}<small>{{ unit() }}</small>
                         </span>
                         <span class="we-set-pill reps"
                           [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
-                          (click)="tapSetPill($event, entry.exerciseId, $index, set, 'reps')">
+                          (click)="tapSetPill($event, entry.exerciseId, $index, set)">
                           {{ set.reps }}<small>r</small>
                         </span>
                       </div>
@@ -379,14 +381,6 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     }
   `,
   styles: [`
-    .we-focus-trap {
-      position: fixed; top: -9999px; left: -9999px;
-      width: 1px; height: 1px; opacity: 0;
-      pointer-events: none; border: none; padding: 0;
-      /* Must stay >=16px — iOS Safari auto-zooms the viewport on focus of any
-         input under 16px, even one that's off-screen like this one. */
-      font-size: 16px;
-    }
 
     .we-entries {
       padding: 10px 16px 0;
@@ -426,6 +420,9 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     }
     .we-section-header:focus-visible {
       outline: 2px solid var(--c-brand); outline-offset: 2px;
+    }
+    .we-section-header--dragging {
+      opacity: 0; pointer-events: none; transition: opacity 0.15s;
     }
     .we-section-accent {
       width: 3px; align-self: stretch; min-height: 13px; border-radius: 3px;
@@ -929,8 +926,6 @@ export class WorkoutEditorComponent implements OnDestroy {
 
   readonly requestAddExercise = output<void>();
 
-  @ViewChild('focusTrap') private focusTrapRef!: ElementRef<HTMLInputElement>;
-
   readonly addingFor        = signal<string | null>(null);
   readonly setQty           = signal(1);
   readonly setQtyOptions    = [1, 2, 3, 4, 5];
@@ -1000,11 +995,12 @@ export class WorkoutEditorComponent implements OnDestroy {
     return map;
   });
 
-  /** Show section headers only when the workout has 2+ consecutive runs */
+  /** Show section headers whenever at least one run has an identifiable muscle group
+   *  (even a single group should be labelled — only hide when no exercise has a subcategory). */
   readonly showSections = computed((): boolean => {
     const w = this.workout();
     if (!w || w.entries.length < 2) return false;
-    return this.sectionBreaks().size > 1;
+    return [...this.sectionBreaks().values()].some(b => b.label);
   });
 
   /** Maps CDK drag-index → flat entries index (accounts for collapsed sections hiding entries from CDK) */
@@ -1250,7 +1246,6 @@ export class WorkoutEditorComponent implements OnDestroy {
   }
 
   startAddSet(entry: WorkoutEntry): void {
-    this.claimKeyboard();
     this._expandEntry(entry.exerciseId);
     this.editingSet.set(null);
     this.addingFor.set(entry.exerciseId);
@@ -1294,9 +1289,6 @@ export class WorkoutEditorComponent implements OnDestroy {
       const last = entry.sets.at(-1);
       if (last) this.setForm.patchValue({ weight: kgToDisplay(last.weight, u), reps: last.reps });
     }
-    requestAnimationFrame(() => {
-      (document.getElementById('add-weight') as HTMLInputElement | null)?.focus();
-    });
   }
 
   applyRecCustomize(): void {
@@ -1337,31 +1329,16 @@ export class WorkoutEditorComponent implements OnDestroy {
     return es?.exerciseId === exerciseId && es?.index === index;
   }
 
-  tapSetPill(event: Event, exerciseId: string, setIndex: number, set: WorkoutSet, field: 'weight' | 'reps'): void {
+  tapSetPill(event: Event, exerciseId: string, setIndex: number, set: WorkoutSet): void {
     if (!this.isEntryEditable(exerciseId)) return;
     event.stopPropagation();
-    this.startEditSet(exerciseId, setIndex, set, field);
+    this.startEditSet(exerciseId, setIndex, set);
   }
 
-  startEditSet(exerciseId: string, index: number, set: WorkoutSet, focus: 'weight' | 'reps' = 'weight'): void {
-    this.claimKeyboard();
+  startEditSet(exerciseId: string, index: number, set: WorkoutSet): void {
     this.addingFor.set(null);
     this.editingSet.set({ exerciseId, index });
     this.editSetForm.setValue({ weight: kgToDisplay(set.weight, this.unit()), reps: set.reps });
-    requestAnimationFrame(() => {
-      const el = document.getElementById(focus === 'weight' ? 'edit-weight' : 'edit-reps') as HTMLInputElement | null;
-      el?.focus();
-      el?.select();
-    });
-  }
-
-  /** Foca un input invisible síncronament dins del gesture per reservar el teclat a iOS. */
-  private claimKeyboard(): void {
-    const trap = this.focusTrapRef?.nativeElement;
-    if (!trap) return;
-    trap.removeAttribute('readonly');
-    trap.focus();
-    trap.setAttribute('readonly', '');
   }
 
   cancelEditSet(): void { this.editingSet.set(null); }

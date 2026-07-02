@@ -150,6 +150,16 @@ describe('WeeklyPlanService', () => {
       expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-20', 'push', []); // week 2
       expect(createPlannedWorkout).toHaveBeenCalledTimes(3);
     });
+
+    it('keeps creating the remaining items when one item fails (e.g. offline)', async () => {
+      const plan = emptyPlan();
+      plan.days[2] = [{ type: 'gym', category: 'push' }, { type: 'gym', category: 'legs' }];
+      createPlannedWorkout.and.callFake((_date: string, category: string) =>
+        category === 'push' ? Promise.reject(new Error('network error')) : Promise.resolve('new-id'));
+
+      await expectAsync(service.apply(plan, 1)).toBeResolved();
+      expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-06', 'legs', []);
+    });
   });
 
   describe('ensureRecurringApplied()', () => {
@@ -181,7 +191,7 @@ describe('WeeklyPlanService', () => {
       expect(createPlannedWorkout).not.toHaveBeenCalled();
     });
 
-    it('retries on the next call if applying the plan failed', async () => {
+    it('does not retry on the next call when an individual item failed, since apply() absorbs per-item errors', async () => {
       weeklyPlan.set(planWithGymOn(2, 'push', true));
       createPlannedWorkout.and.rejectWith(new Error('network error'));
 
@@ -190,7 +200,7 @@ describe('WeeklyPlanService', () => {
       createPlannedWorkout.and.resolveTo('new-id');
 
       await service.ensureRecurringApplied();
-      expect(createPlannedWorkout).toHaveBeenCalled();
+      expect(createPlannedWorkout).not.toHaveBeenCalled();
     });
   });
 });
