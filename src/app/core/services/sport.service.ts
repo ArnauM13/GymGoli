@@ -34,6 +34,22 @@ function toSportSession(row: Record<string, unknown>): SportSession {
   };
 }
 
+// ── localStorage cache row (camelCase keys) → typed SportSession ────────────
+function sportSessionFromCache(raw: Record<string, unknown>): SportSession {
+  return {
+    id:        raw['id'] as string,
+    date:      raw['date'] as string,
+    sportId:   raw['sportId'] as string,
+    subtypeId: (raw['subtypeId'] as string | undefined) ?? undefined,
+    duration:  (raw['duration'] as number | undefined) ?? undefined,
+    feeling:   (raw['feeling'] as FeelingLevel | undefined) ?? undefined,
+    metrics:   (raw['metrics'] as Record<string, string | number> | undefined) ?? undefined,
+    notes:     (raw['notes'] as string | undefined) ?? undefined,
+    status:    (raw['status'] as SportSessionStatus | undefined) ?? 'done',
+    createdAt: new Date(raw['createdAt'] as string),
+  };
+}
+
 @Injectable({ providedIn: 'root' })
 export class SportService {
   private supabase = inject(SupabaseService).client;
@@ -180,6 +196,7 @@ export class SportService {
     this._writeSportsToStorage(uid, updated);
     for (const [key, sessions] of this._monthCache) {
       this._monthCache.set(key, sessions.filter(s => s.sportId !== id));
+      this._writeSessionsToStorage(uid, key, this._monthCache.get(key)!);
     }
     this._rebuild();
   }
@@ -195,9 +212,19 @@ export class SportService {
     const key = `${year}-${String(month + 1).padStart(2, '0')}`;
     if (this._monthCache.has(key)) return;
 
-    this._monthCache.set(key, []); // mark loading
+    const uid = this._uid();
 
-    this.isLoading.set(true);
+    // ── Step 1: serve from localStorage immediately (no spinner if cached) ──
+    const cached = this._readSessionsFromStorage(uid, key);
+    if (cached) {
+      this._monthCache.set(key, cached);
+      this._rebuild();
+    } else {
+      this._monthCache.set(key, []); // mark loading
+      this.isLoading.set(true);
+    }
+
+    // ── Step 2: background refresh from Supabase ────────────────────────────
     try {
       const start   = `${key}-01`;
       const lastDay = new Date(year, month + 1, 0).getDate();
@@ -206,15 +233,17 @@ export class SportService {
       const { data } = await this.supabase
         .from('sport_sessions')
         .select('*')
-        .eq('user_id', this._uid())
+        .eq('user_id', uid)
         .gte('date', start)
         .lte('date', end)
         .order('date', { ascending: false });
 
-      this._monthCache.set(key, (data ?? []).map(r => toSportSession(r as Record<string, unknown>)));
+      const fetched = (data ?? []).map(r => toSportSession(r as Record<string, unknown>));
+      this._monthCache.set(key, fetched);
       this._rebuild();
+      this._writeSessionsToStorage(uid, key, fetched);
     } catch {
-      // silent — month stays missing, UI shows empty
+      // Network failure — keep whatever we have from localStorage/local state
     } finally {
       this.isLoading.set(false);
     }
@@ -295,6 +324,7 @@ export class SportService {
     const bucket  = this._monthCache.get(key) ?? [];
     this._monthCache.set(key, [...bucket, session]);
     this._rebuild();
+    this._writeSessionsToStorage(uid, key, this._monthCache.get(key)!);
   }
 
   /** Convert a planned sport session into a done one. */
@@ -308,6 +338,7 @@ export class SportService {
     const bucket = this._monthCache.get(key) ?? [];
     this._monthCache.set(key, bucket.map(s => s.id === id ? { ...s, status: 'done' } : s));
     this._rebuild();
+    this._writeSessionsToStorage(uid, key, this._monthCache.get(key)!);
   }
 
   /** Update an existing session's data. */
@@ -332,6 +363,7 @@ export class SportService {
       : s
     ));
     this._rebuild();
+    this._writeSessionsToStorage(uid, key, this._monthCache.get(key)!);
   }
 
   async deleteSession(id: string, date: string): Promise<void> {
@@ -360,6 +392,7 @@ export class SportService {
       s.id === sessionId ? { ...s, subtypeId: subtypeId ?? undefined } : s
     ));
     this._rebuild();
+    this._writeSessionsToStorage(uid, key, this._monthCache.get(key)!);
   }
 
   // ── Private mutations ─────────────────────────────────────────────────────
@@ -378,20 +411,23 @@ export class SportService {
     const bucket  = this._monthCache.get(key) ?? [];
     this._monthCache.set(key, [...bucket, session]);
     this._rebuild();
+    this._writeSessionsToStorage(uid, key, this._monthCache.get(key)!);
   }
 
   private async _deleteSession(id: string, date: string): Promise<void> {
+    const uid = this._uid();
     const { error } = await this.supabase
       .from('sport_sessions')
       .delete()
       .eq('id', id)
-      .eq('user_id', this._uid());
+      .eq('user_id', uid);
     if (error) throw error;
 
     const key    = date.substring(0, 7);
     const bucket = this._monthCache.get(key) ?? [];
     this._monthCache.set(key, bucket.filter(s => s.id !== id));
     this._rebuild();
+    this._writeSessionsToStorage(uid, key, this._monthCache.get(key)!);
   }
 
   // ── localStorage cache ────────────────────────────────────────────────────
@@ -407,6 +443,22 @@ export class SportService {
       const raw = localStorage.getItem(this._lsSportsKey(uid));
       if (!raw) return null;
       return (JSON.parse(raw) as Record<string, unknown>[]).map(r => toSport(r));
+    } catch { return null; }
+  }
+
+  private _lsSessionsKey(uid: string, monthKey: string): string {
+    return `gymgoli_sport_sessions_${uid}_${monthKey}`;
+  }
+
+  private _writeSessionsToStorage(uid: string, monthKey: string, sessions: SportSession[]): void {
+    try { localStorage.setItem(this._lsSessionsKey(uid, monthKey), JSON.stringify(sessions)); } catch { /* quota exceeded — non-fatal */ }
+  }
+
+  private _readSessionsFromStorage(uid: string, monthKey: string): SportSession[] | null {
+    try {
+      const raw = localStorage.getItem(this._lsSessionsKey(uid, monthKey));
+      if (!raw) return null;
+      return (JSON.parse(raw) as Record<string, unknown>[]).map(sportSessionFromCache);
     } catch { return null; }
   }
 

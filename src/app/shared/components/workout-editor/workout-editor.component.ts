@@ -64,6 +64,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
             (cdkDragEnded)="isDragging.set(false)"
             [entry]="entry"
             [catColor]="getCatColor(entry)"
+            [catLoading]="!isExerciseResolved(entry)"
             [collapsed]="isCollapsed(entry.exerciseId)"
             [draggable]="editMode() || alwaysEditable()"
             [hideMetaWhenCollapsed]="true"
@@ -1160,7 +1161,11 @@ export class WorkoutEditorComponent implements OnDestroy {
 
   getCatColor(entry: WorkoutEntry): string {
     const ex = this.exerciseService.getById(entry.exerciseId);
-    return ex ? CATEGORY_COLORS[ex.category] : '#bbb';
+    return ex ? CATEGORY_COLORS[ex.category] : 'var(--c-border)';
+  }
+  /** False only in the brief window before exercise data has loaded/cached — drives the loading shimmer instead of a flat gray bar. */
+  isExerciseResolved(entry: WorkoutEntry): boolean {
+    return !!this.exerciseService.getById(entry.exerciseId);
   }
   getCatLabel(entry: WorkoutEntry): string {
     const ex = this.exerciseService.getById(entry.exerciseId);

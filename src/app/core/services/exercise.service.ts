@@ -28,6 +28,22 @@ function toExercise(r: Record<string, unknown>): Exercise {
   };
 }
 
+// ── localStorage cache row (camelCase keys) → typed Exercise ────────────────
+function exerciseFromCache(raw: Record<string, unknown>): Exercise {
+  return {
+    id:          raw['id'] as string,
+    name:        raw['name'] as string,
+    category:    raw['category'] as ExerciseCategory,
+    subcategory: (raw['subcategory'] as ExerciseSubcategory | undefined) ?? undefined,
+    notes:       (raw['notes'] as string | undefined) ?? undefined,
+    muscles:     (raw['muscles'] as string[] | undefined) ?? undefined,
+    description: (raw['description'] as string | undefined) ?? undefined,
+    setsRange:   (raw['setsRange'] as [number, number] | undefined) ?? undefined,
+    repsRange:   (raw['repsRange'] as [number, number] | undefined) ?? undefined,
+    createdAt:   new Date(raw['createdAt'] as string),
+  };
+}
+
 @Injectable({ providedIn: 'root' })
 export class ExerciseService {
   private supabase = inject(SupabaseService).client;
@@ -41,12 +57,18 @@ export class ExerciseService {
   private _loadPromise: Promise<void> | null = null;
 
   constructor() {
-    // Clear cache on logout — don't auto-reload on login (lazy)
+    // Clear on logout. On login, serve the cached list instantly (so any
+    // component reading getById()/exercises() right away — e.g. workout
+    // detail entries — already has real data, not a "not found yet" gap)
+    // while the network refresh happens lazily via ensureLoaded().
     effect(() => {
-      if (!this.auth.uid()) {
-        this._exercises.set([]);
-        this.isLoaded.set(false);
-        this._loadPromise = null;
+      const uid = this.auth.uid();
+      this._exercises.set([]);
+      this.isLoaded.set(false);
+      this._loadPromise = null;
+      if (uid) {
+        const cached = this._readExercisesFromStorage(uid);
+        if (cached) this._exercises.set(cached);
       }
     });
   }
@@ -76,7 +98,9 @@ export class ExerciseService {
       .order('name');
 
     if (error) return;
-    this._exercises.set((data ?? []).map(r => toExercise(r as Record<string, unknown>)));
+    const exercises = (data ?? []).map(r => toExercise(r as Record<string, unknown>));
+    this._exercises.set(exercises);
+    this._writeExercisesToStorage(uid, exercises);
   }
 
   // Inserts default exercises the very first time a user has none
@@ -115,9 +139,9 @@ export class ExerciseService {
     if (error) throw error;
 
     const newEx = toExercise(inserted as Record<string, unknown>);
-    this._exercises.set(
-      [...this._exercises(), newEx].sort((a, b) => a.name.localeCompare(b.name))
-    );
+    const next = [...this._exercises(), newEx].sort((a, b) => a.name.localeCompare(b.name));
+    this._exercises.set(next);
+    this._writeExercisesToStorage(uid, next);
     return newEx;
   }
 
@@ -145,11 +169,11 @@ export class ExerciseService {
 
     if (error) throw error;
 
-    this._exercises.set(
-      this._exercises()
-        .map(e => e.id === id ? { ...e, ...data } : e)
-        .sort((a, b) => a.name.localeCompare(b.name))
-    );
+    const next = this._exercises()
+      .map(e => e.id === id ? { ...e, ...data } : e)
+      .sort((a, b) => a.name.localeCompare(b.name));
+    this._exercises.set(next);
+    this._writeExercisesToStorage(uid, next);
   }
 
   async delete(id: string): Promise<void> {
@@ -163,7 +187,9 @@ export class ExerciseService {
       .eq('user_id', uid);
 
     if (error) throw error;
-    this._exercises.set(this._exercises().filter(e => e.id !== id));
+    const next = this._exercises().filter(e => e.id !== id);
+    this._exercises.set(next);
+    this._writeExercisesToStorage(uid, next);
   }
 
   private _toRow(uid: string, e: Omit<Exercise, 'id' | 'createdAt'>): Record<string, unknown> {
@@ -180,5 +206,21 @@ export class ExerciseService {
       reps_min:    e.repsRange?.[0] ?? null,
       reps_max:    e.repsRange?.[1] ?? null,
     };
+  }
+
+  // ── localStorage cache ────────────────────────────────────────────────────
+
+  private _lsKey(uid: string): string { return `gymgoli_exercises_${uid}`; }
+
+  private _writeExercisesToStorage(uid: string, exercises: Exercise[]): void {
+    try { localStorage.setItem(this._lsKey(uid), JSON.stringify(exercises)); } catch { /* quota exceeded — non-fatal */ }
+  }
+
+  private _readExercisesFromStorage(uid: string): Exercise[] | null {
+    try {
+      const raw = localStorage.getItem(this._lsKey(uid));
+      if (!raw) return null;
+      return (JSON.parse(raw) as Record<string, unknown>[]).map(exerciseFromCache);
+    } catch { return null; }
   }
 }

@@ -21,7 +21,7 @@ import { kgToDisplay } from '../../utils/weight.utils';
 
         <!-- ── Header (always visible, same look as history ex-card) ── -->
         <div class="eec-header" [class.eec-header--minimal]="hideMetaWhenCollapsed()" (click)="headerClick.emit()">
-          <div class="eec-bar"></div>
+          <div class="eec-bar" [class.eec-bar--loading]="catLoading()"></div>
           <div class="eec-body">
             <span class="eec-name">{{ entry().exerciseName }}</span>
             @if (feelingLevel()) {
@@ -122,6 +122,15 @@ import { kgToDisplay } from '../../utils/weight.utils';
     .eec-bar {
       width: 4px; align-self: stretch; flex-shrink: 0;
       background: var(--cat);
+      &.eec-bar--loading {
+        background: linear-gradient(180deg, var(--c-border-2) 0%, var(--c-border) 40%, var(--c-border-2) 80%);
+        background-size: 100% 300px;
+        animation: eec-bar-shimmer 1.5s ease-in-out infinite;
+      }
+    }
+    @keyframes eec-bar-shimmer {
+      from { background-position: 0 -150px; }
+      to   { background-position: 0 calc(150px + 100%); }
     }
 
     .eec-body {
@@ -202,6 +211,7 @@ import { kgToDisplay } from '../../utils/weight.utils';
 export class ExerciseEntryCardComponent {
   readonly entry                = input.required<WorkoutEntry>();
   readonly catColor             = input<string>('#ccc');
+  readonly catLoading           = input<boolean>(false);
   readonly collapsed            = input<boolean>(true);
   readonly draggable            = input<boolean>(false);
   readonly showMenu             = input<boolean>(false);
