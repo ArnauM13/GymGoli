@@ -1,5 +1,5 @@
 -- GymGoli – Schema complet i idempotent
--- Consolida totes les migracions (001–015).
+-- Consolida totes les migracions (001–016).
 -- Segur de re-executar: usa IF NOT EXISTS, DROP … IF EXISTS i OR REPLACE.
 -- Executa a: Supabase Dashboard → SQL Editor → New query
 
@@ -129,6 +129,17 @@ CREATE TABLE IF NOT EXISTS goal_history (
   created_at           timestamptz DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS templates (
+  id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    uuid        NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  name       text        NOT NULL,
+  category   text        NOT NULL CHECK (category IN ('push', 'pull', 'legs', 'mixed')),
+  entries    jsonb       NOT NULL DEFAULT '[]',
+  use_count  integer     NOT NULL DEFAULT 0,
+  last_used  date,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 2. COLUMNES QUE PODRIEN FALTAR (taules creades abans de les migracions)
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -227,6 +238,7 @@ ALTER TABLE sports           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sport_sessions   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_settings    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE goal_history     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE templates        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_profiles    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trainer_invites  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trainer_clients  ENABLE ROW LEVEL SECURITY;
@@ -288,6 +300,11 @@ CREATE POLICY "trainer_read_client_settings" ON user_settings FOR SELECT
 -- goal_history
 DROP POLICY IF EXISTS goal_history_own              ON goal_history;
 CREATE POLICY goal_history_own ON goal_history FOR ALL
+  USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+
+-- templates
+DROP POLICY IF EXISTS "users own templates"         ON templates;
+CREATE POLICY "users own templates" ON templates FOR ALL
   USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
 
 -- user_profiles (propi)
@@ -364,6 +381,9 @@ CREATE INDEX IF NOT EXISTS user_settings_user_id_idx
 
 CREATE UNIQUE INDEX IF NOT EXISTS goal_history_user_date_idx
   ON goal_history (user_id, effective_from);
+
+CREATE INDEX IF NOT EXISTS templates_user_id_idx
+  ON templates (user_id);
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 7. FUNCIONS (SECURITY DEFINER per a invitacions d'entrenador)
