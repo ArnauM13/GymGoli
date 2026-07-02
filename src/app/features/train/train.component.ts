@@ -189,6 +189,12 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         <!-- ══ DASHBOARD MODE ══ -->
         <app-page-header title="Entrenament">
           <button class="ph-offline-btn"
+                  (click)="router.navigate(['/train/planner'])"
+                  title="Planificació setmanal"
+                  aria-label="Planificació setmanal">
+            <span class="material-symbols-outlined">event_repeat</span>
+          </button>
+          <button class="ph-offline-btn"
                   [class.ph-offline-btn--active]="offlineService.forceOffline()"
                   (click)="offlineService.toggleForceOffline()"
                   [title]="offlineService.forceOffline() ? 'Desactivar mode offline' : 'Activar mode offline'"

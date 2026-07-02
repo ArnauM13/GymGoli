@@ -3,6 +3,7 @@ import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { DEFAULT_USER_SETTINGS, FitnessGoal, ThemeMode, UserSettings } from '../models/user-settings.model';
+import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../models/weekly-plan.model';
 
 @Injectable({ providedIn: 'root' })
 export class UserSettingsService {
@@ -32,6 +33,7 @@ export class UserSettingsService {
   readonly weightUnit          = computed(() => this._settings().weightUnit ?? 'kg');
   readonly restTimerSeconds    = computed(() => this._settings().restTimerSeconds ?? 90);
   readonly fitnessGoal         = computed(() => (this._settings().fitnessGoal ?? null) as FitnessGoal | null);
+  readonly weeklyPlan          = computed(() => this._settings().weeklyPlan ?? EMPTY_WEEKLY_PLAN);
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -100,5 +102,9 @@ export class UserSettingsService {
         .from('user_settings')
         .upsert({ user_id: uid, settings: next, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
     } catch { /* best-effort */ }
+  }
+
+  async updateWeeklyPlan(plan: WeeklyPlan): Promise<void> {
+    await this.update({ weeklyPlan: plan });
   }
 }

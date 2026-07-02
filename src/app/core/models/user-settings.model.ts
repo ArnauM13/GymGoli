@@ -1,3 +1,5 @@
+import { WeeklyPlan } from './weekly-plan.model';
+
 export type GoalMode = 'combined' | 'separate';
 export type WeightUnit = 'kg' | 'lb';
 export type ThemeMode = 'light' | 'dark' | 'system';
@@ -35,6 +37,7 @@ export interface UserSettings {
   restTimerSeconds: number;
   onboardingDone: boolean;
   fitnessGoal: FitnessGoal | null;
+  weeklyPlan: WeeklyPlan | null;
 }
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
@@ -48,4 +51,5 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   restTimerSeconds: 90,
   onboardingDone: false,
   fitnessGoal: null,
+  weeklyPlan: null,
 };
