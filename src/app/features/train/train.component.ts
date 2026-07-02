@@ -205,14 +205,14 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         <div class="quick-actions">
           <button class="qa-chip qa-chip--plan" (click)="router.navigate(['/train/planner'])">
             <span class="material-symbols-outlined">event_repeat</span>
-            Crear rutina
+            Planificar
           </button>
           <button class="qa-chip" [class.qa-chip--active]="offlineService.forceOffline()"
                   (click)="offlineService.toggleForceOffline()">
             <span class="material-symbols-outlined">
               {{ offlineService.forceOffline() ? 'wifi_off' : 'wifi' }}
             </span>
-            {{ offlineService.forceOffline() ? 'Mode en línia' : 'Mode sense connexió' }}
+            {{ offlineService.forceOffline() ? 'En línia' : 'Sense connexió' }}
           </button>
         </div>
 
@@ -742,7 +742,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     /* ── Quick actions: weekly planner + offline toggle (filter-chip style, per history page) ── */
     .quick-actions {
-      display: flex; gap: 8px; flex-wrap: wrap;
+      display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;
       margin: 0 16px 12px;
     }
     .qa-chip {

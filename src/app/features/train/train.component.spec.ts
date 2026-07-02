@@ -220,17 +220,17 @@ describe('TrainComponent', () => {
   // ── offline toggle chip label ───────────────────────────────────────────
 
   describe('offline toggle chip', () => {
-    it('reads "Mode sense connexió" when offline mode is off', () => {
+    it('reads "Sense connexió" when offline mode is off', () => {
       const chip = (fixture.nativeElement as HTMLElement).querySelector('.qa-chip:not(.qa-chip--plan)');
-      expect(chip?.textContent?.trim()).toContain('Mode sense connexió');
+      expect(chip?.textContent?.trim()).toContain('Sense connexió');
     });
 
-    it('reads "Mode en línia" once forced offline mode is active', () => {
+    it('reads "En línia" once forced offline mode is active', () => {
       forceOffline.set(true);
       fixture.detectChanges();
       const chip = (fixture.nativeElement as HTMLElement).querySelector('.qa-chip:not(.qa-chip--plan)');
-      expect(chip?.textContent?.trim()).toContain('Mode en línia');
-      expect(chip?.textContent?.trim()).not.toContain('Mode sense connexió');
+      expect(chip?.textContent?.trim()).toContain('En línia');
+      expect(chip?.textContent?.trim()).not.toContain('Sense connexió');
     });
   });
 });
