@@ -1,6 +1,5 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { provideRouter } from '@angular/router';
 
 import { ChartsComponent } from './charts.component';
@@ -11,9 +10,12 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
 import { Exercise } from '../../core/models/exercise.model';
 import { Workout } from '../../core/models/workout.model';
 
+function makeExercise(id: string, category: 'push' | 'pull' | 'legs' = 'push'): Exercise {
+  return { id, name: `Exercise ${id}`, category, createdAt: new Date() };
+}
+
 function makeWorkout(date: string, exerciseId: string, overrides: {
   sets?: { weight: number; reps: number }[];
-  feeling?: number;
 } = {}): Workout {
   return {
     id: date,
@@ -23,7 +25,6 @@ function makeWorkout(date: string, exerciseId: string, overrides: {
       exerciseId,
       exerciseName: 'Test',
       sets: overrides.sets ?? [],
-      feeling: overrides.feeling as any,
     }],
   };
 }
@@ -31,21 +32,29 @@ function makeWorkout(date: string, exerciseId: string, overrides: {
 describe('ChartsComponent', () => {
   let component: ChartsComponent;
   let mockGetWorkoutsForExercise: jasmine.Spy;
+  let mockExercisesWithData: ReturnType<typeof signal<Set<string>>>;
+  let mockLoadAllWorkouts: jasmine.Spy;
 
-  beforeEach(async () => {
-    mockGetWorkoutsForExercise = jasmine.createSpy().and.returnValue([]);
+  function setup(
+    exercises: Exercise[] = [],
+    withData: Set<string> = new Set(),
+    workoutsByExercise: Record<string, Workout[]> = {},
+  ): void {
+    TestBed.resetTestingModule();
+    mockGetWorkoutsForExercise = jasmine.createSpy().and.callFake((id: string) => workoutsByExercise[id] ?? []);
+    mockExercisesWithData      = signal(withData);
+    mockLoadAllWorkouts        = jasmine.createSpy();
 
     const mockWorkoutService = {
       isLoading:              signal(false),
       doneWorkouts:           jasmine.createSpy().and.returnValue([]),
-      exercisesWithData:      jasmine.createSpy().and.returnValue(new Set<string>()),
+      exercisesWithData:      mockExercisesWithData,
       getWorkoutsForExercise: mockGetWorkoutsForExercise,
-      loadAllWorkouts:        jasmine.createSpy(),
-      loadWorkoutsForExercise: jasmine.createSpy().and.resolveTo(undefined),
+      loadAllWorkouts:        mockLoadAllWorkouts,
     };
 
     const mockExerciseService = {
-      exercises:    signal<Exercise[]>([]),
+      exercises:    signal<Exercise[]>(exercises),
       isLoaded:     signal(true),
       ensureLoaded: jasmine.createSpy().and.resolveTo(undefined),
     };
@@ -66,7 +75,7 @@ describe('ChartsComponent', () => {
       weeklySportGoal:    signal(2),
     };
 
-    await TestBed.configureTestingModule({
+    TestBed.configureTestingModule({
       imports:   [ChartsComponent],
       providers: [
         provideRouter([]),
@@ -75,223 +84,86 @@ describe('ChartsComponent', () => {
         { provide: SportService,        useValue: mockSportService },
         { provide: UserSettingsService, useValue: mockSettingsService },
       ],
-    }).compileComponents();
+    });
 
     const fixture = TestBed.createComponent(ChartsComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
-  });
+  }
+
+  beforeEach(() => setup());
 
   it('should create', () => {
     expect(component).toBeTruthy();
   });
 
-  // ── Default state ────────────────────────────────────────────────────────
-
-  it('defaults selectedExerciseId to empty string', () => {
-    expect(component.selectedExerciseId).toBe('');
+  it('loads the full workout history up-front instead of a manual "load more" step', () => {
+    expect(mockLoadAllWorkouts).toHaveBeenCalled();
   });
 
-  it('defaults selectedMetric to weight', () => {
-    expect(component.selectedMetric()).toBe('weight');
+  it('defaults expandedExerciseId to null', () => {
+    expect(component.expandedExerciseId()).toBeNull();
   });
 
-  it('exposes three metrics (weight, volume, feeling)', () => {
-    const values = component.metrics.map(m => m.value);
-    expect(values).toEqual(['weight', 'volume', 'feeling']);
-  });
+  // ── exerciseGroups() ────────────────────────────────────────────────────
 
-  // ── chartData() ──────────────────────────────────────────────────────────
-
-  describe('chartData()', () => {
-    it('returns empty array when no exercise is selected', () => {
-      expect(component.chartData()).toEqual([]);
+  describe('exerciseGroups()', () => {
+    it('returns empty when no exercises have data', () => {
+      expect(component.exerciseGroups()).toEqual([]);
     });
 
-    it('returns empty array when workouts have no sets', () => {
-      mockGetWorkoutsForExercise.and.returnValue([
-        makeWorkout('2024-03-01', 'ex1', { sets: [] }),
-      ]);
-      component.selectedExerciseId = 'ex1';
-      expect(component.chartData()).toEqual([{ date: '2024-03-01', value: 0 }]);
+    it('includes every exercise that has logged data, grouped by category', () => {
+      setup(
+        [makeExercise('a', 'push'), makeExercise('b', 'legs'), makeExercise('c', 'push')],
+        new Set(['a', 'b']),
+      );
+
+      const groups = component.exerciseGroups();
+      expect(groups.map(g => g.cat)).toEqual(['push', 'legs']);
+      expect(groups.find(g => g.cat === 'push')!.records.map(r => r.exercise.id)).toEqual(['a']);
+      expect(groups.find(g => g.cat === 'legs')!.records.map(r => r.exercise.id)).toEqual(['b']);
     });
 
-    it('extracts max weight for the weight metric', () => {
-      mockGetWorkoutsForExercise.and.returnValue([
-        makeWorkout('2024-03-01', 'ex1', { sets: [{ weight: 60, reps: 10 }, { weight: 80, reps: 5 }] }),
-        makeWorkout('2024-03-08', 'ex1', { sets: [{ weight: 85, reps: 4 }] }),
-      ]);
-      component.selectedExerciseId = 'ex1';
-      component.selectedMetric.set('weight');
+    it('shows a max-weight record when positive-weight sets exist', () => {
+      setup([makeExercise('a')], new Set(['a']), {
+        a: [
+          makeWorkout('2024-03-01', 'a', { sets: [{ weight: 60, reps: 10 }] }),
+          makeWorkout('2024-03-08', 'a', { sets: [{ weight: 80, reps: 5 }] }),
+        ],
+      });
 
-      const data = component.chartData();
-      expect(data.length).toBe(2);
-      expect(data[0]).toEqual({ date: '2024-03-01', value: 80 });
-      expect(data[1]).toEqual({ date: '2024-03-08', value: 85 });
+      const record = component.exerciseGroups()[0].records[0];
+      expect(record.display).toBe(80);
     });
 
-    it('computes total volume (weight × reps summed) for the volume metric', () => {
-      mockGetWorkoutsForExercise.and.returnValue([
-        makeWorkout('2024-03-01', 'ex1', { sets: [{ weight: 60, reps: 10 }, { weight: 60, reps: 8 }] }),
-      ]);
-      component.selectedExerciseId = 'ex1';
-      component.selectedMetric.set('volume');
+    it('lists a bodyweight exercise (no positive weight logged) with a null record', () => {
+      setup([makeExercise('a')], new Set(['a']), {
+        a: [makeWorkout('2024-03-01', 'a', { sets: [{ weight: 0, reps: 10 }] })],
+      });
 
-      const data = component.chartData();
-      expect(data[0].value).toBe(60 * 10 + 60 * 8); // 1080
-    });
-
-    it('reads entry-level feeling for the feeling metric', () => {
-      mockGetWorkoutsForExercise.and.returnValue([
-        makeWorkout('2024-03-01', 'ex1', { sets: [{ weight: 60, reps: 10 }], feeling: 3 }),
-        makeWorkout('2024-03-08', 'ex1', { sets: [{ weight: 60, reps: 10 }], feeling: 5 }),
-      ]);
-      component.selectedExerciseId = 'ex1';
-      component.selectedMetric.set('feeling');
-
-      const data = component.chartData();
-      expect(data.map(d => d.value)).toEqual([3, 5]);
-    });
-
-    it('filters out zero-value points when metric is feeling', () => {
-      mockGetWorkoutsForExercise.and.returnValue([
-        makeWorkout('2024-03-01', 'ex1', { sets: [{ weight: 60, reps: 10 }] }),      // no feeling → 0
-        makeWorkout('2024-03-08', 'ex1', { sets: [{ weight: 60, reps: 10 }], feeling: 4 }),
-      ]);
-      component.selectedExerciseId = 'ex1';
-      component.selectedMetric.set('feeling');
-
-      const data = component.chartData();
-      expect(data.length).toBe(1);
-      expect(data[0].value).toBe(4);
-    });
-
-    it('does NOT filter zero-value points for weight metric', () => {
-      mockGetWorkoutsForExercise.and.returnValue([
-        makeWorkout('2024-03-01', 'ex1', { sets: [] }),
-      ]);
-      component.selectedExerciseId = 'ex1';
-      component.selectedMetric.set('weight');
-
-      expect(component.chartData().length).toBe(1);
+      const record = component.exerciseGroups()[0].records[0];
+      expect(record.display).toBeNull();
     });
   });
 
-  // ── stats() ──────────────────────────────────────────────────────────────
+  // ── toggleExercise() ─────────────────────────────────────────────────────
 
-  describe('stats()', () => {
-    it('returns all zeros when there is no chart data', () => {
-      expect(component.stats()).toEqual({ total: 0, max: 0, last: 0, trend: 0 });
+  describe('toggleExercise()', () => {
+    it('expands the given exercise', () => {
+      component.toggleExercise('ex-abc');
+      expect(component.expandedExerciseId()).toBe('ex-abc');
     });
 
-    it('counts sessions correctly', () => {
-      mockGetWorkoutsForExercise.and.returnValue([
-        makeWorkout('2024-03-01', 'ex1', { sets: [{ weight: 60, reps: 10 }] }),
-        makeWorkout('2024-03-08', 'ex1', { sets: [{ weight: 70, reps: 8 }] }),
-        makeWorkout('2024-03-15', 'ex1', { sets: [{ weight: 75, reps: 6 }] }),
-      ]);
-      component.selectedExerciseId = 'ex1';
-      expect(component.stats().total).toBe(3);
+    it('collapses it again on a second call with the same id', () => {
+      component.toggleExercise('ex-abc');
+      component.toggleExercise('ex-abc');
+      expect(component.expandedExerciseId()).toBeNull();
     });
 
-    it('returns the max value across all sessions', () => {
-      mockGetWorkoutsForExercise.and.returnValue([
-        makeWorkout('2024-03-01', 'ex1', { sets: [{ weight: 60, reps: 10 }] }),
-        makeWorkout('2024-03-08', 'ex1', { sets: [{ weight: 90, reps: 3 }] }),
-        makeWorkout('2024-03-15', 'ex1', { sets: [{ weight: 75, reps: 6 }] }),
-      ]);
-      component.selectedExerciseId = 'ex1';
-      expect(component.stats().max).toBe(90);
-    });
-
-    it('returns the last session value', () => {
-      mockGetWorkoutsForExercise.and.returnValue([
-        makeWorkout('2024-03-01', 'ex1', { sets: [{ weight: 60, reps: 10 }] }),
-        makeWorkout('2024-03-08', 'ex1', { sets: [{ weight: 75, reps: 6 }] }),
-      ]);
-      component.selectedExerciseId = 'ex1';
-      expect(component.stats().last).toBe(75);
-    });
-
-    it('calculates positive trend as percentage from first to last', () => {
-      mockGetWorkoutsForExercise.and.returnValue([
-        makeWorkout('2024-03-01', 'ex1', { sets: [{ weight: 100, reps: 5 }] }),
-        makeWorkout('2024-03-08', 'ex1', { sets: [{ weight: 110, reps: 5 }] }),
-      ]);
-      component.selectedExerciseId = 'ex1';
-      expect(component.stats().trend).toBe(10); // +10%
-    });
-
-    it('calculates negative trend correctly', () => {
-      mockGetWorkoutsForExercise.and.returnValue([
-        makeWorkout('2024-03-01', 'ex1', { sets: [{ weight: 100, reps: 5 }] }),
-        makeWorkout('2024-03-08', 'ex1', { sets: [{ weight: 80, reps: 5 }] }),
-      ]);
-      component.selectedExerciseId = 'ex1';
-      expect(component.stats().trend).toBe(-20); // -20%
-    });
-
-    it('returns trend 0 when first value is zero', () => {
-      mockGetWorkoutsForExercise.and.returnValue([
-        makeWorkout('2024-03-01', 'ex1', { sets: [] }),
-        makeWorkout('2024-03-08', 'ex1', { sets: [{ weight: 60, reps: 5 }] }),
-      ]);
-      component.selectedExerciseId = 'ex1';
-      expect(component.stats().trend).toBe(0);
-    });
-  });
-
-  // ── exercises() computed ─────────────────────────────────────────────────
-
-  describe('exercises()', () => {
-    it('returns empty when no exercises exist', () => {
-      expect(component.exercises()).toEqual([]);
-    });
-  });
-
-  // ── selectedExerciseId setter / getter ───────────────────────────────────
-
-  describe('selectedExerciseId', () => {
-    it('setter updates the getter value', () => {
-      component.selectedExerciseId = 'abc';
-      expect(component.selectedExerciseId).toBe('abc');
-    });
-  });
-
-  // ── onExerciseChange() ───────────────────────────────────────────────────
-
-  describe('onExerciseChange()', () => {
-    it('does not throw when called with no active chart', () => {
-      expect(() => component.onExerciseChange()).not.toThrow();
-    });
-
-    it('calls loadWorkoutsForExercise when an exercise is selected', () => {
-      const svc = TestBed.inject(WorkoutService) as any;
-      component.selectedExerciseId = 'ex1';
-      component.onExerciseChange();
-      expect(svc.loadWorkoutsForExercise).toHaveBeenCalledWith('ex1');
-    });
-
-    it('does not call loadWorkoutsForExercise when selection is cleared', () => {
-      const svc = TestBed.inject(WorkoutService) as any;
-      component.selectedExerciseId = '';
-      component.onExerciseChange();
-      expect(svc.loadWorkoutsForExercise).not.toHaveBeenCalled();
-    });
-  });
-
-  // ── selectRecord() ───────────────────────────────────────────────────────
-
-  describe('selectRecord()', () => {
-    it('sets selectedExerciseId to the given exercise', () => {
-      component.selectRecord('ex-abc');
-      expect(component.selectedExerciseId).toBe('ex-abc');
-    });
-
-    it('triggers loadWorkoutsForExercise for the selected exercise', () => {
-      const svc = TestBed.inject(WorkoutService) as any;
-      component.selectRecord('ex-abc');
-      expect(svc.loadWorkoutsForExercise).toHaveBeenCalledWith('ex-abc');
+    it('switches to the newly clicked exercise, closing the previous one', () => {
+      component.toggleExercise('ex-abc');
+      component.toggleExercise('ex-def');
+      expect(component.expandedExerciseId()).toBe('ex-def');
     });
   });
 });
