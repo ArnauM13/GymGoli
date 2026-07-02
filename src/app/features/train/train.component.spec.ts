@@ -30,8 +30,11 @@ const EMPTY_CATEGORY_PROFILE = { daysSinceLast: 99, typicalGapDays: 4, overdueSc
 
 describe('TrainComponent', () => {
   let component: TrainComponent;
+  let fixture: ReturnType<typeof TestBed.createComponent<TrainComponent>>;
+  let forceOffline: ReturnType<typeof signal<boolean>>;
 
   beforeEach(async () => {
+    forceOffline = signal(false);
     const mockWorkoutService = {
       workouts:                   signal<Workout[]>([]),
       isLoading:                  signal(false),
@@ -71,7 +74,7 @@ describe('TrainComponent', () => {
         { provide: AuthService,         useValue: { uid: signal('user-1') } },
         { provide: UserSettingsService, useValue: { weightUnit: signal<'kg' | 'lb'>('kg'), fitnessGoal: signal(null), loaded: signal(true) } },
         { provide: WeeklyPlanService,   useValue: { ensureRecurringApplied: jasmine.createSpy().and.resolveTo(undefined) } },
-        { provide: OfflineService,      useValue: { isOffline: signal(false), forceOffline: signal(false), toggleForceOffline: jasmine.createSpy() } },
+        { provide: OfflineService,      useValue: { isOffline: signal(false), forceOffline, toggleForceOffline: jasmine.createSpy() } },
         { provide: TrainerService,      useValue: { myTrainer: signal(null), hasTrainer: jasmine.createSpy().and.returnValue(false), getProposalForDate: jasmine.createSpy().and.returnValue(null) } },
         { provide: TemplateService,     useValue: { forCategory: jasmine.createSpy().and.returnValue([]), create: jasmine.createSpy().and.resolveTo(undefined), recordUse: jasmine.createSpy().and.resolveTo(undefined) } },
         { provide: WorkoutProfileService, useValue: { profile: signal({ gym: { push: EMPTY_CATEGORY_PROFILE, pull: EMPTY_CATEGORY_PROFILE, legs: EMPTY_CATEGORY_PROFILE }, favoriteSport: null, recentSport: null, minRecovery: 2 }) } },
@@ -85,7 +88,7 @@ describe('TrainComponent', () => {
       })
       .compileComponents();
 
-    const fixture = TestBed.createComponent(TrainComponent);
+    fixture = TestBed.createComponent(TrainComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
@@ -211,6 +214,23 @@ describe('TrainComponent', () => {
       const result = component.topbarDateLabel(makeWorkout({ date: '2024-03-10' }));
       expect(result).not.toBe('Avui');
       expect(result.length).toBeGreaterThan(0);
+    });
+  });
+
+  // ── offline toggle chip label ───────────────────────────────────────────
+
+  describe('offline toggle chip', () => {
+    it('reads "Mode sense connexió" when offline mode is off', () => {
+      const chip = (fixture.nativeElement as HTMLElement).querySelector('.qa-chip:not(.qa-chip--plan)');
+      expect(chip?.textContent?.trim()).toContain('Mode sense connexió');
+    });
+
+    it('reads "Mode en línia" once forced offline mode is active', () => {
+      forceOffline.set(true);
+      fixture.detectChanges();
+      const chip = (fixture.nativeElement as HTMLElement).querySelector('.qa-chip:not(.qa-chip--plan)');
+      expect(chip?.textContent?.trim()).toContain('Mode en línia');
+      expect(chip?.textContent?.trim()).not.toContain('Mode sense connexió');
     });
   });
 });
