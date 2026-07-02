@@ -188,23 +188,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       } @else {
 
         <!-- ══ DASHBOARD MODE ══ -->
-        <app-page-header title="Entrenament">
-          <button class="ph-offline-btn"
-                  (click)="router.navigate(['/train/planner'])"
-                  title="Planificació setmanal"
-                  aria-label="Planificació setmanal">
-            <span class="material-symbols-outlined">event_repeat</span>
-          </button>
-          <button class="ph-offline-btn"
-                  [class.ph-offline-btn--active]="offlineService.forceOffline()"
-                  (click)="offlineService.toggleForceOffline()"
-                  [title]="offlineService.forceOffline() ? 'Desactivar mode offline' : 'Activar mode offline'"
-                  [attr.aria-label]="offlineService.forceOffline() ? 'Desactivar mode offline' : 'Activar mode offline'">
-            <span class="material-symbols-outlined">
-              {{ offlineService.forceOffline() ? 'wifi_off' : 'wifi' }}
-            </span>
-          </button>
-        </app-page-header>
+        <app-page-header title="Entrenament" />
 
         @if (!offlineService.isOffline()) {
           <div class="calendar-wrap">
@@ -216,6 +200,21 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             <app-weekly-summary [weekDate]="selectedDate()" />
           </div>
         }
+
+        <!-- ── Quick actions: weekly planner + offline toggle ── -->
+        <div class="quick-actions">
+          <button class="qa-btn qa-btn--plan" (click)="router.navigate(['/train/planner'])">
+            <span class="material-symbols-outlined">event_repeat</span>
+            <span>Crear rutina</span>
+          </button>
+          <button class="qa-btn" [class.qa-btn--offline-active]="offlineService.forceOffline()"
+                  (click)="offlineService.toggleForceOffline()">
+            <span class="material-symbols-outlined">
+              {{ offlineService.forceOffline() ? 'wifi_off' : 'wifi' }}
+            </span>
+            <span>Mode sense connexió</span>
+          </button>
+        </div>
 
         @if (isSelectedFuture()) {
           <div class="plan-pill">
@@ -741,19 +740,36 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
   styles: [`
     .page { padding: 0; }
 
-    /* ── Offline toggle button ── */
-    .ph-offline-btn {
-      display: flex; align-items: center; justify-content: center;
-      width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
-      border: none; background: var(--c-subtle); color: var(--c-text-2);
-      cursor: pointer; transition: background 0.15s, color 0.15s; touch-action: manipulation;
-      .material-symbols-outlined { font-size: 20px; }
-      &:hover { background: var(--c-hover); }
-      &.ph-offline-btn--active {
-        background: rgba(69,90,100,0.18); color: #455a64;
-        .material-symbols-outlined { font-variation-settings: 'FILL' 1; }
+    /* ── Quick actions: weekly planner + offline toggle ── */
+    .quick-actions {
+      display: flex; gap: 10px;
+      margin: 0 16px 12px;
+    }
+    .qa-btn {
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 12px 8px; border-radius: 14px;
+      border: 1.5px solid var(--c-border-2); background: var(--c-card);
+      color: var(--c-text-2); font-size: 12.5px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      box-shadow: 0 2px 8px var(--c-shadow);
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { border-color: var(--c-border); background: var(--c-hover); }
+      &:active { transform: scale(0.97); }
+    }
+    .qa-btn--plan {
+      border-color: rgba(var(--c-brand-rgb), 0.3);
+      background: rgba(var(--c-brand-rgb), 0.06);
+      color: var(--c-brand);
+      &:hover { border-color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.12); }
+    }
+    .qa-btn--offline-active {
+      border-color: rgba(69,90,100,0.35); background: rgba(69,90,100,0.1); color: #455a64;
+      .material-symbols-outlined { font-variation-settings: 'FILL' 1; }
+      &:hover { border-color: rgba(69,90,100,0.5); background: rgba(69,90,100,0.16); }
+      html.dark & {
+        border-color: rgba(144,164,174,0.35); background: rgba(144,164,174,0.14); color: #90a4ae;
+        &:hover { border-color: rgba(144,164,174,0.5); background: rgba(144,164,174,0.2); }
       }
-      html.dark &.ph-offline-btn--active { background: rgba(144,164,174,0.18); color: #90a4ae; }
     }
 
     /* ── Page header ── */
