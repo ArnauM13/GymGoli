@@ -90,7 +90,15 @@ interface ChartPoint { date: string; value: number; }
     }
   `,
   styles: [`
-    :host { display: block; }
+    /* The drawer gets its own tinted background + top divider so it reads as
+       a distinct, expanded region rather than blending into the section
+       above (which shares the same --c-card as the elements inside here). */
+    :host {
+      display: block;
+      background: var(--c-subtle);
+      border-top: 1px solid var(--c-border-2);
+      padding-bottom: 6px;
+    }
 
     /* ── Tabs ── */
     .epi-tabs {
@@ -98,7 +106,7 @@ interface ChartPoint { date: string; value: number; }
     }
     .epi-tab {
       flex: 1; padding: 7px 4px;
-      border: 1.5px solid var(--c-border-2); border-radius: 8px;
+      border: 1.5px solid var(--c-border); border-radius: 8px;
       background: var(--c-card); font-size: 12px; font-weight: 600; color: var(--c-text-3);
       cursor: pointer; transition: all 0.15s; touch-action: manipulation;
       &.active { background: var(--c-brand); color: var(--c-card); border-color: var(--c-brand); }
@@ -109,7 +117,7 @@ interface ChartPoint { date: string; value: number; }
     .epi-chart-wrap {
       margin: 0 14px;
       background: var(--c-card); border-radius: 12px;
-      box-shadow: 0 1px 6px var(--c-shadow);
+      border: 1.5px solid var(--c-border);
       padding: 12px 12px 8px;
       height: 200px;
       display: flex; align-items: center; justify-content: center;
@@ -118,7 +126,7 @@ interface ChartPoint { date: string; value: number; }
 
     .epi-no-data {
       display: flex; flex-direction: column; align-items: center; gap: 6px;
-      color: var(--c-border); text-align: center;
+      color: var(--c-text-3); text-align: center;
       .material-symbols-outlined { font-size: 36px; }
       p { margin: 0; font-size: 13px; }
     }
@@ -130,8 +138,8 @@ interface ChartPoint { date: string; value: number; }
     }
     .epi-stat {
       background: var(--c-card); border-radius: 10px;
+      border: 1.5px solid var(--c-border);
       padding: 10px 6px; text-align: center;
-      box-shadow: 0 1px 4px var(--c-shadow);
       display: flex; flex-direction: column; gap: 3px;
     }
     .epi-stat-val { font-size: 16px; font-weight: 700; color: var(--c-text); }
