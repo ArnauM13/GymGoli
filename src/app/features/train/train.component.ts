@@ -203,16 +203,16 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
         <!-- ── Quick actions: weekly planner + offline toggle ── -->
         <div class="quick-actions">
-          <button class="qa-btn qa-btn--plan" (click)="router.navigate(['/train/planner'])">
+          <button class="qa-chip qa-chip--plan" (click)="router.navigate(['/train/planner'])">
             <span class="material-symbols-outlined">event_repeat</span>
-            <span>Crear rutina</span>
+            Crear rutina
           </button>
-          <button class="qa-btn" [class.qa-btn--offline-active]="offlineService.forceOffline()"
+          <button class="qa-chip" [class.qa-chip--active]="offlineService.forceOffline()"
                   (click)="offlineService.toggleForceOffline()">
             <span class="material-symbols-outlined">
               {{ offlineService.forceOffline() ? 'wifi_off' : 'wifi' }}
             </span>
-            <span>Mode sense connexió</span>
+            Mode sense connexió
           </button>
         </div>
 
@@ -740,36 +740,31 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
   styles: [`
     .page { padding: 0; }
 
-    /* ── Quick actions: weekly planner + offline toggle ── */
+    /* ── Quick actions: weekly planner + offline toggle (filter-chip style, per history page) ── */
     .quick-actions {
-      display: flex; gap: 10px;
+      display: flex; gap: 8px; flex-wrap: wrap;
       margin: 0 16px 12px;
     }
-    .qa-btn {
-      flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
-      padding: 12px 8px; border-radius: 14px;
-      border: 1.5px solid var(--c-border-2); background: var(--c-card);
+    .qa-chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      height: 34px; padding: 0 12px; border-radius: 17px;
+      border: 1.5px solid var(--c-border); background: var(--c-subtle);
       color: var(--c-text-2); font-size: 12.5px; font-weight: 700;
       cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      box-shadow: 0 2px 8px var(--c-shadow);
-      .material-symbols-outlined { font-size: 18px; }
-      &:hover { border-color: var(--c-border); background: var(--c-hover); }
-      &:active { transform: scale(0.97); }
+      .material-symbols-outlined { font-size: 17px; }
+      &:hover { background: var(--c-border-2); color: var(--c-text); }
+      &:active { transform: scale(0.96); }
     }
-    .qa-btn--plan {
-      border-color: rgba(var(--c-brand-rgb), 0.3);
-      background: rgba(var(--c-brand-rgb), 0.06);
+    .qa-chip--plan {
+      border-color: var(--c-brand);
+      background: rgba(var(--c-brand-rgb), 0.1);
       color: var(--c-brand);
-      &:hover { border-color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.12); }
+      &:hover { background: rgba(var(--c-brand-rgb), 0.18); }
     }
-    .qa-btn--offline-active {
-      border-color: rgba(69,90,100,0.35); background: rgba(69,90,100,0.1); color: #455a64;
+    .qa-chip--active {
+      background: var(--c-brand); border-color: var(--c-brand); color: white;
       .material-symbols-outlined { font-variation-settings: 'FILL' 1; }
-      &:hover { border-color: rgba(69,90,100,0.5); background: rgba(69,90,100,0.16); }
-      html.dark & {
-        border-color: rgba(144,164,174,0.35); background: rgba(144,164,174,0.14); color: #90a4ae;
-        &:hover { border-color: rgba(144,164,174,0.5); background: rgba(144,164,174,0.2); }
-      }
+      &:hover { background: var(--c-brand-dk); }
     }
 
     /* ── Page header ── */
