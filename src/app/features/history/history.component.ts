@@ -2,8 +2,6 @@ import {
   Component, computed, effect, ElementRef, inject,
   OnDestroy, signal, viewChild,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-
 import {
   CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, SUBCATEGORY_LABELS,
   ExerciseCategory,
@@ -18,13 +16,14 @@ import { AuthService } from '../../core/services/auth.service';
 import { kgToDisplay } from '../../shared/utils/weight.utils';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { FilterBarComponent } from '../../shared/components/filter-bar/filter-bar.component';
 
 const PAGE_SIZE = 20;
 
 @Component({
   selector: 'app-history',
   standalone: true,
-  imports: [CalendarComponent, FormsModule, PageHeaderComponent],
+  imports: [CalendarComponent, PageHeaderComponent, FilterBarComponent],
   template: `
     <div class="page">
 
@@ -71,25 +70,12 @@ const PAGE_SIZE = 20;
         </div>
       } @else {
 
-        <!-- ── Cerca ── -->
-        <div class="search-wrap">
-          <span class="material-symbols-outlined search-icon">search</span>
-          <input class="search-input" type="search" [(ngModel)]="searchInputValue"
-                 placeholder="Cerca per exercici..." autocomplete="off"
-                 aria-label="Cerca per exercici">
-          @if (searchQuery()) {
-            <button class="search-clear" (click)="clearSearch()" aria-label="Esborrar cerca">
-              <span class="material-symbols-outlined">close</span>
-            </button>
-          }
-        </div>
-
-        <!-- ── Filtres i ordenació ── -->
-        <div class="filter-bar">
-          <button class="sort-btn" (click)="toggleSort()" aria-label="Canviar ordre">
-            <span class="material-symbols-outlined">{{ sortDesc() ? 'arrow_downward' : 'arrow_upward' }}</span>
-          </button>
-          <div class="filter-divider"></div>
+        <!-- ── Cerca i filtres ── -->
+        <app-filter-bar
+          searchPlaceholder="Cerca per exercici..."
+          [(searchQuery)]="searchQuery"
+          [(sortDesc)]="sortDesc"
+          [(category)]="filterCat">
           @if (selectedDate()) {
             <button class="date-chip" (click)="selectDate(selectedDate()!)">
               <span class="material-symbols-outlined">event</span>
@@ -98,19 +84,7 @@ const PAGE_SIZE = 20;
             </button>
             <div class="filter-divider"></div>
           }
-          <button class="filter-icon" [class.active]="filterCat() === null"
-                  (click)="setCategory(null)" aria-label="Tots" title="Tots">
-            <span class="material-symbols-outlined">apps</span>
-          </button>
-          @for (cat of ['push','pull','legs']; track cat) {
-            <button class="filter-icon" [class.active]="filterCat() === cat"
-                    [style.--cat]="getCatColor(cat)"
-                    [attr.aria-label]="getCatLabel(cat)" [attr.title]="getCatLabel(cat)"
-                    (click)="setCategory(filterCat() === cat ? null : cat)">
-              <span class="material-symbols-outlined">{{ getCatIcon(cat) }}</span>
-            </button>
-          }
-        </div>
+        </app-filter-bar>
 
         <!-- ── Esports del dia seleccionat ── -->
         @if (selectedDate() && selectedDateSports().length > 0) {
@@ -357,67 +331,9 @@ const PAGE_SIZE = 20;
     .sport-tag-icon { font-size: 14px; font-variation-settings: 'FILL' 1; }
     .sport-tag-subtype { font-weight: 400; opacity: 0.85; }
 
-    /* ── Search ── */
-    .search-wrap {
-      position: relative; margin: 0 16px 10px;
-      display: flex; align-items: center;
-    }
-    .search-icon {
-      position: absolute; left: 12px; font-size: 18px;
-      color: var(--c-text-3); pointer-events: none;
-    }
-    .search-input {
-      width: 100%; padding: 10px 36px 10px 38px;
-      border: 1.5px solid var(--c-border); border-radius: 12px;
-      font-size: 14px; background: var(--c-card); color: var(--c-text);
-      outline: none; box-sizing: border-box;
-      &:focus { border-color: var(--c-brand); }
-      &::-webkit-search-cancel-button { display: none; }
-    }
-    .search-clear {
-      position: absolute; right: 10px;
-      width: 24px; height: 24px; border-radius: 50%;
-      border: none; background: var(--c-border-2); cursor: pointer;
-      color: var(--c-text-3); display: flex; align-items: center; justify-content: center;
-      .material-symbols-outlined { font-size: 14px; }
-      &:hover { background: var(--c-hover); color: var(--c-text-2); }
-    }
-
-    .filter-bar {
-      display: flex; align-items: center; gap: 6px;
-      padding: 0 16px 12px; overflow-x: auto;
-      scrollbar-width: none; &::-webkit-scrollbar { display: none; }
-    }
-    .sort-btn {
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-      width: 34px; height: 34px; border-radius: 10px;
-      border: 1.5px solid var(--c-border); background: var(--c-subtle);
-      color: var(--c-text-2);
-      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 18px; }
-      &:hover { background: var(--c-border-2); color: var(--c-text); }
-    }
+    /* ── Filter bar extras (search/sort/category icons live in app-filter-bar) ── */
     .filter-divider {
       width: 1px; height: 20px; background: var(--c-border); flex-shrink: 0; margin: 0 2px;
-    }
-    .filter-icon {
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-      width: 34px; height: 34px; border-radius: 50%;
-      border: 1.5px solid color-mix(in srgb, var(--cat, var(--c-border)) 35%, var(--c-border));
-      background: color-mix(in srgb, var(--cat, var(--c-card)) 8%, var(--c-card));
-      color: var(--cat, var(--c-text-2));
-      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      .material-symbols-outlined { font-size: 18px; }
-      &.active {
-        background: var(--cat, var(--c-brand));
-        color: white;
-        border-color: var(--cat, var(--c-brand));
-        box-shadow: 0 2px 6px color-mix(in srgb, var(--cat, var(--c-brand)) 35%, transparent);
-      }
-      &:not(.active):hover {
-        background: color-mix(in srgb, var(--cat, var(--c-card)) 18%, var(--c-card));
-        border-color: var(--cat, var(--c-border));
-      }
     }
     .filter-empty {
       display: flex; align-items: center; justify-content: center; flex-direction: column;
@@ -661,7 +577,7 @@ export class HistoryComponent implements OnDestroy {
   readonly selectedDate  = signal<string | null>(null);
   readonly expandedId    = signal<string | null>(null);
   readonly sortDesc      = signal(true);
-  readonly filterCat     = signal<string | null>(null);
+  readonly filterCat     = signal<ExerciseCategory | null>(null);
   readonly searchQuery   = signal('');
 
   // ── Pagination state ────────────────────────────────────────────────────
@@ -677,14 +593,6 @@ export class HistoryComponent implements OnDestroy {
   readonly hasActiveFilter = computed(
     () => !!this.filterCat() || !!this.searchQuery() || !!this.selectedDate()
   );
-
-  // ── Search input binding with debounce ──────────────────────────────────
-  private _searchTimer: ReturnType<typeof setTimeout> | null = null;
-  get searchInputValue(): string { return this.searchQuery(); }
-  set searchInputValue(v: string) {
-    if (this._searchTimer) clearTimeout(this._searchTimer);
-    this._searchTimer = setTimeout(() => this.searchQuery.set(v), 300);
-  }
 
   // ── IntersectionObserver sentinel ───────────────────────────────────────
   readonly sentinelRef = viewChild<ElementRef<HTMLElement>>('sentinel');
@@ -718,7 +626,6 @@ export class HistoryComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this._observer?.disconnect();
-    if (this._searchTimer) clearTimeout(this._searchTimer);
   }
 
   // ── Data loading ─────────────────────────────────────────────────────────
@@ -753,14 +660,6 @@ export class HistoryComponent implements OnDestroy {
     } catch {
       // Network failure — keep current state
     }
-  }
-
-  // ── Filter actions ───────────────────────────────────────────────────────
-  setCategory(cat: string | null): void { this.filterCat.set(cat); }
-  toggleSort(): void { this.sortDesc.update(v => !v); }
-  clearSearch(): void {
-    this.searchQuery.set('');
-    if (this._searchTimer) { clearTimeout(this._searchTimer); this._searchTimer = null; }
   }
 
   // ── Calendar ─────────────────────────────────────────────────────────────

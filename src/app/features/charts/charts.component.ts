@@ -12,11 +12,12 @@ import { addDays, mondayOf } from '../../shared/utils/calendar-utils';
 import { kgToDisplay } from '../../shared/utils/weight.utils';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { ExerciseProgressInlineComponent } from '../../shared/components/exercise-progress-inline.component';
+import { FilterBarComponent } from '../../shared/components/filter-bar/filter-bar.component';
 
 @Component({
   selector: 'app-charts',
   standalone: true,
-  imports: [RouterLink, PageHeaderComponent, ExerciseProgressInlineComponent],
+  imports: [RouterLink, PageHeaderComponent, ExerciseProgressInlineComponent, FilterBarComponent],
   template: `
     <div class="page">
       <app-page-header title="Progrés" />
@@ -85,6 +86,15 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
         </div>
       }
 
+      <!-- Cerca i filtres (ordenació desactivada de moment) -->
+      @if (exerciseGroups().length > 0 || hasActiveFilter()) {
+        <app-filter-bar
+          searchPlaceholder="Cerca per exercici..."
+          [showSort]="false"
+          [(searchQuery)]="searchQuery"
+          [(category)]="filterCat" />
+      }
+
       <!-- Exercise list: all exercises with data load up-front, expand inline for stats -->
       @if (exerciseGroups().length > 0) {
         @for (group of exerciseGroups(); track group.cat) {
@@ -114,6 +124,11 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
         <div class="empty-state">
           <span class="material-symbols-outlined empty-icon loading-icon">bar_chart</span>
           <p style="color:var(--c-text-2)">Carregant exercicis...</p>
+        </div>
+      } @else if (hasActiveFilter()) {
+        <div class="filter-empty">
+          <span class="material-symbols-outlined">search_off</span>
+          <p>Cap exercici trobat</p>
         </div>
       } @else {
         <!-- New user empty state -->
@@ -204,6 +219,13 @@ import { ExerciseProgressInlineComponent } from '../../shared/components/exercis
       50%       { opacity: 1;   transform: scale(1.2); }
     }
 
+    .filter-empty {
+      display: flex; align-items: center; justify-content: center; flex-direction: column;
+      gap: 8px; padding: 32px 24px; color: var(--c-text-3);
+      .material-symbols-outlined { font-size: 36px; }
+      p { margin: 0; font-size: 14px; }
+    }
+
     .btn-cta {
       margin-top: 6px; padding: 12px 28px;
       background: var(--c-brand); color: white;
@@ -232,6 +254,10 @@ export class ChartsComponent {
   readonly isLoadingRecords = this.workoutService.isLoading;
 
   readonly expandedExerciseId = signal<string | null>(null);
+
+  readonly searchQuery = signal('');
+  readonly filterCat   = signal<ExerciseCategory | null>(null);
+  readonly hasActiveFilter = computed(() => !!this.searchQuery() || !!this.filterCat());
 
   // ── Summary strip ────────────────────────────────────────────────────────
 
@@ -287,8 +313,10 @@ export class ChartsComponent {
     const exercises = this.exerciseService.exercises();
     const withData  = this.workoutService.exercisesWithData();
     const unit      = this.unit();
+    const query     = this.searchQuery().trim().toLowerCase();
     const records = exercises
       .filter(e => withData.has(e.id))
+      .filter(e => !query || e.name.toLowerCase().includes(query))
       .map(ex => {
         const allWeights = this.workoutService.getWorkoutsForExercise(ex.id)
           .flatMap(w => w.entries.filter(e => e.exerciseId === ex.id).flatMap(e => e.sets.map(s => s.weight)))
@@ -297,7 +325,9 @@ export class ChartsComponent {
         return { exercise: ex, display, color: CATEGORY_COLORS[ex.category] };
       });
 
-    return (['push', 'pull', 'legs'] as ExerciseCategory[])
+    const catFilter = this.filterCat();
+    const cats = catFilter ? [catFilter] : (['push', 'pull', 'legs'] as ExerciseCategory[]);
+    return cats
       .map(cat => ({
         cat,
         label: CATEGORY_LABELS[cat],
