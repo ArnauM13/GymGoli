@@ -1,5 +1,4 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -17,11 +16,12 @@ import {
 } from '../../core/models/exercise.model';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { ExerciseFormDialogComponent } from '../library/components/exercise-form-dialog.component';
+import { FilterBarComponent } from '../../shared/components/filter-bar/filter-bar.component';
 
 @Component({
   selector: 'app-exercises',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FilterBarComponent],
   template: `
     <div class="page">
 
@@ -32,31 +32,11 @@ import { ExerciseFormDialogComponent } from '../library/components/exercise-form
         <h1>Exercicis</h1>
       </header>
 
-      <!-- Search -->
-      <div class="search-wrap">
-        <span class="material-symbols-outlined search-icon">search</span>
-        <input class="search-input" type="search" placeholder="Cerca exercici…"
-               [(ngModel)]="searchQuery" (ngModelChange)="onSearch()">
-        @if (searchQuery()) {
-          <button class="search-clear" (click)="searchQuery.set(''); onSearch()">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        }
-      </div>
-
-      <!-- Category filter -->
-      <div class="filter-bar">
-        <button class="filter-chip" [class.active]="!activeFilter()"
-                (click)="activeFilter.set(null)">Tots</button>
-        @for (cat of categoryList; track cat.value) {
-          <button class="filter-chip" [class.active]="activeFilter() === cat.value"
-                  [style.--cat-color]="getCategoryColor(cat.value)"
-                  (click)="setCategory(cat.value)">
-            <span class="material-symbols-outlined">{{ cat.icon }}</span>
-            {{ cat.label }}
-          </button>
-        }
-      </div>
+      <app-filter-bar
+        searchPlaceholder="Cerca exercici…"
+        [showSort]="false"
+        [(searchQuery)]="searchQuery"
+        [(category)]="activeFilter" />
 
       @if (exercises().length === 0) {
         <div class="card-section">
@@ -148,51 +128,7 @@ import { ExerciseFormDialogComponent } from '../library/components/exercise-form
       &:hover { background: var(--c-hover); }
     }
 
-    /* ── Search ── */
-    .search-wrap {
-      position: relative; margin: 0 16px 10px;
-      display: flex; align-items: center;
-    }
-    .search-icon {
-      position: absolute; left: 12px;
-      font-size: 18px; color: var(--c-text-3); pointer-events: none;
-    }
-    .search-input {
-      width: 100%; padding: 9px 36px 9px 38px;
-      border: 1.5px solid var(--c-border); border-radius: 12px;
-      background: var(--c-card); color: var(--c-text);
-      font-size: 14px; font-family: inherit; outline: none;
-      transition: border-color 0.15s;
-      &:focus { border-color: var(--c-brand); }
-      &::placeholder { color: var(--c-text-3); }
-    }
-    .search-clear {
-      position: absolute; right: 8px;
-      width: 26px; height: 26px; border-radius: 50%;
-      border: none; background: var(--c-border-2); color: var(--c-text-2);
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; font-size: 15px;
-      .material-symbols-outlined { font-size: 15px; }
-      &:hover { background: var(--c-border); }
-    }
-
-    /* ── Filter chips ── */
-    .filter-bar {
-      display: flex; gap: 6px; padding: 0 16px 12px;
-      overflow-x: auto; scrollbar-width: none;
-      &::-webkit-scrollbar { display: none; }
-    }
-    .filter-chip {
-      display: flex; align-items: center; gap: 4px;
-      padding: 6px 12px;
-      border: 1.5px solid var(--c-border); border-radius: 20px;
-      background: var(--c-card); font-size: 12px; font-weight: 600;
-      color: var(--c-text-2); cursor: pointer; white-space: nowrap;
-      touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 15px; }
-      &:hover:not(.active) { border-color: var(--cat-color, var(--c-brand)); color: var(--cat-color, var(--c-brand)); }
-      &.active { background: var(--cat-color, var(--c-brand)); border-color: var(--cat-color, var(--c-brand)); color: white; }
-    }
+    app-filter-bar { display: block; margin-top: 4px; }
 
     /* ── Section card ── */
     .card-section {
@@ -313,14 +249,6 @@ export class ExercisesComponent {
 
   filteredByCategory(cat: ExerciseCategory): Exercise[] {
     return this.exercises().filter(e => e.category === cat);
-  }
-
-  setCategory(cat: ExerciseCategory): void {
-    this.activeFilter.set(this.activeFilter() === cat ? null : cat);
-  }
-
-  onSearch(): void {
-    this.activeFilter.set(null);
   }
 
   formatGuidance(exercise: Exercise): string {

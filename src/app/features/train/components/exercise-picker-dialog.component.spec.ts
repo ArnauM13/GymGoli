@@ -1,9 +1,11 @@
-import { TestBed } from '@angular/core/testing';
+import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { of } from 'rxjs';
 
 import { ExercisePickerDialogComponent, ExercisePickerData } from './exercise-picker-dialog.component';
+import { ExerciseFormDialogComponent } from '../../library/components/exercise-form-dialog.component';
 import { ExerciseService } from '../../../core/services/exercise.service';
 import { Exercise } from '../../../core/models/exercise.model';
 
@@ -17,11 +19,17 @@ function makeExercise(overrides: Partial<Exercise> = {}): Exercise {
 describe('ExercisePickerDialogComponent', () => {
   let component: ExercisePickerDialogComponent;
   let dialogRef: jasmine.SpyObj<MatDialogRef<ExercisePickerDialogComponent>>;
+  let dialog: jasmine.SpyObj<MatDialog>;
+  let nestedDialogRef: jasmine.SpyObj<MatDialogRef<ExerciseFormDialogComponent>>;
   let exerciseService: { exercises: ReturnType<typeof signal<Exercise[]>>; isLoaded: ReturnType<typeof signal<boolean>>; ensureLoaded: jasmine.Spy; create: jasmine.Spy };
   let dialogData: ExercisePickerData;
 
   function setup(): void {
     dialogRef = jasmine.createSpyObj('MatDialogRef', ['close']);
+    nestedDialogRef = jasmine.createSpyObj('MatDialogRef', ['afterClosed']);
+    nestedDialogRef.afterClosed.and.returnValue(of(undefined));
+    dialog = jasmine.createSpyObj('MatDialog', ['open']);
+    dialog.open.and.returnValue(nestedDialogRef);
     exerciseService = {
       exercises:    signal<Exercise[]>([
         makeExercise({ id: 'ex1', name: 'Press banca', category: 'push' }),
@@ -36,6 +44,7 @@ describe('ExercisePickerDialogComponent', () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: MatDialogRef,    useValue: dialogRef },
+        { provide: MatDialog,       useValue: dialog },
         { provide: MAT_DIALOG_DATA, useValue: dialogData },
         { provide: ExerciseService, useValue: exerciseService },
         { provide: MatSnackBar,     useValue: { open: jasmine.createSpy('open') } },
@@ -93,67 +102,47 @@ describe('ExercisePickerDialogComponent', () => {
     });
   });
 
-  describe('create mode', () => {
-    it('startCreate() switches to create mode, prefilling name and category', () => {
-      setup();
-      component.searchTerm.set('Zancada');
-      component.catFilter.set('legs');
-      component.startCreate();
-
-      expect(component.mode()).toBe('create');
-      expect(component.createName).toBe('Zancada');
-      expect(component.createCategory()).toBe('legs');
-    });
-
-    it('cancelCreate() switches back to list mode', () => {
+  describe('startCreate()', () => {
+    it('opens the shared ExerciseFormDialogComponent (same one used to edit exercises)', () => {
       setup();
       component.startCreate();
-      component.cancelCreate();
-      expect(component.mode()).toBe('list');
+      expect(dialog.open).toHaveBeenCalledWith(ExerciseFormDialogComponent, jasmine.objectContaining({ data: {} }));
     });
 
-    it('toggleSubcat() selects then deselects the same subcategory', () => {
+    it('does nothing further if the form dialog is dismissed without a result', fakeAsync(() => {
       setup();
-      component.toggleSubcat('chest');
-      expect(component.createSubcat()).toBe('chest');
-      component.toggleSubcat('chest');
-      expect(component.createSubcat()).toBe('');
-    });
-
-    it('saveNew() creates the exercise and closes the dialog on success', async () => {
-      setup();
-      const created = makeExercise({ id: 'new-id', name: 'Zancada', category: 'legs' });
-      exerciseService.create.and.resolveTo(created);
-      component.createName = 'Zancada';
-      component.createCategory.set('legs');
-
-      await component.saveNew();
-
-      expect(exerciseService.create).toHaveBeenCalled();
-      expect(dialogRef.close).toHaveBeenCalledWith(created);
-    });
-
-    it('saveNew() does nothing without a name or category', async () => {
-      setup();
-      component.createName = '';
-      component.createCategory.set('legs');
-
-      await component.saveNew();
+      nestedDialogRef.afterClosed.and.returnValue(of(undefined));
+      component.startCreate();
+      tick();
 
       expect(exerciseService.create).not.toHaveBeenCalled();
       expect(dialogRef.close).not.toHaveBeenCalled();
-    });
+    }));
 
-    it('saveNew() resets the creating flag and does not close the dialog on failure', async () => {
+    it('creates the exercise from the form result and closes the picker with it', fakeAsync(() => {
       setup();
+      const formResult = { name: 'Zancada', category: 'legs' as const };
+      const created = makeExercise({ id: 'new-id', name: 'Zancada', category: 'legs' });
+      nestedDialogRef.afterClosed.and.returnValue(of(formResult));
+      exerciseService.create.and.resolveTo(created);
+
+      component.startCreate();
+      tick();
+
+      expect(exerciseService.create).toHaveBeenCalledWith(formResult);
+      expect(dialogRef.close).toHaveBeenCalledWith(created);
+    }));
+
+    it('shows an error and does not close the picker if creation fails', fakeAsync(() => {
+      setup();
+      const formResult = { name: 'Zancada', category: 'legs' as const };
+      nestedDialogRef.afterClosed.and.returnValue(of(formResult));
       exerciseService.create.and.rejectWith(new Error('network error'));
-      component.createName = 'Zancada';
-      component.createCategory.set('legs');
 
-      await component.saveNew();
+      component.startCreate();
+      tick();
 
-      expect(component.creating()).toBeFalse();
       expect(dialogRef.close).not.toHaveBeenCalled();
-    });
+    }));
   });
 });
