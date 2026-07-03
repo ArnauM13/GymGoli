@@ -15,7 +15,7 @@ import {
 } from '../../core/models/exercise.model';
 import { Sport, SportMetricDef, SportSession } from '../../core/models/sport.model';
 import { BUILT_IN_TEMPLATES, BuiltInTemplate, WorkoutTemplate } from '../../core/models/template.model';
-import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry } from '../../core/models/workout.model';
+import { FEELING_EMOJI, FeelingLevel, PlannedSource, Workout, WorkoutEntry } from '../../core/models/workout.model';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { TemplateService } from '../../core/services/template.service';
 import { SharedWorkoutService } from '../../core/services/shared-workout.service';
@@ -380,8 +380,8 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
                         <div class="ic-label">
                           <span class="material-symbols-outlined ic-icon">{{ planIcon(plan) }}</span>
                           {{ workoutLabel(plan) }}
-                          @if (plan.plannedSource === 'trainer') {
-                            <span class="pc-badge pc-badge--trainer">Entrenador</span>
+                          @if (planSourceBadge(plan.plannedSource); as badge) {
+                            <span class="pc-badge" [class]="badge.cls">{{ badge.label }}</span>
                           }
                         </div>
                         <span class="ic-meta">{{ planMeta(plan) }}</span>
@@ -442,6 +442,9 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
                         <div class="ic-label">
                           <span class="material-symbols-outlined ic-icon">{{ item.sport.icon }}</span>
                           {{ item.sport.name }}
+                          @if (planSourceBadge(item.session.plannedSource); as badge) {
+                            <span class="pc-badge" [class]="badge.cls">{{ badge.label }}</span>
+                          }
                         </div>
                         <span class="ic-meta">{{ sportPlanMeta(item.sport, item.session) }}</span>
                       </div>
@@ -1337,6 +1340,8 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 8px; flex-shrink: 0;
       background: rgba(var(--c-brand-rgb), 0.12); color: var(--c-brand);
       &.pc-badge--trainer { background: rgba(255,152,0,0.12); color: #ef6c00; }
+      &.pc-badge--routine { background: rgba(var(--c-brand-rgb), 0.12); color: var(--c-brand); }
+      &.pc-badge--manual  { background: rgba(142,36,170,0.12); color: #8e24aa; }
     }
     .pc-actions { display: flex; align-items: center; gap: 6px; padding: 0 10px 0 0; flex-shrink: 0; }
     .pc-start {
@@ -2056,6 +2061,15 @@ export class TrainComponent {
     return cats.length ? (CATEGORY_ICONS[cats[0] as ExerciseCategory] ?? 'fitness_center') : 'fitness_center';
   }
 
+  /** Lets the user tell at a glance whether a planned item came from their
+   *  fixed routine, their own ad-hoc planning, or a trainer proposal. */
+  planSourceBadge(source: PlannedSource | undefined): { label: string; cls: string } | null {
+    if (source === 'trainer') return { label: 'Entrenador', cls: 'pc-badge--trainer' };
+    if (source === 'routine') return { label: 'Rutina', cls: 'pc-badge--routine' };
+    if (source === 'manual' || source === 'self') return { label: 'Planificació pròpia', cls: 'pc-badge--manual' };
+    return null;
+  }
+
   planMeta(w: Workout): string {
     if (!w.entries.length) return 'Pla buit';
     const names = w.entries.slice(0, 2).map(e => e.exerciseName).join(', ');
@@ -2428,7 +2442,11 @@ export class TrainComponent {
       if (existingId) {
         await this.sportService.updateSession(existingId, date, data);
       } else {
-        await this.sportService.logSession(date, sport.id, data, this.isSelectedFuture() ? 'planned' : 'done');
+        await this.sportService.logSession(
+          date, sport.id, data,
+          this.isSelectedFuture() ? 'planned' : 'done',
+          this.isSelectedFuture() ? 'manual' : undefined,
+        );
       }
       this.closeSessionLogger();
     } catch {

@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { ActivatedRoute } from '@angular/router';
 
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
@@ -20,7 +21,7 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
 @Component({
   selector: 'app-weekly-planner',
   standalone: true,
-  imports: [PageHeaderComponent],
+  imports: [PageHeaderComponent, MatCheckboxModule],
   template: `
     <div class="page">
       <app-page-header [title]="weekMonday ? 'Planifica la setmana' : 'Planificació setmanal'" [showBack]="true">
@@ -41,6 +42,18 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
           }
         </span>
       </div>
+
+      @if (weekMonday; as monday) {
+        <div class="overwrite-row">
+          <mat-checkbox [checked]="overwriteRoutine()" (change)="overwriteRoutine.set($event.checked)" color="primary">
+            Sobreescriure la rutina per aquesta setmana
+          </mat-checkbox>
+          <span class="overwrite-desc">
+            S'eliminaran els entrenaments i esports que la teva rutina fixa hagi planificat per a la setmana del
+            {{ weekRange(monday) }} — no afecta la resta de setmanes.
+          </span>
+        </div>
+      }
 
       @for (day of days; track day.index) {
         <div class="card-section">
@@ -203,6 +216,14 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
     }
     .mode-banner-text { font-size: 12px; color: var(--c-text-2); line-height: 1.4; }
 
+    .overwrite-row {
+      margin: 10px 16px 0; padding: 10px 12px;
+      background: var(--c-card); border-radius: 12px;
+      border: 1px solid var(--c-border-2);
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .overwrite-desc { font-size: 11px; color: var(--c-text-3); line-height: 1.4; padding-left: 2px; }
+
     .chip-group-label {
       font-size: 11px; font-weight: 700; color: var(--c-text-3);
       text-transform: uppercase; letter-spacing: 0.3px;
@@ -326,6 +347,9 @@ export class WeeklyPlannerComponent {
   readonly weekMonday = this.route.snapshot.queryParamMap.get('week');
 
   readonly saving = signal(false);
+  /** Week-mode only: also retract the routine's plan for this specific
+   *  week before applying the ad-hoc one. */
+  readonly overwriteRoutine = signal(false);
   readonly plan = signal<WeeklyPlan>(this._clone(this.settingsService.weeklyPlan() ?? EMPTY_WEEKLY_PLAN));
 
   readonly hasSavedPlan = computed(() => {
@@ -476,21 +500,26 @@ export class WeeklyPlannerComponent {
   }
 
   /** When `weekMonday` is set, only that single week is affected — the
-   *  persistent routine in Configuració is never touched. Otherwise this
-   *  always saves as the recurring routine that applies to every week. */
+   *  persistent routine in Configuració is never touched (unless
+   *  `overwriteRoutine` asks to clear the routine's plan for that one
+   *  week too). Otherwise this always saves as the recurring routine that
+   *  applies to every week. */
   async save(): Promise<void> {
     this.saving.set(true);
     try {
       const plan = this.plan();
       if (this.weekMonday) {
-        await this.weeklyPlanService.retractRemoved(plan, WEEKS_SINGLE, this.weekMonday);
-        await this.weeklyPlanService.apply(plan, WEEKS_SINGLE, this.weekMonday);
+        if (this.overwriteRoutine()) {
+          await this.weeklyPlanService.retractRemoved(EMPTY_WEEKLY_PLAN, WEEKS_SINGLE, this.weekMonday, 'routine');
+        }
+        await this.weeklyPlanService.retractRemoved(plan, WEEKS_SINGLE, this.weekMonday, 'manual');
+        await this.weeklyPlanService.apply(plan, WEEKS_SINGLE, this.weekMonday, 'manual');
         this.snackBar.open('Setmana planificada', '', { duration: 2000 });
       } else {
         const recurringPlan: WeeklyPlan = { ...plan, recurring: true };
         await this.settingsService.updateWeeklyPlan(recurringPlan);
-        await this.weeklyPlanService.retractRemoved(recurringPlan, WEEKS_RECURRING);
-        await this.weeklyPlanService.apply(recurringPlan, WEEKS_RECURRING);
+        await this.weeklyPlanService.retractRemoved(recurringPlan, WEEKS_RECURRING, undefined, 'routine');
+        await this.weeklyPlanService.apply(recurringPlan, WEEKS_RECURRING, undefined, 'routine');
         this.snackBar.open('Planificació desada', '', { duration: 2000 });
       }
     } catch {
@@ -510,7 +539,7 @@ export class WeeklyPlannerComponent {
     this.plan.set(this._clone(EMPTY_WEEKLY_PLAN));
     try {
       await this.settingsService.updateWeeklyPlan(EMPTY_WEEKLY_PLAN);
-      await this.weeklyPlanService.retractRemoved(EMPTY_WEEKLY_PLAN, WEEKS_RECURRING);
+      await this.weeklyPlanService.retractRemoved(EMPTY_WEEKLY_PLAN, WEEKS_RECURRING, undefined, 'routine');
       this.snackBar.open('Planificació eliminada', '', { duration: 2000 });
     } catch {
       this.snackBar.open('Error en eliminar la planificació', '', { duration: 3000 });

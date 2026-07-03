@@ -1,6 +1,14 @@
 export type FeelingLevel = 1 | 2 | 3 | 4 | 5;
 export type WorkoutStatus = 'planned' | 'done';
-export type PlannedSource = 'self' | 'trainer';
+/**
+ * 'routine' = materialized from the persistent recurring routine
+ * (Configuració > Estableix rutines); 'manual' = the user's own planning,
+ * whether a single day picked directly on Train or the single-week planner
+ * opened from the calendar's "Planificar" action; 'trainer' = accepted from
+ * a trainer proposal. 'self' is legacy data from before the routine/manual
+ * split existed and is treated as belonging to neither going forward.
+ */
+export type PlannedSource = 'routine' | 'manual' | 'trainer' | 'self';
 
 export const FEELING_EMOJI: Record<FeelingLevel, string> = {
   1: '🔥',  // Excel·lent — menys fatigant

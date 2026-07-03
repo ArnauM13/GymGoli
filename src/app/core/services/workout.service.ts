@@ -418,7 +418,14 @@ export class WorkoutService {
     return id;
   }
 
-  async createPlannedWorkout(date: string, category?: string, entries: WorkoutEntry[] = []): Promise<string> {
+  /** `plannedSource` defaults to 'manual' — the user planning a day directly
+   *  on Train. WeeklyPlanService passes 'routine' or 'manual' explicitly
+   *  depending on whether it's materializing the persistent routine or a
+   *  one-off single-week plan, so the two can be edited independently. */
+  async createPlannedWorkout(
+    date: string, category?: string, entries: WorkoutEntry[] = [],
+    plannedSource: PlannedSource = 'manual',
+  ): Promise<string> {
     const id         = crypto.randomUUID();
     const newWorkout: Workout = {
       id, date,
@@ -427,7 +434,7 @@ export class WorkoutService {
       category,
       createdAt:     new Date(),
       status:        'planned',
-      plannedSource: 'self',
+      plannedSource,
     };
     const monthKey = date.substring(0, 7);
     this._monthCache.set(monthKey, [newWorkout, ...(this._monthCache.get(monthKey) ?? [])]);

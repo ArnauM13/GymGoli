@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS workouts (
   category           text,
   notes              text,
   status             text        NOT NULL DEFAULT 'done' CHECK (status IN ('planned', 'done')),
-  planned_source     text        CHECK (planned_source IN ('self', 'trainer')),
+  planned_source     text        CHECK (planned_source IN ('self', 'trainer', 'routine', 'manual')),
   feeling            smallint    CHECK (feeling BETWEEN 1 AND 5),
   source_proposal_id uuid        REFERENCES trainer_proposals(id) ON DELETE SET NULL,
   created_at         timestamptz DEFAULT now()
@@ -108,6 +108,7 @@ CREATE TABLE IF NOT EXISTS sport_sessions (
   feeling          smallint    CHECK (feeling BETWEEN 1 AND 5),
   metrics          jsonb       DEFAULT '{}',
   status           text        NOT NULL DEFAULT 'done' CHECK (status IN ('planned', 'done')),
+  planned_source   text        CHECK (planned_source IN ('routine', 'manual', 'trainer')),
   created_at       timestamptz DEFAULT now()
 );
 
@@ -171,10 +172,11 @@ ALTER TABLE sports
 
 -- sport_sessions
 ALTER TABLE sport_sessions
-  ADD COLUMN IF NOT EXISTS subtype_id text,
-  ADD COLUMN IF NOT EXISTS duration   integer,
-  ADD COLUMN IF NOT EXISTS feeling    smallint CHECK (feeling BETWEEN 1 AND 5),
-  ADD COLUMN IF NOT EXISTS metrics    jsonb    DEFAULT '{}';
+  ADD COLUMN IF NOT EXISTS subtype_id     text,
+  ADD COLUMN IF NOT EXISTS duration       integer,
+  ADD COLUMN IF NOT EXISTS feeling        smallint CHECK (feeling BETWEEN 1 AND 5),
+  ADD COLUMN IF NOT EXISTS metrics        jsonb    DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS planned_source text     CHECK (planned_source IN ('routine', 'manual', 'trainer'));
 
 DO $$
 BEGIN
@@ -207,7 +209,7 @@ BEGIN
     WHERE table_name = 'workouts' AND column_name = 'planned_source'
   ) THEN
     ALTER TABLE workouts
-      ADD COLUMN planned_source text CHECK (planned_source IN ('self', 'trainer'));
+      ADD COLUMN planned_source text CHECK (planned_source IN ('self', 'trainer', 'routine', 'manual'));
   END IF;
 END $$;
 

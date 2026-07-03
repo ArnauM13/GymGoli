@@ -261,6 +261,30 @@ describe('TrainComponent', () => {
     });
   });
 
+  // ── planSourceBadge() ────────────────────────────────────────────────────
+
+  describe('planSourceBadge()', () => {
+    it('labels a trainer-sourced item', () => {
+      expect(component.planSourceBadge('trainer')).toEqual({ label: 'Entrenador', cls: 'pc-badge--trainer' });
+    });
+
+    it('labels a routine-sourced item', () => {
+      expect(component.planSourceBadge('routine')).toEqual({ label: 'Rutina', cls: 'pc-badge--routine' });
+    });
+
+    it('labels a manually-planned item', () => {
+      expect(component.planSourceBadge('manual')).toEqual({ label: 'Planificació pròpia', cls: 'pc-badge--manual' });
+    });
+
+    it('treats legacy "self" the same as "manual"', () => {
+      expect(component.planSourceBadge('self')).toEqual({ label: 'Planificació pròpia', cls: 'pc-badge--manual' });
+    });
+
+    it('returns null when there is no source', () => {
+      expect(component.planSourceBadge(undefined)).toBeNull();
+    });
+  });
+
   // ── shareWorkout() ───────────────────────────────────────────────────────
 
   describe('shareWorkout()', () => {

@@ -118,6 +118,32 @@ describe('SportService', () => {
       expect(pending[0].sport_id).toBe('running');
       expect(pending[0].date).toBe('2024-03-08');
     }));
+
+    it('tags the session with plannedSource so routine and manual plans can be retracted independently', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+
+      void service.logSession('2024-03-06', 'running', {}, 'planned', 'routine');
+      tick();
+
+      const session = service.plannedSessions().find(s => s.sportId === 'running');
+      expect(session?.plannedSource).toBe('routine');
+      expect(supabaseMock.insertSpy).toHaveBeenCalledWith(
+        jasmine.objectContaining({ planned_source: 'routine' }));
+    }));
+
+    it('sends a null plannedSource when none is given', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+
+      void service.logSession('2024-03-06', 'running', {}, 'done');
+      tick();
+
+      expect(supabaseMock.insertSpy).toHaveBeenCalledWith(
+        jasmine.objectContaining({ planned_source: null }));
+    }));
   });
 
   describe('offline sync queue', () => {

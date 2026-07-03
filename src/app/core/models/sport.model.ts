@@ -1,4 +1,4 @@
-import { FeelingLevel } from './workout.model';
+import { FeelingLevel, PlannedSource } from './workout.model';
 
 export type MetricType = 'number' | 'select';
 
@@ -42,6 +42,7 @@ export interface SportSession {
   metrics?: Record<string, string | number>;
   notes?: string;
   status?: SportSessionStatus; // absent = 'done' (retrocompat)
+  plannedSource?: PlannedSource;
   createdAt: Date;
 }
 

@@ -3,7 +3,7 @@ import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { DEFAULT_SPORTS, Sport, SportMetricDef, SportSession, SportSessionStatus, SportSubtype } from '../models/sport.model';
-import { FeelingLevel } from '../models/workout.model';
+import { FeelingLevel, PlannedSource } from '../models/workout.model';
 
 // ── Row mappers ──────────────────────────────────────────────────────────────
 
@@ -30,6 +30,7 @@ function toSportSession(row: Record<string, unknown>): SportSession {
     metrics:   (row['metrics'] as Record<string, string | number> | null) ?? undefined,
     notes:     (row['notes'] as string | null) ?? undefined,
     status:    (row['status'] as SportSessionStatus | undefined) ?? 'done',
+    plannedSource: (row['planned_source'] as PlannedSource | null) ?? undefined,
     createdAt: new Date(row['created_at'] as string),
   };
 }
@@ -46,6 +47,7 @@ function sportSessionFromCache(raw: Record<string, unknown>): SportSession {
     metrics:   (raw['metrics'] as Record<string, string | number> | undefined) ?? undefined,
     notes:     (raw['notes'] as string | undefined) ?? undefined,
     status:    (raw['status'] as SportSessionStatus | undefined) ?? 'done',
+    plannedSource: (raw['plannedSource'] as PlannedSource | undefined) ?? undefined,
     createdAt: new Date(raw['createdAt'] as string),
   };
 }
@@ -308,11 +310,15 @@ export class SportService {
 
   /** Full session create with all metrics. Used by the session logger UI and
    *  by weekly routine planning — writes locally first so it works offline,
-   *  then syncs to Supabase in the background (queued for retry if offline). */
+   *  then syncs to Supabase in the background (queued for retry if offline).
+   *  `plannedSource` only matters for status: 'planned' — 'routine' or
+   *  'manual', matching WorkoutService.createPlannedWorkout, so a routine
+   *  and an ad-hoc plan can be retracted independently of each other. */
   async logSession(
     date: string, sportId: string,
     data: { subtypeId?: string; duration?: number; feeling?: FeelingLevel; metrics?: Record<string, string | number>; notes?: string },
     status: SportSessionStatus = 'done',
+    plannedSource?: PlannedSource,
   ): Promise<void> {
     const uid = this._uid();
     const id  = crypto.randomUUID();
@@ -324,6 +330,7 @@ export class SportService {
       metrics:   data.metrics,
       notes:     data.notes,
       status,
+      plannedSource,
       createdAt: new Date(),
     };
 
@@ -341,6 +348,7 @@ export class SportService {
       metrics:    data.metrics   ?? null,
       notes:      data.notes     ?? null,
       status,
+      planned_source: plannedSource ?? null,
     };
     try {
       const { error } = await this.supabase.from('sport_sessions').insert(row);

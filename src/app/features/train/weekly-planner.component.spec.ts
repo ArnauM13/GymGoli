@@ -218,14 +218,14 @@ describe('WeeklyPlannerComponent', () => {
   });
 
   describe('save() in settings mode (weekMonday is null)', () => {
-    it('always saves as a recurring plan across the full recurring horizon', async () => {
+    it('always saves as a recurring plan across the full recurring horizon, tagged source "routine"', async () => {
       component.toggleGym(0, 'push');
 
       await component.save();
 
       expect(updateWeeklyPlan).toHaveBeenCalledWith(jasmine.objectContaining({ recurring: true }));
-      expect(retractRemoved).toHaveBeenCalledWith(jasmine.objectContaining({ recurring: true }), WEEKS_RECURRING);
-      expect(applyPlan).toHaveBeenCalledWith(jasmine.objectContaining({ recurring: true }), WEEKS_RECURRING);
+      expect(retractRemoved).toHaveBeenCalledWith(jasmine.objectContaining({ recurring: true }), WEEKS_RECURRING, undefined, 'routine');
+      expect(applyPlan).toHaveBeenCalledWith(jasmine.objectContaining({ recurring: true }), WEEKS_RECURRING, undefined, 'routine');
     });
   });
 
@@ -236,11 +236,11 @@ describe('WeeklyPlannerComponent', () => {
       expect(retractRemoved).not.toHaveBeenCalled();
     });
 
-    it('clears the plan and retracts stale items across the recurring horizon once confirmed', async () => {
+    it('clears the plan and retracts stale routine items across the recurring horizon once confirmed', async () => {
       savedPlan.set({ recurring: true, days: [[], [], [], [], [], [], []] });
       await component.deletePlan();
 
-      expect(retractRemoved).toHaveBeenCalledWith(EMPTY_WEEKLY_PLAN, WEEKS_RECURRING);
+      expect(retractRemoved).toHaveBeenCalledWith(EMPTY_WEEKLY_PLAN, WEEKS_RECURRING, undefined, 'routine');
       expect(component.plan().days.every(items => items.length === 0)).toBeTrue();
     });
   });
@@ -259,15 +259,37 @@ describe('WeeklyPlannerComponent', () => {
       expect(component.weekRange('2024-03-04')).toContain('2024');
     });
 
+    it('overwriteRoutine defaults to false', () => {
+      expect(component.overwriteRoutine()).toBeFalse();
+    });
+
     describe('save()', () => {
-      it('applies only to the requested week without touching the persisted routine', async () => {
+      it('applies only to the requested week, tagged source "manual", without touching the persisted routine', async () => {
         component.toggleGym(0, 'push');
 
         await component.save();
 
-        expect(retractRemoved).toHaveBeenCalledWith(component.plan(), WEEKS_SINGLE, '2024-03-04');
-        expect(applyPlan).toHaveBeenCalledWith(component.plan(), WEEKS_SINGLE, '2024-03-04');
+        expect(retractRemoved).toHaveBeenCalledWith(component.plan(), WEEKS_SINGLE, '2024-03-04', 'manual');
+        expect(applyPlan).toHaveBeenCalledWith(component.plan(), WEEKS_SINGLE, '2024-03-04', 'manual');
         expect(updateWeeklyPlan).not.toHaveBeenCalled();
+      });
+
+      it('does not retract the routine\'s plan for this week when the checkbox is unchecked', async () => {
+        component.toggleGym(0, 'push');
+
+        await component.save();
+
+        expect(retractRemoved).not.toHaveBeenCalledWith(EMPTY_WEEKLY_PLAN, WEEKS_SINGLE, '2024-03-04', 'routine');
+      });
+
+      it('also retracts the routine\'s plan for this specific week when "overwrite" is checked', async () => {
+        component.toggleGym(0, 'push');
+        component.overwriteRoutine.set(true);
+
+        await component.save();
+
+        expect(retractRemoved).toHaveBeenCalledWith(EMPTY_WEEKLY_PLAN, WEEKS_SINGLE, '2024-03-04', 'routine');
+        expect(retractRemoved).toHaveBeenCalledWith(component.plan(), WEEKS_SINGLE, '2024-03-04', 'manual');
       });
     });
   });
