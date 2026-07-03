@@ -3,8 +3,10 @@ import { ActivatedRoute, Router } from '@angular/router';
 
 import { AuthService } from '../../core/services/auth.service';
 import { SharedWorkoutService } from '../../core/services/shared-workout.service';
+import { UserSettingsService } from '../../core/services/user-settings.service';
 import { CATEGORY_LABELS } from '../../core/models/exercise.model';
-import { SharedWorkout } from '../../core/models/shared-workout.model';
+import { SharedWorkout, SharedWorkoutEntry } from '../../core/models/shared-workout.model';
+import { kgToDisplay } from '../../shared/utils/weight.utils';
 
 type Status = 'loading' | 'confirm' | 'importing' | 'success' | 'error' | 'needs-auth';
 
@@ -34,7 +36,12 @@ type Status = 'loading' | 'confirm' | 'importing' | 'success' | 'error' | 'needs
               @if (w.entries.length > 0) {
                 <ul class="share-ex-list">
                   @for (e of w.entries; track e.exerciseName) {
-                    <li>{{ e.exerciseName }}</li>
+                    <li>
+                      <span class="share-ex-name">{{ e.exerciseName }}</span>
+                      @if (e.sets.length > 0) {
+                        <span class="share-ex-sets">{{ setsSummary(e) }}</span>
+                      }
+                    </li>
                   }
                 </ul>
               } @else {
@@ -110,9 +117,11 @@ type Status = 'loading' | 'confirm' | 'importing' | 'success' | 'error' | 'needs
       background: rgba(var(--c-brand-rgb), 0.1); border-radius: 10px; padding: 2px 8px;
     }
     .share-ex-list {
-      margin: 0; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 4px;
-      li { font-size: 13px; color: var(--c-text-2); }
+      margin: 0; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 6px;
+      li { display: flex; flex-direction: column; gap: 1px; }
     }
+    .share-ex-name { font-size: 13px; font-weight: 600; color: var(--c-text); }
+    .share-ex-sets { font-size: 11.5px; color: var(--c-text-3); }
     .share-empty { margin: 0; font-size: 12px; color: var(--c-text-3); font-style: italic; }
 
     .share-actions { display: flex; gap: 10px; width: 100%; }
@@ -136,6 +145,7 @@ export class ShareImportComponent implements OnInit {
   private router              = inject(Router);
   private auth                = inject(AuthService);
   private sharedWorkoutService = inject(SharedWorkoutService);
+  private settingsService      = inject(UserSettingsService);
 
   readonly status       = signal<Status>('loading');
   readonly errorMessage = signal('');
@@ -194,6 +204,13 @@ export class ShareImportComponent implements OnInit {
 
   categoryLabel(cat: SharedWorkout['category']): string {
     return cat === 'mixed' ? 'Mixt' : CATEGORY_LABELS[cat];
+  }
+
+  setsSummary(entry: SharedWorkoutEntry): string {
+    const unit = this.settingsService.weightUnit();
+    return entry.sets
+      .map(s => `${s.reps}×${kgToDisplay(s.weight, unit)}${unit}`)
+      .join(', ');
   }
 
   skippedNote(): string {

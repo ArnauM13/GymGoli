@@ -26,15 +26,14 @@ export class SharedWorkoutService {
   private workoutService   = inject(WorkoutService);
 
   /** Creates a shareable snapshot of a workout and returns its id (used to build the link).
-   *  Carries no reference to the sender's account — just the name and exercises. */
+   *  Carries no reference to the sender's account — just the name, exercises and every
+   *  set they logged, so the recipient sees exactly what was done. */
   async share(name: string, category: ExerciseCategory | 'mixed', entries: WorkoutEntry[]): Promise<string> {
     if (!this.auth.uid()) throw new Error('Not authenticated');
 
     const sharedEntries: SharedWorkoutEntry[] = entries.map(e => ({
       exerciseName: e.exerciseName,
-      sets:   e.sets.length || undefined,
-      reps:   e.sets[0]?.reps,
-      weight: e.sets[0]?.weight,
+      sets: e.sets.map(s => ({ weight: s.weight, reps: s.reps })),
     }));
 
     const { data, error } = await this.supabase
@@ -58,9 +57,10 @@ export class SharedWorkoutService {
 
   /** Matches the shared workout's exercises by name against the current
    *  user's own exercise library — exercise ids are per-user so the
-   *  sender's ids can't be reused — and creates it as a planned workout
-   *  for today in the recipient's own calendar. Returns any exercise
-   *  names that had no match. */
+   *  sender's ids can't be reused — and creates it as a completed
+   *  workout for today in the recipient's own calendar, sets and all,
+   *  as if they had done it themselves. Returns any exercise names that
+   *  had no match. */
   async importAsWorkout(shared: SharedWorkout): Promise<{ workoutId: string; skipped: string[] }> {
     await this.exerciseService.ensureLoaded();
     const myExercises = this.exerciseService.exercises();
@@ -70,12 +70,18 @@ export class SharedWorkoutService {
     for (const e of shared.entries) {
       const match = myExercises.find(x => x.name.toLowerCase() === e.exerciseName.toLowerCase());
       if (!match) { skipped.push(e.exerciseName); continue; }
-      entries.push({ exerciseId: match.id, exerciseName: match.name, sets: [] });
+      entries.push({
+        exerciseId: match.id, exerciseName: match.name,
+        sets: e.sets.map(s => ({ weight: s.weight, reps: s.reps })),
+      });
     }
 
-    const today    = new Date().toISOString().split('T')[0];
-    const category = shared.category === 'mixed' ? undefined : shared.category;
-    const workoutId = await this.workoutService.createPlannedWorkout(today, category, entries);
+    const today     = new Date().toISOString().split('T')[0];
+    const category  = shared.category === 'mixed' ? undefined : shared.category;
+    const workoutId = await this.workoutService.createWorkoutForDate(today, category);
+    for (const entry of entries) {
+      await this.workoutService.addExerciseToWorkout(workoutId, entry);
+    }
     return { workoutId, skipped };
   }
 }

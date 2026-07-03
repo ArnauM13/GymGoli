@@ -1,15 +1,18 @@
 import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
 import { ShareImportComponent } from './share-import.component';
 import { AuthService } from '../../core/services/auth.service';
 import { SharedWorkoutService } from '../../core/services/shared-workout.service';
+import { UserSettingsService } from '../../core/services/user-settings.service';
 import { SharedWorkout } from '../../core/models/shared-workout.model';
 
 function shared(overrides: Partial<SharedWorkout> = {}): SharedWorkout {
   return {
     id: 'share-1', name: 'Push A', category: 'push',
-    entries: [{ exerciseName: 'Press banca' }], createdAt: '2024-01-01',
+    entries: [{ exerciseName: 'Press banca', sets: [{ weight: 60, reps: 8 }, { weight: 65, reps: 6 }] }],
+    createdAt: '2024-01-01',
     ...overrides,
   };
 }
@@ -35,6 +38,7 @@ describe('ShareImportComponent', () => {
         { provide: Router,         useValue: router },
         { provide: AuthService,    useValue: { waitForAuth } },
         { provide: SharedWorkoutService, useValue: { fetchById, importAsWorkout } },
+        { provide: UserSettingsService,  useValue: { weightUnit: signal<'kg' | 'lb'>('kg') } },
       ],
     });
     component = TestBed.runInInjectionContext(() => new ShareImportComponent());
@@ -94,5 +98,16 @@ describe('ShareImportComponent', () => {
     setup('share-1');
     component.goHome();
     expect(router.navigate).toHaveBeenCalledWith(['/train']);
+  });
+
+  describe('setsSummary()', () => {
+    it('formats each set as reps×weight in the user\'s preferred unit', () => {
+      setup('share-1');
+      const summary = component.setsSummary({
+        exerciseName: 'Press banca',
+        sets: [{ weight: 60, reps: 8 }, { weight: 65, reps: 6 }],
+      });
+      expect(summary).toBe('8×60kg, 6×65kg');
+    });
   });
 });

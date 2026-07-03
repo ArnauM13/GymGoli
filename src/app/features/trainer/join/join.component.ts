@@ -36,20 +36,20 @@ import { TrainerService } from '../../../core/services/trainer.service';
   styles: [`
     .join-page {
       min-height: 100vh; display: flex; align-items: center; justify-content: center;
-      padding: 24px; background: #f5f5f7;
+      padding: 24px; background: var(--c-bg);
     }
     .join-card {
       display: flex; flex-direction: column; align-items: center; gap: 16px;
-      padding: 32px 28px; background: white; border-radius: 24px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+      padding: 32px 28px; background: var(--c-card); border-radius: 24px;
+      box-shadow: 0 4px 24px var(--c-shadow-md);
       max-width: 360px; width: 100%; text-align: center;
     }
     .join-icon {
-      font-size: 48px; color: #006874;
+      font-size: 48px; color: var(--c-brand);
       font-variation-settings: 'FILL' 1, 'wght' 300;
     }
-    h1 { margin: 0; font-size: 20px; font-weight: 800; color: #1a1a1a; letter-spacing: -0.3px; }
-    .join-desc { margin: 0; font-size: 14px; color: #666; line-height: 1.5; }
+    h1 { margin: 0; font-size: 20px; font-weight: 800; color: var(--c-text); letter-spacing: -0.3px; }
+    .join-desc { margin: 0; font-size: 14px; color: var(--c-text-2); line-height: 1.5; }
     .success-icon {
       font-size: 40px; color: #2e7d32;
       font-variation-settings: 'FILL' 1;
@@ -60,13 +60,13 @@ import { TrainerService } from '../../../core/services/trainer.service';
     }
     .btn-primary {
       padding: 10px 28px; border: none; border-radius: 10px;
-      background: #006874; color: white;
+      background: var(--c-brand); color: white;
       font-size: 14px; font-weight: 700; cursor: pointer;
       transition: background 0.15s; touch-action: manipulation;
-      &:hover { background: #005a63; }
+      &:hover { background: var(--c-brand-dk); }
     }
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    .spin { animation: spin 1s linear infinite; font-size: 32px; color: #006874; }
+    .spin { animation: spin 1s linear infinite; font-size: 32px; color: var(--c-brand); }
   `],
 })
 export class JoinComponent implements OnInit {

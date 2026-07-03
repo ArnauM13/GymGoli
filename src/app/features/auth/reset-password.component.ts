@@ -66,13 +66,13 @@ import { AuthService } from '../../core/services/auth.service';
     .reset-page {
       min-height: 100dvh;
       display: flex; align-items: center; justify-content: center;
-      background: linear-gradient(135deg, #f0fafb 0%, #e8f4f5 100%);
+      background: var(--c-bg);
       padding: 24px;
     }
 
     .reset-card {
-      background: white; border-radius: 24px;
-      box-shadow: 0 8px 40px rgba(0,104,116,0.12);
+      background: var(--c-card); border-radius: 24px;
+      box-shadow: 0 8px 40px color-mix(in srgb, var(--c-brand) 12%, transparent);
       padding: 40px 32px; width: 100%; max-width: 360px;
       display: flex; flex-direction: column; align-items: center; gap: 24px;
     }
@@ -82,8 +82,8 @@ import { AuthService } from '../../core/services/auth.service';
       text-align: center;
     }
     .reset-logo { width: 60px; height: 60px; border-radius: 16px; object-fit: cover; }
-    .reset-title { margin: 0; font-size: 22px; font-weight: 800; color: #1a1a1a; }
-    .reset-sub   { margin: 0; font-size: 14px; color: #888; }
+    .reset-title { margin: 0; font-size: 22px; font-weight: 800; color: var(--c-text); }
+    .reset-sub   { margin: 0; font-size: 14px; color: var(--c-text-3); }
 
     .reset-form {
       width: 100%; display: flex; flex-direction: column; gap: 10px;
@@ -91,24 +91,24 @@ import { AuthService } from '../../core/services/auth.service';
 
     .form-input {
       width: 100%; padding: 12px 14px;
-      border: 1.5px solid #e0e0e0; border-radius: 10px;
-      font-size: 14px; color: #1a1a1a; outline: none;
+      border: 1.5px solid var(--c-border); border-radius: 10px;
+      background: var(--c-card); font-size: 14px; color: var(--c-text); outline: none;
       transition: border-color 0.15s; box-sizing: border-box;
-      &:focus { border-color: #006874; }
+      &:focus { border-color: var(--c-brand); }
     }
 
     .form-error {
       margin: 0; font-size: 12px; color: #ef5350;
-      padding: 6px 10px; background: #fef2f2; border-radius: 8px;
+      padding: 6px 10px; background: rgba(239, 83, 80, 0.1); border-radius: 8px;
     }
 
     .btn-primary {
       display: flex; align-items: center; justify-content: center; gap: 8px;
       width: 100%; padding: 13px; border: none; border-radius: 12px;
-      background: #006874; color: white;
+      background: var(--c-brand); color: white;
       font-size: 15px; font-weight: 600; cursor: pointer;
       transition: all 0.2s; touch-action: manipulation;
-      &:hover:not(:disabled) { background: #00565f; transform: translateY(-1px); }
+      &:hover:not(:disabled) { background: var(--c-brand-dk); transform: translateY(-1px); }
       &:disabled { opacity: 0.6; cursor: default; }
       .material-symbols-outlined { font-size: 18px; }
     }
@@ -118,7 +118,7 @@ import { AuthService } from '../../core/services/auth.service';
       text-align: center; width: 100%;
     }
     .success-icon { font-size: 48px; color: #4caf50; font-variation-settings: 'FILL' 1; }
-    .success-msg  { margin: 0; font-size: 14px; color: #555; line-height: 1.5; }
+    .success-msg  { margin: 0; font-size: 14px; color: var(--c-text-2); line-height: 1.5; }
 
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     .spin { animation: spin 1s linear infinite; }
