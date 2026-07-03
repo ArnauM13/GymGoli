@@ -312,7 +312,7 @@ export class WorkoutService {
     if (date)     q = q.eq('date', date);
     if (search) {
       const escaped = search.replace(/%/g, '\\%').replace(/_/g, '\\_');
-      q = q.filter('entries::text', 'ilike', `%${escaped}%`);
+      q = q.ilike('exercise_names', `%${escaped}%`);
     }
 
     const { data, count, error } = await q.range(from, to);

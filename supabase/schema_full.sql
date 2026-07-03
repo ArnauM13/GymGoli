@@ -81,7 +81,13 @@ CREATE TABLE IF NOT EXISTS workouts (
   planned_source     text        CHECK (planned_source IN ('self', 'trainer', 'routine', 'manual')),
   feeling            smallint    CHECK (feeling BETWEEN 1 AND 5),
   source_proposal_id uuid        REFERENCES trainer_proposals(id) ON DELETE SET NULL,
-  created_at         timestamptz DEFAULT now()
+  created_at         timestamptz DEFAULT now(),
+  -- Space-joined exercise names, kept in sync automatically — lets
+  -- Historial's search filter with a plain, always-supported .ilike()
+  -- instead of casting the whole `entries` blob to text.
+  exercise_names     text GENERATED ALWAYS AS (
+    (SELECT string_agg(entry ->> 'exerciseName', ' ') FROM jsonb_array_elements(entries) AS entry)
+  ) STORED
 );
 
 CREATE TABLE IF NOT EXISTS sports (
@@ -210,6 +216,16 @@ BEGIN
   ) THEN
     ALTER TABLE workouts
       ADD COLUMN planned_source text CHECK (planned_source IN ('self', 'trainer', 'routine', 'manual'));
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'workouts' AND column_name = 'exercise_names'
+  ) THEN
+    ALTER TABLE workouts
+      ADD COLUMN exercise_names text GENERATED ALWAYS AS (
+        (SELECT string_agg(entry ->> 'exerciseName', ' ') FROM jsonb_array_elements(entries) AS entry)
+      ) STORED;
   END IF;
 END $$;
 
@@ -390,6 +406,11 @@ CREATE INDEX IF NOT EXISTS workouts_user_id_date_idx
 
 CREATE INDEX IF NOT EXISTS workouts_user_status_date_idx
   ON workouts (user_id, status, date);
+
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+CREATE INDEX IF NOT EXISTS workouts_exercise_names_trgm_idx
+  ON workouts USING gin (exercise_names gin_trgm_ops);
 
 CREATE INDEX IF NOT EXISTS sports_user_id_idx
   ON sports (user_id);
