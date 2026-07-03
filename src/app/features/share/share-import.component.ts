@@ -72,20 +72,20 @@ type Status = 'loading' | 'confirm' | 'importing' | 'success' | 'error' | 'needs
   styles: [`
     .share-page {
       min-height: 100vh; display: flex; align-items: center; justify-content: center;
-      padding: 24px; background: #f5f5f7;
+      padding: 24px; background: var(--c-bg);
     }
     .share-card {
       display: flex; flex-direction: column; align-items: center; gap: 16px;
-      padding: 32px 28px; background: white; border-radius: 24px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+      padding: 32px 28px; background: var(--c-card); border-radius: 24px;
+      box-shadow: 0 4px 24px var(--c-shadow-md);
       max-width: 380px; width: 100%; text-align: center;
     }
     .share-icon {
-      font-size: 48px; color: #006874;
+      font-size: 48px; color: var(--c-brand);
       font-variation-settings: 'FILL' 1, 'wght' 300;
     }
-    h1 { margin: 0; font-size: 20px; font-weight: 800; color: #1a1a1a; letter-spacing: -0.3px; }
-    .share-desc { margin: 0; font-size: 14px; color: #666; line-height: 1.5; }
+    h1 { margin: 0; font-size: 20px; font-weight: 800; color: var(--c-text); letter-spacing: -0.3px; }
+    .share-desc { margin: 0; font-size: 14px; color: var(--c-text-2); line-height: 1.5; }
     .success-icon {
       font-size: 40px; color: #2e7d32;
       font-variation-settings: 'FILL' 1;
@@ -97,23 +97,23 @@ type Status = 'loading' | 'confirm' | 'importing' | 'success' | 'error' | 'needs
 
     .share-preview {
       width: 100%; box-sizing: border-box; padding: 14px 16px;
-      background: #f7f7f8; border: 1.5px solid #eee; border-radius: 14px;
+      background: var(--c-subtle); border: 1.5px solid var(--c-border-2); border-radius: 14px;
       text-align: left;
     }
     .share-preview-header {
       display: flex; align-items: center; justify-content: space-between; gap: 8px;
       margin-bottom: 8px;
     }
-    .share-preview-name { font-size: 14px; font-weight: 700; color: #1a1a1a; }
+    .share-preview-name { font-size: 14px; font-weight: 700; color: var(--c-text); }
     .share-preview-cat {
-      font-size: 11px; font-weight: 700; color: #006874;
-      background: rgba(0, 104, 116, 0.1); border-radius: 10px; padding: 2px 8px;
+      font-size: 11px; font-weight: 700; color: var(--c-brand);
+      background: rgba(var(--c-brand-rgb), 0.1); border-radius: 10px; padding: 2px 8px;
     }
     .share-ex-list {
       margin: 0; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 4px;
-      li { font-size: 13px; color: #444; }
+      li { font-size: 13px; color: var(--c-text-2); }
     }
-    .share-empty { margin: 0; font-size: 12px; color: #999; font-style: italic; }
+    .share-empty { margin: 0; font-size: 12px; color: var(--c-text-3); font-style: italic; }
 
     .share-actions { display: flex; gap: 10px; width: 100%; }
     .btn-primary, .btn-secondary {
@@ -121,14 +121,14 @@ type Status = 'loading' | 'confirm' | 'importing' | 'success' | 'error' | 'needs
       font-size: 14px; font-weight: 700; cursor: pointer;
       transition: background 0.15s; touch-action: manipulation; border: none;
     }
-    .btn-primary { background: #006874; color: white; &:hover { background: #005a63; } }
+    .btn-primary { background: var(--c-brand); color: white; &:hover { background: var(--c-brand-dk); } }
     .btn-secondary {
-      background: transparent; color: #666; border: 1.5px solid #ddd;
-      &:hover { background: #f0f0f0; }
+      background: transparent; color: var(--c-text-2); border: 1.5px solid var(--c-border);
+      &:hover { background: var(--c-hover); }
     }
 
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    .spin { animation: spin 1s linear infinite; font-size: 32px; color: #006874; }
+    .spin { animation: spin 1s linear infinite; font-size: 32px; color: var(--c-brand); }
   `],
 })
 export class ShareImportComponent implements OnInit {
