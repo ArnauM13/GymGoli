@@ -4,7 +4,7 @@ import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
-import { workoutCategories, mondayOf, addDays } from '../../shared/utils/calendar-utils';
+import { workoutCategories, mondayOf, addDays, weekRangeLabel } from '../../shared/utils/calendar-utils';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { TrainerService } from '../../core/services/trainer.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -22,7 +22,7 @@ import { SharedWorkoutService } from '../../core/services/shared-workout.service
 import { SportService } from '../../core/services/sport.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { WorkoutService } from '../../core/services/workout.service';
-import { WeeklyPlanService } from '../../core/services/weekly-plan.service';
+import { WeeklyPlanService, WEEKS_SINGLE } from '../../core/services/weekly-plan.service';
 import { OfflineService } from '../../core/services/offline.service';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
@@ -193,25 +193,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       } @else {
 
         <!-- ══ DASHBOARD MODE ══ -->
-        <app-page-header title="Entrenament" />
-
-        @if (!offlineService.isOffline()) {
-          <div class="calendar-wrap">
-            <app-calendar
-              [allowFuturePlanning]="true"
-              [selectedDate]="selectedDate()"
-              (dateSelected)="selectedDate.set($event)"
-            />
-            <app-weekly-summary [weekDate]="selectedDate()" />
-          </div>
-        }
-
-        <!-- ── Quick actions: weekly planner + offline toggle ── -->
-        <div class="quick-actions">
-          <button class="qa-chip qa-chip--plan" (click)="router.navigate(['/train/planner'])">
-            <span class="material-symbols-outlined">event_repeat</span>
-            Planificar
-          </button>
+        <app-page-header title="Entrenament">
           <button class="qa-chip" [class.qa-chip--active]="offlineService.forceOffline()"
                   (click)="offlineService.toggleForceOffline()">
             <span class="material-symbols-outlined">
@@ -219,7 +201,21 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             </span>
             {{ offlineService.forceOffline() ? 'En línia' : 'Sense connexió' }}
           </button>
-        </div>
+        </app-page-header>
+
+        @if (!offlineService.isOffline()) {
+          <div class="calendar-wrap">
+            <app-calendar
+              [allowFuturePlanning]="true"
+              [selectedDate]="selectedDate()"
+              [showPlanAction]="true"
+              [planLoading]="planningWeek()"
+              (dateSelected)="selectedDate.set($event)"
+              (planWeek)="planCurrentWeek($event)"
+            />
+            <app-weekly-summary [weekDate]="selectedDate()" />
+          </div>
+        }
 
         @if (isSelectedFuture()) {
           <div class="plan-pill">
@@ -745,11 +741,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
   styles: [`
     .page { padding: 0; }
 
-    /* ── Quick actions: weekly planner + offline toggle (filter-chip style, per history page) ── */
-    .quick-actions {
-      display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;
-      margin: 0 16px 12px;
-    }
+    /* ── Offline toggle chip (in the page header) ── */
     .qa-chip {
       display: inline-flex; align-items: center; gap: 5px;
       height: 34px; padding: 0 12px; border-radius: 17px;
@@ -759,12 +751,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .material-symbols-outlined { font-size: 17px; }
       &:hover { background: var(--c-border-2); color: var(--c-text); }
       &:active { transform: scale(0.96); }
-    }
-    .qa-chip--plan {
-      border-color: var(--c-brand);
-      background: rgba(var(--c-brand-rgb), 0.1);
-      color: var(--c-brand);
-      &:hover { background: rgba(var(--c-brand-rgb), 0.18); }
     }
     .qa-chip--active {
       background: var(--c-brand); border-color: var(--c-brand); color: white;
@@ -1649,6 +1635,7 @@ export class TrainComponent {
   readonly awFeelingOpen     = signal(false);
   readonly feelingLevels5: FeelingLevel[] = [1, 2, 3, 4, 5];
   readonly acceptingProposal = signal(false);
+  readonly planningWeek     = signal(false);
 
   private readonly _dismissedKey = computed(() =>
     `gymgoli_dismissed_proposals_${this.auth?.uid() ?? ''}`
@@ -1996,6 +1983,27 @@ export class TrainComponent {
       const list = JSON.parse(localStorage.getItem(key) ?? '[]') as string[];
       if (!list.includes(date)) { list.push(date); localStorage.setItem(key, JSON.stringify(list)); }
     } catch { }
+  }
+
+  // ── Plan the currently-viewed week from the calendar's "Planificar" action ──
+
+  async planCurrentWeek(monday: string): Promise<void> {
+    const plan = this.settingsService.weeklyPlan();
+    if (!plan.days.some(items => items.length > 0)) {
+      this.snackBar.open('Encara no tens cap rutina configurada a Configuració > Estableix rutines', '', { duration: 3500 });
+      return;
+    }
+
+    this.planningWeek.set(true);
+    this.snackBar.open(`Planificant la setmana del ${weekRangeLabel(monday)}...`, '', { duration: 2000 });
+    try {
+      await this.weeklyPlanService.apply(plan, WEEKS_SINGLE, monday);
+      this.snackBar.open('Setmana planificada', '', { duration: 2000 });
+    } catch {
+      this.snackBar.open('Error en planificar la setmana', '', { duration: 3000 });
+    } finally {
+      this.planningWeek.set(false);
+    }
   }
 
   // ── Workout navigation ────────────────────────────────────────────────────

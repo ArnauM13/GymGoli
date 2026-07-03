@@ -17,8 +17,9 @@ import { TrainerService } from '../../core/services/trainer.service';
 import { TemplateService } from '../../core/services/template.service';
 import { SharedWorkoutService } from '../../core/services/shared-workout.service';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
-import { WeeklyPlanService } from '../../core/services/weekly-plan.service';
+import { WeeklyPlanService, WEEKS_SINGLE } from '../../core/services/weekly-plan.service';
 import { Workout, WorkoutEntry } from '../../core/models/workout.model';
+import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../../core/models/weekly-plan.model';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 
 const TODAY = new Date().toISOString().split('T')[0];
@@ -33,9 +34,15 @@ describe('TrainComponent', () => {
   let component: TrainComponent;
   let fixture: ReturnType<typeof TestBed.createComponent<TrainComponent>>;
   let forceOffline: ReturnType<typeof signal<boolean>>;
+  let weeklyPlan: ReturnType<typeof signal<WeeklyPlan>>;
+  let applyPlan: jasmine.Spy;
+  let snackBarOpen: jasmine.Spy;
 
   beforeEach(async () => {
     forceOffline = signal(false);
+    weeklyPlan   = signal(EMPTY_WEEKLY_PLAN);
+    applyPlan    = jasmine.createSpy('apply').and.resolveTo(undefined);
+    snackBarOpen = jasmine.createSpy('open');
     const mockWorkoutService = {
       workouts:                   signal<Workout[]>([]),
       isLoading:                  signal(false),
@@ -73,15 +80,15 @@ describe('TrainComponent', () => {
         { provide: SportService,        useValue: mockSportService },
         { provide: ExerciseService,     useValue: { exercises: signal([]), isLoaded: signal(true), ensureLoaded: jasmine.createSpy().and.resolveTo(undefined) } },
         { provide: AuthService,         useValue: { uid: signal('user-1') } },
-        { provide: UserSettingsService, useValue: { weightUnit: signal<'kg' | 'lb'>('kg'), fitnessGoal: signal(null), loaded: signal(true) } },
-        { provide: WeeklyPlanService,   useValue: { ensureRecurringApplied: jasmine.createSpy().and.resolveTo(undefined) } },
+        { provide: UserSettingsService, useValue: { weightUnit: signal<'kg' | 'lb'>('kg'), fitnessGoal: signal(null), loaded: signal(true), weeklyPlan } },
+        { provide: WeeklyPlanService,   useValue: { ensureRecurringApplied: jasmine.createSpy().and.resolveTo(undefined), apply: applyPlan } },
         { provide: OfflineService,      useValue: { isOffline: signal(false), forceOffline, toggleForceOffline: jasmine.createSpy() } },
         { provide: TrainerService,      useValue: { myTrainer: signal(null), hasTrainer: jasmine.createSpy().and.returnValue(false), getProposalForDate: jasmine.createSpy().and.returnValue(null) } },
         { provide: TemplateService,     useValue: { forCategory: jasmine.createSpy().and.returnValue([]), create: jasmine.createSpy().and.resolveTo(undefined), recordUse: jasmine.createSpy().and.resolveTo(undefined) } },
         { provide: SharedWorkoutService, useValue: { share: jasmine.createSpy().and.resolveTo('share-id') } },
         { provide: WorkoutProfileService, useValue: { profile: signal({ gym: { push: EMPTY_CATEGORY_PROFILE, pull: EMPTY_CATEGORY_PROFILE, legs: EMPTY_CATEGORY_PROFILE }, favoriteSport: null, recentSport: null, minRecovery: 2 }) } },
         { provide: MatDialog,              useValue: { open: jasmine.createSpy() } },
-        { provide: MatSnackBar,            useValue: { open: jasmine.createSpy() } },
+        { provide: MatSnackBar,            useValue: { open: snackBarOpen } },
         { provide: ConfirmDialogService,   useValue: { confirm: jasmine.createSpy('confirm').and.resolveTo(false) } },
       ],
     })
@@ -223,16 +230,60 @@ describe('TrainComponent', () => {
 
   describe('offline toggle chip', () => {
     it('reads "Sense connexió" when offline mode is off', () => {
-      const chip = (fixture.nativeElement as HTMLElement).querySelector('.qa-chip:not(.qa-chip--plan)');
+      const chip = (fixture.nativeElement as HTMLElement).querySelector('.qa-chip');
       expect(chip?.textContent?.trim()).toContain('Sense connexió');
     });
 
     it('reads "En línia" once forced offline mode is active', () => {
       forceOffline.set(true);
       fixture.detectChanges();
-      const chip = (fixture.nativeElement as HTMLElement).querySelector('.qa-chip:not(.qa-chip--plan)');
+      const chip = (fixture.nativeElement as HTMLElement).querySelector('.qa-chip');
       expect(chip?.textContent?.trim()).toContain('En línia');
       expect(chip?.textContent?.trim()).not.toContain('Sense connexió');
+    });
+  });
+
+  // ── planCurrentWeek() ────────────────────────────────────────────────────
+
+  describe('planCurrentWeek()', () => {
+    it('warns instead of applying when no routine is configured', async () => {
+      await component.planCurrentWeek('2024-03-04');
+      expect(applyPlan).not.toHaveBeenCalled();
+      expect(snackBarOpen).toHaveBeenCalledWith(
+        jasmine.stringMatching(/cap rutina/), '', jasmine.any(Object));
+    });
+
+    it('applies the saved plan to the given week for a single week', async () => {
+      const plan: WeeklyPlan = { recurring: false, days: [[{ type: 'gym', category: 'push' }], [], [], [], [], [], []] };
+      weeklyPlan.set(plan);
+
+      await component.planCurrentWeek('2024-03-04');
+
+      expect(applyPlan).toHaveBeenCalledWith(plan, WEEKS_SINGLE, '2024-03-04');
+      expect(snackBarOpen).toHaveBeenCalledWith('Setmana planificada', '', jasmine.any(Object));
+    });
+
+    it('shows an error snackbar when applying fails', async () => {
+      const plan: WeeklyPlan = { recurring: false, days: [[{ type: 'gym', category: 'push' }], [], [], [], [], [], []] };
+      weeklyPlan.set(plan);
+      applyPlan.and.rejectWith(new Error('network error'));
+
+      await component.planCurrentWeek('2024-03-04');
+
+      expect(snackBarOpen).toHaveBeenCalledWith('Error en planificar la setmana', '', jasmine.any(Object));
+    });
+
+    it('toggles planningWeek while the plan is being applied', async () => {
+      let resolveApply!: () => void;
+      applyPlan.and.returnValue(new Promise<void>(resolve => { resolveApply = resolve; }));
+      const plan: WeeklyPlan = { recurring: false, days: [[{ type: 'gym', category: 'push' }], [], [], [], [], [], []] };
+      weeklyPlan.set(plan);
+
+      const promise = component.planCurrentWeek('2024-03-04');
+      expect(component.planningWeek()).toBeTrue();
+      resolveApply();
+      await promise;
+      expect(component.planningWeek()).toBeFalse();
     });
   });
 

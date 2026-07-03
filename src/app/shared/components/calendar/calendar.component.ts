@@ -6,8 +6,8 @@ import { Workout } from '../../../core/models/workout.model';
 import { SportService } from '../../../core/services/sport.service';
 import { CATEGORY_COLORS, ExerciseCategory } from '../../../core/models/exercise.model';
 import {
-  MONTHS_CA, MONTHS_SHORT, CalDay,
-  mondayOf, addDays, catDotBackground, sportDotBackground, workoutCategories,
+  MONTHS_CA, CalDay,
+  mondayOf, addDays, catDotBackground, sportDotBackground, workoutCategories, weekRangeLabel,
 } from '../../utils/calendar-utils';
 
 @Component({
@@ -157,9 +157,21 @@ import {
       }
 
       <!-- ── Footer ── -->
-      @if (isDialog) {
+      @if (isDialog || (showPlanAction() && view() === 'week')) {
         <div class="cal-footer">
-          <button class="cal-select-today" (click)="selectDay(todayStr)">Avui</button>
+          @if (isDialog) {
+            <button class="cal-select-today" (click)="selectDay(todayStr)">Avui</button>
+          }
+          @if (showPlanAction() && view() === 'week') {
+            <button class="cal-plan-btn" (click)="planWeek.emit(weekStart())" [disabled]="planLoading()">
+              @if (planLoading()) {
+                <span class="material-symbols-outlined spin">sync</span>
+              } @else {
+                <span class="material-symbols-outlined">event_repeat</span>
+              }
+              Planificar
+            </button>
+          }
         </div>
       }
 
@@ -365,6 +377,18 @@ import {
       cursor: pointer; touch-action: manipulation;
       &:hover { background: var(--c-brand-dk); }
     }
+    .cal-plan-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 16px; border-radius: 16px;
+      border: none; background: var(--c-brand); color: white;
+      font-size: 13px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
+      .material-symbols-outlined { font-size: 17px; }
+      &:hover:not(:disabled) { background: var(--c-brand-dk); }
+      &:disabled { opacity: 0.7; cursor: default; }
+    }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .spin { animation: spin 1s linear infinite; }
   `],
 })
 export class CalendarComponent {
@@ -375,7 +399,10 @@ export class CalendarComponent {
 
   readonly selectedDate          = input<string | null>(null);
   readonly allowFuturePlanning   = input(false, { transform: booleanAttribute });
+  readonly showPlanAction        = input(false, { transform: booleanAttribute });
+  readonly planLoading           = input(false, { transform: booleanAttribute });
   readonly dateSelected          = output<string>();
+  readonly planWeek              = output<string>();
 
   // ── View ──────────────────────────────────────────────────────────────────
   readonly view    = signal<'week' | 'month'>('week');
@@ -438,18 +465,7 @@ export class CalendarComponent {
     if (this.view() === 'month') {
       return `${MONTHS_CA[this.calMonth()]} ${this.calYear()}`;
     }
-    const monday = this.weekStart();
-    const sunday = addDays(monday, 6);
-    const mDate  = new Date(monday + 'T12:00:00');
-    const sDate  = new Date(sunday  + 'T12:00:00');
-    const mDay   = mDate.getDate();
-    const sDay   = sDate.getDate();
-    const sMonth = MONTHS_SHORT[sDate.getMonth()];
-    const year   = sDate.getFullYear();
-    if (mDate.getMonth() === sDate.getMonth()) {
-      return `${mDay} – ${sDay} ${sMonth} ${year}`;
-    }
-    return `${mDay} ${MONTHS_SHORT[mDate.getMonth()]} – ${sDay} ${sMonth} ${year}`;
+    return weekRangeLabel(this.weekStart());
   });
 
   // ── Navigation ────────────────────────────────────────────────────────────

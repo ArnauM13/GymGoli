@@ -32,12 +32,14 @@ export class WeeklyPlanService {
 
   private _toppedUpForUid: string | null = null;
 
-  async apply(plan: WeeklyPlan, weeks: number): Promise<void> {
+  /** `startMonday` lets a caller target a specific week (e.g. "plan the week
+   *  I'm viewing right now") instead of always anchoring to the current one. */
+  async apply(plan: WeeklyPlan, weeks: number, startMonday?: string): Promise<void> {
     const hasAnyItem = plan.days.some(items => items.length > 0);
     if (!hasAnyItem) return;
 
     const today  = TODAY();
-    const monday = mondayOf(today);
+    const monday = startMonday ?? mondayOf(today);
 
     const months = new Set<string>();
     for (let i = 0; i < weeks * 7; i++) months.add(addDays(monday, i).substring(0, 7));

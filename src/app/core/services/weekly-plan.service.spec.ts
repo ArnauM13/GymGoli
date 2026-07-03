@@ -169,6 +169,13 @@ describe('WeeklyPlanService', () => {
       expect(createPlannedWorkout).toHaveBeenCalledTimes(3);
     });
 
+    it('targets an explicit startMonday instead of the current week when given one', async () => {
+      // Explicit week starting 2024-03-11 (the week after the mocked "today"), Friday -> 2024-03-15
+      await service.apply(planWithGymOn(4, 'push'), 1, '2024-03-11');
+      expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-15', 'push', []);
+      expect(createPlannedWorkout).not.toHaveBeenCalledWith('2024-03-08', 'push', []);
+    });
+
     it('keeps creating the remaining items when one item fails (e.g. offline)', async () => {
       const plan = emptyPlan();
       plan.days[2] = [{ type: 'gym', category: 'push' }, { type: 'gym', category: 'legs' }];

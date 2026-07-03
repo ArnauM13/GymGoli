@@ -203,6 +203,17 @@ import {
           </div>
           <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
         </a>
+
+        <div class="setting-divider"></div>
+
+        <a class="nav-row" routerLink="/train/planner">
+          <span class="material-symbols-outlined nav-row-icon">event_repeat</span>
+          <div class="setting-info">
+            <span class="setting-label">Estableix rutines</span>
+            <span class="setting-desc">Defineix el pla setmanal de gym i esport per dia.</span>
+          </div>
+          <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
+        </a>
       </div>
 
       <!-- ── Bloc 3: Preferències ── -->

@@ -31,6 +31,21 @@ export function addDays(dateStr: string, days: number): string {
   return d.toISOString().split('T')[0];
 }
 
+/** e.g. "6 – 12 jul 2026", or "30 jun – 6 jul 2026" when the week spans two months. */
+export function weekRangeLabel(monday: string): string {
+  const sunday = addDays(monday, 6);
+  const mDate  = new Date(monday + 'T12:00:00');
+  const sDate  = new Date(sunday + 'T12:00:00');
+  const mDay   = mDate.getDate();
+  const sDay   = sDate.getDate();
+  const sMonth = MONTHS_SHORT[sDate.getMonth()];
+  const year   = sDate.getFullYear();
+  if (mDate.getMonth() === sDate.getMonth()) {
+    return `${mDay} – ${sDay} ${sMonth} ${year}`;
+  }
+  return `${mDay} ${MONTHS_SHORT[mDate.getMonth()]} – ${sDay} ${sMonth} ${year}`;
+}
+
 export function workoutCategories(w: Workout): string[] {
   return w.categories?.length ? w.categories : (w.category ? [w.category] : []);
 }
