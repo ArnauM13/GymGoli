@@ -16,32 +16,33 @@ const CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
   standalone: true,
   imports: [FormsModule],
   template: `
-    <div class="search-wrap">
-      <span class="material-symbols-outlined search-icon">search</span>
-      <input class="search-input" type="search" [(ngModel)]="inputValue"
-             [placeholder]="searchPlaceholder()" autocomplete="off"
-             [attr.aria-label]="searchPlaceholder()">
-      @if (searchQuery()) {
-        <button class="search-clear" (click)="clearSearch()" aria-label="Esborrar cerca">
-          <span class="material-symbols-outlined">close</span>
-        </button>
-      }
-    </div>
-
     <div class="filter-bar">
       @if (showSort()) {
         <button class="sort-btn" (click)="toggleSort()" aria-label="Canviar ordre">
           <span class="material-symbols-outlined">{{ sortDesc() ? 'arrow_downward' : 'arrow_upward' }}</span>
         </button>
-        <div class="filter-divider"></div>
       }
+
+      <div class="search-wrap">
+        <span class="material-symbols-outlined search-icon">search</span>
+        <input class="search-input" type="search" [(ngModel)]="inputValue"
+               [placeholder]="searchPlaceholder()" autocomplete="off"
+               [attr.aria-label]="searchPlaceholder()">
+        @if (searchQuery()) {
+          <button class="search-clear" (click)="clearSearch()" aria-label="Esborrar cerca">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        }
+      </div>
 
       <ng-content />
 
+      <!-- "Tots" (clear category filter) disabled for now — specific filters only.
       <button class="filter-icon" [class.active]="category() === null"
               (click)="category.set(null)" aria-label="Tots" title="Tots">
         <span class="material-symbols-outlined">apps</span>
       </button>
+      -->
       @for (cat of categories; track cat) {
         <button class="filter-icon" [class.active]="category() === cat"
                 [style.--cat]="catColor(cat)"
@@ -53,9 +54,15 @@ const CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
     </div>
   `,
   styles: [`
+    /* ── Filters + search + sort, all inline ── */
+    .filter-bar {
+      display: flex; align-items: center; gap: 6px;
+      padding: 0 16px 12px;
+    }
+
     /* ── Search ── */
     .search-wrap {
-      position: relative; margin: 0 16px 10px;
+      position: relative; flex: 1; min-width: 0;
       display: flex; align-items: center;
     }
     .search-icon {
@@ -79,12 +86,6 @@ const CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
       &:hover { background: var(--c-hover); color: var(--c-text-2); }
     }
 
-    /* ── Filters + sort ── */
-    .filter-bar {
-      display: flex; align-items: center; gap: 6px;
-      padding: 0 16px 12px; overflow-x: auto;
-      scrollbar-width: none; &::-webkit-scrollbar { display: none; }
-    }
     .sort-btn {
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
       width: 34px; height: 34px; border-radius: 10px;
@@ -93,9 +94,6 @@ const CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
       cursor: pointer; touch-action: manipulation; transition: all 0.15s;
       .material-symbols-outlined { font-size: 18px; }
       &:hover { background: var(--c-border-2); color: var(--c-text); }
-    }
-    .filter-divider {
-      width: 1px; height: 20px; background: var(--c-border); flex-shrink: 0; margin: 0 2px;
     }
     .filter-icon {
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;

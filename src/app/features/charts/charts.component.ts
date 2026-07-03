@@ -24,64 +24,66 @@ import { FilterBarComponent } from '../../shared/components/filter-bar/filter-ba
 
       <!-- Summary strip (only when there is data) -->
       @if (!isLoadingRecords() && totalWorkouts() > 0) {
-        <div class="summary-block">
-          <div class="summary-section">
-            <span class="summary-section-title">Resum</span>
-            <div class="summary-grid">
-              <div class="summary-tile">
-                <span class="summary-val">{{ totalWorkouts() }}</span>
-                <span class="summary-lbl">Entrenaments</span>
-              </div>
-              <div class="summary-tile">
-                <span class="summary-val">
-                  @if (weekStreak() > 0) { 🔥 }{{ weekStreak() }}
-                </span>
-                <span class="summary-lbl">Set. consecutives</span>
+        <div class="summary-card">
+          <div class="summary-block">
+            <div class="summary-section">
+              <span class="summary-section-title">Resum</span>
+              <div class="summary-grid">
+                <div class="summary-tile">
+                  <span class="summary-val">{{ totalWorkouts() }}</span>
+                  <span class="summary-lbl">Entrenaments</span>
+                </div>
+                <div class="summary-tile">
+                  <span class="summary-val">
+                    @if (weekStreak() > 0) { 🔥 }{{ weekStreak() }}
+                  </span>
+                  <span class="summary-lbl">Set. consecutives</span>
+                </div>
               </div>
             </div>
-          </div>
-          <div class="summary-section">
-            <span class="summary-section-title">Setmana actual</span>
-            @if (goalMode() === 'separate') {
-              <div class="summary-grid">
-                <div class="summary-tile">
-                  <span class="summary-val">
-                    {{ thisWeekCount() }}
-                    @if (weeklyGymGoal()) { <span class="summary-sub">/ {{ weeklyGymGoal() }}</span> }
-                  </span>
-                  <span class="summary-lbl">Gimnàs</span>
-                </div>
-                <div class="summary-tile">
-                  <span class="summary-val">
-                    {{ thisWeekSportCount() }}
-                    @if (weeklySportGoal()) { <span class="summary-sub">/ {{ weeklySportGoal() }}</span> }
-                  </span>
-                  <span class="summary-lbl">Esport</span>
-                </div>
-              </div>
-            } @else {
-              <div class="summary-grid">
-                <div class="summary-tile">
-                  <span class="summary-val">{{ thisWeekCount() }}</span>
-                  <span class="summary-lbl">Gimnàs</span>
-                </div>
-                <div class="summary-tile">
-                  <span class="summary-val">{{ thisWeekSportCount() }}</span>
-                  <span class="summary-lbl">Esport</span>
-                </div>
-              </div>
-              @if (weeklyGoal()) {
-                <div class="summary-combined-goal">
-                  <div class="scg-track">
-                    <div class="scg-fill" [style.width.%]="combinedWeeklyBarPct()"></div>
+            <div class="summary-section">
+              <span class="summary-section-title">Setmana actual</span>
+              @if (goalMode() === 'separate') {
+                <div class="summary-grid">
+                  <div class="summary-tile">
+                    <span class="summary-val">
+                      {{ thisWeekCount() }}
+                      @if (weeklyGymGoal()) { <span class="summary-sub">/ {{ weeklyGymGoal() }}</span> }
+                    </span>
+                    <span class="summary-lbl">Gimnàs</span>
                   </div>
-                  <span class="scg-label">
-                    {{ thisWeekCount() + thisWeekSportCount() }}/{{ weeklyGoal() }} activitats
-                    @if (combinedWeeklyMet()) { ✓ }
-                  </span>
+                  <div class="summary-tile">
+                    <span class="summary-val">
+                      {{ thisWeekSportCount() }}
+                      @if (weeklySportGoal()) { <span class="summary-sub">/ {{ weeklySportGoal() }}</span> }
+                    </span>
+                    <span class="summary-lbl">Esport</span>
+                  </div>
                 </div>
+              } @else {
+                <div class="summary-grid">
+                  <div class="summary-tile">
+                    <span class="summary-val">{{ thisWeekCount() }}</span>
+                    <span class="summary-lbl">Gimnàs</span>
+                  </div>
+                  <div class="summary-tile">
+                    <span class="summary-val">{{ thisWeekSportCount() }}</span>
+                    <span class="summary-lbl">Esport</span>
+                  </div>
+                </div>
+                @if (weeklyGoal()) {
+                  <div class="summary-combined-goal">
+                    <div class="scg-track">
+                      <div class="scg-fill" [style.width.%]="combinedWeeklyBarPct()"></div>
+                    </div>
+                    <span class="scg-label">
+                      {{ thisWeekCount() + thisWeekSportCount() }}/{{ weeklyGoal() }} activitats
+                      @if (combinedWeeklyMet()) { ✓ }
+                    </span>
+                  </div>
+                }
               }
-            }
+            </div>
           </div>
         </div>
       }
@@ -145,8 +147,13 @@ import { FilterBarComponent } from '../../shared/components/filter-bar/filter-ba
   styles: [`
     .page { padding: 0 0 16px; }
 
-    /* ── Summary block ───────────────────────────────────── */
-    .summary-block { display: flex; flex-direction: column; gap: 12px; padding: 8px 16px 4px; }
+    /* ── Summary card ─────────────────────────────────────── */
+    .summary-card {
+      margin: 12px 16px 0; padding: 14px 14px 16px;
+      background: var(--c-card); border-radius: 18px;
+      box-shadow: 0 2px 10px var(--c-shadow);
+    }
+    .summary-block { display: flex; flex-direction: column; gap: 12px; }
     .summary-section { display: flex; flex-direction: column; gap: 6px; }
     .summary-section-title {
       font-size: 11px; font-weight: 600; color: var(--c-text-2);
@@ -154,8 +161,7 @@ import { FilterBarComponent } from '../../shared/components/filter-bar/filter-ba
     }
     .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .summary-tile {
-      background: var(--c-card); border-radius: 12px;
-      box-shadow: 0 1px 4px var(--c-shadow);
+      background: var(--c-subtle); border: 1px solid var(--c-border-2); border-radius: 12px;
       padding: 12px 8px; text-align: center;
       display: flex; flex-direction: column; gap: 4px;
     }
