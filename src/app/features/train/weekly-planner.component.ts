@@ -109,9 +109,6 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
             </div>
           }
 
-          @if (itemCount(day.index) === 0) {
-            <span class="rest-hint">Descans</span>
-          }
         </div>
       }
 
@@ -182,11 +179,6 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
     .tpl-chip {
       padding: 4px 10px; font-size: 11px;
       .material-symbols-outlined { font-size: 13px; }
-    }
-
-    .rest-hint {
-      display: block; font-size: 11px; font-weight: 600; color: var(--c-text-3);
-      font-style: italic; margin-top: 2px;
     }
 
     .save-bar {
