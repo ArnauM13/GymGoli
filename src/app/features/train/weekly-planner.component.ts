@@ -226,7 +226,7 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
       &.active { background: var(--cat-color, var(--c-brand)); border-color: var(--cat-color, var(--c-brand)); color: white; }
     }
 
-    .tpl-row { margin: -2px 0 12px; padding-left: 4px; }
+    .tpl-row { margin: 10px 0 12px; padding-left: 4px; }
     .tpl-row-label {
       display: block; font-size: 10.5px; font-weight: 600; color: var(--c-text-3);
       margin-bottom: 6px;
