@@ -8,12 +8,14 @@ import { of } from 'rxjs';
 import { WeeklyPlannerComponent } from './weekly-planner.component';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WeeklyPlanService, WEEKS_RECURRING, WEEKS_SINGLE } from '../../core/services/weekly-plan.service';
+import { WorkoutService } from '../../core/services/workout.service';
 import { SportService } from '../../core/services/sport.service';
 import { TemplateService } from '../../core/services/template.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../../core/models/weekly-plan.model';
 import { WorkoutTemplate } from '../../core/models/template.model';
 import { Exercise } from '../../core/models/exercise.model';
+import { Workout } from '../../core/models/workout.model';
 
 function template(overrides: Partial<WorkoutTemplate> = {}): WorkoutTemplate {
   return { id: 't1', name: 'Push A', category: 'push', entries: [], createdAt: '2024-01-01', ...overrides };
@@ -27,6 +29,9 @@ describe('WeeklyPlannerComponent', () => {
   let retractRemoved: jasmine.Spy;
   let applyPlan: jasmine.Spy;
   let confirm: jasmine.Spy;
+  let chooseAction: jasmine.Spy;
+  let getPlannedForDate: jasmine.Spy;
+  let getPlannedSportSessionsForDate: jasmine.Spy;
   let dialogOpen: jasmine.Spy;
   let afterClosedResult: Exercise | undefined;
 
@@ -37,6 +42,9 @@ describe('WeeklyPlannerComponent', () => {
     retractRemoved = jasmine.createSpy('retractRemoved').and.resolveTo(undefined);
     applyPlan = jasmine.createSpy('apply').and.resolveTo(undefined);
     confirm = jasmine.createSpy('confirm').and.resolveTo(true);
+    chooseAction = jasmine.createSpy('chooseAction').and.resolveTo(null);
+    getPlannedForDate = jasmine.createSpy('getPlannedForDate').and.returnValue([]);
+    getPlannedSportSessionsForDate = jasmine.createSpy('getPlannedSportSessionsForDate').and.returnValue([]);
     afterClosedResult = undefined;
     dialogOpen = jasmine.createSpy('open').and.returnValue({
       afterClosed: () => of(afterClosedResult),
@@ -46,10 +54,11 @@ describe('WeeklyPlannerComponent', () => {
       providers: [
         { provide: UserSettingsService, useValue: { weeklyPlan: savedPlan, updateWeeklyPlan } },
         { provide: WeeklyPlanService,   useValue: { apply: applyPlan, retractRemoved } },
-        { provide: SportService,        useValue: { sports: signal([]), ensureLoaded: jasmine.createSpy() } },
+        { provide: WorkoutService,      useValue: { getPlannedForDate } },
+        { provide: SportService,        useValue: { sports: signal([]), ensureLoaded: jasmine.createSpy(), getPlannedSportSessionsForDate } },
         { provide: TemplateService,     useValue: { forCategory } },
         { provide: MatSnackBar,         useValue: { open: jasmine.createSpy() } },
-        { provide: ConfirmDialogService, useValue: { confirm } },
+        { provide: ConfirmDialogService, useValue: { confirm, chooseAction } },
         { provide: MatDialog,           useValue: { open: dialogOpen } },
         { provide: ActivatedRoute,      useValue: { snapshot: { queryParamMap: { get: () => week } } } },
       ],
@@ -259,37 +268,62 @@ describe('WeeklyPlannerComponent', () => {
       expect(component.weekRange('2024-03-04')).toContain('2024');
     });
 
-    it('overwriteRoutine defaults to false', () => {
-      expect(component.overwriteRoutine()).toBeFalse();
-    });
-
-    describe('save()', () => {
-      it('applies only to the requested week, tagged source "manual", without touching the persisted routine', async () => {
+    describe('save() when the routine has nothing planned for this week', () => {
+      it('applies only to the requested week, tagged source "manual", without asking or touching the persisted routine', async () => {
         component.toggleGym(0, 'push');
 
         await component.save();
 
+        expect(chooseAction).not.toHaveBeenCalled();
         expect(retractRemoved).toHaveBeenCalledWith(component.plan(), WEEKS_SINGLE, '2024-03-04', 'manual');
         expect(applyPlan).toHaveBeenCalledWith(component.plan(), WEEKS_SINGLE, '2024-03-04', 'manual');
         expect(updateWeeklyPlan).not.toHaveBeenCalled();
       });
+    });
 
-      it('does not retract the routine\'s plan for this week when the checkbox is unchecked', async () => {
+    describe('save() when the routine already has something planned for this week', () => {
+      beforeEach(() => {
+        getPlannedForDate.and.callFake((date: string) =>
+          date === '2024-03-06' ? [{ id: 'w1', plannedSource: 'routine' } as unknown as Workout] : []);
+      });
+
+      it('asks the user to overwrite or add on top before saving anything', async () => {
         component.toggleGym(0, 'push');
+        chooseAction.and.resolveTo(null);
 
         await component.save();
 
-        expect(retractRemoved).not.toHaveBeenCalledWith(EMPTY_WEEKLY_PLAN, WEEKS_SINGLE, '2024-03-04', 'routine');
+        expect(chooseAction).toHaveBeenCalledWith(
+          jasmine.stringMatching(/rutina/i),
+          jasmine.arrayContaining([
+            jasmine.objectContaining({ value: 'overwrite' }),
+            jasmine.objectContaining({ value: 'add' }),
+          ]),
+        );
+        expect(retractRemoved).not.toHaveBeenCalled();
+        expect(applyPlan).not.toHaveBeenCalled();
       });
 
-      it('also retracts the routine\'s plan for this specific week when "overwrite" is checked', async () => {
+      it('only retracts the manual plan (routine untouched) when the user chooses to add on top', async () => {
         component.toggleGym(0, 'push');
-        component.overwriteRoutine.set(true);
+        chooseAction.and.resolveTo('add');
+
+        await component.save();
+
+        expect(retractRemoved).toHaveBeenCalledWith(component.plan(), WEEKS_SINGLE, '2024-03-04', 'manual');
+        expect(retractRemoved).not.toHaveBeenCalledWith(EMPTY_WEEKLY_PLAN, WEEKS_SINGLE, '2024-03-04', 'routine');
+        expect(applyPlan).toHaveBeenCalledWith(component.plan(), WEEKS_SINGLE, '2024-03-04', 'manual');
+      });
+
+      it('also retracts the routine\'s plan for this specific week when the user chooses to overwrite', async () => {
+        component.toggleGym(0, 'push');
+        chooseAction.and.resolveTo('overwrite');
 
         await component.save();
 
         expect(retractRemoved).toHaveBeenCalledWith(EMPTY_WEEKLY_PLAN, WEEKS_SINGLE, '2024-03-04', 'routine');
         expect(retractRemoved).toHaveBeenCalledWith(component.plan(), WEEKS_SINGLE, '2024-03-04', 'manual');
+        expect(applyPlan).toHaveBeenCalledWith(component.plan(), WEEKS_SINGLE, '2024-03-04', 'manual');
       });
     });
   });

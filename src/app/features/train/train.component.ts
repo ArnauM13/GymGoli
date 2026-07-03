@@ -214,7 +214,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             <app-weekly-summary [weekDate]="selectedDate()" />
             @if (viewedWeekHasPlan()) {
               <div class="cw-edit-row">
-                <button class="cw-edit-btn" (click)="goPlanWeek()">
+                <button class="week-action-btn" (click)="goPlanWeek()">
                   <span class="material-symbols-outlined">edit_calendar</span>
                   Editar planificació
                 </button>
@@ -229,10 +229,12 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
                 <h2 class="section-title">Planificació</h2>
               </div>
               <p class="plan-desc">Defineix ràpidament els entrenaments per a la setmana que estàs veient al calendari.</p>
-              <button class="plan-week-btn" (click)="goPlanWeek()">
-                <span class="material-symbols-outlined">event_repeat</span>
-                Planificar aquesta setmana
-              </button>
+              <div class="plan-actions">
+                <button class="week-action-btn" (click)="goPlanWeek()">
+                  <span class="material-symbols-outlined">event_repeat</span>
+                  Planificar aquesta setmana
+                </button>
+              </div>
             </div>
           }
         }
@@ -830,15 +832,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       padding: 8px 10px; border-top: 1px solid var(--c-border-2);
       background: var(--c-card);
     }
-    .cw-edit-btn {
-      display: flex; align-items: center; gap: 5px;
-      padding: 6px 12px; border-radius: 10px;
-      border: 1.5px solid var(--c-border); background: var(--c-subtle);
-      color: var(--c-brand); font-size: 12px; font-weight: 700;
-      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 15px; }
-      &:hover { background: rgba(var(--c-brand-rgb), 0.1); border-color: var(--c-brand); }
-    }
 
     /* ── Planificació section (below the calendar + goals strip) ── */
     .card-section {
@@ -852,9 +845,13 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .section-icon  { font-size: 18px; color: var(--c-text-3); font-variation-settings: 'FILL' 0, 'wght' 300; }
     .section-title { margin: 0; flex: 1; font-size: 14px; font-weight: 700; color: var(--c-text-2); letter-spacing: 0.2px; }
     .plan-desc { margin: 0 0 12px; font-size: 12.5px; color: var(--c-text-3); line-height: 1.4; }
-    .plan-week-btn {
-      width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;
-      padding: 12px 16px; border: none; border-radius: 12px;
+    .plan-actions { display: flex; justify-content: flex-end; }
+
+    /* ── Shared format for "Planificar aquesta setmana" and "Editar
+       planificació": content-sized, right-aligned, never full-width ── */
+    .week-action-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 10px 16px; border: none; border-radius: 12px;
       background: var(--c-brand); color: white;
       font-size: 13.5px; font-weight: 700; cursor: pointer;
       transition: background 0.15s; touch-action: manipulation;
