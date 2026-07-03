@@ -1,6 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatDialog } from '@angular/material/dialog';
+import { of } from 'rxjs';
 
 import { WeeklyPlannerComponent } from './weekly-planner.component';
 import { UserSettingsService } from '../../core/services/user-settings.service';
@@ -10,6 +12,7 @@ import { TemplateService } from '../../core/services/template.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../../core/models/weekly-plan.model';
 import { WorkoutTemplate } from '../../core/models/template.model';
+import { Exercise } from '../../core/models/exercise.model';
 
 function template(overrides: Partial<WorkoutTemplate> = {}): WorkoutTemplate {
   return { id: 't1', name: 'Push A', category: 'push', entries: [], createdAt: '2024-01-01', ...overrides };
@@ -22,6 +25,8 @@ describe('WeeklyPlannerComponent', () => {
   let retractRemoved: jasmine.Spy;
   let applyPlan: jasmine.Spy;
   let confirm: jasmine.Spy;
+  let dialogOpen: jasmine.Spy;
+  let afterClosedResult: Exercise | undefined;
 
   function setup(): void {
     forCategory = jasmine.createSpy('forCategory').and.returnValue([]);
@@ -29,6 +34,10 @@ describe('WeeklyPlannerComponent', () => {
     retractRemoved = jasmine.createSpy('retractRemoved').and.resolveTo(undefined);
     applyPlan = jasmine.createSpy('apply').and.resolveTo(undefined);
     confirm = jasmine.createSpy('confirm').and.resolveTo(true);
+    afterClosedResult = undefined;
+    dialogOpen = jasmine.createSpy('open').and.returnValue({
+      afterClosed: () => of(afterClosedResult),
+    });
 
     TestBed.configureTestingModule({
       providers: [
@@ -38,6 +47,7 @@ describe('WeeklyPlannerComponent', () => {
         { provide: TemplateService,     useValue: { forCategory } },
         { provide: MatSnackBar,         useValue: { open: jasmine.createSpy() } },
         { provide: ConfirmDialogService, useValue: { confirm } },
+        { provide: MatDialog,           useValue: { open: dialogOpen } },
       ],
     });
     component = TestBed.runInInjectionContext(() => new WeeklyPlannerComponent());
@@ -87,6 +97,113 @@ describe('WeeklyPlannerComponent', () => {
 
       expect(component.gymTemplate(0, 'push')).toBe('t1');
       expect(component.gymTemplate(1, 'push')).toBeUndefined();
+    });
+
+    it('clears any custom entries when a template is picked (mutual exclusivity)', () => {
+      const exercise = { id: 'ex1', name: 'Press banca' } as Exercise;
+      component.toggleGym(0, 'push');
+      component.addGymEntry(0, 'push', exercise);
+      component.setGymTemplate(0, 'push', 't1');
+
+      expect(component.gymTemplate(0, 'push')).toBe('t1');
+      expect(component.gymEntries(0, 'push')).toEqual([]);
+    });
+  });
+
+  describe('gymEntries() / addGymEntry() / removeGymEntry()', () => {
+    it('is empty until an exercise is added', () => {
+      component.toggleGym(0, 'push');
+      expect(component.gymEntries(0, 'push')).toEqual([]);
+    });
+
+    it('adds an exercise to the matching gym item only', () => {
+      const exercise = { id: 'ex1', name: 'Press banca' } as Exercise;
+      component.toggleGym(0, 'push');
+      component.toggleGym(0, 'legs');
+      component.addGymEntry(0, 'push', exercise);
+
+      expect(component.gymEntries(0, 'push')).toEqual([{ exerciseId: 'ex1', exerciseName: 'Press banca' }]);
+      expect(component.gymEntries(0, 'legs')).toEqual([]);
+    });
+
+    it('clears a template id when a custom exercise is added (mutual exclusivity)', () => {
+      const exercise = { id: 'ex1', name: 'Press banca' } as Exercise;
+      component.toggleGym(0, 'push');
+      component.setGymTemplate(0, 'push', 't1');
+      component.addGymEntry(0, 'push', exercise);
+
+      expect(component.gymTemplate(0, 'push')).toBeUndefined();
+    });
+
+    it('removes an exercise by id', () => {
+      const ex1 = { id: 'ex1', name: 'Press banca' } as Exercise;
+      const ex2 = { id: 'ex2', name: 'Press militar' } as Exercise;
+      component.toggleGym(0, 'push');
+      component.addGymEntry(0, 'push', ex1);
+      component.addGymEntry(0, 'push', ex2);
+      component.removeGymEntry(0, 'push', 'ex1');
+
+      expect(component.gymEntries(0, 'push')).toEqual([{ exerciseId: 'ex2', exerciseName: 'Press militar' }]);
+    });
+  });
+
+  describe('openExercisePicker()', () => {
+    it('opens the exercise picker excluding already-added exercises and adds the picked one', () => {
+      const picked = { id: 'ex2', name: 'Press militar' } as Exercise;
+      afterClosedResult = picked;
+      component.toggleGym(0, 'push');
+      component.addGymEntry(0, 'push', { id: 'ex1', name: 'Press banca' } as Exercise);
+
+      component.openExercisePicker(0, 'push');
+
+      expect(dialogOpen).toHaveBeenCalled();
+      const config = dialogOpen.calls.mostRecent().args[1];
+      expect(config.data).toEqual({ excludeIds: ['ex1'], defaultCategory: 'push' });
+      expect(component.gymEntries(0, 'push')).toContain(jasmine.objectContaining({ exerciseId: 'ex2' }));
+    });
+
+    it('does nothing when the dialog is dismissed without a selection', () => {
+      afterClosedResult = undefined;
+      component.toggleGym(0, 'push');
+      component.openExercisePicker(0, 'push');
+      expect(component.gymEntries(0, 'push')).toEqual([]);
+    });
+  });
+
+  describe('sportSubtype() / setSportSubtype() / sportDuration() / setSportDuration()', () => {
+    it('are undefined until a sport is toggled on', () => {
+      expect(component.sportSubtype(0, 'running')).toBeUndefined();
+      expect(component.sportDuration(0, 'running')).toBeUndefined();
+    });
+
+    it('sets and clears the subtype for the matching sport item only', () => {
+      component.toggleSport(0, 'running');
+      component.toggleSport(0, 'swimming');
+      component.setSportSubtype(0, 'running', 'sub1');
+
+      expect(component.sportSubtype(0, 'running')).toBe('sub1');
+      expect(component.sportSubtype(0, 'swimming')).toBeUndefined();
+
+      component.setSportSubtype(0, 'running', undefined);
+      expect(component.sportSubtype(0, 'running')).toBeUndefined();
+    });
+
+    it('sets the duration for the matching sport item only', () => {
+      component.toggleSport(0, 'running');
+      component.setSportDuration(0, 'running', 45);
+      expect(component.sportDuration(0, 'running')).toBe(45);
+    });
+  });
+
+  describe('numFromEvent()', () => {
+    it('returns undefined for an empty input', () => {
+      const ev = { target: { value: '' } } as unknown as Event;
+      expect(component.numFromEvent(ev)).toBeUndefined();
+    });
+
+    it('parses a numeric input value', () => {
+      const ev = { target: { value: '30' } } as unknown as Event;
+      expect(component.numFromEvent(ev)).toBe(30);
     });
   });
 

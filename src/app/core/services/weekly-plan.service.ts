@@ -9,6 +9,7 @@ import { addDays, mondayOf, workoutCategories } from '../../shared/utils/calenda
 import { WeeklyPlan } from '../models/weekly-plan.model';
 import { WorkoutEntry } from '../models/workout.model';
 import { ExerciseCategory } from '../models/exercise.model';
+import { TemplateEntry } from '../models/template.model';
 
 export const WEEKS_SINGLE    = 1;
 export const WEEKS_RECURRING = 8;
@@ -61,12 +62,15 @@ export class WeeklyPlanService {
                 this.workoutService.getPlannedForDate(date).some(x => workoutCategories(x).includes(item.category)) ||
                 this.workoutService.getDoneWorkoutsForDate(date).some(x => workoutCategories(x).includes(item.category));
               if (!already) {
-                const entries = this._templateEntries(item.templateId);
+                const entries = this._resolveEntries(item.entries, item.templateId);
                 await this.workoutService.createPlannedWorkout(date, item.category, entries);
               }
             } else {
               const existing = this.sportService.getSessionForDate(date, item.sportId);
-              if (!existing) await this.sportService.logSession(date, item.sportId, {}, 'planned');
+              if (!existing) {
+                await this.sportService.logSession(
+                  date, item.sportId, { subtypeId: item.subtypeId, duration: item.duration }, 'planned');
+              }
             }
           } catch {
             // One item's creation failing (e.g. transient network error) shouldn't
@@ -116,13 +120,19 @@ export class WeeklyPlanService {
     }
   }
 
-  /** Resolves a template's saved entries into WorkoutEntry[], same mapping
-   *  used when starting a workout from a template on the Train page. */
-  private _templateEntries(templateId: string | undefined): WorkoutEntry[] {
+  /** Resolves a gym item's exercises into WorkoutEntry[] — a custom, one-off
+   *  list built directly in the planner takes priority over a saved
+   *  template, same mapping used when starting a workout from a template
+   *  on the Train page. */
+  private _resolveEntries(customEntries: TemplateEntry[] | undefined, templateId: string | undefined): WorkoutEntry[] {
+    if (customEntries && customEntries.length > 0) return this._mapEntries(customEntries);
     if (!templateId) return [];
     const t = this.templateService.templates().find(x => x.id === templateId);
-    if (!t) return [];
-    return t.entries.map(e => ({
+    return t ? this._mapEntries(t.entries) : [];
+  }
+
+  private _mapEntries(entries: TemplateEntry[]): WorkoutEntry[] {
+    return entries.map(e => ({
       exerciseId: e.exerciseId,
       exerciseName: e.exerciseName,
       sets: (e.sets && e.reps && e.sets > 0 && e.reps > 0)

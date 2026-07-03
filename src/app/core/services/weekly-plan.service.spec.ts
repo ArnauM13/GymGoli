@@ -151,7 +151,8 @@ describe('WeeklyPlanService', () => {
 
     it('logs a planned sport session for a future day with a sport item', async () => {
       await service.apply(planWithSportOn(4, 'running'), 1);
-      expect(logSession).toHaveBeenCalledWith('2024-03-08', 'running', {}, 'planned');
+      expect(logSession).toHaveBeenCalledWith(
+        '2024-03-08', 'running', { subtypeId: undefined, duration: undefined }, 'planned');
     });
 
     it('does not duplicate a sport session that already exists for that day', async () => {
@@ -198,6 +199,34 @@ describe('WeeklyPlanService', () => {
       templates = [];
       await service.apply(planWithGymOn(4, 'push', false, 'missing-tpl'), 1);
       expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-08', 'push', []);
+    });
+
+    it('prioritizes a custom entries list over a template id when both are present', async () => {
+      templates = [{
+        id: 'tpl-1', name: 'Push A', category: 'push', createdAt: '2024-01-01',
+        entries: [{ exerciseId: 'from-tpl', exerciseName: 'From template' }],
+      }];
+      const plan = emptyPlan();
+      plan.days[4] = [{
+        type: 'gym', category: 'push', templateId: 'tpl-1',
+        entries: [{ exerciseId: 'custom1', exerciseName: 'Custom exercise' }],
+      }];
+
+      await service.apply(plan, 1);
+
+      expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-08', 'push', [
+        { exerciseId: 'custom1', exerciseName: 'Custom exercise', sets: [] },
+      ]);
+    });
+
+    it('passes a sport item\'s subtype and duration through to logSession', async () => {
+      const plan = emptyPlan();
+      plan.days[4] = [{ type: 'sport', sportId: 'running', subtypeId: 'sub1', duration: 45 }];
+
+      await service.apply(plan, 1);
+
+      expect(logSession).toHaveBeenCalledWith(
+        '2024-03-08', 'running', { subtypeId: 'sub1', duration: 45 }, 'planned');
     });
   });
 
