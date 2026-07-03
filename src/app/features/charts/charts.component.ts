@@ -183,7 +183,7 @@ import { FilterBarComponent } from '../../shared/components/filter-bar/filter-ba
     .scg-label { font-size: 11px; font-weight: 600; color: var(--c-text-2); white-space: nowrap; }
 
     /* ── Filter bar spacing (match History's gaps) ───────── */
-    app-filter-bar { display: block; margin-top: 8px; margin-bottom: -12px; }
+    app-filter-bar { display: block; margin-top: 14px; margin-bottom: -12px; }
 
     /* ── Exercise list ────────────────────────────────────── */
     .pr-section {
