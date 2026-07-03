@@ -1,7 +1,23 @@
 -- GymGoli – Schema complet i idempotent
--- Consolida totes les migracions (001–018).
+-- Consolida totes les migracions (001–020).
 -- Segur de re-executar: usa IF NOT EXISTS, DROP … IF EXISTS i OR REPLACE.
 -- Executa a: Supabase Dashboard → SQL Editor → New query
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- 0. FUNCIONS AUXILIARS (necessàries abans de crear les taules que les usen)
+-- ══════════════════════════════════════════════════════════════════════════════
+
+-- Generated columns can't reference a subquery directly (Postgres error
+-- 0A000), so the jsonb_array_elements() aggregation used by
+-- workouts.exercise_names is wrapped in an immutable SQL function first.
+CREATE OR REPLACE FUNCTION workout_exercise_names(entries jsonb)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT string_agg(entry ->> 'exerciseName', ' ')
+  FROM jsonb_array_elements(entries) AS entry
+$$;
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 1. TAULES
@@ -85,9 +101,7 @@ CREATE TABLE IF NOT EXISTS workouts (
   -- Space-joined exercise names, kept in sync automatically — lets
   -- Historial's search filter with a plain, always-supported .ilike()
   -- instead of casting the whole `entries` blob to text.
-  exercise_names     text GENERATED ALWAYS AS (
-    (SELECT string_agg(entry ->> 'exerciseName', ' ') FROM jsonb_array_elements(entries) AS entry)
-  ) STORED
+  exercise_names     text GENERATED ALWAYS AS (workout_exercise_names(entries)) STORED
 );
 
 CREATE TABLE IF NOT EXISTS sports (
@@ -223,9 +237,7 @@ BEGIN
     WHERE table_name = 'workouts' AND column_name = 'exercise_names'
   ) THEN
     ALTER TABLE workouts
-      ADD COLUMN exercise_names text GENERATED ALWAYS AS (
-        (SELECT string_agg(entry ->> 'exerciseName', ' ') FROM jsonb_array_elements(entries) AS entry)
-      ) STORED;
+      ADD COLUMN exercise_names text GENERATED ALWAYS AS (workout_exercise_names(entries)) STORED;
   END IF;
 END $$;
 
