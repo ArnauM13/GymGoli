@@ -20,6 +20,7 @@ import { WorkoutProfileService } from '../../core/services/workout-profile.servi
 import { WeeklyPlanService } from '../../core/services/weekly-plan.service';
 import { Workout, WorkoutEntry } from '../../core/models/workout.model';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
+import { mondayOf } from '../../shared/utils/calendar-utils';
 
 const TODAY = new Date().toISOString().split('T')[0];
 
@@ -243,21 +244,51 @@ describe('TrainComponent', () => {
   // ── goPlanWeek() ─────────────────────────────────────────────────────────
 
   describe('goPlanWeek()', () => {
-    it('falls back to the selected date\'s week when no calendar ref is available', () => {
-      component.calendarRef = undefined;
-      component.selectedDate.set('2024-03-06'); // Wednesday -> Monday 2024-03-04
-      component.goPlanWeek();
-
-      expect(navigateSpy).toHaveBeenCalledWith(
-        ['/train/planner'], { queryParams: { week: '2024-03-04' } });
-    });
-
-    it('uses the calendar\'s currently-viewed week when available', () => {
-      component.calendarRef = { weekStart: () => '2024-04-01' } as any;
+    it('navigates to the planner with the currently-viewed week', () => {
+      component.viewedWeekMonday.set('2024-04-01');
       component.goPlanWeek();
 
       expect(navigateSpy).toHaveBeenCalledWith(
         ['/train/planner'], { queryParams: { week: '2024-04-01' } });
+    });
+  });
+
+  describe('viewedWeekIsFuture()', () => {
+    it('is false for the week containing today', () => {
+      component.viewedWeekMonday.set(mondayOf(TODAY));
+      expect(component.viewedWeekIsFuture()).toBeFalse();
+    });
+
+    it('is true for a week after the current one', () => {
+      const nextWeek = new Date(TODAY + 'T12:00:00');
+      nextWeek.setDate(nextWeek.getDate() + 7);
+      component.viewedWeekMonday.set(nextWeek.toISOString().split('T')[0]);
+      expect(component.viewedWeekIsFuture()).toBeTrue();
+    });
+  });
+
+  describe('viewedWeekHasPlan()', () => {
+    let getPlannedForDate: jasmine.Spy;
+    let getPlannedSportSessionsForDate: jasmine.Spy;
+
+    beforeEach(() => {
+      getPlannedForDate = TestBed.inject(WorkoutService).getPlannedForDate as jasmine.Spy;
+      getPlannedSportSessionsForDate = TestBed.inject(SportService).getPlannedSportSessionsForDate as jasmine.Spy;
+      component.viewedWeekMonday.set('2024-03-04');
+    });
+
+    it('is false when nothing is planned for any day of the viewed week', () => {
+      expect(component.viewedWeekHasPlan()).toBeFalse();
+    });
+
+    it('is true when a planned workout exists on any day of the viewed week', () => {
+      getPlannedForDate.and.callFake((date: string) => date === '2024-03-06' ? [{ id: 'w1' }] : []);
+      expect(component.viewedWeekHasPlan()).toBeTrue();
+    });
+
+    it('is true when a planned sport session exists on any day of the viewed week', () => {
+      getPlannedSportSessionsForDate.and.callFake((date: string) => date === '2024-03-08' ? [{ sport: {}, session: {} }] : []);
+      expect(component.viewedWeekHasPlan()).toBeTrue();
     });
   });
 

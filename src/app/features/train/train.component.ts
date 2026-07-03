@@ -206,25 +206,35 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         @if (!offlineService.isOffline()) {
           <div class="calendar-wrap">
             <app-calendar
-              #calendarRef
               [allowFuturePlanning]="true"
               [selectedDate]="selectedDate()"
               (dateSelected)="selectedDate.set($event)"
+              (weekChanged)="viewedWeekMonday.set($event)"
             />
             <app-weekly-summary [weekDate]="selectedDate()" />
+            @if (viewedWeekHasPlan()) {
+              <div class="cw-edit-row">
+                <button class="cw-edit-btn" (click)="goPlanWeek()">
+                  <span class="material-symbols-outlined">edit_calendar</span>
+                  Editar planificació
+                </button>
+              </div>
+            }
           </div>
 
-          <div class="card-section plan-section">
-            <div class="section-header">
-              <span class="material-symbols-outlined section-icon">event_repeat</span>
-              <h2 class="section-title">Planificació</h2>
+          @if (viewedWeekIsFuture() && !viewedWeekHasPlan()) {
+            <div class="card-section plan-section">
+              <div class="section-header">
+                <span class="material-symbols-outlined section-icon">event_repeat</span>
+                <h2 class="section-title">Planificació</h2>
+              </div>
+              <p class="plan-desc">Defineix ràpidament els entrenaments per a la setmana que estàs veient al calendari.</p>
+              <button class="plan-week-btn" (click)="goPlanWeek()">
+                <span class="material-symbols-outlined">event_repeat</span>
+                Planificar aquesta setmana
+              </button>
             </div>
-            <p class="plan-desc">Defineix ràpidament els entrenaments per a la setmana que estàs veient al calendari.</p>
-            <button class="plan-week-btn" (click)="goPlanWeek()">
-              <span class="material-symbols-outlined">event_repeat</span>
-              Planificar aquesta setmana
-            </button>
-          </div>
+          }
         }
 
         @if (isSelectedFuture()) {
@@ -811,6 +821,23 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       box-shadow: 0 2px 12px rgba(0,0,0,0.08);
       border-radius: 16px; overflow: hidden;
       background: var(--c-card);
+    }
+
+    /* ── "Editar planificació" subsection, right-aligned, when the viewed
+       week already has an active plan ── */
+    .cw-edit-row {
+      display: flex; justify-content: flex-end;
+      padding: 8px 10px; border-top: 1px solid var(--c-border-2);
+      background: var(--c-card);
+    }
+    .cw-edit-btn {
+      display: flex; align-items: center; gap: 5px;
+      padding: 6px 12px; border-radius: 10px;
+      border: 1.5px solid var(--c-border); background: var(--c-subtle);
+      color: var(--c-brand); font-size: 12px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 15px; }
+      &:hover { background: rgba(var(--c-brand-rgb), 0.1); border-color: var(--c-brand); }
     }
 
     /* ── Planificació section (below the calendar + goals strip) ── */
@@ -1650,9 +1677,12 @@ export class TrainComponent {
   private confirmDialog    = inject(ConfirmDialogService);
 
   @ViewChild('editor') editor?: WorkoutEditorComponent;
-  @ViewChild('calendarRef') calendarRef?: CalendarComponent;
 
   readonly selectedDate    = signal<string>(TODAY());
+  /** Monday of whichever week the calendar is currently showing — kept in
+   *  sync via the calendar's `weekChanged` output, regardless of view mode
+   *  or how the user got there (day click vs prev/next navigation). */
+  readonly viewedWeekMonday = signal<string>(mondayOf(TODAY()));
   readonly sportToggling   = signal(false);
   readonly workoutTypes    = WORKOUT_TYPES;
   readonly speedDialOpen   = signal(false);
@@ -1759,6 +1789,22 @@ export class TrainComponent {
   );
 
   readonly isSelectedFuture = computed(() => this.selectedDate() > TODAY());
+
+  readonly viewedWeekIsFuture = computed(() => this.viewedWeekMonday() > mondayOf(TODAY()));
+
+  /** Whether the week the calendar is currently showing already has at
+   *  least one planned (not-yet-done) workout or sport session, from any
+   *  source — decides whether Train offers to plan the week or to edit
+   *  what's already there. */
+  readonly viewedWeekHasPlan = computed(() => {
+    const monday = this.viewedWeekMonday();
+    for (let i = 0; i < 7; i++) {
+      const date = addDays(monday, i);
+      if (this.workoutService.getPlannedForDate(date).length > 0) return true;
+      if (this.sportService.getPlannedSportSessionsForDate(date).length > 0) return true;
+    }
+    return false;
+  });
 
   readonly datePlanned = computed(() =>
     this.workoutService.getPlannedForDate(this.selectedDate())
@@ -2025,8 +2071,7 @@ export class TrainComponent {
   // ── Plan the currently-viewed week ────────────────────────────────────────
 
   goPlanWeek(): void {
-    const monday = this.calendarRef?.weekStart() ?? mondayOf(this.selectedDate());
-    this.router.navigate(['/train/planner'], { queryParams: { week: monday } });
+    this.router.navigate(['/train/planner'], { queryParams: { week: this.viewedWeekMonday() } });
   }
 
   // ── Workout navigation ────────────────────────────────────────────────────

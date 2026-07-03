@@ -376,6 +376,9 @@ export class CalendarComponent {
   readonly selectedDate          = input<string | null>(null);
   readonly allowFuturePlanning   = input(false, { transform: booleanAttribute });
   readonly dateSelected          = output<string>();
+  /** Fires whenever the Monday of the currently-viewed week changes —
+   *  on init and on every navigation, regardless of week/month view. */
+  readonly weekChanged           = output<string>();
 
   // ── View ──────────────────────────────────────────────────────────────────
   readonly view    = signal<'week' | 'month'>('week');
@@ -400,6 +403,8 @@ export class CalendarComponent {
   constructor() {
     const initialView = this.dialogData?.initialView;
     if (initialView) this.view.set(initialView);
+
+    effect(() => this.weekChanged.emit(this.weekStart()));
 
     // Navigate to the relevant period when selectedDate input changes
     effect(() => {
