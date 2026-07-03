@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
+import { ActivatedRoute } from '@angular/router';
 
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { UserSettingsService } from '../../core/services/user-settings.service';
@@ -13,41 +13,33 @@ import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, Exercise, ExerciseCat
 import { EMPTY_WEEKLY_PLAN, WEEKDAY_LABELS, WeeklyPlan, WeeklyPlanItem } from '../../core/models/weekly-plan.model';
 import { TemplateEntry, WorkoutTemplate } from '../../core/models/template.model';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
+import { weekRangeLabel } from '../../shared/utils/calendar-utils';
 
 const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
 
 @Component({
   selector: 'app-weekly-planner',
   standalone: true,
-  imports: [MatSlideToggleModule, PageHeaderComponent],
+  imports: [PageHeaderComponent],
   template: `
     <div class="page">
-      <app-page-header title="Planificació setmanal" [showBack]="true">
-        @if (hasSavedPlan()) {
+      <app-page-header [title]="weekMonday ? 'Planifica la setmana' : 'Planificació setmanal'" [showBack]="true">
+        @if (!weekMonday && hasSavedPlan()) {
           <button class="ph-delete-btn" (click)="deletePlan()" title="Eliminar planificació" aria-label="Eliminar planificació">
             <span class="material-symbols-outlined">delete</span>
           </button>
         }
       </app-page-header>
 
-      <div class="card-section">
-        <div class="section-header">
-          <span class="material-symbols-outlined section-icon">event_repeat</span>
-          <h2 class="section-title">Repetició</h2>
-        </div>
-        <div class="recurring-row">
-          <div class="recurring-info">
-            <span class="recurring-label">Repeteix cada setmana</span>
-            <span class="recurring-desc">
-              @if (plan().recurring) {
-                El pla s'aplicarà automàticament durant les properes {{ weeksRecurring }} setmanes.
-              } @else {
-                El pla només s'aplicarà a la setmana actual.
-              }
-            </span>
-          </div>
-          <mat-slide-toggle [checked]="plan().recurring" (change)="setRecurring($event.checked)" />
-        </div>
+      <div class="mode-banner">
+        <span class="material-symbols-outlined mode-banner-icon">{{ weekMonday ? 'event' : 'event_repeat' }}</span>
+        <span class="mode-banner-text">
+          @if (weekMonday; as monday) {
+            Només per a la setmana del {{ weekRange(monday) }}. La resta de setmanes no es veuran afectades.
+          } @else {
+            Aquesta configuració s'aplica cada setmana, de manera indefinida.
+          }
+        </span>
       </div>
 
       @for (day of days; track day.index) {
@@ -176,7 +168,7 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
           } @else {
             <span class="material-symbols-outlined">check</span>
           }
-          Desar planificació
+          {{ weekMonday ? 'Planificar la setmana' : 'Desar planificació' }}
         </button>
       </div>
     </div>
@@ -199,10 +191,17 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
       background: var(--c-subtle); border-radius: 10px; padding: 2px 8px;
     }
 
-    .recurring-row { display: flex; align-items: center; gap: 12px; }
-    .recurring-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-    .recurring-label { font-size: 13px; font-weight: 700; color: var(--c-text); }
-    .recurring-desc { font-size: 11px; color: var(--c-text-3); line-height: 1.4; }
+    .mode-banner {
+      display: flex; align-items: flex-start; gap: 8px;
+      margin: 12px 16px 0; padding: 10px 12px;
+      background: rgba(var(--c-brand-rgb), 0.06); border-radius: 12px;
+      border: 1px solid rgba(var(--c-brand-rgb), 0.15);
+    }
+    .mode-banner-icon {
+      font-size: 16px; color: var(--c-brand); flex-shrink: 0; margin-top: 1px;
+      font-variation-settings: 'FILL' 1;
+    }
+    .mode-banner-text { font-size: 12px; color: var(--c-text-2); line-height: 1.4; }
 
     .chip-group-label {
       font-size: 11px; font-weight: 700; color: var(--c-text-3);
@@ -317,10 +316,14 @@ export class WeeklyPlannerComponent {
   private snackBar         = inject(MatSnackBar);
   private confirmDialog    = inject(ConfirmDialogService);
   private dialog           = inject(MatDialog);
+  private route            = inject(ActivatedRoute);
 
   readonly gymCategories  = GYM_CATEGORIES;
-  readonly weeksRecurring = WEEKS_RECURRING;
   readonly days = WEEKDAY_LABELS.map((label, index) => ({ label, index }));
+
+  /** Monday of a single week to plan (from the calendar's "Planificar" action),
+   *  or null when editing the persistent routine from Configuració. */
+  readonly weekMonday = this.route.snapshot.queryParamMap.get('week');
 
   readonly saving = signal(false);
   readonly plan = signal<WeeklyPlan>(this._clone(this.settingsService.weeklyPlan() ?? EMPTY_WEEKLY_PLAN));
@@ -337,6 +340,8 @@ export class WeeklyPlannerComponent {
   private _clone(plan: WeeklyPlan): WeeklyPlan {
     return { recurring: plan.recurring, days: plan.days.map(items => [...items]) };
   }
+
+  weekRange(monday: string): string { return weekRangeLabel(monday); }
 
   categoryLabel(cat: ExerciseCategory): string { return CATEGORY_LABELS[cat]; }
   categoryIcon(cat: ExerciseCategory): string { return CATEGORY_ICONS[cat]; }
@@ -452,10 +457,6 @@ export class WeeklyPlannerComponent {
     return value === '' ? undefined : Number(value);
   }
 
-  setRecurring(recurring: boolean): void {
-    this.plan.update(p => ({ ...p, recurring }));
-  }
-
   toggleGym(dayIndex: number, cat: ExerciseCategory): void {
     this._toggle(dayIndex, i => i.type === 'gym' && i.category === cat, { type: 'gym', category: cat });
   }
@@ -474,16 +475,24 @@ export class WeeklyPlannerComponent {
     });
   }
 
+  /** When `weekMonday` is set, only that single week is affected — the
+   *  persistent routine in Configuració is never touched. Otherwise this
+   *  always saves as the recurring routine that applies to every week. */
   async save(): Promise<void> {
     this.saving.set(true);
     try {
       const plan = this.plan();
-      const previousWeeks = this.settingsService.weeklyPlan().recurring ? WEEKS_RECURRING : WEEKS_SINGLE;
-      const weeks = plan.recurring ? WEEKS_RECURRING : WEEKS_SINGLE;
-      await this.settingsService.updateWeeklyPlan(plan);
-      await this.weeklyPlanService.retractRemoved(plan, Math.max(previousWeeks, weeks));
-      await this.weeklyPlanService.apply(plan, weeks);
-      this.snackBar.open('Planificació desada', '', { duration: 2000 });
+      if (this.weekMonday) {
+        await this.weeklyPlanService.retractRemoved(plan, WEEKS_SINGLE, this.weekMonday);
+        await this.weeklyPlanService.apply(plan, WEEKS_SINGLE, this.weekMonday);
+        this.snackBar.open('Setmana planificada', '', { duration: 2000 });
+      } else {
+        const recurringPlan: WeeklyPlan = { ...plan, recurring: true };
+        await this.settingsService.updateWeeklyPlan(recurringPlan);
+        await this.weeklyPlanService.retractRemoved(recurringPlan, WEEKS_RECURRING);
+        await this.weeklyPlanService.apply(recurringPlan, WEEKS_RECURRING);
+        this.snackBar.open('Planificació desada', '', { duration: 2000 });
+      }
     } catch {
       this.snackBar.open('Error en desar la planificació', '', { duration: 3000 });
     } finally {
@@ -498,11 +507,10 @@ export class WeeklyPlannerComponent {
     );
     if (!ok) return;
 
-    const previousWeeks = this.settingsService.weeklyPlan().recurring ? WEEKS_RECURRING : WEEKS_SINGLE;
     this.plan.set(this._clone(EMPTY_WEEKLY_PLAN));
     try {
       await this.settingsService.updateWeeklyPlan(EMPTY_WEEKLY_PLAN);
-      await this.weeklyPlanService.retractRemoved(EMPTY_WEEKLY_PLAN, previousWeeks);
+      await this.weeklyPlanService.retractRemoved(EMPTY_WEEKLY_PLAN, WEEKS_RECURRING);
       this.snackBar.open('Planificació eliminada', '', { duration: 2000 });
     } catch {
       this.snackBar.open('Error en eliminar la planificació', '', { duration: 3000 });

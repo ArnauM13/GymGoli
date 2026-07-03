@@ -17,9 +17,8 @@ import { TrainerService } from '../../core/services/trainer.service';
 import { TemplateService } from '../../core/services/template.service';
 import { SharedWorkoutService } from '../../core/services/shared-workout.service';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
-import { WeeklyPlanService, WEEKS_SINGLE } from '../../core/services/weekly-plan.service';
+import { WeeklyPlanService } from '../../core/services/weekly-plan.service';
 import { Workout, WorkoutEntry } from '../../core/models/workout.model';
-import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../../core/models/weekly-plan.model';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 
 const TODAY = new Date().toISOString().split('T')[0];
@@ -34,14 +33,11 @@ describe('TrainComponent', () => {
   let component: TrainComponent;
   let fixture: ReturnType<typeof TestBed.createComponent<TrainComponent>>;
   let forceOffline: ReturnType<typeof signal<boolean>>;
-  let weeklyPlan: ReturnType<typeof signal<WeeklyPlan>>;
-  let applyPlan: jasmine.Spy;
   let snackBarOpen: jasmine.Spy;
+  let navigateSpy: jasmine.Spy;
 
   beforeEach(async () => {
     forceOffline = signal(false);
-    weeklyPlan   = signal(EMPTY_WEEKLY_PLAN);
-    applyPlan    = jasmine.createSpy('apply').and.resolveTo(undefined);
     snackBarOpen = jasmine.createSpy('open');
     const mockWorkoutService = {
       workouts:                   signal<Workout[]>([]),
@@ -80,8 +76,8 @@ describe('TrainComponent', () => {
         { provide: SportService,        useValue: mockSportService },
         { provide: ExerciseService,     useValue: { exercises: signal([]), isLoaded: signal(true), ensureLoaded: jasmine.createSpy().and.resolveTo(undefined) } },
         { provide: AuthService,         useValue: { uid: signal('user-1') } },
-        { provide: UserSettingsService, useValue: { weightUnit: signal<'kg' | 'lb'>('kg'), fitnessGoal: signal(null), loaded: signal(true), weeklyPlan } },
-        { provide: WeeklyPlanService,   useValue: { ensureRecurringApplied: jasmine.createSpy().and.resolveTo(undefined), apply: applyPlan } },
+        { provide: UserSettingsService, useValue: { weightUnit: signal<'kg' | 'lb'>('kg'), fitnessGoal: signal(null), loaded: signal(true) } },
+        { provide: WeeklyPlanService,   useValue: { ensureRecurringApplied: jasmine.createSpy().and.resolveTo(undefined) } },
         { provide: OfflineService,      useValue: { isOffline: signal(false), forceOffline, toggleForceOffline: jasmine.createSpy() } },
         { provide: TrainerService,      useValue: { myTrainer: signal(null), hasTrainer: jasmine.createSpy().and.returnValue(false), getProposalForDate: jasmine.createSpy().and.returnValue(null) } },
         { provide: TemplateService,     useValue: { forCategory: jasmine.createSpy().and.returnValue([]), create: jasmine.createSpy().and.resolveTo(undefined), recordUse: jasmine.createSpy().and.resolveTo(undefined) } },
@@ -100,6 +96,7 @@ describe('TrainComponent', () => {
     fixture = TestBed.createComponent(TrainComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
+    navigateSpy = spyOn(component.router, 'navigate').and.resolveTo(true);
   });
 
   it('should create', () => {
@@ -243,47 +240,24 @@ describe('TrainComponent', () => {
     });
   });
 
-  // ── planCurrentWeek() ────────────────────────────────────────────────────
+  // ── goPlanWeek() ─────────────────────────────────────────────────────────
 
-  describe('planCurrentWeek()', () => {
-    it('warns instead of applying when no routine is configured', async () => {
-      await component.planCurrentWeek('2024-03-04');
-      expect(applyPlan).not.toHaveBeenCalled();
-      expect(snackBarOpen).toHaveBeenCalledWith(
-        jasmine.stringMatching(/cap rutina/), '', jasmine.any(Object));
+  describe('goPlanWeek()', () => {
+    it('falls back to the selected date\'s week when no calendar ref is available', () => {
+      component.calendarRef = undefined;
+      component.selectedDate.set('2024-03-06'); // Wednesday -> Monday 2024-03-04
+      component.goPlanWeek();
+
+      expect(navigateSpy).toHaveBeenCalledWith(
+        ['/train/planner'], { queryParams: { week: '2024-03-04' } });
     });
 
-    it('applies the saved plan to the given week for a single week', async () => {
-      const plan: WeeklyPlan = { recurring: false, days: [[{ type: 'gym', category: 'push' }], [], [], [], [], [], []] };
-      weeklyPlan.set(plan);
+    it('uses the calendar\'s currently-viewed week when available', () => {
+      component.calendarRef = { weekStart: () => '2024-04-01' } as any;
+      component.goPlanWeek();
 
-      await component.planCurrentWeek('2024-03-04');
-
-      expect(applyPlan).toHaveBeenCalledWith(plan, WEEKS_SINGLE, '2024-03-04');
-      expect(snackBarOpen).toHaveBeenCalledWith('Setmana planificada', '', jasmine.any(Object));
-    });
-
-    it('shows an error snackbar when applying fails', async () => {
-      const plan: WeeklyPlan = { recurring: false, days: [[{ type: 'gym', category: 'push' }], [], [], [], [], [], []] };
-      weeklyPlan.set(plan);
-      applyPlan.and.rejectWith(new Error('network error'));
-
-      await component.planCurrentWeek('2024-03-04');
-
-      expect(snackBarOpen).toHaveBeenCalledWith('Error en planificar la setmana', '', jasmine.any(Object));
-    });
-
-    it('toggles planningWeek while the plan is being applied', async () => {
-      let resolveApply!: () => void;
-      applyPlan.and.returnValue(new Promise<void>(resolve => { resolveApply = resolve; }));
-      const plan: WeeklyPlan = { recurring: false, days: [[{ type: 'gym', category: 'push' }], [], [], [], [], [], []] };
-      weeklyPlan.set(plan);
-
-      const promise = component.planCurrentWeek('2024-03-04');
-      expect(component.planningWeek()).toBeTrue();
-      resolveApply();
-      await promise;
-      expect(component.planningWeek()).toBeFalse();
+      expect(navigateSpy).toHaveBeenCalledWith(
+        ['/train/planner'], { queryParams: { week: '2024-04-01' } });
     });
   });
 

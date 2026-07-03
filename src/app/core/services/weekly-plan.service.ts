@@ -91,9 +91,9 @@ export class WeeklyPlanService {
    * and only `plannedSource: 'self'` workouts, so anything the user
    * actually started, or a trainer proposed, is left untouched.
    */
-  async retractRemoved(plan: WeeklyPlan, weeks: number): Promise<void> {
+  async retractRemoved(plan: WeeklyPlan, weeks: number, startMonday?: string): Promise<void> {
     const today  = TODAY();
-    const monday = mondayOf(today);
+    const monday = startMonday ?? mondayOf(today);
 
     for (let w = 0; w < weeks; w++) {
       for (let dow = 0; dow < 7; dow++) {

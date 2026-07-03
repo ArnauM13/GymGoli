@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { of } from 'rxjs';
@@ -22,15 +23,17 @@ describe('WeeklyPlannerComponent', () => {
   let component: WeeklyPlannerComponent;
   let forCategory: jasmine.Spy;
   let savedPlan: ReturnType<typeof signal<WeeklyPlan>>;
+  let updateWeeklyPlan: jasmine.Spy;
   let retractRemoved: jasmine.Spy;
   let applyPlan: jasmine.Spy;
   let confirm: jasmine.Spy;
   let dialogOpen: jasmine.Spy;
   let afterClosedResult: Exercise | undefined;
 
-  function setup(): void {
+  function setup(week: string | null = null): void {
     forCategory = jasmine.createSpy('forCategory').and.returnValue([]);
     savedPlan = signal(EMPTY_WEEKLY_PLAN);
+    updateWeeklyPlan = jasmine.createSpy('updateWeeklyPlan').and.resolveTo(undefined);
     retractRemoved = jasmine.createSpy('retractRemoved').and.resolveTo(undefined);
     applyPlan = jasmine.createSpy('apply').and.resolveTo(undefined);
     confirm = jasmine.createSpy('confirm').and.resolveTo(true);
@@ -41,13 +44,14 @@ describe('WeeklyPlannerComponent', () => {
 
     TestBed.configureTestingModule({
       providers: [
-        { provide: UserSettingsService, useValue: { weeklyPlan: savedPlan, updateWeeklyPlan: jasmine.createSpy().and.resolveTo(undefined) } },
+        { provide: UserSettingsService, useValue: { weeklyPlan: savedPlan, updateWeeklyPlan } },
         { provide: WeeklyPlanService,   useValue: { apply: applyPlan, retractRemoved } },
         { provide: SportService,        useValue: { sports: signal([]), ensureLoaded: jasmine.createSpy() } },
         { provide: TemplateService,     useValue: { forCategory } },
         { provide: MatSnackBar,         useValue: { open: jasmine.createSpy() } },
         { provide: ConfirmDialogService, useValue: { confirm } },
         { provide: MatDialog,           useValue: { open: dialogOpen } },
+        { provide: ActivatedRoute,      useValue: { snapshot: { queryParamMap: { get: () => week } } } },
       ],
     });
     component = TestBed.runInInjectionContext(() => new WeeklyPlannerComponent());
@@ -207,26 +211,21 @@ describe('WeeklyPlannerComponent', () => {
     });
   });
 
-  describe('save()', () => {
-    it('retracts stale items before applying the new plan, using the wider of the two horizons', async () => {
-      savedPlan.set({ recurring: true, days: [[], [], [], [], [], [], []] }); // previously recurring (8 weeks)
-      component.toggleGym(0, 'push');
-      component.setRecurring(false); // new plan is single-week
-
-      await component.save();
-
-      expect(retractRemoved).toHaveBeenCalledWith(component.plan(), WEEKS_RECURRING);
-      expect(applyPlan).toHaveBeenCalledWith(component.plan(), WEEKS_SINGLE);
+  describe('weekMonday', () => {
+    it('is null in the default (settings/recurring routine) mode', () => {
+      expect(component.weekMonday).toBeNull();
     });
+  });
 
-    it('uses the new plan\'s horizon when it is wider than the previous one', async () => {
-      savedPlan.set({ recurring: false, days: [[], [], [], [], [], [], []] });
+  describe('save() in settings mode (weekMonday is null)', () => {
+    it('always saves as a recurring plan across the full recurring horizon', async () => {
       component.toggleGym(0, 'push');
-      component.setRecurring(true);
 
       await component.save();
 
-      expect(retractRemoved).toHaveBeenCalledWith(component.plan(), WEEKS_RECURRING);
+      expect(updateWeeklyPlan).toHaveBeenCalledWith(jasmine.objectContaining({ recurring: true }));
+      expect(retractRemoved).toHaveBeenCalledWith(jasmine.objectContaining({ recurring: true }), WEEKS_RECURRING);
+      expect(applyPlan).toHaveBeenCalledWith(jasmine.objectContaining({ recurring: true }), WEEKS_RECURRING);
     });
   });
 
@@ -237,12 +236,39 @@ describe('WeeklyPlannerComponent', () => {
       expect(retractRemoved).not.toHaveBeenCalled();
     });
 
-    it('clears the plan and retracts stale items across the previous horizon once confirmed', async () => {
+    it('clears the plan and retracts stale items across the recurring horizon once confirmed', async () => {
       savedPlan.set({ recurring: true, days: [[], [], [], [], [], [], []] });
       await component.deletePlan();
 
       expect(retractRemoved).toHaveBeenCalledWith(EMPTY_WEEKLY_PLAN, WEEKS_RECURRING);
       expect(component.plan().days.every(items => items.length === 0)).toBeTrue();
+    });
+  });
+
+  describe('week mode (single-week planning from the calendar)', () => {
+    beforeEach(() => {
+      TestBed.resetTestingModule();
+      setup('2024-03-04');
+    });
+
+    it('exposes the requested week', () => {
+      expect(component.weekMonday).toBe('2024-03-04');
+    });
+
+    it('weekRange() formats the week label', () => {
+      expect(component.weekRange('2024-03-04')).toContain('2024');
+    });
+
+    describe('save()', () => {
+      it('applies only to the requested week without touching the persisted routine', async () => {
+        component.toggleGym(0, 'push');
+
+        await component.save();
+
+        expect(retractRemoved).toHaveBeenCalledWith(component.plan(), WEEKS_SINGLE, '2024-03-04');
+        expect(applyPlan).toHaveBeenCalledWith(component.plan(), WEEKS_SINGLE, '2024-03-04');
+        expect(updateWeeklyPlan).not.toHaveBeenCalled();
+      });
     });
   });
 });

@@ -157,21 +157,9 @@ import {
       }
 
       <!-- ── Footer ── -->
-      @if (isDialog || (showPlanAction() && view() === 'week')) {
+      @if (isDialog) {
         <div class="cal-footer">
-          @if (isDialog) {
-            <button class="cal-select-today" (click)="selectDay(todayStr)">Avui</button>
-          }
-          @if (showPlanAction() && view() === 'week') {
-            <button class="cal-plan-btn" (click)="planWeek.emit(weekStart())" [disabled]="planLoading()">
-              @if (planLoading()) {
-                <span class="material-symbols-outlined spin">sync</span>
-              } @else {
-                <span class="material-symbols-outlined">event_repeat</span>
-              }
-              Planificar
-            </button>
-          }
+          <button class="cal-select-today" (click)="selectDay(todayStr)">Avui</button>
         </div>
       }
 
@@ -377,18 +365,6 @@ import {
       cursor: pointer; touch-action: manipulation;
       &:hover { background: var(--c-brand-dk); }
     }
-    .cal-plan-btn {
-      display: flex; align-items: center; gap: 6px;
-      padding: 8px 16px; border-radius: 16px;
-      border: none; background: var(--c-brand); color: white;
-      font-size: 13px; font-weight: 700;
-      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
-      .material-symbols-outlined { font-size: 17px; }
-      &:hover:not(:disabled) { background: var(--c-brand-dk); }
-      &:disabled { opacity: 0.7; cursor: default; }
-    }
-    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    .spin { animation: spin 1s linear infinite; }
   `],
 })
 export class CalendarComponent {
@@ -399,10 +375,7 @@ export class CalendarComponent {
 
   readonly selectedDate          = input<string | null>(null);
   readonly allowFuturePlanning   = input(false, { transform: booleanAttribute });
-  readonly showPlanAction        = input(false, { transform: booleanAttribute });
-  readonly planLoading           = input(false, { transform: booleanAttribute });
   readonly dateSelected          = output<string>();
-  readonly planWeek              = output<string>();
 
   // ── View ──────────────────────────────────────────────────────────────────
   readonly view    = signal<'week' | 'month'>('week');

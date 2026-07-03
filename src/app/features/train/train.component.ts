@@ -4,7 +4,7 @@ import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
-import { workoutCategories, mondayOf, addDays, weekRangeLabel } from '../../shared/utils/calendar-utils';
+import { workoutCategories, mondayOf, addDays } from '../../shared/utils/calendar-utils';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { TrainerService } from '../../core/services/trainer.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -22,7 +22,7 @@ import { SharedWorkoutService } from '../../core/services/shared-workout.service
 import { SportService } from '../../core/services/sport.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { WorkoutService } from '../../core/services/workout.service';
-import { WeeklyPlanService, WEEKS_SINGLE } from '../../core/services/weekly-plan.service';
+import { WeeklyPlanService } from '../../core/services/weekly-plan.service';
 import { OfflineService } from '../../core/services/offline.service';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
@@ -206,14 +206,24 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         @if (!offlineService.isOffline()) {
           <div class="calendar-wrap">
             <app-calendar
+              #calendarRef
               [allowFuturePlanning]="true"
               [selectedDate]="selectedDate()"
-              [showPlanAction]="true"
-              [planLoading]="planningWeek()"
               (dateSelected)="selectedDate.set($event)"
-              (planWeek)="planCurrentWeek($event)"
             />
             <app-weekly-summary [weekDate]="selectedDate()" />
+          </div>
+
+          <div class="card-section plan-section">
+            <div class="section-header">
+              <span class="material-symbols-outlined section-icon">event_repeat</span>
+              <h2 class="section-title">Planificació</h2>
+            </div>
+            <p class="plan-desc">Defineix ràpidament els entrenaments per a la setmana que estàs veient al calendari.</p>
+            <button class="plan-week-btn" (click)="goPlanWeek()">
+              <span class="material-symbols-outlined">event_repeat</span>
+              Planificar aquesta setmana
+            </button>
           </div>
         }
 
@@ -798,6 +808,28 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       box-shadow: 0 2px 12px rgba(0,0,0,0.08);
       border-radius: 16px; overflow: hidden;
       background: var(--c-card);
+    }
+
+    /* ── Planificació section (below the calendar + goals strip) ── */
+    .card-section {
+      margin: 0 16px 12px;
+      padding: 14px 14px 16px;
+      background: var(--c-card);
+      border-radius: 18px;
+      box-shadow: 0 2px 10px var(--c-shadow);
+    }
+    .section-header { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
+    .section-icon  { font-size: 18px; color: var(--c-text-3); font-variation-settings: 'FILL' 0, 'wght' 300; }
+    .section-title { margin: 0; flex: 1; font-size: 14px; font-weight: 700; color: var(--c-text-2); letter-spacing: 0.2px; }
+    .plan-desc { margin: 0 0 12px; font-size: 12.5px; color: var(--c-text-3); line-height: 1.4; }
+    .plan-week-btn {
+      width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 12px 16px; border: none; border-radius: 12px;
+      background: var(--c-brand); color: white;
+      font-size: 13.5px; font-weight: 700; cursor: pointer;
+      transition: background 0.15s; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { background: var(--c-brand-dk); }
     }
 
     /* ── Planning mode pill (shown under calendar for future dates) ── */
@@ -1613,6 +1645,7 @@ export class TrainComponent {
   private confirmDialog    = inject(ConfirmDialogService);
 
   @ViewChild('editor') editor?: WorkoutEditorComponent;
+  @ViewChild('calendarRef') calendarRef?: CalendarComponent;
 
   readonly selectedDate    = signal<string>(TODAY());
   readonly sportToggling   = signal(false);
@@ -1635,7 +1668,6 @@ export class TrainComponent {
   readonly awFeelingOpen     = signal(false);
   readonly feelingLevels5: FeelingLevel[] = [1, 2, 3, 4, 5];
   readonly acceptingProposal = signal(false);
-  readonly planningWeek     = signal(false);
 
   private readonly _dismissedKey = computed(() =>
     `gymgoli_dismissed_proposals_${this.auth?.uid() ?? ''}`
@@ -1985,25 +2017,11 @@ export class TrainComponent {
     } catch { }
   }
 
-  // ── Plan the currently-viewed week from the calendar's "Planificar" action ──
+  // ── Plan the currently-viewed week ────────────────────────────────────────
 
-  async planCurrentWeek(monday: string): Promise<void> {
-    const plan = this.settingsService.weeklyPlan();
-    if (!plan.days.some(items => items.length > 0)) {
-      this.snackBar.open('Encara no tens cap rutina configurada a Configuració > Estableix rutines', '', { duration: 3500 });
-      return;
-    }
-
-    this.planningWeek.set(true);
-    this.snackBar.open(`Planificant la setmana del ${weekRangeLabel(monday)}...`, '', { duration: 2000 });
-    try {
-      await this.weeklyPlanService.apply(plan, WEEKS_SINGLE, monday);
-      this.snackBar.open('Setmana planificada', '', { duration: 2000 });
-    } catch {
-      this.snackBar.open('Error en planificar la setmana', '', { duration: 3000 });
-    } finally {
-      this.planningWeek.set(false);
-    }
+  goPlanWeek(): void {
+    const monday = this.calendarRef?.weekStart() ?? mondayOf(this.selectedDate());
+    this.router.navigate(['/train/planner'], { queryParams: { week: monday } });
   }
 
   // ── Workout navigation ────────────────────────────────────────────────────
