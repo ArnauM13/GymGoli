@@ -24,7 +24,7 @@ type Status = 'loading' | 'confirm' | 'importing' | 'success' | 'error' | 'needs
         } @else if (status() === 'confirm') {
           @if (workout(); as w) {
             <p class="share-desc">
-              Algú ha compartit aquest entrenament amb tu. Vols importar-lo a les teves plantilles?
+              Algú ha compartit aquest entrenament amb tu. Vols importar-lo com a entrenament d'avui?
             </p>
             <div class="share-preview">
               <div class="share-preview-header">
@@ -52,12 +52,12 @@ type Status = 'loading' | 'confirm' | 'importing' | 'success' | 'error' | 'needs
         } @else if (status() === 'success') {
           <span class="material-symbols-outlined success-icon">check_circle</span>
           <p class="share-desc">
-            Entrenament importat a les teves plantilles.
+            Entrenament afegit al teu dia d'avui.
             @if (skippedCount() > 0) {
               <br>{{ skippedNote() }}
             }
           </p>
-          <button class="btn-primary" (click)="goTemplates()">Veure plantilles</button>
+          <button class="btn-primary" (click)="goHome()">Anar a Entrena</button>
         } @else if (status() === 'error') {
           <span class="material-symbols-outlined error-icon">error</span>
           <p class="share-desc">{{ errorMessage() }}</p>
@@ -183,7 +183,7 @@ export class ShareImportComponent implements OnInit {
     if (!shared) return;
     this.status.set('importing');
     try {
-      const { skipped } = await this.sharedWorkoutService.importAsTemplate(shared);
+      const { skipped } = await this.sharedWorkoutService.importAsWorkout(shared);
       this.skippedCount.set(skipped.length);
       this.status.set('success');
     } catch {
@@ -203,7 +203,6 @@ export class ShareImportComponent implements OnInit {
       + `perquè no ${plural ? 'existeixen' : 'existeix'} a la teva llista d'exercicis.)`;
   }
 
-  goHome(): void      { this.router.navigate(['/train']); }
-  goTemplates(): void { this.router.navigate(['/templates']); }
-  goLogin(): void     { this.router.navigate(['/login']); }
+  goHome(): void  { this.router.navigate(['/train']); }
+  goLogin(): void { this.router.navigate(['/login']); }
 }

@@ -14,7 +14,6 @@ export interface SharedWorkoutEntry {
 
 export interface SharedWorkout {
   id: string;
-  ownerId: string;
   name: string;
   category: ExerciseCategory | 'mixed';
   entries: SharedWorkoutEntry[];

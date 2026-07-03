@@ -5,10 +5,9 @@ import { SharedWorkoutService } from './shared-workout.service';
 import { SupabaseService } from './supabase.service';
 import { AuthService } from './auth.service';
 import { ExerciseService } from './exercise.service';
-import { TemplateService } from './template.service';
+import { WorkoutService } from './workout.service';
 import { Exercise } from '../models/exercise.model';
 import { WorkoutEntry } from '../models/workout.model';
-import { WorkoutTemplate } from '../models/template.model';
 
 function exercise(overrides: Partial<Exercise> = {}): Exercise {
   return { id: 'ex1', name: 'Press banca', category: 'push', createdAt: new Date(), ...overrides };
@@ -16,7 +15,7 @@ function exercise(overrides: Partial<Exercise> = {}): Exercise {
 
 function sharedRow(overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
   return {
-    id: 'share-1', owner_id: 'user-1', name: 'Push A', category: 'push',
+    id: 'share-1', name: 'Push A', category: 'push',
     entries: [{ exerciseName: 'Press banca', sets: 3, reps: 8, weight: 60 }],
     created_at: '2024-01-01T00:00:00.000Z',
     ...overrides,
@@ -28,11 +27,12 @@ describe('SharedWorkoutService', () => {
   let insertResult: { data: Record<string, unknown> | null; error: unknown };
   let selectResult: { data: Record<string, unknown> | null; error: unknown };
   let myExercises: Exercise[];
-  let templateCreate: jasmine.Spy;
+  let createPlannedWorkout: jasmine.Spy;
+  let insertSpy: jasmine.Spy;
   let service: SharedWorkoutService;
 
   function buildSupabaseMock() {
-    const insertSpy = jasmine.createSpy('insert').and.callFake(() => ({
+    insertSpy = jasmine.createSpy('insert').and.callFake(() => ({
       select: () => ({
         single: () => Promise.resolve(insertResult),
       }),
@@ -51,16 +51,14 @@ describe('SharedWorkoutService', () => {
     insertResult = { data: sharedRow(), error: null };
     selectResult = { data: sharedRow(), error: null };
     myExercises = [exercise()];
-    templateCreate = jasmine.createSpy('create').and.callFake(
-      (name: string, category: string, entries: unknown[]) =>
-        Promise.resolve({ id: 'tpl-new', name, category, entries, createdAt: '2024-01-01' } as WorkoutTemplate));
+    createPlannedWorkout = jasmine.createSpy('createPlannedWorkout').and.resolveTo('workout-new');
 
     TestBed.configureTestingModule({
       providers: [
         { provide: AuthService,     useValue: { uid } },
         { provide: SupabaseService, useValue: buildSupabaseMock() },
         { provide: ExerciseService, useValue: { exercises: () => myExercises, ensureLoaded: jasmine.createSpy().and.resolveTo(undefined) } },
-        { provide: TemplateService, useValue: { create: templateCreate } },
+        { provide: WorkoutService,  useValue: { createPlannedWorkout } },
       ],
     });
     service = TestBed.inject(SharedWorkoutService);
@@ -69,12 +67,16 @@ describe('SharedWorkoutService', () => {
   beforeEach(() => setup());
 
   describe('share()', () => {
-    it('inserts a snapshot of the entries and returns the new id', async () => {
+    it('inserts a snapshot of the entries with no owner reference and returns the new id', async () => {
       const entries: WorkoutEntry[] = [
         { exerciseId: 'ex1', exerciseName: 'Press banca', sets: [{ weight: 60, reps: 8 }, { weight: 60, reps: 6 }] },
       ];
       const id = await service.share('Push A', 'push', entries);
+
       expect(id).toBe('share-1');
+      const payload = insertSpy.calls.mostRecent().args[0];
+      expect(payload.owner_id).toBeUndefined();
+      expect(payload.name).toBe('Push A');
     });
 
     it('throws when there is no authenticated user', async () => {
@@ -84,11 +86,12 @@ describe('SharedWorkoutService', () => {
   });
 
   describe('fetchById()', () => {
-    it('returns the mapped shared workout', async () => {
+    it('returns the mapped shared workout with no owner field', async () => {
       const shared = await service.fetchById('share-1');
       expect(shared?.name).toBe('Push A');
       expect(shared?.category).toBe('push');
       expect(shared?.entries[0].exerciseName).toBe('Press banca');
+      expect((shared as unknown as Record<string, unknown>)?.['ownerId']).toBeUndefined();
     });
 
     it('returns null when the row does not exist', async () => {
@@ -98,15 +101,15 @@ describe('SharedWorkoutService', () => {
     });
   });
 
-  describe('importAsTemplate()', () => {
-    it('matches entries by exercise name and creates a template', async () => {
+  describe('importAsWorkout()', () => {
+    it('matches entries by exercise name and creates a planned workout for today', async () => {
       const shared = await service.fetchById('share-1');
-      const { template, skipped } = await service.importAsTemplate(shared!);
+      const { workoutId, skipped } = await service.importAsWorkout(shared!);
 
-      expect(templateCreate).toHaveBeenCalledWith('Push A', 'push', [
-        { exerciseId: 'ex1', exerciseName: 'Press banca', sets: 3, reps: 8, weight: 60 },
+      expect(createPlannedWorkout).toHaveBeenCalledWith(jasmine.any(String), 'push', [
+        { exerciseId: 'ex1', exerciseName: 'Press banca', sets: [] },
       ]);
-      expect(template.id).toBe('tpl-new');
+      expect(workoutId).toBe('workout-new');
       expect(skipped).toEqual([]);
     });
 
@@ -114,21 +117,29 @@ describe('SharedWorkoutService', () => {
       myExercises = [];
       selectResult = { data: sharedRow({ entries: [{ exerciseName: 'Exercici desconegut' }] }), error: null };
       const shared = await service.fetchById('share-1');
-      const { skipped } = await service.importAsTemplate(shared!);
+      const { skipped } = await service.importAsWorkout(shared!);
 
       expect(skipped).toEqual(['Exercici desconegut']);
-      expect(templateCreate).toHaveBeenCalledWith('Push A', 'push', []);
+      expect(createPlannedWorkout).toHaveBeenCalledWith(jasmine.any(String), 'push', []);
     });
 
     it('matches exercise names case-insensitively', async () => {
       myExercises = [exercise({ name: 'PRESS BANCA' })];
       const shared = await service.fetchById('share-1');
-      const { skipped } = await service.importAsTemplate(shared!);
+      const { skipped } = await service.importAsWorkout(shared!);
 
       expect(skipped).toEqual([]);
-      expect(templateCreate).toHaveBeenCalledWith('Push A', 'push', [
+      expect(createPlannedWorkout).toHaveBeenCalledWith(jasmine.any(String), 'push', [
         jasmine.objectContaining({ exerciseName: 'PRESS BANCA' }),
       ]);
+    });
+
+    it('passes no category for a mixed shared workout', async () => {
+      selectResult = { data: sharedRow({ category: 'mixed' }), error: null };
+      const shared = await service.fetchById('share-1');
+      await service.importAsWorkout(shared!);
+
+      expect(createPlannedWorkout).toHaveBeenCalledWith(jasmine.any(String), undefined, jasmine.any(Array));
     });
   });
 });

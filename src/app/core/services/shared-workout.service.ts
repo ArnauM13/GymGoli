@@ -3,16 +3,14 @@ import { Injectable, inject } from '@angular/core';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { ExerciseService } from './exercise.service';
-import { TemplateService } from './template.service';
+import { WorkoutService } from './workout.service';
 import { ExerciseCategory } from '../models/exercise.model';
 import { WorkoutEntry } from '../models/workout.model';
 import { SharedWorkout, SharedWorkoutEntry } from '../models/shared-workout.model';
-import { TemplateEntry, WorkoutTemplate } from '../models/template.model';
 
 function toSharedWorkout(row: Record<string, unknown>): SharedWorkout {
   return {
     id:        row['id'] as string,
-    ownerId:   row['owner_id'] as string,
     name:      row['name'] as string,
     category:  row['category'] as ExerciseCategory | 'mixed',
     entries:   (row['entries'] as SharedWorkoutEntry[] | null) ?? [],
@@ -25,12 +23,12 @@ export class SharedWorkoutService {
   private supabase        = inject(SupabaseService).client;
   private auth             = inject(AuthService);
   private exerciseService  = inject(ExerciseService);
-  private templateService  = inject(TemplateService);
+  private workoutService   = inject(WorkoutService);
 
-  /** Creates a shareable snapshot of a workout and returns its id (used to build the link). */
+  /** Creates a shareable snapshot of a workout and returns its id (used to build the link).
+   *  Carries no reference to the sender's account — just the name and exercises. */
   async share(name: string, category: ExerciseCategory | 'mixed', entries: WorkoutEntry[]): Promise<string> {
-    const uid = this.auth.uid();
-    if (!uid) throw new Error('Not authenticated');
+    if (!this.auth.uid()) throw new Error('Not authenticated');
 
     const sharedEntries: SharedWorkoutEntry[] = entries.map(e => ({
       exerciseName: e.exerciseName,
@@ -41,7 +39,7 @@ export class SharedWorkoutService {
 
     const { data, error } = await this.supabase
       .from('shared_workouts')
-      .insert({ owner_id: uid, name, category, entries: sharedEntries })
+      .insert({ name, category, entries: sharedEntries })
       .select()
       .single();
     if (error) throw error;
@@ -60,21 +58,24 @@ export class SharedWorkoutService {
 
   /** Matches the shared workout's exercises by name against the current
    *  user's own exercise library — exercise ids are per-user so the
-   *  sender's ids can't be reused — and saves the result as a new
-   *  personal template. Returns any exercise names that had no match. */
-  async importAsTemplate(shared: SharedWorkout): Promise<{ template: WorkoutTemplate; skipped: string[] }> {
+   *  sender's ids can't be reused — and creates it as a planned workout
+   *  for today in the recipient's own calendar. Returns any exercise
+   *  names that had no match. */
+  async importAsWorkout(shared: SharedWorkout): Promise<{ workoutId: string; skipped: string[] }> {
     await this.exerciseService.ensureLoaded();
     const myExercises = this.exerciseService.exercises();
     const skipped: string[] = [];
 
-    const entries: TemplateEntry[] = [];
+    const entries: WorkoutEntry[] = [];
     for (const e of shared.entries) {
       const match = myExercises.find(x => x.name.toLowerCase() === e.exerciseName.toLowerCase());
       if (!match) { skipped.push(e.exerciseName); continue; }
-      entries.push({ exerciseId: match.id, exerciseName: match.name, sets: e.sets, reps: e.reps, weight: e.weight });
+      entries.push({ exerciseId: match.id, exerciseName: match.name, sets: [] });
     }
 
-    const template = await this.templateService.create(shared.name, shared.category, entries);
-    return { template, skipped };
+    const today    = new Date().toISOString().split('T')[0];
+    const category = shared.category === 'mixed' ? undefined : shared.category;
+    const workoutId = await this.workoutService.createPlannedWorkout(today, category, entries);
+    return { workoutId, skipped };
   }
 }
