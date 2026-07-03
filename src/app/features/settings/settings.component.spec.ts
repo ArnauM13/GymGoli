@@ -3,7 +3,6 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { Router } from '@angular/router';
-import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { SettingsComponent } from './settings.component';
 import { UserSettingsService } from '../../core/services/user-settings.service';
@@ -14,6 +13,7 @@ import { SportService } from '../../core/services/sport.service';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { TrainerService } from '../../core/services/trainer.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
+import { FeedbackService } from '../../shared/services/feedback.service';
 
 describe('SettingsComponent', () => {
   let component: SettingsComponent;
@@ -30,7 +30,7 @@ describe('SettingsComponent', () => {
   let mockLogout:        jasmine.Spy;
   let mockDeleteAccount: jasmine.Spy;
   let mockNavigate:      jasmine.Spy;
-  let mockSnackBarOpen:  jasmine.Spy;
+  let mockFeedbackError: jasmine.Spy;
 
   beforeEach(async () => {
     mockEnabled    = signal(false);
@@ -46,7 +46,7 @@ describe('SettingsComponent', () => {
     mockLogout     = jasmine.createSpy('logout').and.returnValue(Promise.resolve());
     mockDeleteAccount = jasmine.createSpy('deleteAccount').and.returnValue(Promise.resolve());
     mockNavigate   = jasmine.createSpy('navigate').and.returnValue(Promise.resolve(true));
-    mockSnackBarOpen = jasmine.createSpy('open');
+    mockFeedbackError = jasmine.createSpy('error');
 
     await TestBed.configureTestingModule({
       imports: [SettingsComponent],
@@ -104,8 +104,8 @@ describe('SettingsComponent', () => {
           useValue: { navigate: mockNavigate },
         },
         {
-          provide: MatSnackBar,
-          useValue: { open: mockSnackBarOpen },
+          provide: FeedbackService,
+          useValue: { success: jasmine.createSpy(), error: mockFeedbackError, info: jasmine.createSpy() },
         },
         {
           provide: TrainerService,
@@ -488,7 +488,7 @@ describe('SettingsComponent', () => {
       confirmSpy.and.resolveTo(true);
       mockDeleteAccount.and.returnValue(Promise.reject(new Error('fail')));
       await component.deleteAccount();
-      expect(mockSnackBarOpen).toHaveBeenCalled();
+      expect(mockFeedbackError).toHaveBeenCalled();
       expect(component.deletingAccount()).toBeFalse();
     });
   });

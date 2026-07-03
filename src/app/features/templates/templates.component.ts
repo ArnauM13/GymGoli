@@ -1,7 +1,6 @@
 import { Component, computed, inject, signal, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 
 import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
@@ -9,6 +8,7 @@ import { TemplateEntry, WorkoutTemplate } from '../../core/models/template.model
 import { TemplateService } from '../../core/services/template.service';
 import { ExercisePickerDialogComponent } from '../train/components/exercise-picker-dialog.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { FeedbackService } from '../../shared/services/feedback.service';
 
 type EditorCat = ExerciseCategory | 'mixed';
 
@@ -393,7 +393,7 @@ const CAT_LABEL: Record<EditorCat, string> = {
 export class TemplatesComponent {
   readonly templateService = inject(TemplateService);
   private dialog           = inject(MatDialog);
-  private snackBar         = inject(MatSnackBar);
+  private feedback         = inject(FeedbackService);
 
   readonly sortedTemplates = computed(() =>
     [...this.templateService.templates()].sort((a, b) => (b.useCount ?? 0) - (a.useCount ?? 0))
@@ -467,23 +467,23 @@ export class TemplatesComponent {
           category: this.editorCat,
           entries: this.editorEntries,
         });
-        this.snackBar.open('Plantilla actualitzada', '', { duration: 2000 });
+        this.feedback.success('Plantilla actualitzada', 2000);
       } else {
         await this.templateService.create(this.editorName.trim(), this.editorCat, this.editorEntries);
-        this.snackBar.open('Plantilla creada', '', { duration: 2000 });
+        this.feedback.success('Plantilla creada', 2000);
       }
       this.closeEditor();
     } catch {
-      this.snackBar.open('Error en desar la plantilla', '', { duration: 3000 });
+      this.feedback.error('Error en desar la plantilla', 3000);
     }
   }
 
   async deleteTemplate(id: string): Promise<void> {
     try {
       await this.templateService.delete(id);
-      this.snackBar.open('Plantilla eliminada', '', { duration: 2000 });
+      this.feedback.success('Plantilla eliminada', 2000);
     } catch {
-      this.snackBar.open('Error en eliminar', '', { duration: 3000 });
+      this.feedback.error('Error en eliminar', 3000);
     }
   }
 }

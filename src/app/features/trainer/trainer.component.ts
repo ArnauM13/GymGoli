@@ -2,9 +2,9 @@ import {
   Component, OnInit, inject, signal,
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
+import { FeedbackService } from '../../shared/services/feedback.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { TrainerService } from '../../core/services/trainer.service';
 import {
@@ -688,7 +688,7 @@ type DashboardView = 'clients' | 'detail';
 })
 export class TrainerComponent implements OnInit {
   readonly trainerService = inject(TrainerService);
-  private snackBar        = inject(MatSnackBar);
+  private feedback        = inject(FeedbackService);
   private confirmDialog   = inject(ConfirmDialogService);
 
   readonly invitePanelOpen  = signal(false);
@@ -838,7 +838,7 @@ export class TrainerComponent implements OnInit {
     try {
       await this.trainerService.generateInvite();
     } catch (e) {
-      this.snackBar.open((e as Error).message, 'OK', { duration: 4000 });
+      this.feedback.error((e as Error).message, 4000);
     } finally {
       this.generatingInvite.set(false);
     }
@@ -846,14 +846,14 @@ export class TrainerComponent implements OnInit {
 
   copyCode(code: string): void {
     navigator.clipboard.writeText(code).then(() => {
-      this.snackBar.open('Codi copiat', '', { duration: 1800 });
+      this.feedback.success('Codi copiat', 1800);
     });
   }
 
   copyLink(token: string): void {
     const url = `${window.location.origin}/join/${token}`;
     navigator.clipboard.writeText(url).then(() => {
-      this.snackBar.open('Enllaç copiat', '', { duration: 1800 });
+      this.feedback.success('Enllaç copiat', 1800);
     });
   }
 
@@ -925,9 +925,9 @@ export class TrainerComponent implements OnInit {
       this.clientProposalsCache.set(clientId, updated);
       this.clientProposals.set(updated);
       this.proposalForm.set(null);
-      this.snackBar.open('Proposta desada', '', { duration: 1800 });
+      this.feedback.success('Proposta desada', 1800);
     } catch (e) {
-      this.snackBar.open((e as Error).message, 'OK', { duration: 4000 });
+      this.feedback.error((e as Error).message, 4000);
     } finally {
       this.savingProposal.set(false);
     }
@@ -941,7 +941,7 @@ export class TrainerComponent implements OnInit {
       this.clientProposalsCache.set(p.clientId, updated);
       this.clientProposals.set(updated);
     } catch (e) {
-      this.snackBar.open((e as Error).message, 'OK', { duration: 4000 });
+      this.feedback.error((e as Error).message, 4000);
     }
   }
 
@@ -970,9 +970,9 @@ export class TrainerComponent implements OnInit {
     try {
       await this.trainerService.removeClient(c.clientId);
       this.selectedClient.set(null);
-      this.snackBar.open('Client eliminat', '', { duration: 2000 });
+      this.feedback.success('Client eliminat', 2000);
     } catch (e) {
-      this.snackBar.open((e as Error).message, 'OK', { duration: 4000 });
+      this.feedback.error((e as Error).message, 4000);
     }
   }
 }

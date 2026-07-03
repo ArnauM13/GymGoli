@@ -2,7 +2,6 @@ import { Component, OnDestroy, ViewEncapsulation, computed, effect, inject, inpu
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { MatDialog } from '@angular/material/dialog';
-import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { CATEGORY_COLORS, CATEGORY_LABELS, SUBCATEGORY_LABELS } from '../../../core/models/exercise.model';
 import { FEELING_EMOJI, FEELING_LABEL, FeelingLevel, Workout, WorkoutEntry, WorkoutSet } from '../../../core/models/workout.model';
@@ -14,6 +13,7 @@ import { WorkoutService } from '../../../core/services/workout.service';
 import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component';
 import { kgToDisplay, displayToKg, weightStep } from '../../utils/weight.utils';
 import { ExerciseEntryCardComponent } from '../exercise-entry-card/exercise-entry-card.component';
+import { FeedbackService } from '../../services/feedback.service';
 
 const GOAL_REC: Record<FitnessGoal, { sets: number; reps: number }> = {
   strength: { sets: 4, reps: 5 },
@@ -913,7 +913,7 @@ export class WorkoutEditorComponent implements OnDestroy {
   private exerciseService  = inject(ExerciseService);
   private settingsService  = inject(UserSettingsService);
   readonly offlineService  = inject(OfflineService);
-  private snackBar         = inject(MatSnackBar);
+  private feedback         = inject(FeedbackService);
   private fb               = inject(FormBuilder);
   private dialog           = inject(MatDialog);
 
@@ -1128,7 +1128,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     try {
       await this.workoutService.updateEntryFeeling(w.id, entry.exerciseId, undefined);
     } catch {
-      this.snackBar.open('Error en eliminar la fatiga', '', { duration: 2000 });
+      this.feedback.error('Error en eliminar la fatiga', 2000);
     }
     this.closeFatigaPicker();
   }
@@ -1150,7 +1150,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     try {
       await this.workoutService.updateEntryNotes(w.id, exerciseId, notes || undefined);
     } catch {
-      this.snackBar.open('Error en desar la nota', '', { duration: 2000 });
+      this.feedback.error('Error en desar la nota', 2000);
     }
     this.closeNotesPopup();
   }
@@ -1200,7 +1200,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     try {
       await this.workoutService.reorderEntries(w.id, entries);
     } catch {
-      this.snackBar.open('Error en reordenar', '', { duration: 2000 });
+      this.feedback.error('Error en reordenar', 2000);
     }
   }
 
@@ -1238,10 +1238,10 @@ export class WorkoutEditorComponent implements OnDestroy {
     try {
       await this.workoutService.updateEntryFeeling(w.id, entry.exerciseId, newFeeling);
       if (!hadWorkoutFeeling && this.workout()?.feeling != null) {
-        this.snackBar.open('Sensació general calculada automàticament', '', { duration: 2500 });
+        this.feedback.info('Sensació general calculada automàticament', 2500);
       }
     } catch {
-      this.snackBar.open('Error en actualitzar la fatiga', '', { duration: 2000 });
+      this.feedback.error('Error en actualitzar la fatiga', 2000);
     }
   }
 
@@ -1320,7 +1320,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     try {
       await this.workoutService.addSetsToEntry(w.id, entry.exerciseId, [{ weight: last.weight, reps: last.reps }]);
     } catch {
-      this.snackBar.open('Error en repetir', '', { duration: 2000 });
+      this.feedback.error('Error en repetir', 2000);
     }
   }
 
@@ -1356,7 +1356,7 @@ export class WorkoutEditorComponent implements OnDestroy {
       });
       this.cancelEditSet();
     } catch {
-      this.snackBar.open('Error en actualitzar la sèrie', '', { duration: 3000 });
+      this.feedback.error('Error en actualitzar la sèrie', 3000);
     }
   }
 
@@ -1374,7 +1374,7 @@ export class WorkoutEditorComponent implements OnDestroy {
       if (restSecs > 0 && w.status !== 'planned') this.startRestTimer(restSecs, exerciseId);
       this.cancelSet();
     } catch {
-      this.snackBar.open('Error en afegir les sèries', '', { duration: 3000 });
+      this.feedback.error('Error en afegir les sèries', 3000);
     }
   }
 
@@ -1387,7 +1387,7 @@ export class WorkoutEditorComponent implements OnDestroy {
       this.lastSessionData.set(null);
       this.cancelSet();
     } catch {
-      this.snackBar.open('Error en aplicar l\'última sessió', '', { duration: 3000 });
+      this.feedback.error('Error en aplicar l\'última sessió', 3000);
     }
   }
 
@@ -1397,7 +1397,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     try {
       await this.workoutService.removeSetFromEntry(w.id, exerciseId, index);
     } catch {
-      this.snackBar.open('Error en eliminar', '', { duration: 2000 });
+      this.feedback.error('Error en eliminar', 2000);
     }
   }
 
@@ -1408,7 +1408,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     try {
       await this.workoutService.removeEntryFromWorkout(w.id, exerciseId);
     } catch {
-      this.snackBar.open('Error en eliminar', '', { duration: 2000 });
+      this.feedback.error('Error en eliminar', 2000);
     }
   }
 

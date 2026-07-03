@@ -2,7 +2,6 @@ import { Component, ViewChild, computed, effect, inject, signal, untracked } fro
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
 import { workoutCategories, mondayOf, addDays } from '../../shared/utils/calendar-utils';
 import { UserSettingsService } from '../../core/services/user-settings.service';
@@ -21,6 +20,7 @@ import { TemplateService } from '../../core/services/template.service';
 import { SharedWorkoutService } from '../../core/services/shared-workout.service';
 import { SportService } from '../../core/services/sport.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
+import { FeedbackService } from '../../shared/services/feedback.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { WeeklyPlanService } from '../../core/services/weekly-plan.service';
 import { OfflineService } from '../../core/services/offline.service';
@@ -1670,7 +1670,7 @@ export class TrainComponent {
   private weeklyPlanService = inject(WeeklyPlanService);
   readonly router          = inject(Router);
   private dialog           = inject(MatDialog);
-  private snackBar         = inject(MatSnackBar);
+  private feedback         = inject(FeedbackService);
   private confirmDialog    = inject(ConfirmDialogService);
 
   @ViewChild('editor') editor?: WorkoutEditorComponent;
@@ -1848,7 +1848,7 @@ export class TrainComponent {
       await this.sportService.startPlannedSession(item.session.id, this.selectedDate());
       this.openSessionLogger(item.sport);
     } catch {
-      this.snackBar.open('Error en iniciar el pla', '', { duration: 2500 });
+      this.feedback.error('Error en iniciar el pla', 2500);
     }
   }
 
@@ -1875,7 +1875,7 @@ export class TrainComponent {
     try {
       await this.sportService.deleteSession(sessionId, this.selectedDate());
     } catch {
-      this.snackBar.open('Error en eliminar', '', { duration: 2500 });
+      this.feedback.error('Error en eliminar', 2500);
     } finally {
       this.sportToggling.set(false);
     }
@@ -2049,7 +2049,7 @@ export class TrainComponent {
       );
       this.openWorkout(id);
     } catch {
-      this.snackBar.open('Error en acceptar la proposta', '', { duration: 3000 });
+      this.feedback.error('Error en acceptar la proposta', 3000);
     } finally {
       this.acceptingProposal.set(false);
     }
@@ -2094,7 +2094,7 @@ export class TrainComponent {
       await this.workoutService.startPlannedWorkout(w.id);
       this.openWorkout(w.id);
     } catch {
-      this.snackBar.open('Error en iniciar el pla', '', { duration: 2500 });
+      this.feedback.error('Error en iniciar el pla', 2500);
     }
   }
 
@@ -2181,7 +2181,7 @@ export class TrainComponent {
     try {
       await this.workoutService.updateWorkoutFeeling(workoutId, level);
     } catch {
-      this.snackBar.open('Error en guardar la sensació', '', { duration: 2000 });
+      this.feedback.error('Error en guardar la sensació', 2000);
     }
   }
 
@@ -2206,9 +2206,9 @@ export class TrainComponent {
       await this.templateService.create(name, cat, entries);
       this.saveTemplateOpen.set(false);
       this.saveTemplateName = '';
-      this.snackBar.open('Plantilla guardada', '', { duration: 2000 });
+      this.feedback.success('Plantilla guardada', 2000);
     } catch {
-      this.snackBar.open('Error en guardar la plantilla', '', { duration: 3000 });
+      this.feedback.error('Error en guardar la plantilla', 3000);
     }
   }
 
@@ -2224,10 +2224,10 @@ export class TrainComponent {
         await navigator.share({ title: this.workoutLabel(w), text: 'T\'he compartit un entrenament!', url }).catch(() => {});
       } else {
         await navigator.clipboard.writeText(url);
-        this.snackBar.open('Enllaç copiat', '', { duration: 1800 });
+        this.feedback.success('Enllaç copiat', 1800);
       }
     } catch {
-      this.snackBar.open('Error en compartir l\'entrenament', '', { duration: 3000 });
+      this.feedback.error('Error en compartir l\'entrenament', 3000);
     }
   }
 
@@ -2239,7 +2239,7 @@ export class TrainComponent {
       await this.workoutService.deleteWorkout(w.id);
       this.activeWorkoutId.set(null);
     } catch {
-      this.snackBar.open('Error en eliminar', '', { duration: 2000 });
+      this.feedback.error('Error en eliminar', 2000);
     }
   }
 
@@ -2248,7 +2248,7 @@ export class TrainComponent {
     try {
       await this.workoutService.deleteWorkout(w.id);
     } catch {
-      this.snackBar.open('Error en eliminar', '', { duration: 2000 });
+      this.feedback.error('Error en eliminar', 2000);
     }
   }
 
@@ -2298,7 +2298,7 @@ export class TrainComponent {
       const id = await this._createForSelectedDate(cat, []);
       this.openWorkout(id);
     } catch {
-      this.snackBar.open('Error en crear l\'entrenament', '', { duration: 3000 });
+      this.feedback.error('Error en crear l\'entrenament', 3000);
     } finally { this.creating.set(false); }
   }
 
@@ -2312,7 +2312,7 @@ export class TrainComponent {
       const id = await this._createForSelectedDate(cat, last?.entries ?? []);
       this.openWorkout(id);
     } catch {
-      this.snackBar.open('Error en crear l\'entrenament', '', { duration: 3000 });
+      this.feedback.error('Error en crear l\'entrenament', 3000);
     } finally { this.creating.set(false); }
   }
 
@@ -2334,7 +2334,7 @@ export class TrainComponent {
       const id = await this._createForSelectedDate(useCat, entries);
       this.openWorkout(id);
     } catch {
-      this.snackBar.open('Error en crear l\'entrenament', '', { duration: 3000 });
+      this.feedback.error('Error en crear l\'entrenament', 3000);
     } finally { this.creating.set(false); }
   }
 
@@ -2352,7 +2352,7 @@ export class TrainComponent {
       const id = await this._createForSelectedDate(cat, entries);
       this.openWorkout(id);
     } catch {
-      this.snackBar.open('Error en crear l\'entrenament', '', { duration: 3000 });
+      this.feedback.error('Error en crear l\'entrenament', 3000);
     } finally { this.creating.set(false); }
   }
 
@@ -2391,7 +2391,7 @@ export class TrainComponent {
           this.editor?.startAddSet({ exerciseId: exercise.id, exerciseName: exercise.name, sets: [] });
         }, 0);
       } catch {
-        this.snackBar.open('Error en afegir l\'exercici', '', { duration: 3000 });
+        this.feedback.error('Error en afegir l\'exercici', 3000);
       }
     });
   }
@@ -2492,7 +2492,7 @@ export class TrainComponent {
       }
       this.closeSessionLogger();
     } catch {
-      this.snackBar.open('Error en guardar', '', { duration: 2500 });
+      this.feedback.error('Error en guardar', 2500);
     } finally {
       this.sportToggling.set(false);
     }
@@ -2506,7 +2506,7 @@ export class TrainComponent {
       await this.sportService.deleteSession(id, this.selectedDate());
       this.closeSessionLogger();
     } catch {
-      this.snackBar.open('Error en eliminar', '', { duration: 2500 });
+      this.feedback.error('Error en eliminar', 2500);
     } finally {
       this.sportToggling.set(false);
     }

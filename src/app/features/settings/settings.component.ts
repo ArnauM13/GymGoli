@@ -2,7 +2,6 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { AuthService } from '../../core/services/auth.service';
 import { ExerciseService } from '../../core/services/exercise.service';
@@ -12,6 +11,7 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { TrainerService } from '../../core/services/trainer.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
+import { FeedbackService } from '../../shared/services/feedback.service';
 import {
   FitnessGoal, GoalMode, ThemeMode, WeightUnit,
   FITNESS_GOAL_EMOJIS, FITNESS_GOAL_LABELS, FITNESS_GOAL_WEEKLY_DEFAULTS,
@@ -781,7 +781,7 @@ export class SettingsComponent {
   private sportService     = inject(SportService);
   private workoutService   = inject(WorkoutService);
   private router           = inject(Router);
-  private snackBar         = inject(MatSnackBar);
+  private feedback         = inject(FeedbackService);
   private doc              = inject(DOCUMENT);
   private confirmDialog    = inject(ConfirmDialogService);
 
@@ -817,7 +817,7 @@ export class SettingsComponent {
   async logout(): Promise<void> {
     await this.authService.logout();
     await this.router.navigate(['/login']);
-    this.snackBar.open('Sessió tancada', '', { duration: 2000 });
+    this.feedback.success('Sessió tancada', 2000);
   }
 
   setWeightUnit(unit: WeightUnit): void {
@@ -908,7 +908,7 @@ export class SettingsComponent {
         await this.trainerService.loadActiveInvite();
       }
     } catch (e) {
-      this.snackBar.open((e as Error).message ?? 'Error', 'OK', { duration: 4000 });
+      this.feedback.error((e as Error).message ?? 'Error', 4000);
     } finally {
       this.togglingTrainer.set(false);
     }
@@ -919,7 +919,7 @@ export class SettingsComponent {
     try {
       await this.trainerService.generateInvite();
     } catch (e) {
-      this.snackBar.open((e as Error).message ?? 'Error', 'OK', { duration: 4000 });
+      this.feedback.error((e as Error).message ?? 'Error', 4000);
     } finally {
       this.generatingInvite.set(false);
     }
@@ -927,14 +927,14 @@ export class SettingsComponent {
 
   copyInviteCode(code: string): void {
     navigator.clipboard.writeText(code).then(() =>
-      this.snackBar.open('Codi copiat', '', { duration: 1800 })
+      this.feedback.success('Codi copiat', 1800)
     );
   }
 
   copyInviteLink(token: string): void {
     const url = `${window.location.origin}/join/${token}`;
     navigator.clipboard.writeText(url).then(() =>
-      this.snackBar.open('Enllaç copiat', '', { duration: 1800 })
+      this.feedback.success('Enllaç copiat', 1800)
     );
   }
 
@@ -946,9 +946,9 @@ export class SettingsComponent {
       await this.trainerService.acceptInviteByCode(code);
       this.showInviteInput.set(false);
       this.inviteCodeInput.set('');
-      this.snackBar.open('Entrenador connectat correctament', '', { duration: 2500 });
+      this.feedback.success('Entrenador connectat correctament', 2500);
     } catch (e) {
-      this.snackBar.open((e as Error).message ?? 'Error', 'OK', { duration: 4000 });
+      this.feedback.error((e as Error).message ?? 'Error', 4000);
     } finally {
       this.acceptingInvite.set(false);
     }
@@ -959,9 +959,9 @@ export class SettingsComponent {
     if (!await this.confirmDialog.confirm(`Vols desconnectar-te de ${trainerName}? Deixaràs de rebre propostes d'entrenament.`, { confirmLabel: 'Desconnectar' })) return;
     try {
       await this.trainerService.disconnectFromTrainer();
-      this.snackBar.open('Entrenador desconnectat', '', { duration: 2000 });
+      this.feedback.success('Entrenador desconnectat', 2000);
     } catch (e) {
-      this.snackBar.open((e as Error).message ?? 'Error', 'OK', { duration: 4000 });
+      this.feedback.error((e as Error).message ?? 'Error', 4000);
     }
   }
 
@@ -1001,10 +1001,9 @@ export class SettingsComponent {
       await this.authService.deleteAccount();
       this.router.navigate(['/login']);
     } catch {
-      this.snackBar.open(
+      this.feedback.error(
         'Error en eliminar el compte. Contacta amb el suport si el problema persisteix.',
-        'OK',
-        { duration: 6000 }
+        6000,
       );
     } finally {
       this.deletingAccount.set(false);

@@ -120,6 +120,19 @@ html, body {
   --mdc-snackbar-supporting-text-color: #fff;
 }
 
+// FeedbackService's toasts fully control their own look (rounded card,
+// colored accent bar) — strip the default Material surface around them.
+.feedback-toast-panel .mat-mdc-snackbar-surface {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  min-width: 0 !important;
+  max-width: 92vw !important;
+}
+.feedback-toast-panel .mat-mdc-snack-bar-label {
+  padding: 0 !important;
+}
+
 // Dark-mode: Material slide-toggle accent adjustment
 html.dark {
   --mdc-switch-selected-track-color: var(--c-brand);

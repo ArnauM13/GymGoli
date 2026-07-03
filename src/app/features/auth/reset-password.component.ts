@@ -1,7 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { AuthService } from '../../core/services/auth.service';
 
@@ -127,7 +126,6 @@ import { AuthService } from '../../core/services/auth.service';
 export class ResetPasswordComponent {
   private authService = inject(AuthService);
   private router      = inject(Router);
-  private snackBar    = inject(MatSnackBar);
 
   readonly loading = signal(false);
   readonly success = signal(false);
