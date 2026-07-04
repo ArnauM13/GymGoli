@@ -360,7 +360,7 @@ export class WorkoutService {
   }
 
   getLastSessionInfo(exerciseId: string, excludeWorkoutId?: string): { date: string; maxWeight: number; feeling?: FeelingLevel } | null {
-    const past = this.workouts()
+    const past = this.doneWorkouts()
       .filter(w =>
         w.id !== excludeWorkoutId &&
         w.entries.some(e => e.exerciseId === exerciseId && e.sets.length > 0)
@@ -374,7 +374,7 @@ export class WorkoutService {
 
   // ── Query helpers ────────────────────────────────────────────────────────
   getLastWorkoutByCategory(category: string): Workout | null {
-    return this.workouts().find(w =>
+    return this.doneWorkouts().find(w =>
       w.categories?.includes(category) || w.category === category
     ) ?? null;
   }

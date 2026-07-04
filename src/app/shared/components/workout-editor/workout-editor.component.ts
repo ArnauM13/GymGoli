@@ -1256,7 +1256,7 @@ export class WorkoutEditorComponent implements OnDestroy {
       const info = this.workoutService.getLastSessionInfo(entry.exerciseId, w.id);
       const goal = this.settingsService.fitnessGoal();
       if (info) {
-        const lastEntry = this.workoutService.workouts()
+        const lastEntry = this.workoutService.doneWorkouts()
           .filter(wk => wk.id !== w.id && wk.entries.some(e => e.exerciseId === entry.exerciseId && e.sets.length > 0))
           .sort((a, b) => b.date.localeCompare(a.date))[0]
           ?.entries.find(e => e.exerciseId === entry.exerciseId);
