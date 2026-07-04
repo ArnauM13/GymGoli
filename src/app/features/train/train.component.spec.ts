@@ -4,7 +4,6 @@ import { signal } from '@angular/core';
 import { LowerCasePipe } from '@angular/common';
 import { provideRouter } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
-import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { TrainComponent } from './train.component';
 import { WorkoutService } from '../../core/services/workout.service';
@@ -20,6 +19,7 @@ import { WorkoutProfileService } from '../../core/services/workout-profile.servi
 import { WeeklyPlanService } from '../../core/services/weekly-plan.service';
 import { Workout, WorkoutEntry } from '../../core/models/workout.model';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
+import { FeedbackService } from '../../shared/services/feedback.service';
 import { mondayOf } from '../../shared/utils/calendar-utils';
 
 const TODAY = new Date().toISOString().split('T')[0];
@@ -34,12 +34,10 @@ describe('TrainComponent', () => {
   let component: TrainComponent;
   let fixture: ReturnType<typeof TestBed.createComponent<TrainComponent>>;
   let forceOffline: ReturnType<typeof signal<boolean>>;
-  let snackBarOpen: jasmine.Spy;
   let navigateSpy: jasmine.Spy;
 
   beforeEach(async () => {
     forceOffline = signal(false);
-    snackBarOpen = jasmine.createSpy('open');
     const mockWorkoutService = {
       workouts:                   signal<Workout[]>([]),
       isLoading:                  signal(false),
@@ -85,7 +83,7 @@ describe('TrainComponent', () => {
         { provide: SharedWorkoutService, useValue: { share: jasmine.createSpy().and.resolveTo('share-id') } },
         { provide: WorkoutProfileService, useValue: { profile: signal({ gym: { push: EMPTY_CATEGORY_PROFILE, pull: EMPTY_CATEGORY_PROFILE, legs: EMPTY_CATEGORY_PROFILE }, favoriteSport: null, recentSport: null, minRecovery: 2 }) } },
         { provide: MatDialog,              useValue: { open: jasmine.createSpy() } },
-        { provide: MatSnackBar,            useValue: { open: snackBarOpen } },
+        { provide: FeedbackService,        useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
         { provide: ConfirmDialogService,   useValue: { confirm: jasmine.createSpy('confirm').and.resolveTo(false) } },
       ],
     })

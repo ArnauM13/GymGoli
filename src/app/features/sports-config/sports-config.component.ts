@@ -1,12 +1,12 @@
 import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
-import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { Sport } from '../../core/models/sport.model';
 import { SportService } from '../../core/services/sport.service';
 import { SportFormDialogComponent } from '../library/components/sport-form-dialog.component';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
+import { FeedbackService } from '../../shared/services/feedback.service';
 
 @Component({
   selector: 'app-sports-config',
@@ -156,7 +156,7 @@ import { ConfirmDialogService } from '../../shared/services/confirm-dialog.servi
 export class SportsConfigComponent {
   private sportService = inject(SportService);
   private dialog       = inject(MatDialog);
-  private snackBar     = inject(MatSnackBar);
+  private feedback     = inject(FeedbackService);
   private confirmDialog = inject(ConfirmDialogService);
   private router       = inject(Router);
 
@@ -173,13 +173,13 @@ export class SportsConfigComponent {
       try {
         if (sport) {
           await this.sportService.updateSport(sport.id, result);
-          this.snackBar.open('Esport actualitzat', '', { duration: 2000 });
+          this.feedback.success('Esport actualitzat', 2000);
         } else {
           await this.sportService.createSport(result);
-          this.snackBar.open('Esport creat', '', { duration: 2000 });
+          this.feedback.success('Esport creat', 2000);
         }
       } catch (err) {
-        this.snackBar.open(`Error: ${(err as { message?: string }).message ?? 'desconegut'}`, 'OK', { duration: 5000 });
+        this.feedback.error(`Error: ${(err as { message?: string }).message ?? 'desconegut'}`, 5000);
       }
     });
   }
@@ -188,9 +188,9 @@ export class SportsConfigComponent {
     if (!await this.confirmDialog.confirm(`Eliminar "${sport.name}"?`, { variant: 'danger', confirmLabel: 'Eliminar' })) return;
     try {
       await this.sportService.deleteSport(sport.id);
-      this.snackBar.open('Esport eliminat', '', { duration: 2000 });
+      this.feedback.success('Esport eliminat', 2000);
     } catch {
-      this.snackBar.open('Error en eliminar', '', { duration: 3000 });
+      this.feedback.error('Error en eliminar', 3000);
     }
   }
 }

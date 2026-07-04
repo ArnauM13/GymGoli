@@ -1,13 +1,13 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { of } from 'rxjs';
 
 import { ExercisePickerDialogComponent, ExercisePickerData } from './exercise-picker-dialog.component';
 import { ExerciseFormDialogComponent } from '../../library/components/exercise-form-dialog.component';
 import { ExerciseService } from '../../../core/services/exercise.service';
 import { Exercise } from '../../../core/models/exercise.model';
+import { FeedbackService } from '../../../shared/services/feedback.service';
 
 function makeExercise(overrides: Partial<Exercise> = {}): Exercise {
   return {
@@ -47,7 +47,7 @@ describe('ExercisePickerDialogComponent', () => {
         { provide: MatDialog,       useValue: dialog },
         { provide: MAT_DIALOG_DATA, useValue: dialogData },
         { provide: ExerciseService, useValue: exerciseService },
-        { provide: MatSnackBar,     useValue: { open: jasmine.createSpy('open') } },
+        { provide: FeedbackService, useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
       ],
     });
     component = TestBed.runInInjectionContext(() => new ExercisePickerDialogComponent());

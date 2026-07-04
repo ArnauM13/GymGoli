@@ -1,6 +1,5 @@
 import { Component, inject, signal, computed } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatSnackBar } from '@angular/material/snack-bar';
 
 import {
   Exercise, ExerciseCategory,
@@ -10,6 +9,7 @@ import {
 import { ExerciseService } from '../../../core/services/exercise.service';
 import { FilterBarComponent } from '../../../shared/components/filter-bar/filter-bar.component';
 import { ExerciseFormDialogComponent } from '../../library/components/exercise-form-dialog.component';
+import { FeedbackService } from '../../../shared/services/feedback.service';
 
 export interface ExercisePickerData {
   excludeIds?: string[];
@@ -180,7 +180,7 @@ export class ExercisePickerDialogComponent {
   private dialogRef       = inject(MatDialogRef<ExercisePickerDialogComponent>);
   private dialog          = inject(MatDialog);
   private exerciseService = inject(ExerciseService);
-  private snackBar        = inject(MatSnackBar);
+  private feedback        = inject(FeedbackService);
   readonly data: ExercisePickerData = inject(MAT_DIALOG_DATA);
 
   readonly isLoaded    = this.exerciseService.isLoaded;
@@ -226,7 +226,7 @@ export class ExercisePickerDialogComponent {
         const exercise = await this.exerciseService.create(result);
         this.dialogRef.close(exercise);
       } catch {
-        this.snackBar.open('Error en crear l\'exercici', '', { duration: 2500 });
+        this.feedback.error('Error en crear l\'exercici', 2500);
       }
     });
   }

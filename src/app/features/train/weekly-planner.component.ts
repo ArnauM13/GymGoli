@@ -1,5 +1,4 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute } from '@angular/router';
 
@@ -10,6 +9,7 @@ import { SportService } from '../../core/services/sport.service';
 import { WeeklyPlanService, WEEKS_RECURRING, WEEKS_SINGLE } from '../../core/services/weekly-plan.service';
 import { TemplateService } from '../../core/services/template.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
+import { FeedbackService } from '../../shared/services/feedback.service';
 import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, Exercise, ExerciseCategory } from '../../core/models/exercise.model';
 import { EMPTY_WEEKLY_PLAN, WEEKDAY_LABELS, WeeklyPlan, WeeklyPlanItem } from '../../core/models/weekly-plan.model';
 import { TemplateEntry, WorkoutTemplate } from '../../core/models/template.model';
@@ -163,7 +163,7 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
       }
 
       <div class="save-bar">
-        <button class="btn-primary save-btn" (click)="save()" [disabled]="saving()">
+        <button class="save-btn" (click)="save()" [disabled]="saving()">
           @if (saving()) {
             <span class="material-symbols-outlined spin">sync</span>
           } @else {
@@ -280,19 +280,17 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
       position: fixed; left: 16px; right: 16px;
       bottom: calc(var(--nav-height) + 16px);
       z-index: 89;
-    }
-    .btn-primary {
-      padding: 8px 16px; border: none; border-radius: 10px;
-      background: var(--c-brand); color: white;
-      font-size: 13px; font-weight: 700; cursor: pointer;
-      transition: background 0.15s; touch-action: manipulation;
-      &:hover { background: var(--c-brand-dk); }
+      display: flex; justify-content: flex-end;
     }
     .save-btn {
-      width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;
-      padding: 13px 16px; font-size: 14px;
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 10px 16px; border: none; border-radius: 12px;
+      background: var(--c-brand); color: white;
+      font-size: 13.5px; font-weight: 700; cursor: pointer;
+      transition: background 0.15s; touch-action: manipulation;
       box-shadow: 0 4px 16px var(--c-shadow-md);
       .material-symbols-outlined { font-size: 18px; }
+      &:hover { background: var(--c-brand-dk); }
       &:disabled { opacity: 0.6; cursor: default; }
     }
 
@@ -315,7 +313,7 @@ export class WeeklyPlannerComponent {
   private workoutService   = inject(WorkoutService);
   readonly sportService    = inject(SportService);
   private templateService  = inject(TemplateService);
-  private snackBar         = inject(MatSnackBar);
+  private feedback         = inject(FeedbackService);
   private confirmDialog    = inject(ConfirmDialogService);
   private dialog           = inject(MatDialog);
   private route            = inject(ActivatedRoute);
@@ -328,7 +326,7 @@ export class WeeklyPlannerComponent {
   readonly weekMonday = this.route.snapshot.queryParamMap.get('week');
 
   readonly saving = signal(false);
-  readonly plan = signal<WeeklyPlan>(this._clone(this.settingsService.weeklyPlan() ?? EMPTY_WEEKLY_PLAN));
+  readonly plan = signal<WeeklyPlan>(this._initialPlan());
 
   readonly hasSavedPlan = computed(() => {
     const p = this.settingsService.weeklyPlan();
@@ -341,6 +339,36 @@ export class WeeklyPlannerComponent {
 
   private _clone(plan: WeeklyPlan): WeeklyPlan {
     return { recurring: plan.recurring, days: plan.days.map(items => [...items]) };
+  }
+
+  /** Week-mode starts from what's actually planned for that specific week
+   *  (so editing shows the real state, not the persistent routine);
+   *  settings-mode keeps editing the persistent routine as before. */
+  private _initialPlan(): WeeklyPlan {
+    if (this.weekMonday) return this._reconstructWeekPlan(this.weekMonday);
+    return this._clone(this.settingsService.weeklyPlan() ?? EMPTY_WEEKLY_PLAN);
+  }
+
+  private _reconstructWeekPlan(monday: string): WeeklyPlan {
+    const days: WeeklyPlanItem[][] = [];
+    for (let i = 0; i < 7; i++) {
+      const date = addDays(monday, i);
+      const items: WeeklyPlanItem[] = [];
+
+      for (const workout of this.workoutService.getPlannedForDate(date)) {
+        const category = workout.category as ExerciseCategory | undefined;
+        if (!category) continue;
+        const entries: TemplateEntry[] = workout.entries.map(e => ({ exerciseId: e.exerciseId, exerciseName: e.exerciseName }));
+        items.push({ type: 'gym', category, entries: entries.length > 0 ? entries : undefined });
+      }
+
+      for (const { sport, session } of this.sportService.getPlannedSportSessionsForDate(date)) {
+        items.push({ type: 'sport', sportId: sport.id, subtypeId: session.subtypeId, duration: session.duration });
+      }
+
+      days.push(items);
+    }
+    return { recurring: false, days };
   }
 
   weekRange(monday: string): string { return weekRangeLabel(monday); }
@@ -526,9 +554,9 @@ export class WeeklyPlannerComponent {
       }
       await this.weeklyPlanService.retractRemoved(plan, WEEKS_SINGLE, monday, 'manual');
       await this.weeklyPlanService.apply(plan, WEEKS_SINGLE, monday, 'manual');
-      this.snackBar.open('Setmana planificada', '', { duration: 2000 });
+      this.feedback.success('Setmana planificada', 2000);
     } catch {
-      this.snackBar.open('Error en desar la planificació', '', { duration: 3000 });
+      this.feedback.error('Error en desar la planificació', 3000);
     } finally {
       this.saving.set(false);
     }
@@ -541,9 +569,9 @@ export class WeeklyPlannerComponent {
       await this.settingsService.updateWeeklyPlan(recurringPlan);
       await this.weeklyPlanService.retractRemoved(recurringPlan, WEEKS_RECURRING, undefined, 'routine');
       await this.weeklyPlanService.apply(recurringPlan, WEEKS_RECURRING, undefined, 'routine');
-      this.snackBar.open('Planificació desada', '', { duration: 2000 });
+      this.feedback.success('Planificació desada', 2000);
     } catch {
-      this.snackBar.open('Error en desar la planificació', '', { duration: 3000 });
+      this.feedback.error('Error en desar la planificació', 3000);
     } finally {
       this.saving.set(false);
     }
@@ -560,9 +588,9 @@ export class WeeklyPlannerComponent {
     try {
       await this.settingsService.updateWeeklyPlan(EMPTY_WEEKLY_PLAN);
       await this.weeklyPlanService.retractRemoved(EMPTY_WEEKLY_PLAN, WEEKS_RECURRING, undefined, 'routine');
-      this.snackBar.open('Planificació eliminada', '', { duration: 2000 });
+      this.feedback.success('Planificació eliminada', 2000);
     } catch {
-      this.snackBar.open('Error en eliminar la planificació', '', { duration: 3000 });
+      this.feedback.error('Error en eliminar la planificació', 3000);
     }
   }
 }

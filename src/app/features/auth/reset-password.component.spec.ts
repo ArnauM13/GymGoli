@@ -1,7 +1,6 @@
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
-import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { ResetPasswordComponent } from './reset-password.component';
 import { AuthService } from '../../core/services/auth.service';
@@ -25,10 +24,6 @@ describe('ResetPasswordComponent', () => {
         {
           provide: Router,
           useValue: { navigate: mockNavigate },
-        },
-        {
-          provide: MatSnackBar,
-          useValue: { open: jasmine.createSpy('open') },
         },
       ],
     })

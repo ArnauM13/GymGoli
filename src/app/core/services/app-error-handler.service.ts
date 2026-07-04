@@ -1,9 +1,10 @@
 import { ErrorHandler, Injectable, NgZone, inject, isDevMode } from '@angular/core';
-import { MatSnackBar } from '@angular/material/snack-bar';
+
+import { FeedbackService } from '../../shared/services/feedback.service';
 
 @Injectable()
 export class AppErrorHandler implements ErrorHandler {
-  private readonly snackBar = inject(MatSnackBar);
+  private readonly feedback = inject(FeedbackService);
   private readonly zone     = inject(NgZone);
 
   handleError(error: unknown): void {
@@ -16,11 +17,7 @@ export class AppErrorHandler implements ErrorHandler {
     if (msg.includes('ChunkLoadError') || msg.includes('Loading chunk')) return;
 
     this.zone.run(() => {
-      this.snackBar.open(
-        'S\'ha produït un error inesperat. Torna-ho a provar.',
-        'Tancar',
-        { duration: 5000, panelClass: 'snack-error' },
-      );
+      this.feedback.error('S\'ha produït un error inesperat. Torna-ho a provar.', 5000);
     });
   }
 }

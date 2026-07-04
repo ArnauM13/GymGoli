@@ -1,7 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { of } from 'rxjs';
 
@@ -12,10 +11,12 @@ import { WorkoutService } from '../../core/services/workout.service';
 import { SportService } from '../../core/services/sport.service';
 import { TemplateService } from '../../core/services/template.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
+import { FeedbackService } from '../../shared/services/feedback.service';
 import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../../core/models/weekly-plan.model';
 import { WorkoutTemplate } from '../../core/models/template.model';
 import { Exercise } from '../../core/models/exercise.model';
 import { Workout } from '../../core/models/workout.model';
+import { Sport, SportSession } from '../../core/models/sport.model';
 
 function template(overrides: Partial<WorkoutTemplate> = {}): WorkoutTemplate {
   return { id: 't1', name: 'Push A', category: 'push', entries: [], createdAt: '2024-01-01', ...overrides };
@@ -35,7 +36,13 @@ describe('WeeklyPlannerComponent', () => {
   let dialogOpen: jasmine.Spy;
   let afterClosedResult: Exercise | undefined;
 
-  function setup(week: string | null = null): void {
+  function setup(
+    week: string | null = null,
+    initial: {
+      getPlannedForDate?: (date: string) => Workout[];
+      getPlannedSportSessionsForDate?: (date: string) => Array<{ sport: Sport; session: SportSession }>;
+    } = {},
+  ): void {
     forCategory = jasmine.createSpy('forCategory').and.returnValue([]);
     savedPlan = signal(EMPTY_WEEKLY_PLAN);
     updateWeeklyPlan = jasmine.createSpy('updateWeeklyPlan').and.resolveTo(undefined);
@@ -43,8 +50,9 @@ describe('WeeklyPlannerComponent', () => {
     applyPlan = jasmine.createSpy('apply').and.resolveTo(undefined);
     confirm = jasmine.createSpy('confirm').and.resolveTo(true);
     chooseAction = jasmine.createSpy('chooseAction').and.resolveTo(null);
-    getPlannedForDate = jasmine.createSpy('getPlannedForDate').and.returnValue([]);
-    getPlannedSportSessionsForDate = jasmine.createSpy('getPlannedSportSessionsForDate').and.returnValue([]);
+    getPlannedForDate = jasmine.createSpy('getPlannedForDate').and.callFake(initial.getPlannedForDate ?? (() => []));
+    getPlannedSportSessionsForDate = jasmine.createSpy('getPlannedSportSessionsForDate')
+      .and.callFake(initial.getPlannedSportSessionsForDate ?? (() => []));
     afterClosedResult = undefined;
     dialogOpen = jasmine.createSpy('open').and.returnValue({
       afterClosed: () => of(afterClosedResult),
@@ -57,7 +65,7 @@ describe('WeeklyPlannerComponent', () => {
         { provide: WorkoutService,      useValue: { getPlannedForDate } },
         { provide: SportService,        useValue: { sports: signal([]), ensureLoaded: jasmine.createSpy(), getPlannedSportSessionsForDate } },
         { provide: TemplateService,     useValue: { forCategory } },
-        { provide: MatSnackBar,         useValue: { open: jasmine.createSpy() } },
+        { provide: FeedbackService,     useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
         { provide: ConfirmDialogService, useValue: { confirm, chooseAction } },
         { provide: MatDialog,           useValue: { open: dialogOpen } },
         { provide: ActivatedRoute,      useValue: { snapshot: { queryParamMap: { get: () => week } } } },
@@ -266,6 +274,52 @@ describe('WeeklyPlannerComponent', () => {
 
     it('weekRange() formats the week label', () => {
       expect(component.weekRange('2024-03-04')).toContain('2024');
+    });
+
+    describe('pre-filling the actual planned state for this week (not the persisted routine)', () => {
+      it('marks a gym category as selected with its actual planned entries for that day', () => {
+        TestBed.resetTestingModule();
+        setup('2024-03-04', {
+          getPlannedForDate: (date) => date === '2024-03-04'
+            ? [{ id: 'w1', category: 'push', entries: [{ exerciseId: 'ex1', exerciseName: 'Press banca' }] } as unknown as Workout]
+            : [],
+        });
+
+        expect(component.isGymSelected(0, 'push')).toBeTrue();
+        expect(component.gymEntries(0, 'push')).toEqual([{ exerciseId: 'ex1', exerciseName: 'Press banca' }]);
+        expect(component.isGymSelected(1, 'push')).toBeFalse();
+      });
+
+      it('marks a sport as selected with its actual planned subtype/duration for that day', () => {
+        TestBed.resetTestingModule();
+        setup('2024-03-04', {
+          getPlannedSportSessionsForDate: (date) => date === '2024-03-05'
+            ? [{ sport: { id: 'running' } as Sport, session: { subtypeId: 'sub1', duration: 30 } as SportSession }]
+            : [],
+        });
+
+        expect(component.isSportSelected(1, 'running')).toBeTrue();
+        expect(component.sportSubtype(1, 'running')).toBe('sub1');
+        expect(component.sportDuration(1, 'running')).toBe(30);
+        expect(component.isSportSelected(0, 'running')).toBeFalse();
+      });
+
+      it('ignores planned workouts with no category (defensive)', () => {
+        TestBed.resetTestingModule();
+        setup('2024-03-04', {
+          getPlannedForDate: (date) => date === '2024-03-04'
+            ? [{ id: 'w1', entries: [] } as unknown as Workout]
+            : [],
+        });
+
+        expect(component.plan().days[0]).toEqual([]);
+      });
+
+      it('starts empty when nothing is planned for any day of the week', () => {
+        TestBed.resetTestingModule();
+        setup('2024-03-04');
+        expect(component.plan().days.every(items => items.length === 0)).toBeTrue();
+      });
     });
 
     describe('save() when the routine has nothing planned for this week', () => {

@@ -2,13 +2,13 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialog } from '@angular/material/dialog';
-import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { LibraryComponent } from './library.component';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Exercise } from '../../core/models/exercise.model';
+import { FeedbackService } from '../../shared/services/feedback.service';
 
 function makeExercise(overrides: Partial<Exercise> = {}): Exercise {
   return { id: '1', name: 'Test', category: 'push', createdAt: new Date(), ...overrides };
@@ -47,7 +47,7 @@ describe('LibraryComponent', () => {
         { provide: SportService,    useValue: mockSportService },
         { provide: AuthService,     useValue: { uid: signal('user-1') } },
         { provide: MatDialog,       useValue: { open: jasmine.createSpy() } },
-        { provide: MatSnackBar,     useValue: { open: jasmine.createSpy() } },
+        { provide: FeedbackService, useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
       ],
     }).compileComponents();
 

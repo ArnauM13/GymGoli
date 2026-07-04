@@ -1,9 +1,9 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
-import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
+import { FeedbackService } from '../../shared/services/feedback.service';
 
 import {
   CATEGORY_COLORS,
@@ -216,7 +216,7 @@ import { FilterBarComponent } from '../../shared/components/filter-bar/filter-ba
 export class ExercisesComponent {
   private exerciseService = inject(ExerciseService);
   private dialog          = inject(MatDialog);
-  private snackBar        = inject(MatSnackBar);
+  private feedback        = inject(FeedbackService);
   private confirmDialog   = inject(ConfirmDialogService);
   private router          = inject(Router);
 
@@ -276,13 +276,13 @@ export class ExercisesComponent {
       try {
         if (exercise) {
           await this.exerciseService.update(exercise.id, result);
-          this.snackBar.open('Exercici actualitzat', '', { duration: 2000 });
+          this.feedback.success('Exercici actualitzat', 2000);
         } else {
           await this.exerciseService.create(result);
-          this.snackBar.open('Exercici creat', '', { duration: 2000 });
+          this.feedback.success('Exercici creat', 2000);
         }
       } catch (err) {
-        this.snackBar.open(`Error: ${(err as { message?: string }).message ?? 'desconegut'}`, 'OK', { duration: 5000 });
+        this.feedback.error(`Error: ${(err as { message?: string }).message ?? 'desconegut'}`, 5000);
       }
     });
   }
@@ -291,14 +291,14 @@ export class ExercisesComponent {
     if (!await this.confirmDialog.confirm(`Eliminar "${exercise.name}"?`, { variant: 'danger', confirmLabel: 'Eliminar' })) return;
     try {
       await this.exerciseService.delete(exercise.id);
-      this.snackBar.open('Exercici eliminat', '', { duration: 2000 });
+      this.feedback.success('Exercici eliminat', 2000);
     } catch {
-      this.snackBar.open('Error en eliminar', '', { duration: 3000 });
+      this.feedback.error('Error en eliminar', 3000);
     }
   }
 
   async seed(): Promise<void> {
     await this.exerciseService.ensureLoaded();
-    this.snackBar.open('Exercicis carregats', '', { duration: 2000 });
+    this.feedback.success('Exercicis carregats', 2000);
   }
 }

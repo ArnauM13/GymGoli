@@ -1,10 +1,10 @@
 import { Component, HostListener, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { AuthService } from '../../core/services/auth.service';
 import { environment } from '../../../environments/environment';
+import { FeedbackService } from '../../shared/services/feedback.service';
 
 type AuthMode = 'login' | 'register' | 'forgot';
 
@@ -312,7 +312,7 @@ function friendlyError(err: unknown): string {
 export class LoginComponent {
   private authService = inject(AuthService);
   private router      = inject(Router);
-  private snackBar    = inject(MatSnackBar);
+  private feedback    = inject(FeedbackService);
 
   readonly mode            = signal<AuthMode>('login');
   readonly loadingEmail    = signal(false);
@@ -387,7 +387,7 @@ export class LoginComponent {
       this.loadingGoogle.set(false);
     } catch (err: unknown) {
       this.loadingGoogle.set(false);
-      this.snackBar.open('Error en iniciar sessió amb Google', '', { duration: 3000 });
+      this.feedback.error('Error en iniciar sessió amb Google', 3000);
     }
   }
 

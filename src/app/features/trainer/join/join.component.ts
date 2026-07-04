@@ -1,6 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { AuthService } from '../../../core/services/auth.service';
 import { TrainerService } from '../../../core/services/trainer.service';
@@ -74,7 +73,6 @@ export class JoinComponent implements OnInit {
   private router         = inject(Router);
   private auth           = inject(AuthService);
   private trainerService = inject(TrainerService);
-  private snackBar       = inject(MatSnackBar);
 
   readonly status       = signal<'loading' | 'success' | 'error' | 'needs-auth'>('loading');
   readonly errorMessage = signal('');
