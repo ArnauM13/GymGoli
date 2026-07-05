@@ -32,6 +32,8 @@ describe('WeeklyPlannerComponent', () => {
   let confirm: jasmine.Spy;
   let chooseAction: jasmine.Spy;
   let getPlannedForDate: jasmine.Spy;
+  let getWorkoutsForDate: jasmine.Spy;
+  let getSportSessionsForDate: jasmine.Spy;
   let getPlannedSportSessionsForDate: jasmine.Spy;
   let dialogOpen: jasmine.Spy;
   let afterClosedResult: Exercise | undefined;
@@ -40,6 +42,8 @@ describe('WeeklyPlannerComponent', () => {
     week: string | null = null,
     initial: {
       getPlannedForDate?: (date: string) => Workout[];
+      getWorkoutsForDate?: (date: string) => Workout[];
+      getSportSessionsForDate?: (date: string) => Array<{ sport: Sport; session: SportSession }>;
       getPlannedSportSessionsForDate?: (date: string) => Array<{ sport: Sport; session: SportSession }>;
     } = {},
   ): void {
@@ -51,6 +55,9 @@ describe('WeeklyPlannerComponent', () => {
     confirm = jasmine.createSpy('confirm').and.resolveTo(true);
     chooseAction = jasmine.createSpy('chooseAction').and.resolveTo(null);
     getPlannedForDate = jasmine.createSpy('getPlannedForDate').and.callFake(initial.getPlannedForDate ?? (() => []));
+    getWorkoutsForDate = jasmine.createSpy('getWorkoutsForDate').and.callFake(initial.getWorkoutsForDate ?? (() => []));
+    getSportSessionsForDate = jasmine.createSpy('getSportSessionsForDate')
+      .and.callFake(initial.getSportSessionsForDate ?? (() => []));
     getPlannedSportSessionsForDate = jasmine.createSpy('getPlannedSportSessionsForDate')
       .and.callFake(initial.getPlannedSportSessionsForDate ?? (() => []));
     afterClosedResult = undefined;
@@ -62,8 +69,8 @@ describe('WeeklyPlannerComponent', () => {
       providers: [
         { provide: UserSettingsService, useValue: { weeklyPlan: savedPlan, updateWeeklyPlan } },
         { provide: WeeklyPlanService,   useValue: { apply: applyPlan, retractRemoved } },
-        { provide: WorkoutService,      useValue: { getPlannedForDate } },
-        { provide: SportService,        useValue: { sports: signal([]), ensureLoaded: jasmine.createSpy(), getPlannedSportSessionsForDate } },
+        { provide: WorkoutService,      useValue: { getPlannedForDate, getWorkoutsForDate } },
+        { provide: SportService,        useValue: { sports: signal([]), ensureLoaded: jasmine.createSpy(), getSportSessionsForDate, getPlannedSportSessionsForDate } },
         { provide: TemplateService,     useValue: { forCategory } },
         { provide: FeedbackService,     useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
         { provide: ConfirmDialogService, useValue: { confirm, chooseAction } },
@@ -280,8 +287,8 @@ describe('WeeklyPlannerComponent', () => {
       it('marks a gym category as selected with its actual planned entries for that day', () => {
         TestBed.resetTestingModule();
         setup('2024-03-04', {
-          getPlannedForDate: (date) => date === '2024-03-04'
-            ? [{ id: 'w1', category: 'push', entries: [{ exerciseId: 'ex1', exerciseName: 'Press banca' }] } as unknown as Workout]
+          getWorkoutsForDate: (date) => date === '2024-03-04'
+            ? [{ id: 'w1', plannedSource: 'manual', category: 'push', entries: [{ exerciseId: 'ex1', exerciseName: 'Press banca' }] } as unknown as Workout]
             : [],
         });
 
@@ -294,7 +301,7 @@ describe('WeeklyPlannerComponent', () => {
         TestBed.resetTestingModule();
         setup('2024-03-04', {
           getPlannedSportSessionsForDate: (date) => date === '2024-03-05'
-            ? [{ sport: { id: 'running' } as Sport, session: { subtypeId: 'sub1', duration: 30 } as SportSession }]
+            ? [{ sport: { id: 'running' } as Sport, session: { plannedSource: 'manual', subtypeId: 'sub1', duration: 30 } as SportSession }]
             : [],
         });
 
@@ -304,11 +311,44 @@ describe('WeeklyPlannerComponent', () => {
         expect(component.isSportSelected(0, 'running')).toBeFalse();
       });
 
+      it('still marks a day whose planned workout has already been completed (status done)', () => {
+        TestBed.resetTestingModule();
+        setup('2024-03-04', {
+          getWorkoutsForDate: (date) => date === '2024-03-04'
+            ? [{ id: 'w1', status: 'done', plannedSource: 'manual', category: 'push', entries: [] } as unknown as Workout]
+            : [],
+        });
+
+        expect(component.isGymSelected(0, 'push')).toBeTrue();
+      });
+
+      it('still marks a day whose planned sport session has already been completed (status done)', () => {
+        TestBed.resetTestingModule();
+        setup('2024-03-04', {
+          getSportSessionsForDate: (date) => date === '2024-03-05'
+            ? [{ sport: { id: 'running' } as Sport, session: { status: 'done', plannedSource: 'manual' } as SportSession }]
+            : [],
+        });
+
+        expect(component.isSportSelected(1, 'running')).toBeTrue();
+      });
+
+      it('ignores workouts not created by planning (no plannedSource), even if already categorized', () => {
+        TestBed.resetTestingModule();
+        setup('2024-03-04', {
+          getWorkoutsForDate: (date) => date === '2024-03-04'
+            ? [{ id: 'w1', category: 'push', entries: [] } as unknown as Workout]
+            : [],
+        });
+
+        expect(component.isGymSelected(0, 'push')).toBeFalse();
+      });
+
       it('ignores planned workouts with no category (defensive)', () => {
         TestBed.resetTestingModule();
         setup('2024-03-04', {
-          getPlannedForDate: (date) => date === '2024-03-04'
-            ? [{ id: 'w1', entries: [] } as unknown as Workout]
+          getWorkoutsForDate: (date) => date === '2024-03-04'
+            ? [{ id: 'w1', plannedSource: 'manual', entries: [] } as unknown as Workout]
             : [],
         });
 

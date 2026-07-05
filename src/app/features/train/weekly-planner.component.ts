@@ -349,20 +349,30 @@ export class WeeklyPlannerComponent {
     return this._clone(this.settingsService.weeklyPlan() ?? EMPTY_WEEKLY_PLAN);
   }
 
+  /** Reads every workout/session created by planning (any `plannedSource`)
+   *  regardless of whether it's still `planned` or already marked done —
+   *  a day the user already completed is still part of "this week's plan"
+   *  and must show up checked when re-opening the editor. */
   private _reconstructWeekPlan(monday: string): WeeklyPlan {
     const days: WeeklyPlanItem[][] = [];
     for (let i = 0; i < 7; i++) {
       const date = addDays(monday, i);
       const items: WeeklyPlanItem[] = [];
 
-      for (const workout of this.workoutService.getPlannedForDate(date)) {
+      for (const workout of this.workoutService.getWorkoutsForDate(date)) {
+        if (!workout.plannedSource) continue;
         const category = workout.category as ExerciseCategory | undefined;
         if (!category) continue;
         const entries: TemplateEntry[] = workout.entries.map(e => ({ exerciseId: e.exerciseId, exerciseName: e.exerciseName }));
         items.push({ type: 'gym', category, entries: entries.length > 0 ? entries : undefined });
       }
 
-      for (const { sport, session } of this.sportService.getPlannedSportSessionsForDate(date)) {
+      const sportPairs = [
+        ...this.sportService.getSportSessionsForDate(date),
+        ...this.sportService.getPlannedSportSessionsForDate(date),
+      ];
+      for (const { sport, session } of sportPairs) {
+        if (!session.plannedSource) continue;
         items.push({ type: 'sport', sportId: sport.id, subtypeId: session.subtypeId, duration: session.duration });
       }
 
