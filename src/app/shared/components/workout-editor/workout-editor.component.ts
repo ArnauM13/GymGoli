@@ -259,6 +259,11 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                       <span class="material-symbols-outlined">repeat</span>
                       <span class="we-repeat-label">{{ dispW(entry.sets[entry.sets.length - 1].weight) }}{{ unit() }} × {{ entry.sets[entry.sets.length - 1].reps }}</span>
                     </button>
+                    @if (restTimerEnabled()) {
+                      <button class="we-rest-trigger-btn" (click)="startManualRest(entry.exerciseId)" title="Iniciar descans">
+                        <span class="material-symbols-outlined">timer</span>
+                      </button>
+                    }
                   }
                 </div>
               }
@@ -833,6 +838,17 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       &:active { transform: scale(0.97); }
     }
     .we-repeat-label { font-size: 13px; font-weight: 700; }
+    .we-rest-trigger-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 44px; padding: 12px; border-radius: 10px;
+      border: 1.5px solid var(--c-border);
+      background: var(--c-card);
+      color: var(--c-text-2); flex-shrink: 0;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { border-color: var(--c-brand); color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.05); }
+      &:active { transform: scale(0.97); }
+    }
 
     /* ── Add-exercise button (history edit mode) ── */
     .we-add-exercise-btn {
@@ -944,6 +960,7 @@ export class WorkoutEditorComponent implements OnDestroy {
   readonly collapsedSections = signal<Set<string>>(new Set());
   readonly isDragging        = signal(false);
   // ── Rest timer ─────────────────────────────────────────────────────────────
+  readonly restTimerEnabled = computed(() => this.settingsService.restTimerSeconds() > 0);
   readonly timerActive    = signal(false);
   readonly timerRemaining = signal(0);
   readonly timerTotal     = signal(0);
@@ -1373,9 +1390,6 @@ export class WorkoutEditorComponent implements OnDestroy {
     const sets = Array.from({ length: count }, () => ({ weight: weightKg, reps: reps! }));
     try {
       await this.workoutService.addSetsToEntry(w.id, exerciseId, sets);
-      // Start rest timer after logging sets
-      const restSecs = this.settingsService.restTimerSeconds();
-      if (restSecs > 0 && w.status !== 'planned') this.startRestTimer(restSecs, exerciseId);
       this.cancelSet();
     } catch {
       this.feedback.error('Error en afegir les sèries', 3000);
@@ -1417,6 +1431,13 @@ export class WorkoutEditorComponent implements OnDestroy {
   }
 
   // ── Rest timer ─────────────────────────────────────────────────────────────
+  /** Manually triggered from the "Descans" button — the timer never starts
+   *  on its own after logging a set, only when the user asks for it. */
+  startManualRest(exerciseId: string): void {
+    if (!this.restTimerEnabled()) return;
+    this.startRestTimer(this.settingsService.restTimerSeconds(), exerciseId);
+  }
+
   startRestTimer(seconds: number, exerciseId?: string): void {
     this.cancelTimer();
     this._timerForExercise = exerciseId ?? null;
