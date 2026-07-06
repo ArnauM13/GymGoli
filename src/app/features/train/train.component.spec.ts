@@ -17,9 +17,13 @@ import { TemplateService } from '../../core/services/template.service';
 import { SharedWorkoutService } from '../../core/services/shared-workout.service';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
 import { Workout, WorkoutEntry } from '../../core/models/workout.model';
+import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../../core/models/weekly-plan.model';
+import { UserSettings, DEFAULT_USER_SETTINGS } from '../../core/models/user-settings.model';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { mondayOf } from '../../shared/utils/calendar-utils';
+
+const ROUTINE_HINT_KEY = 'gymgoli_routine_hint_shown_user-1';
 
 const TODAY = new Date().toISOString().split('T')[0];
 
@@ -34,9 +38,19 @@ describe('TrainComponent', () => {
   let fixture: ReturnType<typeof TestBed.createComponent<TrainComponent>>;
   let forceOffline: ReturnType<typeof signal<boolean>>;
   let navigateSpy: jasmine.Spy;
+  let weeklyPlanSignal: ReturnType<typeof signal<WeeklyPlan>>;
+  let settingsSignal: ReturnType<typeof signal<UserSettings>>;
+  let updateSettings: jasmine.Spy;
 
   beforeEach(async () => {
+    localStorage.removeItem(ROUTINE_HINT_KEY);
     forceOffline = signal(false);
+    weeklyPlanSignal = signal<WeeklyPlan>(EMPTY_WEEKLY_PLAN);
+    settingsSignal    = signal<UserSettings>(DEFAULT_USER_SETTINGS);
+    updateSettings    = jasmine.createSpy('update').and.callFake((patch: Partial<UserSettings>) => {
+      settingsSignal.set({ ...settingsSignal(), ...patch });
+      return Promise.resolve();
+    });
     const mockWorkoutService = {
       workouts:                   signal<Workout[]>([]),
       isLoading:                  signal(false),
@@ -74,7 +88,13 @@ describe('TrainComponent', () => {
         { provide: SportService,        useValue: mockSportService },
         { provide: ExerciseService,     useValue: { exercises: signal([]), isLoaded: signal(true), ensureLoaded: jasmine.createSpy().and.resolveTo(undefined) } },
         { provide: AuthService,         useValue: { uid: signal('user-1') } },
-        { provide: UserSettingsService, useValue: { weightUnit: signal<'kg' | 'lb'>('kg'), fitnessGoal: signal(null), loaded: signal(true) } },
+        {
+          provide: UserSettingsService,
+          useValue: {
+            weightUnit: signal<'kg' | 'lb'>('kg'), fitnessGoal: signal(null), loaded: signal(true),
+            weeklyPlan: weeklyPlanSignal, settings: settingsSignal, update: updateSettings,
+          },
+        },
         { provide: OfflineService,      useValue: { isOffline: signal(false), forceOffline, toggleForceOffline: jasmine.createSpy() } },
         { provide: TrainerService,      useValue: { myTrainer: signal(null), hasTrainer: jasmine.createSpy().and.returnValue(false), getProposalForDate: jasmine.createSpy().and.returnValue(null) } },
         { provide: TemplateService,     useValue: { forCategory: jasmine.createSpy().and.returnValue([]), create: jasmine.createSpy().and.resolveTo(undefined), recordUse: jasmine.createSpy().and.resolveTo(undefined) } },
@@ -98,6 +118,46 @@ describe('TrainComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  // ── "Set up a routine" hint ──────────────────────────────────────────────
+
+  describe('showRoutineHint()', () => {
+    it('is shown when there is no recurring routine and it has not been dismissed', () => {
+      expect(component.showRoutineHint()).toBeTrue();
+    });
+
+    it('is hidden once a recurring routine is set', () => {
+      weeklyPlanSignal.set({ recurring: true, days: [[], [], [], [], [], [], []] });
+      expect(component.showRoutineHint()).toBeFalse();
+    });
+
+    it('is hidden once the user dismisses it for good', () => {
+      component.dismissRoutineHint();
+      expect(component.showRoutineHint()).toBeFalse();
+    });
+
+    it('does not come back the next time the app loads within ~7 days', () => {
+      // A second instance re-reads the same (per-device) throttle key that
+      // the first instance's construction just wrote to.
+      const fixture2 = TestBed.createComponent(TrainComponent);
+      fixture2.detectChanges();
+      expect(fixture2.componentInstance.showRoutineHint()).toBeFalse();
+    });
+  });
+
+  describe('dismissRoutineHint()', () => {
+    it('persists the dismissal via UserSettingsService', () => {
+      component.dismissRoutineHint();
+      expect(updateSettings).toHaveBeenCalledWith({ routineHintDismissed: true });
+    });
+  });
+
+  describe('goSetRoutine()', () => {
+    it('navigates to the routine planner with no week param (settings/recurring mode)', () => {
+      component.goSetRoutine();
+      expect(navigateSpy).toHaveBeenCalledWith(['/train/planner']);
+    });
   });
 
   // ── workoutLabel() ───────────────────────────────────────────────────────

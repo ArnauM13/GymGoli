@@ -207,6 +207,22 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           </button>
         </app-page-header>
 
+        @if (showRoutineHint()) {
+          <div class="routine-hint-card">
+            <button class="rh-dismiss" (click)="dismissRoutineHint()" aria-label="No tornar a mostrar">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+            <button type="button" class="rh-body" (click)="goSetRoutine()">
+              <span class="material-symbols-outlined rh-icon">event_repeat</span>
+              <span class="rh-text">
+                <span class="rh-title">Encara no tens una rutina</span>
+                <span class="rh-desc">Per què no n'estableixes una? Es planificarà automàticament cada setmana.</span>
+              </span>
+              <span class="material-symbols-outlined rh-arrow">chevron_right</span>
+            </button>
+          </div>
+        }
+
         @if (!offlineService.isOffline()) {
           <div class="calendar-wrap">
             <app-calendar
@@ -827,6 +843,46 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       box-shadow: 0 2px 12px rgba(0,0,0,0.08);
       border-radius: 16px; overflow: hidden;
       background: var(--c-card);
+    }
+
+    /* ── "Set up a routine" hint ── */
+    .routine-hint-card {
+      position: relative;
+      margin: 0 16px 12px;
+      background: var(--c-card);
+      border-radius: 16px;
+      border: 1.5px solid rgba(var(--c-brand-rgb), 0.2);
+      box-shadow: 0 2px 10px var(--c-shadow);
+      overflow: hidden;
+      animation: rh-in 0.25s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+    }
+    @keyframes rh-in {
+      from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+      to   { opacity: 1; transform: translateY(0)    scale(1); }
+    }
+    .rh-body {
+      display: flex; align-items: center; gap: 12px; width: 100%;
+      padding: 14px 40px 14px 14px;
+      border: none; background: transparent; text-align: left;
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
+      &:hover { background: rgba(var(--c-brand-rgb), 0.05); }
+    }
+    .rh-icon {
+      flex-shrink: 0; font-size: 22px; color: var(--c-brand);
+      font-variation-settings: 'FILL' 1;
+    }
+    .rh-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .rh-title { font-size: 13.5px; font-weight: 700; color: var(--c-text); }
+    .rh-desc  { font-size: 12px; color: var(--c-text-3); line-height: 1.4; }
+    .rh-arrow { flex-shrink: 0; font-size: 20px; color: var(--c-text-3); }
+    .rh-dismiss {
+      position: absolute; top: 8px; right: 8px; z-index: 1;
+      width: 28px; height: 28px; border-radius: 50%; border: none;
+      background: var(--c-subtle); color: var(--c-text-3);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s, color 0.15s;
+      .material-symbols-outlined { font-size: 15px; }
+      &:hover { background: rgba(239,83,80,0.1); color: #ef5350; }
     }
 
     /* ── "Editar planificació" subsection, right-aligned, when the viewed
@@ -1809,6 +1865,20 @@ export class TrainComponent {
     return false;
   });
 
+  /** Opens once per ~7 days (per device) so the "set up a routine" hint
+   *  below isn't shown on every single visit — not tied to whether it's
+   *  actually eligible to show (that's `showRoutineHint`), just throttles
+   *  how often we're willing to re-offer it. */
+  private readonly _routineHintGateOpen = signal(false);
+
+  /** Suggests setting up a recurring routine — only while none is set,
+   *  the user hasn't dismissed it for good, and the time gate is open. */
+  readonly showRoutineHint = computed(() =>
+    this._routineHintGateOpen() &&
+    !this.settingsService.weeklyPlan().recurring &&
+    !this.settingsService.settings().routineHintDismissed
+  );
+
   readonly datePlanned = computed(() =>
     this.workoutService.getPlannedForDate(this.selectedDate())
   );
@@ -2012,6 +2082,23 @@ export class TrainComponent {
   constructor() {
     this.sportService.ensureLoaded();
 
+    // Open the routine-hint time gate once settings are loaded, at most
+    // once every ~7 days per device — independent of whether it'll
+    // actually be shown (see showRoutineHint).
+    effect(() => {
+      if (this.settingsService.loaded()) {
+        untracked(() => this._openRoutineHintGateIfDue());
+      }
+    });
+
+    // Record "shown now" the moment the hint actually becomes visible, so
+    // the next time gate opens ~7 days from here, not from page load.
+    effect(() => {
+      if (this.showRoutineHint()) {
+        untracked(() => this._recordRoutineHintShown());
+      }
+    });
+
     effect(() => {
       const date = this.selectedDate();
       const [yearStr, monthStr] = date.split('-');
@@ -2068,6 +2155,31 @@ export class TrainComponent {
 
   goPlanWeek(): void {
     this.router.navigate(['/train/planner'], { queryParams: { week: this.viewedWeekMonday() } });
+  }
+
+  // ── "Set up a routine" hint ───────────────────────────────────────────────
+
+  private _routineHintKey(): string {
+    return `gymgoli_routine_hint_shown_${this.auth?.uid() ?? ''}`;
+  }
+
+  private _openRoutineHintGateIfDue(): void {
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    let last = 0;
+    try { last = Number(localStorage.getItem(this._routineHintKey()) ?? '0'); } catch { }
+    if (Date.now() - last >= sevenDaysMs) this._routineHintGateOpen.set(true);
+  }
+
+  private _recordRoutineHintShown(): void {
+    try { localStorage.setItem(this._routineHintKey(), String(Date.now())); } catch { }
+  }
+
+  goSetRoutine(): void {
+    this.router.navigate(['/train/planner']);
+  }
+
+  dismissRoutineHint(): void {
+    this.settingsService.update({ routineHintDismissed: true });
   }
 
   // ── Workout navigation ────────────────────────────────────────────────────

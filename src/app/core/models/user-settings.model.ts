@@ -38,6 +38,8 @@ export interface UserSettings {
   onboardingDone: boolean;
   fitnessGoal: FitnessGoal | null;
   weeklyPlan: WeeklyPlan | null;
+  /** User asked to stop seeing the "set up a routine" reminder on Train. */
+  routineHintDismissed: boolean;
 }
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
@@ -52,4 +54,5 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   onboardingDone: false,
   fitnessGoal: null,
   weeklyPlan: null,
+  routineHintDismissed: false,
 };
