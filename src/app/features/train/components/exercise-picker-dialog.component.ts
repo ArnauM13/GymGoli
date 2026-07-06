@@ -4,7 +4,7 @@ import { MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef } from '@angu
 import {
   Exercise, ExerciseCategory,
   CATEGORY_LABELS, CATEGORY_COLORS,
-  MUSCLE_LABELS, SUBCATEGORY_LABELS,
+  MUSCLE_LABELS, SUBCATEGORY_LABELS, SUBCATEGORY_OPTIONS,
 } from '../../../core/models/exercise.model';
 import { ExerciseService } from '../../../core/services/exercise.service';
 import { FilterBarComponent } from '../../../shared/components/filter-bar/filter-bar.component';
@@ -45,7 +45,7 @@ export interface ExercisePickerData {
           </div>
         }
       } @else {
-        @if (filtered().length === 0) {
+        @if (groupedFiltered().length === 0) {
           <div class="empty">
             <p class="empty-msg">Cap exercici trobat</p>
             <button class="empty-create-btn" type="button" (click)="startCreate()">
@@ -54,28 +54,31 @@ export interface ExercisePickerData {
             </button>
           </div>
         }
-        @for (ex of filtered(); track ex.id) {
-          <button class="exercise-item" (click)="select(ex)">
-            <span class="category-dot" [style.background]="getCategoryColor(ex.category)"></span>
-            <div class="info">
-              <span class="name">{{ ex.name }}</span>
-              @if (ex.muscles?.length || ex.setsRange) {
-                <div class="ex-meta">
-                  @if (ex.setsRange && ex.repsRange) {
-                    <span class="ex-guide">{{ formatRange(ex.setsRange) }} × {{ formatRange(ex.repsRange) }}</span>
-                  }
-                  @for (m of (ex.muscles ?? []); track m; let i = $index) {
-                    @if (i < 2) {
-                      <span class="ex-muscle">{{ getMuscleLabel(m) }}</span>
+        @for (group of groupedFiltered(); track group.key) {
+          <div class="muscle-group-header">{{ group.label }}</div>
+          @for (ex of group.exercises; track ex.id) {
+            <button class="exercise-item" (click)="select(ex)">
+              <span class="category-dot" [style.background]="getCategoryColor(ex.category)"></span>
+              <div class="info">
+                <span class="name">{{ ex.name }}</span>
+                @if (ex.muscles?.length || ex.setsRange) {
+                  <div class="ex-meta">
+                    @if (ex.setsRange && ex.repsRange) {
+                      <span class="ex-guide">{{ formatRange(ex.setsRange) }} × {{ formatRange(ex.repsRange) }}</span>
                     }
-                  }
-                </div>
-              } @else if (ex.subcategory) {
-                <span class="sub">{{ getSubLabel(ex.subcategory) }} · {{ getCategoryLabel(ex.category) }}</span>
-              }
-            </div>
-            <span class="material-symbols-outlined arrow">chevron_right</span>
-          </button>
+                    @for (m of (ex.muscles ?? []); track m; let i = $index) {
+                      @if (i < 2) {
+                        <span class="ex-muscle">{{ getMuscleLabel(m) }}</span>
+                      }
+                    }
+                  </div>
+                } @else if (ex.subcategory) {
+                  <span class="sub">{{ getSubLabel(ex.subcategory) }} · {{ getCategoryLabel(ex.category) }}</span>
+                }
+              </div>
+              <span class="material-symbols-outlined arrow">chevron_right</span>
+            </button>
+          }
         }
       }
     </mat-dialog-content>
@@ -102,6 +105,15 @@ export interface ExercisePickerData {
       cursor: pointer; text-align: left;
       transition: background 0.15s; touch-action: manipulation;
       &:hover { background: var(--c-subtle); }
+    }
+
+    .muscle-group-header {
+      position: sticky; top: 0; z-index: 1;
+      padding: 8px 24px 6px;
+      font-size: 10.5px; font-weight: 700; color: var(--c-text-3);
+      text-transform: uppercase; letter-spacing: 0.4px;
+      background: var(--c-card);
+      &:not(:first-child) { margin-top: 4px; border-top: 1px solid var(--c-border-2); padding-top: 12px; }
     }
 
     .category-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
@@ -200,6 +212,29 @@ export class ExercisePickerDialogComponent {
       .filter(e => !excluded.includes(e.id))
       .filter(e => !cat || e.category === cat)
       .filter(e => !term || e.name.toLowerCase().includes(term));
+  });
+
+  /** Subdivides filtered() by main muscle group (subcategory), in a fixed
+   *  push→pull→legs / chest→shoulders→triceps… order, with an "Altres"
+   *  bucket for exercises that don't have one set. */
+  readonly groupedFiltered = computed(() => {
+    const list = this.filtered();
+    const order = [
+      ...SUBCATEGORY_OPTIONS.push,
+      ...SUBCATEGORY_OPTIONS.pull,
+      ...SUBCATEGORY_OPTIONS.legs,
+    ];
+
+    const groups: { key: string; label: string; exercises: Exercise[] }[] = [];
+    for (const { value, label } of order) {
+      const exercises = list.filter(e => e.subcategory === value);
+      if (exercises.length > 0) groups.push({ key: value, label, exercises });
+    }
+
+    const rest = list.filter(e => !e.subcategory);
+    if (rest.length > 0) groups.push({ key: 'other', label: 'Altres', exercises: rest });
+
+    return groups;
   });
 
   getCategoryColor(cat: ExerciseCategory): string { return CATEGORY_COLORS[cat] ?? '#bbb'; }

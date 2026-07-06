@@ -87,6 +87,50 @@ describe('ExercisePickerDialogComponent', () => {
     });
   });
 
+  describe('groupedFiltered()', () => {
+    it('puts exercises with no subcategory into an "Altres" group', () => {
+      setup();
+      const groups = component.groupedFiltered();
+      expect(groups.map(g => g.label)).toEqual(['Altres']);
+      expect(groups[0].exercises.map(e => e.id)).toEqual(['ex1', 'ex2', 'ex3']);
+    });
+
+    it('subdivides exercises by their main muscle group (subcategory), ordered chest → shoulders → triceps', () => {
+      setup();
+      exerciseService.exercises.set([
+        makeExercise({ id: 'ex1', name: 'Press banca', category: 'push', subcategory: 'chest' }),
+        makeExercise({ id: 'ex2', name: 'Press militar', category: 'push', subcategory: 'shoulders' }),
+        makeExercise({ id: 'ex3', name: 'Extensió tríceps', category: 'push', subcategory: 'triceps' }),
+      ]);
+
+      const groups = component.groupedFiltered();
+      expect(groups.map(g => g.label)).toEqual(['Pit', 'Espatlles', 'Tríceps']);
+      expect(groups[0].exercises.map(e => e.id)).toEqual(['ex1']);
+    });
+
+    it('keeps groups ordered push → pull → legs regardless of exercise order', () => {
+      setup();
+      exerciseService.exercises.set([
+        makeExercise({ id: 'ex1', name: 'Sentadilla', category: 'legs', subcategory: 'quads' }),
+        makeExercise({ id: 'ex2', name: 'Dominades', category: 'pull', subcategory: 'back' }),
+        makeExercise({ id: 'ex3', name: 'Press banca', category: 'push', subcategory: 'chest' }),
+      ]);
+
+      expect(component.groupedFiltered().map(g => g.label)).toEqual(['Pit', 'Esquena', 'Quàdriceps']);
+    });
+
+    it('omits groups with no matching exercises once a search term filters them out', () => {
+      setup();
+      exerciseService.exercises.set([
+        makeExercise({ id: 'ex1', name: 'Press banca', category: 'push', subcategory: 'chest' }),
+        makeExercise({ id: 'ex2', name: 'Press militar', category: 'push', subcategory: 'shoulders' }),
+      ]);
+      component.searchTerm.set('banca');
+
+      expect(component.groupedFiltered().map(g => g.label)).toEqual(['Pit']);
+    });
+  });
+
   describe('select() / close()', () => {
     it('select() closes the dialog with the chosen exercise', () => {
       setup();
