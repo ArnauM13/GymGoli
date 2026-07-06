@@ -1,7 +1,5 @@
 import { Injectable, inject } from '@angular/core';
 
-import { AuthService } from './auth.service';
-import { UserSettingsService } from './user-settings.service';
 import { WorkoutService } from './workout.service';
 import { SportService } from './sport.service';
 import { TemplateService } from './template.service';
@@ -12,7 +10,9 @@ import { ExerciseCategory } from '../models/exercise.model';
 import { TemplateEntry } from '../models/template.model';
 
 export const WEEKS_SINGLE    = 1;
-export const WEEKS_RECURRING = 8;
+/** ~3 months — the routine is materialized this far ahead once, when saved
+ *  (see Configuració > Estableix rutines), not re-applied on every visit. */
+export const WEEKS_RECURRING = 13;
 
 /**
  * 'routine' = the persistent recurring routine (Configuració > Estableix
@@ -33,13 +33,9 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
  */
 @Injectable({ providedIn: 'root' })
 export class WeeklyPlanService {
-  private auth            = inject(AuthService);
-  private settingsService = inject(UserSettingsService);
   private workoutService  = inject(WorkoutService);
   private sportService    = inject(SportService);
   private templateService = inject(TemplateService);
-
-  private _toppedUpForUid: string | null = null;
 
   /** `startMonday` lets a caller target a specific week (e.g. "plan the week
    *  I'm viewing right now") instead of always anchoring to the current one.
@@ -156,24 +152,5 @@ export class WeeklyPlanService {
         ? Array.from({ length: e.sets }, () => ({ weight: e.weight ?? 0, reps: e.reps! }))
         : [],
     }));
-  }
-
-  /**
-   * Keeps a recurring plan's horizon topped up so the "fixed weekly
-   * routine" keeps producing planned workouts without the user having to
-   * revisit the planner. Safe to call repeatedly — creation is idempotent
-   * and this only runs once per authenticated session.
-   */
-  async ensureRecurringApplied(): Promise<void> {
-    const uid = this.auth.uid();
-    if (!uid || this._toppedUpForUid === uid) return;
-    const plan = this.settingsService.weeklyPlan();
-    if (!plan.recurring) return;
-    this._toppedUpForUid = uid;
-    try {
-      await this.apply(plan, WEEKS_RECURRING);
-    } catch {
-      this._toppedUpForUid = null;
-    }
   }
 }

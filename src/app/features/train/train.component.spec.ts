@@ -16,7 +16,6 @@ import { TrainerService } from '../../core/services/trainer.service';
 import { TemplateService } from '../../core/services/template.service';
 import { SharedWorkoutService } from '../../core/services/shared-workout.service';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
-import { WeeklyPlanService } from '../../core/services/weekly-plan.service';
 import { Workout, WorkoutEntry } from '../../core/models/workout.model';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
@@ -76,7 +75,6 @@ describe('TrainComponent', () => {
         { provide: ExerciseService,     useValue: { exercises: signal([]), isLoaded: signal(true), ensureLoaded: jasmine.createSpy().and.resolveTo(undefined) } },
         { provide: AuthService,         useValue: { uid: signal('user-1') } },
         { provide: UserSettingsService, useValue: { weightUnit: signal<'kg' | 'lb'>('kg'), fitnessGoal: signal(null), loaded: signal(true) } },
-        { provide: WeeklyPlanService,   useValue: { ensureRecurringApplied: jasmine.createSpy().and.resolveTo(undefined) } },
         { provide: OfflineService,      useValue: { isOffline: signal(false), forceOffline, toggleForceOffline: jasmine.createSpy() } },
         { provide: TrainerService,      useValue: { myTrainer: signal(null), hasTrainer: jasmine.createSpy().and.returnValue(false), getProposalForDate: jasmine.createSpy().and.returnValue(null) } },
         { provide: TemplateService,     useValue: { forCategory: jasmine.createSpy().and.returnValue([]), create: jasmine.createSpy().and.resolveTo(undefined), recordUse: jasmine.createSpy().and.resolveTo(undefined) } },

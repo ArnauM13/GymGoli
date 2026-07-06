@@ -1,13 +1,10 @@
 import { TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
 
-import { WeeklyPlanService, WEEKS_RECURRING } from './weekly-plan.service';
-import { AuthService } from './auth.service';
-import { UserSettingsService } from './user-settings.service';
+import { WeeklyPlanService } from './weekly-plan.service';
 import { WorkoutService } from './workout.service';
 import { SportService } from './sport.service';
 import { TemplateService } from './template.service';
-import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../models/weekly-plan.model';
+import { WeeklyPlan } from '../models/weekly-plan.model';
 import { Workout } from '../models/workout.model';
 import { SportSession } from '../models/sport.model';
 import { WorkoutTemplate } from '../models/template.model';
@@ -32,8 +29,6 @@ function planWithSportOn(dayIndex: number, sportId: string, recurring = false): 
 }
 
 describe('WeeklyPlanService', () => {
-  let uid: ReturnType<typeof signal<string | null>>;
-  let weeklyPlan: ReturnType<typeof signal<WeeklyPlan>>;
   let ensureMonthLoadedWorkout: jasmine.Spy;
   let ensureMonthLoadedSport: jasmine.Spy;
   let getPlannedForDate: jasmine.Spy;
@@ -52,8 +47,6 @@ describe('WeeklyPlanService', () => {
     jasmine.clock().install();
     jasmine.clock().mockDate(new Date('2024-03-06T12:00:00'));
 
-    uid                       = signal<string | null>('user-1');
-    weeklyPlan                = signal<WeeklyPlan>(EMPTY_WEEKLY_PLAN);
     ensureMonthLoadedWorkout  = jasmine.createSpy().and.resolveTo(undefined);
     ensureMonthLoadedSport    = jasmine.createSpy().and.resolveTo(undefined);
     getPlannedForDate         = jasmine.createSpy().and.returnValue([]);
@@ -68,8 +61,6 @@ describe('WeeklyPlanService', () => {
 
     TestBed.configureTestingModule({
       providers: [
-        { provide: AuthService,         useValue: { uid } },
-        { provide: UserSettingsService, useValue: { weeklyPlan } },
         {
           provide: WorkoutService,
           useValue: {
@@ -348,48 +339,6 @@ describe('WeeklyPlanService', () => {
       ]);
       deleteWorkout.and.rejectWith(new Error('network error'));
       await expectAsync(service.retractRemoved(emptyPlan(), 1)).toBeResolved();
-    });
-  });
-
-  describe('ensureRecurringApplied()', () => {
-    it('does nothing when there is no authenticated user', async () => {
-      uid.set(null);
-      weeklyPlan.set(planWithGymOn(2, 'push', true));
-      await service.ensureRecurringApplied();
-      expect(createPlannedWorkout).not.toHaveBeenCalled();
-    });
-
-    it('does nothing when the saved plan is not recurring', async () => {
-      weeklyPlan.set(planWithGymOn(2, 'push', false));
-      await service.ensureRecurringApplied();
-      expect(createPlannedWorkout).not.toHaveBeenCalled();
-    });
-
-    it('applies the plan across the full recurring horizon', async () => {
-      weeklyPlan.set(planWithGymOn(2, 'push', true));
-      await service.ensureRecurringApplied();
-      expect(createPlannedWorkout).toHaveBeenCalledTimes(WEEKS_RECURRING);
-    });
-
-    it('only tops up once per authenticated session', async () => {
-      weeklyPlan.set(planWithGymOn(2, 'push', true));
-      await service.ensureRecurringApplied();
-      createPlannedWorkout.calls.reset();
-
-      await service.ensureRecurringApplied();
-      expect(createPlannedWorkout).not.toHaveBeenCalled();
-    });
-
-    it('does not retry on the next call when an individual item failed, since apply() absorbs per-item errors', async () => {
-      weeklyPlan.set(planWithGymOn(2, 'push', true));
-      createPlannedWorkout.and.rejectWith(new Error('network error'));
-
-      await service.ensureRecurringApplied();
-      createPlannedWorkout.calls.reset();
-      createPlannedWorkout.and.resolveTo('new-id');
-
-      await service.ensureRecurringApplied();
-      expect(createPlannedWorkout).not.toHaveBeenCalled();
     });
   });
 });
