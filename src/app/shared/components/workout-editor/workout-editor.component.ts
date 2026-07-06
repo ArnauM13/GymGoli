@@ -57,14 +57,14 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
           @if (!isEntryHidden($index)) {
           <app-exercise-entry-card
-            cdkDrag [cdkDragDisabled]="!editMode() && !alwaysEditable()"
+            cdkDrag [cdkDragDisabled]="!editMode() && !reorderable()"
             (cdkDragStarted)="isDragging.set(true)"
             (cdkDragEnded)="isDragging.set(false)"
             [entry]="entry"
             [catColor]="getCatColor(entry)"
             [catLoading]="!isExerciseResolved(entry)"
             [collapsed]="isCollapsed(entry.exerciseId)"
-            [draggable]="editMode() || alwaysEditable()"
+            [draggable]="editMode() || reorderable()"
             [hideMetaWhenCollapsed]="true"
             [maxWeight]="entryMaxWeight(entry)"
             [unit]="unit()"
@@ -923,6 +923,10 @@ export class WorkoutEditorComponent implements OnDestroy {
   readonly editMode       = input<boolean>(false);
   /** When true (Today mode): all entries are always editable, no per-entry toggle shown */
   readonly alwaysEditable = input<boolean>(false);
+  /** Whether exercises can be dragged to reorder — off by default, the
+   *  parent enables it explicitly (e.g. from an "Ordenar exercicis" menu
+   *  action) so entries can't be reordered by accident. */
+  readonly reorderable    = input<boolean>(false);
 
   readonly requestAddExercise = output<void>();
 

@@ -138,6 +138,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           [workout]="w"
           [editMode]="false"
           [alwaysEditable]="true"
+          [reorderable]="reorderMode()"
           (requestAddExercise)="openPicker()"
         />
 
@@ -145,6 +146,10 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         @if (workoutMenuOpen()) {
           <div class="aw-menu-backdrop" (click)="workoutMenuOpen.set(false)"></div>
           <div class="aw-menu-dropdown">
+            <button class="aw-menu-item" (click)="workoutMenuOpen.set(false); reorderMode.set(!reorderMode())">
+              <span class="material-symbols-outlined">{{ reorderMode() ? 'check' : 'swap_vert' }}</span>
+              {{ reorderMode() ? 'Finalitzar ordenació' : 'Ordenar exercicis' }}
+            </button>
             @if (!offlineService.isOffline()) {
               <button class="aw-menu-item" (click)="openSaveAsTemplate(w)">
                 <span class="material-symbols-outlined">bookmark_add</span>
@@ -1684,6 +1689,9 @@ export class TrainComponent {
   readonly workoutTypes    = WORKOUT_TYPES;
   readonly speedDialOpen   = signal(false);
   readonly workoutMenuOpen = signal(false);
+  /** Off by default — exercises can only be dragged to reorder once the
+   *  user turns this on from the workout's three-dot menu. */
+  readonly reorderMode     = signal(false);
   readonly saveTemplateOpen = signal(false);
   saveTemplateName = '';
   readonly activeWorkoutId = signal<string | null>(null);

@@ -192,6 +192,14 @@ describe('TrainComponent', () => {
 
   });
 
+  // ── reorderMode ──────────────────────────────────────────────────────────
+
+  describe('reorderMode', () => {
+    it('is off by default', () => {
+      expect(component.reorderMode()).toBeFalse();
+    });
+  });
+
   // ── isToday() ────────────────────────────────────────────────────────────
 
   describe('isToday()', () => {
