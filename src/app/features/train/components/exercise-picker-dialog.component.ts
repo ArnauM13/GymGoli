@@ -108,11 +108,9 @@ export interface ExercisePickerData {
     }
 
     .muscle-group-header {
-      position: sticky; top: 0; z-index: 1;
       padding: 8px 24px 6px;
       font-size: 10.5px; font-weight: 700; color: var(--c-text-3);
       text-transform: uppercase; letter-spacing: 0.4px;
-      background: var(--c-card);
       &:not(:first-child) { margin-top: 4px; border-top: 1px solid var(--c-border-2); padding-top: 12px; }
     }
 
