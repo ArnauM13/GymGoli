@@ -89,6 +89,8 @@ export interface Exercise {
   description?: string;
   setsRange?: [number, number];
   repsRange?: [number, number];
+  /** Worked one side at a time — lets the workout editor log weight per side. */
+  unilateral?: boolean;
   createdAt: Date;
 }
 

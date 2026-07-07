@@ -183,9 +183,24 @@ const PAGE_SIZE = 20;
                             @for (set of entry.sets; track $index) {
                               <div class="entry-set-line" [class.entry-set-line--max]="isMaxSet(entry, set)">
                                 <span class="esl-num">{{ $index + 1 }}</span>
-                                <span class="esl-weight">{{ dispW(set.weight) }}<small>{{ unit() }}</small></span>
+                                <span class="esl-weight-group">
+                                  @if (set.weightLeft != null) {
+                                    <span class="esl-weight">E {{ dispW(set.weightLeft) }}<small>{{ unit() }}</small></span>
+                                    <span class="esl-weight">D {{ dispW(set.weightRight!) }}<small>{{ unit() }}</small></span>
+                                  } @else {
+                                    <span class="esl-weight">{{ dispW(set.weight) }}<small>{{ unit() }}</small></span>
+                                  }
+                                </span>
                                 <span class="esl-x">×</span>
-                                <span class="esl-reps">{{ set.reps }}</span>
+                                <span class="esl-reps-group">
+                                  <span class="esl-reps">{{ set.reps }}</span>
+                                  @for (d of (set.drops ?? []); track $index) {
+                                    <span class="esl-drop-sep">→</span>
+                                    <span class="esl-weight drop">{{ dispW(d.weight) }}<small>{{ unit() }}</small></span>
+                                    <span class="esl-x">×</span>
+                                    <span class="esl-reps">{{ d.reps }}</span>
+                                  }
+                                </span>
                                 @if (isMaxSet(entry, set)) { <span class="esl-pr">PR</span> }
                               </div>
                             }
@@ -482,6 +497,9 @@ const PAGE_SIZE = 20;
     }
     .esl-x { font-size: 11px; color: var(--c-text-3); }
     .esl-reps { font-size: 12px; font-weight: 600; color: var(--c-text-2); }
+    .esl-weight-group, .esl-reps-group { display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; }
+    .esl-weight.drop { font-size: 11px; font-weight: 600; opacity: 0.75; }
+    .esl-drop-sep { font-size: 11px; color: var(--c-text-3); }
     .esl-pr {
       font-size: 9px; font-weight: 800; letter-spacing: 0.3px;
       color: #b88500; background: rgba(255, 193, 7, 0.18);
@@ -778,6 +796,6 @@ export class HistoryComponent implements OnDestroy {
     if (entry.sets.length <= 1) return false;
     const max = this.getMaxWeight(entry);
     if (max === 0) return false;
-    return entry.sets.some(s => s.weight !== max) && set.weight === max;
+    return entry.sets.some(s => setMaxWeight(s) !== max) && setMaxWeight(set) === max;
   }
 }

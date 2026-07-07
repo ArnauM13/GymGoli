@@ -24,6 +24,7 @@ function toExercise(r: Record<string, unknown>): Exercise {
     description: (r['description'] as string | null) ?? undefined,
     setsRange:   sMin != null && sMax != null ? [sMin, sMax] : undefined,
     repsRange:   rMin != null && rMax != null ? [rMin, rMax] : undefined,
+    unilateral:  (r['unilateral'] as boolean | null) ?? undefined,
     createdAt:   new Date(r['created_at'] as string),
   };
 }
@@ -40,6 +41,7 @@ function exerciseFromCache(raw: Record<string, unknown>): Exercise {
     description: (raw['description'] as string | undefined) ?? undefined,
     setsRange:   (raw['setsRange'] as [number, number] | undefined) ?? undefined,
     repsRange:   (raw['repsRange'] as [number, number] | undefined) ?? undefined,
+    unilateral:  (raw['unilateral'] as boolean | undefined) ?? undefined,
     createdAt:   new Date(raw['createdAt'] as string),
   };
 }
@@ -160,6 +162,7 @@ export class ExerciseService {
     patch['sets_max']    = data.setsRange?.[1] ?? null;
     patch['reps_min']    = data.repsRange?.[0] ?? null;
     patch['reps_max']    = data.repsRange?.[1] ?? null;
+    patch['unilateral']  = data.unilateral ?? false;
 
     const { error } = await this.supabase
       .from('exercises')
@@ -205,6 +208,7 @@ export class ExerciseService {
       sets_max:    e.setsRange?.[1] ?? null,
       reps_min:    e.repsRange?.[0] ?? null,
       reps_max:    e.repsRange?.[1] ?? null,
+      unilateral:  e.unilateral ?? false,
     };
   }
 

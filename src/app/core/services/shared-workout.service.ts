@@ -33,7 +33,11 @@ export class SharedWorkoutService {
 
     const sharedEntries: SharedWorkoutEntry[] = entries.map(e => ({
       exerciseName: e.exerciseName,
-      sets: e.sets.map(s => ({ weight: s.weight, reps: s.reps, ...(s.drops ? { drops: s.drops } : {}) })),
+      sets: e.sets.map(s => ({
+        weight: s.weight, reps: s.reps,
+        ...(s.drops ? { drops: s.drops } : {}),
+        ...(s.weightLeft != null ? { weightLeft: s.weightLeft, weightRight: s.weightRight } : {}),
+      })),
     }));
 
     const { data, error } = await this.supabase
@@ -72,7 +76,11 @@ export class SharedWorkoutService {
       if (!match) { skipped.push(e.exerciseName); continue; }
       entries.push({
         exerciseId: match.id, exerciseName: match.name,
-        sets: e.sets.map(s => ({ weight: s.weight, reps: s.reps, ...(s.drops ? { drops: s.drops } : {}) })),
+        sets: e.sets.map(s => ({
+          weight: s.weight, reps: s.reps,
+          ...(s.drops ? { drops: s.drops } : {}),
+          ...(s.weightLeft != null ? { weightLeft: s.weightLeft, weightRight: s.weightRight } : {}),
+        })),
       });
     }
 

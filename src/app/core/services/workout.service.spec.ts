@@ -204,4 +204,22 @@ describe('WorkoutService', () => {
       expect(service.getLastSessionInfo('a')?.maxWeight).toBe(60);
     });
   });
+
+  describe('unilateral (per-side) weights affect max-weight lookups', () => {
+    it('getAllTimeMaxWeight() counts the heavier side even when `weight` is lower', async () => {
+      const id = await service.createWorkoutForDate('2024-03-06');
+      await service.addExerciseToWorkout(id, { exerciseId: 'a', exerciseName: 'A', sets: [] });
+      await service.addSetsToEntry(id, 'a', [{ weight: 20, reps: 10, weightLeft: 18, weightRight: 20 }]);
+
+      expect(service.getAllTimeMaxWeight('a')).toBe(20);
+    });
+
+    it('getLastSessionInfo() reports the heavier side as maxWeight', async () => {
+      const id = await service.createWorkoutForDate('2024-03-06');
+      await service.addExerciseToWorkout(id, { exerciseId: 'a', exerciseName: 'A', sets: [] });
+      await service.addSetsToEntry(id, 'a', [{ weight: 20, reps: 10, weightLeft: 18, weightRight: 22 }]);
+
+      expect(service.getLastSessionInfo('a')?.maxWeight).toBe(22);
+    });
+  });
 });

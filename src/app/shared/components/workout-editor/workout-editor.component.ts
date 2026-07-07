@@ -166,7 +166,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                       <form [formGroup]="editSetForm" (ngSubmit)="saveEditSet()" class="we-inline-edit">
                         <div class="we-inline-inputs">
                           <div class="we-inline-group">
-                            <label for="edit-weight">Pes</label>
+                            <label for="edit-weight">{{ isUnilateral(entry) ? 'Esquerra' : 'Pes' }}</label>
                             <div class="we-number-input compact">
                               <button type="button" (click)="adjustEditWeight(-1)" aria-label="Menys pes">−</button>
                               <input id="edit-weight" type="number" formControlName="weight" min="0" step="2.5"
@@ -174,6 +174,17 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                               <button type="button" (click)="adjustEditWeight(1)" aria-label="Més pes">+</button>
                             </div>
                           </div>
+                          @if (isUnilateral(entry)) {
+                            <div class="we-inline-group">
+                              <label for="edit-weight-right">Dreta</label>
+                              <div class="we-number-input compact">
+                                <button type="button" (click)="adjustEditWeightRight(-1)" aria-label="Menys pes">−</button>
+                                <input id="edit-weight-right" type="number" formControlName="weightRight" min="0" step="2.5"
+                                       (focus)="$any($event.target).select()">
+                                <button type="button" (click)="adjustEditWeightRight(1)" aria-label="Més pes">+</button>
+                              </div>
+                            </div>
+                          }
                           <div class="we-inline-group">
                             <label for="edit-reps">Reps</label>
                             <div class="we-number-input compact">
@@ -221,12 +232,25 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                          (click)="isEntryEditable(entry.exerciseId) && startEditSet(entry.exerciseId, $index, set)">
                       <span class="we-set-num">{{ $index + 1 }}</span>
                       <div class="we-set-pills">
-                        <span class="we-set-pill weight"
-                          [class.we-set-pill--pr]="prExerciseIds().has(entry.exerciseId) && set.weight > 0 && set.weight === entryMaxWeight(entry)"
-                          [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
-                          (click)="tapSetPill($event, entry.exerciseId, $index, set)">
-                          {{ dispW(set.weight) }}<small>{{ unit() }}</small>
-                        </span>
+                        @if (set.weightLeft != null) {
+                          <span class="we-set-pill weight side"
+                            [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
+                            (click)="tapSetPill($event, entry.exerciseId, $index, set)">
+                            E {{ dispW(set.weightLeft) }}<small>{{ unit() }}</small>
+                          </span>
+                          <span class="we-set-pill weight side"
+                            [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
+                            (click)="tapSetPill($event, entry.exerciseId, $index, set)">
+                            D {{ dispW(set.weightRight!) }}<small>{{ unit() }}</small>
+                          </span>
+                        } @else {
+                          <span class="we-set-pill weight"
+                            [class.we-set-pill--pr]="prExerciseIds().has(entry.exerciseId) && set.weight > 0 && set.weight === entryMaxWeight(entry)"
+                            [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
+                            (click)="tapSetPill($event, entry.exerciseId, $index, set)">
+                            {{ dispW(set.weight) }}<small>{{ unit() }}</small>
+                          </span>
+                        }
                         <span class="we-set-pill reps"
                           [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
                           (click)="tapSetPill($event, entry.exerciseId, $index, set)">
@@ -259,7 +283,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                 <form [formGroup]="setForm" class="we-set-form">
                   <div class="we-set-inputs">
                     <div class="we-input-group">
-                      <label for="add-weight">Pes ({{ unit() }})</label>
+                      <label for="add-weight">{{ isUnilateral(entry) ? 'Esquerra (' + unit() + ')' : 'Pes (' + unit() + ')' }}</label>
                       <div class="we-number-input">
                         <button type="button" (click)="adjustWeight(-1)" aria-label="Menys pes">−</button>
                         <input id="add-weight" type="number" formControlName="weight" min="0" step="2.5"
@@ -267,6 +291,17 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                         <button type="button" (click)="adjustWeight(1)" aria-label="Més pes">+</button>
                       </div>
                     </div>
+                    @if (isUnilateral(entry)) {
+                      <div class="we-input-group">
+                        <label for="add-weight-right">Dreta ({{ unit() }})</label>
+                        <div class="we-number-input">
+                          <button type="button" (click)="adjustWeightRight(-1)" aria-label="Menys pes">−</button>
+                          <input id="add-weight-right" type="number" formControlName="weightRight" min="0" step="2.5"
+                                 (focus)="$any($event.target).select()">
+                          <button type="button" (click)="adjustWeightRight(1)" aria-label="Més pes">+</button>
+                        </div>
+                      </div>
+                    }
                     <div class="we-input-group">
                       <label for="add-reps">Repeticions</label>
                       <div class="we-number-input">
@@ -331,9 +366,9 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                   </button>
                   @if (entry.sets.length > 0) {
                     <button class="we-repeat-btn" (click)="repeatLastSet(entry)"
-                            [title]="'Repetir: ' + dispW(entry.sets[entry.sets.length - 1].weight) + unit() + ' × ' + entry.sets[entry.sets.length - 1].reps">
+                            [title]="'Repetir: ' + repeatLabel(entry)">
                       <span class="material-symbols-outlined">repeat</span>
-                      <span class="we-repeat-label">{{ dispW(entry.sets[entry.sets.length - 1].weight) }}{{ unit() }} × {{ entry.sets[entry.sets.length - 1].reps }}</span>
+                      <span class="we-repeat-label">{{ repeatLabel(entry) }}</span>
                     </button>
                     @if (restTimerEnabled()) {
                       <button class="we-rest-trigger-btn" (click)="startManualRest(entry.exerciseId)" title="Iniciar descans">
@@ -783,6 +818,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
         &:active { filter: brightness(0.85); }
       }
       &.drop { padding: 4px 9px; font-size: 12px; opacity: 0.75; }
+      &.side { padding: 6px 10px; font-size: 13px; }
     }
     .we-drop-sep { font-size: 14px; color: var(--c-text-3); flex-shrink: 0; }
 
@@ -907,7 +943,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       display: flex; flex-direction: column; gap: 12px;
     }
 
-    .we-set-inputs { display: flex; gap: 10px; }
+    .we-set-inputs { display: flex; gap: 10px; flex-wrap: wrap; }
 
     .we-input-group {
       flex: 1; display: flex; flex-direction: column; gap: 4px;
@@ -1254,13 +1290,15 @@ export class WorkoutEditorComponent implements OnDestroy {
   });
 
   readonly setForm = this.fb.group({
-    weight: [0, [Validators.required, Validators.min(0)]],
-    reps:   [8, [Validators.required, Validators.min(1)]],
+    weight:      [0, [Validators.required, Validators.min(0)]],
+    weightRight: [0, [Validators.min(0)]],
+    reps:        [8, [Validators.required, Validators.min(1)]],
   });
 
   readonly editSetForm = this.fb.group({
-    weight: [0, [Validators.required, Validators.min(0)]],
-    reps:   [8, [Validators.required, Validators.min(1)]],
+    weight:      [0, [Validators.required, Validators.min(0)]],
+    weightRight: [0, [Validators.min(0)]],
+    reps:        [8, [Validators.required, Validators.min(1)]],
   });
 
   constructor() {
@@ -1339,7 +1377,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     this.addingFor.set(null);
     this.editingSet.set(null);
     this.setQty.set(1);
-    this.setForm.reset({ weight: 0, reps: 8 });
+    this.setForm.reset({ weight: 0, weightRight: 0, reps: 8 });
     this.dropStages.set([]);
   }
 
@@ -1444,12 +1482,30 @@ export class WorkoutEditorComponent implements OnDestroy {
     return entry.sets.reduce((m, s) => Math.max(m, setMaxWeight(s)), 0);
   }
 
+  isUnilateral(entry: WorkoutEntry): boolean {
+    return !!this.exerciseService.getById(entry.exerciseId)?.unilateral;
+  }
+
   dispW(kg: number): number { return kgToDisplay(kg, this.unit()); }
+
+  repeatLabel(entry: WorkoutEntry): string {
+    const last = entry.sets[entry.sets.length - 1];
+    const u = this.unit();
+    if (last.weightLeft != null) {
+      return `E ${this.dispW(last.weightLeft)}${u} · D ${this.dispW(last.weightRight!)}${u} × ${last.reps}`;
+    }
+    return `${this.dispW(last.weight)}${u} × ${last.reps}`;
+  }
 
   adjustWeight(delta: number): void {
     const step = weightStep(this.unit());
     const v = (this.setForm.value.weight ?? 0) + delta * step;
     this.setForm.patchValue({ weight: Math.max(0, Math.round(v * 10) / 10) });
+  }
+  adjustWeightRight(delta: number): void {
+    const step = weightStep(this.unit());
+    const v = (this.setForm.value.weightRight ?? 0) + delta * step;
+    this.setForm.patchValue({ weightRight: Math.max(0, Math.round(v * 10) / 10) });
   }
   adjustReps(delta: number): void {
     const v = (this.setForm.value.reps ?? 1) + delta;
@@ -1460,6 +1516,11 @@ export class WorkoutEditorComponent implements OnDestroy {
     const step = weightStep(this.unit());
     const v = (this.editSetForm.value.weight ?? 0) + delta * step;
     this.editSetForm.patchValue({ weight: Math.max(0, Math.round(v * 10) / 10) });
+  }
+  adjustEditWeightRight(delta: number): void {
+    const step = weightStep(this.unit());
+    const v = (this.editSetForm.value.weightRight ?? 0) + delta * step;
+    this.editSetForm.patchValue({ weightRight: Math.max(0, Math.round(v * 10) / 10) });
   }
   adjustEditReps(delta: number): void {
     const v = (this.editSetForm.value.reps ?? 1) + delta;
@@ -1498,13 +1559,14 @@ export class WorkoutEditorComponent implements OnDestroy {
           ?.entries.find(e => e.exerciseId === entry.exerciseId);
         this.lastSessionData.set({ exerciseId: entry.exerciseId, ...info, sets: lastEntry?.sets ?? [] });
         this.prevNoteData.set(lastEntry?.notes ? { exerciseId: entry.exerciseId, notes: lastEntry.notes } : null);
+        const wR = kgToDisplay(info.maxWeight, u);
         if (goal) {
           const rec = GOAL_REC[goal];
           this.recData.set({ exerciseId: entry.exerciseId, sets: rec.sets, reps: rec.reps, goalLabel: FITNESS_GOAL_LABELS[goal] });
-          this.setForm.reset({ weight: kgToDisplay(info.maxWeight, u), reps: rec.reps });
+          this.setForm.reset({ weight: kgToDisplay(info.maxWeight, u), weightRight: wR, reps: rec.reps });
         } else {
           this.recData.set(null);
-          this.setForm.patchValue({ weight: kgToDisplay(info.maxWeight, u), reps: 8 });
+          this.setForm.patchValue({ weight: kgToDisplay(info.maxWeight, u), weightRight: wR, reps: 8 });
         }
       } else {
         this.lastSessionData.set(null);
@@ -1512,10 +1574,10 @@ export class WorkoutEditorComponent implements OnDestroy {
         if (goal) {
           const rec = GOAL_REC[goal];
           this.recData.set({ exerciseId: entry.exerciseId, sets: rec.sets, reps: rec.reps, goalLabel: FITNESS_GOAL_LABELS[goal] });
-          this.setForm.reset({ weight: 0, reps: rec.reps });
+          this.setForm.reset({ weight: 0, weightRight: 0, reps: rec.reps });
         } else {
           this.recData.set(null);
-          this.setForm.reset({ weight: 0, reps: 8 });
+          this.setForm.reset({ weight: 0, weightRight: 0, reps: 8 });
         }
       }
     } else {
@@ -1523,7 +1585,13 @@ export class WorkoutEditorComponent implements OnDestroy {
       this.recData.set(null);
       this.prevNoteData.set(null);
       const last = entry.sets.at(-1);
-      if (last) this.setForm.patchValue({ weight: kgToDisplay(last.weight, u), reps: last.reps });
+      if (last) {
+        this.setForm.patchValue({
+          weight: kgToDisplay(last.weight, u),
+          weightRight: kgToDisplay(last.weightRight ?? last.weight, u),
+          reps: last.reps,
+        });
+      }
     }
   }
 
@@ -1554,7 +1622,10 @@ export class WorkoutEditorComponent implements OnDestroy {
     if (!w || !entry.sets.length) return;
     const last = entry.sets.at(-1)!;
     try {
-      await this.workoutService.addSetsToEntry(w.id, entry.exerciseId, [{ weight: last.weight, reps: last.reps }]);
+      await this.workoutService.addSetsToEntry(w.id, entry.exerciseId, [{
+        weight: last.weight, reps: last.reps,
+        ...(last.weightLeft != null ? { weightLeft: last.weightLeft, weightRight: last.weightRight } : {}),
+      }]);
     } catch {
       this.feedback.error('Error en repetir', 2000);
     }
@@ -1574,7 +1645,11 @@ export class WorkoutEditorComponent implements OnDestroy {
   startEditSet(exerciseId: string, index: number, set: WorkoutSet): void {
     this.addingFor.set(null);
     this.editingSet.set({ exerciseId, index });
-    this.editSetForm.setValue({ weight: kgToDisplay(set.weight, this.unit()), reps: set.reps });
+    this.editSetForm.setValue({
+      weight: kgToDisplay(set.weight, this.unit()),
+      weightRight: kgToDisplay(set.weightRight ?? set.weight, this.unit()),
+      reps: set.reps,
+    });
     this.editDropStages.set((set.drops ?? []).map(d => ({ weight: kgToDisplay(d.weight, this.unit()), reps: d.reps })));
   }
 
@@ -1587,13 +1662,19 @@ export class WorkoutEditorComponent implements OnDestroy {
     if (this.editSetForm.invalid) return;
     const es = this.editingSet();
     if (!es) return;
-    const { weight, reps } = this.editSetForm.value;
+    const { weight, weightRight, reps } = this.editSetForm.value;
     const w = this.workout();
     if (!w) return;
+    const entry = w.entries.find(e => e.exerciseId === es.exerciseId);
+    const unilateral = !!entry && this.isUnilateral(entry);
+    const weightKg      = displayToKg(weight!, this.unit());
+    const weightRightKg = displayToKg(weightRight!, this.unit());
     const drops = this.editDropStages();
     try {
       await this.workoutService.updateSetInEntry(w.id, es.exerciseId, es.index, {
-        weight: displayToKg(weight!, this.unit()), reps: reps!,
+        weight: unilateral ? Math.max(weightKg, weightRightKg) : weightKg,
+        reps: reps!,
+        ...(unilateral ? { weightLeft: weightKg, weightRight: weightRightKg } : {}),
         ...(drops.length > 0 ? { drops: drops.map(d => ({ weight: displayToKg(d.weight, this.unit()), reps: d.reps })) } : {}),
       });
       this.cancelEditSet();
@@ -1604,14 +1685,20 @@ export class WorkoutEditorComponent implements OnDestroy {
 
   async submitSets(exerciseId: string, count: number): Promise<void> {
     if (this.setForm.invalid) return;
-    const { weight, reps } = this.setForm.value;
+    const { weight, weightRight, reps } = this.setForm.value;
     const w = this.workout();
     if (!w) return;
-    const weightKg = displayToKg(weight!, this.unit());
+    const entry = w.entries.find(e => e.exerciseId === exerciseId);
+    const unilateral = !!entry && this.isUnilateral(entry);
+    const weightKg      = displayToKg(weight!, this.unit());
+    const weightRightKg = displayToKg(weightRight!, this.unit());
     const drops = this.dropStages();
+    const baseSet: WorkoutSet = unilateral
+      ? { weight: Math.max(weightKg, weightRightKg), reps: reps!, weightLeft: weightKg, weightRight: weightRightKg }
+      : { weight: weightKg, reps: reps! };
     const sets: WorkoutSet[] = drops.length > 0
-      ? [{ weight: weightKg, reps: reps!, drops: drops.map(d => ({ weight: displayToKg(d.weight, this.unit()), reps: d.reps })) }]
-      : Array.from({ length: count }, () => ({ weight: weightKg, reps: reps! }));
+      ? [{ ...baseSet, drops: drops.map(d => ({ weight: displayToKg(d.weight, this.unit()), reps: d.reps })) }]
+      : Array.from({ length: count }, () => ({ ...baseSet }));
     try {
       await this.workoutService.addSetsToEntry(w.id, exerciseId, sets);
       this.cancelSet();

@@ -8,7 +8,11 @@ import { ExerciseCategory } from './exercise.model';
  */
 export interface SharedWorkoutEntry {
   exerciseName: string;
-  sets: { weight: number; reps: number; drops?: { weight: number; reps: number }[] }[];
+  sets: {
+    weight: number; reps: number;
+    drops?: { weight: number; reps: number }[];
+    weightLeft?: number; weightRight?: number;
+  }[];
 }
 
 export interface SharedWorkout {

@@ -58,7 +58,12 @@ interface SessionDetail {
                 <div class="esd-sets">
                   @for (set of s.sets; track $index) {
                     <span class="esd-set-pill">
-                      {{ dispW(set.weight) }}{{ unit() }}<span class="esd-set-reps">&nbsp;×&nbsp;{{ set.reps }}</span>
+                      @if (set.weightLeft != null) {
+                        E {{ dispW(set.weightLeft) }}{{ unit() }} · D {{ dispW(set.weightRight!) }}{{ unit() }}
+                      } @else {
+                        {{ dispW(set.weight) }}{{ unit() }}
+                      }
+                      <span class="esd-set-reps">&nbsp;×&nbsp;{{ set.reps }}</span>
                       @for (d of (set.drops ?? []); track $index) {
                         <span class="esd-drop-sep">→</span>{{ dispW(d.weight) }}{{ unit() }}<span class="esd-set-reps">&nbsp;×&nbsp;{{ d.reps }}</span>
                       }

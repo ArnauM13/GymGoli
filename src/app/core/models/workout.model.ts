@@ -33,6 +33,11 @@ export interface WorkoutSet {
   /** Extra stages performed immediately after this one, no rest, at
    *  progressively lower weight — e.g. 70kg×8 → 50kg×6 → 30kg×4. */
   drops?: { weight: number; reps: number }[];
+  /** Only present for unilateral exercises — per-side weight for this set.
+   *  `weight` mirrors the heavier side so aggregate stats (PRs, charts)
+   *  keep working without special-casing. */
+  weightLeft?:  number;
+  weightRight?: number;
 }
 
 export interface WorkoutEntry {
@@ -46,14 +51,19 @@ export interface WorkoutEntry {
   supersetGroupId?: string;
 }
 
-/** Heaviest weight lifted in this set, including any drop stages. */
+/** Heaviest weight lifted in this set, including per-side and drop stages. */
 export function setMaxWeight(set: WorkoutSet): number {
-  return (set.drops ?? []).reduce((m, d) => Math.max(m, d.weight), set.weight);
+  const base = Math.max(set.weight, set.weightLeft ?? 0, set.weightRight ?? 0);
+  return (set.drops ?? []).reduce((m, d) => Math.max(m, d.weight), base);
 }
 
-/** Total volume (weight × reps) of this set, including any drop stages. */
+/** Total volume (weight × reps) of this set, including any drop stages.
+ *  Unilateral sets count both sides' weight for that same rep count. */
 export function setVolume(set: WorkoutSet): number {
-  return set.weight * set.reps + (set.drops ?? []).reduce((sum, d) => sum + d.weight * d.reps, 0);
+  const base = set.weightLeft != null && set.weightRight != null
+    ? (set.weightLeft + set.weightRight) * set.reps
+    : set.weight * set.reps;
+  return base + (set.drops ?? []).reduce((sum, d) => sum + d.weight * d.reps, 0);
 }
 
 export interface Workout {

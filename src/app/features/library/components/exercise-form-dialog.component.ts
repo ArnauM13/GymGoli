@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
 import {
   CATEGORY_COLORS,
@@ -25,7 +26,7 @@ const MUSCLE_GROUPS: { label: string; values: string[] }[] = [
 @Component({
   selector: 'app-exercise-form-dialog',
   standalone: true,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, MatSlideToggleModule],
   template: `
     <div class="dlg-wrap">
 
@@ -101,6 +102,21 @@ const MUSCLE_GROUPS: { label: string; values: string[] }[] = [
                   </div>
                 </div>
               }
+            </div>
+          </div>
+
+          <!-- Unilateral -->
+          <div class="field">
+            <div class="unilateral-row">
+              <div class="unilateral-info">
+                <span class="field-label">Exercici unilateral</span>
+                <span class="unilateral-desc">Es treballa un costat a la vegada — permet registrar el pes per separat a cada braç o cama.</span>
+              </div>
+              <mat-slide-toggle
+                [checked]="unilateral()"
+                (change)="unilateral.set($event.checked)"
+                color="primary"
+              />
             </div>
           </div>
 
@@ -281,6 +297,11 @@ const MUSCLE_GROUPS: { label: string; values: string[] }[] = [
       letter-spacing: 0.2px;
     }
 
+    /* ── Unilateral ── */
+    .unilateral-row { display: flex; align-items: center; gap: 12px; }
+    .unilateral-info { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+    .unilateral-desc { font-size: 12px; color: var(--c-text-3); line-height: 1.4; }
+
     /* ── Guia sèries / reps ── */
     .guide-row { display: flex; gap: 10px; }
     .guide-group {
@@ -357,6 +378,8 @@ export class ExerciseFormDialogComponent {
   readonly setsRange = signal(!!this._setsInit && this._setsInit[0] !== this._setsInit[1]);
   readonly repsRange = signal(!!this._repsInit && this._repsInit[0] !== this._repsInit[1]);
 
+  readonly unilateral = signal(!!this.data.exercise?.unilateral);
+
   readonly categories = (Object.keys(CATEGORY_LABELS) as ExerciseCategory[]).map(value => ({
     value,
     label: CATEGORY_LABELS[value],
@@ -419,6 +442,7 @@ export class ExerciseFormDialogComponent {
       notes:       notes?.trim() || undefined,
       setsRange,
       repsRange,
+      unilateral: this.unilateral() || undefined,
     });
   }
 
