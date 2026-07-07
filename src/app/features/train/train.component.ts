@@ -14,7 +14,7 @@ import {
 } from '../../core/models/exercise.model';
 import { Sport, SportMetricDef, SportSession } from '../../core/models/sport.model';
 import { BUILT_IN_TEMPLATES, BuiltInTemplate, WorkoutTemplate } from '../../core/models/template.model';
-import { FEELING_EMOJI, FeelingLevel, PlannedSource, Workout, WorkoutEntry } from '../../core/models/workout.model';
+import { FEELING_EMOJI, FeelingLevel, PlannedSource, Workout, WorkoutEntry, setMaxWeight, setVolume } from '../../core/models/workout.model';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { TemplateService } from '../../core/services/template.service';
 import { SharedWorkoutService } from '../../core/services/shared-workout.service';
@@ -138,6 +138,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           [editMode]="false"
           [alwaysEditable]="true"
           [reorderable]="reorderMode()"
+          [groupingMode]="groupingMode()"
           (requestAddExercise)="openPicker()"
         />
 
@@ -145,9 +146,13 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         @if (workoutMenuOpen()) {
           <div class="aw-menu-backdrop" (click)="workoutMenuOpen.set(false)"></div>
           <div class="aw-menu-dropdown">
-            <button class="aw-menu-item" (click)="workoutMenuOpen.set(false); reorderMode.set(!reorderMode())">
+            <button class="aw-menu-item" (click)="workoutMenuOpen.set(false); reorderMode.set(!reorderMode()); groupingMode.set(false)">
               <span class="material-symbols-outlined">{{ reorderMode() ? 'check' : 'swap_vert' }}</span>
               {{ reorderMode() ? 'Finalitzar ordenació' : 'Ordenar exercicis' }}
+            </button>
+            <button class="aw-menu-item" (click)="workoutMenuOpen.set(false); groupingMode.set(!groupingMode()); reorderMode.set(false)">
+              <span class="material-symbols-outlined">{{ groupingMode() ? 'check' : 'link' }}</span>
+              {{ groupingMode() ? 'Finalitzar agrupació' : 'Agrupar en superset' }}
             </button>
             @if (!offlineService.isOffline()) {
               <button class="aw-menu-item" (click)="openSaveAsTemplate(w)">
@@ -1746,6 +1751,9 @@ export class TrainComponent {
   /** Off by default — exercises can only be dragged to reorder once the
    *  user turns this on from the workout's three-dot menu. */
   readonly reorderMode     = signal(false);
+  /** Off by default — mutually exclusive with reorderMode; lets the user
+   *  select 2+ exercises to link into a superset. */
+  readonly groupingMode    = signal(false);
   readonly saveTemplateOpen = signal(false);
   saveTemplateName = '';
   readonly activeWorkoutId = signal<string | null>(null);
@@ -2275,7 +2283,7 @@ export class TrainComponent {
 
   workoutVolume(w: Workout): number {
     return w.entries.reduce((sum, e) =>
-      sum + e.sets.reduce((s2, set) => s2 + set.weight * set.reps, 0), 0);
+      sum + e.sets.reduce((s2, set) => s2 + setVolume(set), 0), 0);
   }
 
   workoutVolumeFmt(w: Workout): string {
@@ -2473,7 +2481,7 @@ export class TrainComponent {
   }
 
   maxWeight(entry: WorkoutEntry): number {
-    return entry.sets.length ? Math.max(...entry.sets.map(s => s.weight)) : 0;
+    return entry.sets.length ? Math.max(...entry.sets.map(s => setMaxWeight(s))) : 0;
   }
 
   openPicker(newCategory?: ExerciseCategory): void {

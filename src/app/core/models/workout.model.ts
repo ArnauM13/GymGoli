@@ -30,6 +30,9 @@ export interface WorkoutSet {
   weight: number;
   reps:   number;
   // feeling moved to WorkoutEntry level
+  /** Extra stages performed immediately after this one, no rest, at
+   *  progressively lower weight — e.g. 70kg×8 → 50kg×6 → 30kg×4. */
+  drops?: { weight: number; reps: number }[];
 }
 
 export interface WorkoutEntry {
@@ -38,6 +41,19 @@ export interface WorkoutEntry {
   sets:         WorkoutSet[];
   feeling?:     FeelingLevel;
   notes?:       string;
+  /** Entries sharing this id are performed back-to-back with no rest and
+   *  are rendered as one connected block, always kept contiguous. */
+  supersetGroupId?: string;
+}
+
+/** Heaviest weight lifted in this set, including any drop stages. */
+export function setMaxWeight(set: WorkoutSet): number {
+  return (set.drops ?? []).reduce((m, d) => Math.max(m, d.weight), set.weight);
+}
+
+/** Total volume (weight × reps) of this set, including any drop stages. */
+export function setVolume(set: WorkoutSet): number {
+  return set.weight * set.reps + (set.drops ?? []).reduce((sum, d) => sum + d.weight * d.reps, 0);
 }
 
 export interface Workout {

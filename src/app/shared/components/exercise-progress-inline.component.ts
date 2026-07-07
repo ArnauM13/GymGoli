@@ -22,7 +22,7 @@ import {
   Tooltip,
 } from 'chart.js';
 
-import { Workout } from '../../core/models/workout.model';
+import { Workout, setMaxWeight, setVolume } from '../../core/models/workout.model';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
 
@@ -219,8 +219,8 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
     if (!entry) return 0;
     if (metric === 'feeling') return entry.feeling ?? 0;
     if (!entry.sets.length) return 0;
-    if (metric === 'weight') return Math.max(...entry.sets.map(s => s.weight));
-    return entry.sets.reduce((sum, s) => sum + s.weight * s.reps, 0);
+    if (metric === 'weight') return Math.max(...entry.sets.map(s => setMaxWeight(s)));
+    return entry.sets.reduce((sum, s) => sum + setVolume(s), 0);
   }
 
   private _label(metric: Metric): string {

@@ -6,7 +6,7 @@ import {
   CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, SUBCATEGORY_LABELS,
   ExerciseCategory,
 } from '../../core/models/exercise.model';
-import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry, WorkoutSet } from '../../core/models/workout.model';
+import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry, WorkoutSet, setMaxWeight, setVolume } from '../../core/models/workout.model';
 import { Sport, SportSubtype } from '../../core/models/sport.model';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
@@ -739,7 +739,7 @@ export class HistoryComponent implements OnDestroy {
   }
   getMaxWeight(entry: WorkoutEntry): number {
     if (!entry.sets.length) return 0;
-    return Math.max(...entry.sets.map(s => s.weight));
+    return Math.max(...entry.sets.map(s => setMaxWeight(s)));
   }
 
   getDay(date: string): string {
@@ -758,7 +758,7 @@ export class HistoryComponent implements OnDestroy {
   }
   totalVolume(workout: Workout): number {
     return Math.round(workout.entries.reduce((t, e) =>
-      t + e.sets.reduce((s, set) => s + set.weight * set.reps, 0), 0
+      t + e.sets.reduce((s, set) => s + setVolume(set), 0), 0
     ));
   }
   volumeFmt(workout: Workout): string {

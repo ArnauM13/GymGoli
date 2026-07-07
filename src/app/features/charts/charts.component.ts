@@ -4,6 +4,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 
 import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
+import { setMaxWeight } from '../../core/models/workout.model';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
@@ -328,7 +329,7 @@ export class ChartsComponent {
       .filter(e => !query || e.name.toLowerCase().includes(query))
       .map(ex => {
         const allWeights = this.workoutService.getWorkoutsForExercise(ex.id)
-          .flatMap(w => w.entries.filter(e => e.exerciseId === ex.id).flatMap(e => e.sets.map(s => s.weight)))
+          .flatMap(w => w.entries.filter(e => e.exerciseId === ex.id).flatMap(e => e.sets.map(s => setMaxWeight(s))))
           .filter(w => w > 0);
         const display = allWeights.length ? kgToDisplay(Math.max(...allWeights), unit) : null;
         return { exercise: ex, display, color: CATEGORY_COLORS[ex.category] };

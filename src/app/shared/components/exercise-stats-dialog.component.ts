@@ -59,6 +59,9 @@ interface SessionDetail {
                   @for (set of s.sets; track $index) {
                     <span class="esd-set-pill">
                       {{ dispW(set.weight) }}{{ unit() }}<span class="esd-set-reps">&nbsp;×&nbsp;{{ set.reps }}</span>
+                      @for (d of (set.drops ?? []); track $index) {
+                        <span class="esd-drop-sep">→</span>{{ dispW(d.weight) }}{{ unit() }}<span class="esd-set-reps">&nbsp;×&nbsp;{{ d.reps }}</span>
+                      }
                     </span>
                   }
                 </div>
@@ -164,6 +167,7 @@ interface SessionDetail {
       font-size: 12px; font-weight: 700; color: var(--c-brand);
       white-space: nowrap;
     }
+    .esd-drop-sep { margin: 0 3px; opacity: 0.6; font-weight: 500; }
     .esd-set-reps { font-size: 11px; font-weight: 500; color: var(--c-text-3); }
 
     /* ── Footer ── */

@@ -5,7 +5,7 @@ import { ExerciseService } from './exercise.service';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { SyncService } from './sync.service';
-import { FeelingLevel, PlannedSource, Workout, WorkoutEntry, WorkoutSet, WorkoutStatus } from '../models/workout.model';
+import { FeelingLevel, PlannedSource, Workout, WorkoutEntry, WorkoutSet, WorkoutStatus, setMaxWeight } from '../models/workout.model';
 
 // ── Supabase row → typed Workout (snake_case keys) ──────────────────────────
 function toWorkout(row: Record<string, unknown>): Workout {
@@ -354,7 +354,7 @@ export class WorkoutService {
     for (const w of this._historical()) {
       if (w.id === excludeWorkoutId) continue;
       const entry = w.entries.find(e => e.exerciseId === exerciseId);
-      if (entry) for (const s of entry.sets) if (s.weight > max) max = s.weight;
+      if (entry) for (const s of entry.sets) { const m = setMaxWeight(s); if (m > max) max = m; }
     }
     return max;
   }
@@ -368,7 +368,7 @@ export class WorkoutService {
       .sort((a, b) => b.date.localeCompare(a.date));
     if (!past.length) return null;
     const entry     = past[0].entries.find(e => e.exerciseId === exerciseId)!;
-    const maxWeight = Math.max(...entry.sets.map(s => s.weight));
+    const maxWeight = Math.max(...entry.sets.map(s => setMaxWeight(s)));
     return { date: past[0].date, maxWeight, feeling: entry.feeling };
   }
 
@@ -567,7 +567,54 @@ export class WorkoutService {
   }
 
   async reorderEntries(workoutId: string, entries: WorkoutEntry[]): Promise<void> {
+    await this._updateWorkout(workoutId, { entries: this._normalizeSupersetOrder(entries) });
+  }
+
+  /** Groups 2+ entries into a superset — performed back-to-back with no
+   *  rest, rendered as one connected block. Always kept contiguous, anchored
+   *  at the earliest selected entry's position. */
+  async groupIntoSuperset(workoutId: string, exerciseIds: string[]): Promise<void> {
+    if (exerciseIds.length < 2) return;
+    const workout = this._find(workoutId);
+    if (!workout) return;
+    const groupId = crypto.randomUUID();
+    const idSet   = new Set(exerciseIds);
+    const tagged  = workout.entries.map(e => idSet.has(e.exerciseId) ? { ...e, supersetGroupId: groupId } : e);
+    await this._updateWorkout(workoutId, { entries: this._normalizeSupersetOrder(tagged) });
+  }
+
+  /** Removes a single exercise from its superset; dissolves the group
+   *  entirely if fewer than 2 members would remain. */
+  async removeFromSuperset(workoutId: string, exerciseId: string): Promise<void> {
+    const workout = this._find(workoutId);
+    if (!workout) return;
+    const groupId = workout.entries.find(e => e.exerciseId === exerciseId)?.supersetGroupId;
+    if (!groupId) return;
+    const remaining = workout.entries.filter(e => e.supersetGroupId === groupId && e.exerciseId !== exerciseId);
+    const dissolve  = remaining.length < 2;
+    const entries = workout.entries.map(e => {
+      const clears = e.exerciseId === exerciseId || (dissolve && e.supersetGroupId === groupId);
+      if (!clears) return e;
+      const { supersetGroupId: _g, ...rest } = e;
+      return rest as WorkoutEntry;
+    });
     await this._updateWorkout(workoutId, { entries });
+  }
+
+  /** Re-groups entries so every superset's members sit next to each other,
+   *  anchored at the position of the first member encountered in the given
+   *  order — used after reordering and after creating a new group. */
+  private _normalizeSupersetOrder(entries: WorkoutEntry[]): WorkoutEntry[] {
+    const placed = new Set<string>();
+    const result: WorkoutEntry[] = [];
+    for (const e of entries) {
+      const gid = e.supersetGroupId;
+      if (!gid) { result.push(e); continue; }
+      if (placed.has(gid)) continue;
+      placed.add(gid);
+      result.push(...entries.filter(x => x.supersetGroupId === gid));
+    }
+    return result;
   }
 
   async deleteWorkout(id: string): Promise<void> {

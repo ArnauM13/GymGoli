@@ -77,4 +77,35 @@ describe('ExerciseEntryCardComponent', () => {
       expect(headerSpy).not.toHaveBeenCalled();
     });
   });
+
+  describe('selectable (superset grouping mode)', () => {
+    it('shows an unchecked circle instead of the chevron when selectable and not selected', () => {
+      fixture.componentRef.setInput('entry', entry());
+      fixture.componentRef.setInput('selectable', true);
+      fixture.componentRef.setInput('selected', false);
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('.eec-select-check')?.textContent?.trim()).toBe('radio_button_unchecked');
+      expect(el.querySelector('.eec-chevron')).toBeFalsy();
+    });
+
+    it('shows a filled check and highlights the card when selected', () => {
+      fixture.componentRef.setInput('entry', entry());
+      fixture.componentRef.setInput('selectable', true);
+      fixture.componentRef.setInput('selected', true);
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('.eec-select-check')?.textContent?.trim()).toBe('check_circle');
+      expect(el.querySelector('.eec-card--selected')).toBeTruthy();
+    });
+
+    it('renders the normal chevron when not selectable', () => {
+      fixture.componentRef.setInput('entry', entry());
+      fixture.componentRef.setInput('selectable', false);
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('.eec-chevron')).toBeTruthy();
+      expect(el.querySelector('.eec-select-check')).toBeFalsy();
+    });
+  });
 });

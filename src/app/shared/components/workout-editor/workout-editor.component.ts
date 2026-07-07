@@ -4,7 +4,7 @@ import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-
 import { MatDialog } from '@angular/material/dialog';
 
 import { CATEGORY_COLORS, CATEGORY_LABELS, SUBCATEGORY_LABELS } from '../../../core/models/exercise.model';
-import { FEELING_EMOJI, FEELING_LABEL, FeelingLevel, Workout, WorkoutEntry, WorkoutSet } from '../../../core/models/workout.model';
+import { FEELING_EMOJI, FEELING_LABEL, FeelingLevel, Workout, WorkoutEntry, WorkoutSet, setMaxWeight } from '../../../core/models/workout.model';
 import { FitnessGoal, FITNESS_GOAL_LABELS } from '../../../core/models/user-settings.model';
 import { ExerciseService } from '../../../core/services/exercise.service';
 import { OfflineService } from '../../../core/services/offline.service';
@@ -56,6 +56,25 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
           }
 
           @if (!isEntryHidden($index)) {
+
+          @if (entry.supersetGroupId && supersetContinuations().has($index)) {
+            <div class="we-superset-connector" aria-hidden="true">
+              <span class="material-symbols-outlined">bolt</span>
+              <span class="we-superset-connector-label">Sense descans</span>
+            </div>
+          }
+          @if (entry.supersetGroupId && supersetGroupStarts().has($index)) {
+            <div class="we-superset-chip">
+              <span class="material-symbols-outlined">link</span>
+              <span>Superset {{ supersetLabels().get(entry.supersetGroupId) }}</span>
+              @if (alwaysEditable() || editMode()) {
+                <button type="button" class="we-superset-ungroup-btn" (click)="ungroupSuperset(entry.exerciseId)" title="Desfer superset">
+                  <span class="material-symbols-outlined">close</span>
+                </button>
+              }
+            </div>
+          }
+
           <app-exercise-entry-card
             cdkDrag [cdkDragDisabled]="!editMode() && !reorderable()"
             (cdkDragStarted)="isDragging.set(true)"
@@ -70,11 +89,13 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
             [unit]="unit()"
             [feelingLevel]="entry.feeling"
             [prBadge]="prExerciseIds().has(entry.exerciseId)"
-            [showStatsAction]="!offlineService.isOffline()"
-            [showDeleteAction]="alwaysEditable() || editMode()"
+            [showStatsAction]="!offlineService.isOffline() && !groupingMode()"
+            [showDeleteAction]="(alwaysEditable() || editMode()) && !groupingMode()"
+            [selectable]="groupingMode()"
+            [selected]="selectedForGroup().has(entry.exerciseId)"
             (statsClick)="openStats(entry)"
             (deleteClick)="removeEntry(entry.exerciseId)"
-            (headerClick)="toggleCollapse(entry.exerciseId)">
+            (headerClick)="groupingMode() ? toggleGroupSelect(entry.exerciseId) : toggleCollapse(entry.exerciseId)">
 
             <!-- ── Projected body content ──
 
@@ -163,6 +184,30 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                             </div>
                           </div>
                         </div>
+                        <div class="we-drop-stages">
+                          @for (d of editDropStages(); track $index) {
+                            <div class="we-drop-stage-row">
+                              <span class="material-symbols-outlined we-drop-arrow">subdirectory_arrow_right</span>
+                              <div class="we-number-input compact">
+                                <button type="button" (click)="adjustEditDropWeight($index, -1)" aria-label="Menys pes">−</button>
+                                <input type="number" [value]="d.weight" (change)="setEditDropWeight($index, $any($event.target).value)" min="0" step="2.5">
+                                <button type="button" (click)="adjustEditDropWeight($index, 1)" aria-label="Més pes">+</button>
+                              </div>
+                              <div class="we-number-input compact">
+                                <button type="button" (click)="adjustEditDropReps($index, -1)" aria-label="Menys repeticions">−</button>
+                                <input type="number" [value]="d.reps" (change)="setEditDropReps($index, $any($event.target).value)" min="1" step="1">
+                                <button type="button" (click)="adjustEditDropReps($index, 1)" aria-label="Més repeticions">+</button>
+                              </div>
+                              <button type="button" class="we-drop-remove-btn" (click)="removeEditDropStage($index)" aria-label="Eliminar tram">
+                                <span class="material-symbols-outlined">close</span>
+                              </button>
+                            </div>
+                          }
+                          <button type="button" class="we-add-drop-btn" (click)="addEditDropStage()">
+                            <span class="material-symbols-outlined">add</span>
+                            {{ editDropStages().length === 0 ? 'Afegir dropset' : 'Afegir un altre tram' }}
+                          </button>
+                        </div>
                         <div class="we-inline-actions">
                           <button type="button" class="we-inline-cancel" (click)="cancelEditSet()">Cancel·lar</button>
                           <button type="submit" class="we-inline-save" [disabled]="editSetForm.invalid">Desar</button>
@@ -187,6 +232,11 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                           (click)="tapSetPill($event, entry.exerciseId, $index, set)">
                           {{ set.reps }}<small>r</small>
                         </span>
+                        @for (d of (set.drops ?? []); track $index) {
+                          <span class="material-symbols-outlined we-drop-sep">arrow_forward</span>
+                          <span class="we-set-pill weight drop">{{ dispW(d.weight) }}<small>{{ unit() }}</small></span>
+                          <span class="we-set-pill reps drop">{{ d.reps }}<small>r</small></span>
+                        }
                       </div>
                       @if (isEntryEditable(entry.exerciseId)) {
                         <button class="we-icon-btn-sm danger"
@@ -227,12 +277,38 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                       </div>
                     </div>
                   </div>
-                  <div class="we-qty-row">
-                    @for (n of setQtyOptions; track n) {
-                      <button type="button" class="we-qty-chip"
-                              [class.we-qty-chip--active]="setQty() === n"
-                              (click)="setQty.set(n)">×{{ n }}</button>
+                  @if (dropStages().length === 0) {
+                    <div class="we-qty-row">
+                      @for (n of setQtyOptions; track n) {
+                        <button type="button" class="we-qty-chip"
+                                [class.we-qty-chip--active]="setQty() === n"
+                                (click)="setQty.set(n)">×{{ n }}</button>
+                      }
+                    </div>
+                  }
+                  <div class="we-drop-stages">
+                    @for (d of dropStages(); track $index) {
+                      <div class="we-drop-stage-row">
+                        <span class="material-symbols-outlined we-drop-arrow">subdirectory_arrow_right</span>
+                        <div class="we-number-input compact">
+                          <button type="button" (click)="adjustDropWeight($index, -1)" aria-label="Menys pes">−</button>
+                          <input type="number" [value]="d.weight" (change)="setDropWeight($index, $any($event.target).value)" min="0" step="2.5">
+                          <button type="button" (click)="adjustDropWeight($index, 1)" aria-label="Més pes">+</button>
+                        </div>
+                        <div class="we-number-input compact">
+                          <button type="button" (click)="adjustDropReps($index, -1)" aria-label="Menys repeticions">−</button>
+                          <input type="number" [value]="d.reps" (change)="setDropReps($index, $any($event.target).value)" min="1" step="1">
+                          <button type="button" (click)="adjustDropReps($index, 1)" aria-label="Més repeticions">+</button>
+                        </div>
+                        <button type="button" class="we-drop-remove-btn" (click)="removeDropStage($index)" aria-label="Eliminar tram">
+                          <span class="material-symbols-outlined">close</span>
+                        </button>
+                      </div>
                     }
+                    <button type="button" class="we-add-drop-btn" (click)="addDropStage()">
+                      <span class="material-symbols-outlined">add</span>
+                      {{ dropStages().length === 0 ? 'Afegir dropset' : 'Afegir un altre tram' }}
+                    </button>
                   </div>
                   <div class="we-set-form-actions">
                     <button type="button" class="we-cancel-btn" (click)="cancelSet()">
@@ -242,7 +318,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                             (click)="submitSets(entry.exerciseId, setQty())"
                             [disabled]="setForm.invalid">
                       <span class="material-symbols-outlined">add</span>
-                      {{ setQty() > 1 ? 'Afegir ×' + setQty() : 'Afegir' }}
+                      {{ dropStages().length > 0 ? 'Afegir dropset' : (setQty() > 1 ? 'Afegir ×' + setQty() : 'Afegir') }}
                     </button>
                   </div>
                 </form>
@@ -313,6 +389,19 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
         }
 
       </div>
+
+      <!-- ── Superset grouping confirm bar ── -->
+      @if (groupingMode()) {
+        <div class="we-group-confirm-bar">
+          <span class="we-group-confirm-count">
+            {{ selectedForGroup().size === 0 ? 'Selecciona 2 o més exercicis' : selectedForGroup().size + ' seleccionats' }}
+          </span>
+          <button type="button" class="we-group-confirm-btn" [disabled]="selectedForGroup().size < 2" (click)="confirmGroup()">
+            <span class="material-symbols-outlined">link</span>
+            Crear superset
+          </button>
+        </div>
+      }
 
       <!-- ── Rest timer ── -->
       @if (timerActive()) {
@@ -680,7 +769,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       width: 20px; text-align: center; flex-shrink: 0;
     }
 
-    .we-set-pills { flex: 1; display: flex; gap: 8px; }
+    .we-set-pills { flex: 1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
     .we-set-pill {
       display: inline-flex; align-items: baseline; gap: 3px;
@@ -693,6 +782,78 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
         &:hover { filter: brightness(0.93); }
         &:active { filter: brightness(0.85); }
       }
+      &.drop { padding: 4px 9px; font-size: 12px; opacity: 0.75; }
+    }
+    .we-drop-sep { font-size: 14px; color: var(--c-text-3); flex-shrink: 0; }
+
+    /* ── Dropset stage editor (add/edit forms) ── */
+    .we-drop-stages { display: flex; flex-direction: column; gap: 8px; }
+    .we-drop-stage-row {
+      display: flex; align-items: center; gap: 6px;
+    }
+    .we-drop-arrow { font-size: 18px; color: var(--c-text-3); flex-shrink: 0; }
+    .we-drop-remove-btn {
+      width: 30px; height: 30px; flex-shrink: 0; border-radius: 8px;
+      border: 1px solid rgba(239,83,80,0.2); background: rgba(239,83,80,0.08);
+      color: #ef5350; cursor: pointer; touch-action: manipulation;
+      display: flex; align-items: center; justify-content: center; transition: background 0.15s;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover { background: rgba(239,83,80,0.16); }
+    }
+    .we-add-drop-btn {
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+      padding: 9px; border-radius: 8px;
+      border: 1.5px dashed var(--c-border); background: transparent;
+      color: var(--c-text-2); font-size: 12.5px; font-weight: 600;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover { border-color: var(--c-brand); color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.05); }
+    }
+
+    /* ── Superset grouping ── */
+    .we-superset-chip {
+      display: flex; align-items: center; gap: 6px;
+      margin: 0 0 -12px; padding: 7px 12px 12px; border-radius: 10px 10px 0 0;
+      background: color-mix(in srgb, var(--c-brand) 14%, var(--c-card));
+      border: 1.5px solid rgba(var(--c-brand-rgb), 0.3); border-bottom: none;
+      font-size: 11.5px; font-weight: 700; color: var(--c-brand);
+      .material-symbols-outlined { font-size: 15px; }
+    }
+    .we-superset-ungroup-btn {
+      margin-left: auto; width: 22px; height: 22px; border-radius: 50%;
+      border: none; background: transparent; color: var(--c-brand);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
+      .material-symbols-outlined { font-size: 14px; }
+      &:hover { background: rgba(var(--c-brand-rgb), 0.15); }
+    }
+    .we-superset-connector {
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+      margin: -4px 0; color: var(--c-brand); opacity: 0.75;
+      .material-symbols-outlined { font-size: 15px; }
+    }
+    .we-superset-connector-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
+
+    /* ── Grouping-mode confirm bar ── */
+    .we-group-confirm-bar {
+      position: fixed; bottom: 72px; left: 50%; transform: translateX(-50%);
+      z-index: 100; width: calc(100% - 64px); max-width: 340px;
+      display: flex; align-items: center; gap: 10px;
+      background: var(--c-card); border-radius: 16px;
+      box-shadow: 0 4px 24px var(--c-shadow-md);
+      padding: 10px 10px 10px 16px;
+      border: 1.5px solid rgba(var(--c-brand-rgb), 0.25);
+      animation: rt-in 0.25s cubic-bezier(0.34, 1.3, 0.64, 1) both;
+    }
+    .we-group-confirm-count { flex: 1; font-size: 12.5px; font-weight: 600; color: var(--c-text-2); }
+    .we-group-confirm-btn {
+      display: flex; align-items: center; gap: 5px; flex-shrink: 0;
+      padding: 10px 14px; border-radius: 10px; border: none;
+      background: var(--c-brand); color: white; font-size: 13px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover:not(:disabled) { background: var(--c-brand-dk); }
+      &:disabled { opacity: 0.4; cursor: default; }
     }
 
     /* ── Icon buttons ── */
@@ -943,6 +1104,9 @@ export class WorkoutEditorComponent implements OnDestroy {
    *  parent enables it explicitly (e.g. from an "Ordenar exercicis" menu
    *  action) so entries can't be reordered by accident. */
   readonly reorderable    = input<boolean>(false);
+  /** Superset-grouping selection mode — off by default, the parent enables
+   *  it explicitly (e.g. from an "Agrupar en superset" menu action). */
+  readonly groupingMode   = input<boolean>(false);
 
   readonly requestAddExercise = output<void>();
 
@@ -959,6 +1123,51 @@ export class WorkoutEditorComponent implements OnDestroy {
   readonly collapsedEntries  = signal<Set<string>>(new Set());
   readonly collapsedSections = signal<Set<string>>(new Set());
   readonly isDragging        = signal(false);
+
+  // ── Dropsets ─────────────────────────────────────────────────────────────
+  readonly dropStages     = signal<{ weight: number; reps: number }[]>([]);
+  readonly editDropStages = signal<{ weight: number; reps: number }[]>([]);
+
+  // ── Superset grouping ───────────────────────────────────────────────────
+  readonly selectedForGroup = signal<Set<string>>(new Set());
+
+  /** groupId → display label (A, B, C…), assigned in first-appearance order. */
+  readonly supersetLabels = computed((): Map<string, string> => {
+    const w = this.workout();
+    const map = new Map<string, string>();
+    if (!w) return map;
+    let next = 0;
+    for (const e of w.entries) {
+      if (e.supersetGroupId && !map.has(e.supersetGroupId)) {
+        map.set(e.supersetGroupId, String.fromCharCode(65 + (next++ % 26)));
+      }
+    }
+    return map;
+  });
+
+  /** Entry index → true when it's the first entry of its superset group (chip shown here). */
+  readonly supersetGroupStarts = computed((): Set<number> => {
+    const w = this.workout();
+    const set = new Set<number>();
+    if (!w) return set;
+    for (let i = 0; i < w.entries.length; i++) {
+      const gid = w.entries[i].supersetGroupId;
+      if (gid && w.entries[i - 1]?.supersetGroupId !== gid) set.add(i);
+    }
+    return set;
+  });
+
+  /** Entry index → true when it directly continues the previous entry's superset group (connector shown here). */
+  readonly supersetContinuations = computed((): Set<number> => {
+    const w = this.workout();
+    const set = new Set<number>();
+    if (!w) return set;
+    for (let i = 1; i < w.entries.length; i++) {
+      const gid = w.entries[i].supersetGroupId;
+      if (gid && w.entries[i - 1].supersetGroupId === gid) set.add(i);
+    }
+    return set;
+  });
   // ── Rest timer ─────────────────────────────────────────────────────────────
   readonly restTimerEnabled = computed(() => this.settingsService.restTimerSeconds() > 0);
   readonly timerActive    = signal(false);
@@ -975,7 +1184,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     const ids = new Set<string>();
     for (const entry of w.entries) {
       if (entry.sets.length === 0) continue;
-      const maxInEntry = Math.max(...entry.sets.map(s => s.weight));
+      const maxInEntry = this.entryMaxWeight(entry);
       if (maxInEntry <= 0) continue;
       const prevMax = this.workoutService.getAllTimeMaxWeight(entry.exerciseId, w.id);
       if (prevMax > 0 && maxInEntry > prevMax) ids.add(entry.exerciseId);
@@ -1072,6 +1281,11 @@ export class WorkoutEditorComponent implements OnDestroy {
         }
       });
     }, { allowSignalWrites: true });
+
+    // Clear any pending selection whenever grouping mode is turned off.
+    effect(() => {
+      if (!this.groupingMode()) untracked(() => this.selectedForGroup.set(new Set()));
+    }, { allowSignalWrites: true });
   }
 
   isEntryEditable(exerciseId: string): boolean {
@@ -1126,6 +1340,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     this.editingSet.set(null);
     this.setQty.set(1);
     this.setForm.reset({ weight: 0, reps: 8 });
+    this.dropStages.set([]);
   }
 
   getFeelingEmoji(level: FeelingLevel): string { return FEELING_EMOJI[level]; }
@@ -1226,7 +1441,7 @@ export class WorkoutEditorComponent implements OnDestroy {
   }
 
   entryMaxWeight(entry: WorkoutEntry): number {
-    return entry.sets.reduce((m, s) => Math.max(m, s.weight), 0);
+    return entry.sets.reduce((m, s) => Math.max(m, setMaxWeight(s)), 0);
   }
 
   dispW(kg: number): number { return kgToDisplay(kg, this.unit()); }
@@ -1360,9 +1575,13 @@ export class WorkoutEditorComponent implements OnDestroy {
     this.addingFor.set(null);
     this.editingSet.set({ exerciseId, index });
     this.editSetForm.setValue({ weight: kgToDisplay(set.weight, this.unit()), reps: set.reps });
+    this.editDropStages.set((set.drops ?? []).map(d => ({ weight: kgToDisplay(d.weight, this.unit()), reps: d.reps })));
   }
 
-  cancelEditSet(): void { this.editingSet.set(null); }
+  cancelEditSet(): void {
+    this.editingSet.set(null);
+    this.editDropStages.set([]);
+  }
 
   async saveEditSet(): Promise<void> {
     if (this.editSetForm.invalid) return;
@@ -1371,9 +1590,11 @@ export class WorkoutEditorComponent implements OnDestroy {
     const { weight, reps } = this.editSetForm.value;
     const w = this.workout();
     if (!w) return;
+    const drops = this.editDropStages();
     try {
       await this.workoutService.updateSetInEntry(w.id, es.exerciseId, es.index, {
         weight: displayToKg(weight!, this.unit()), reps: reps!,
+        ...(drops.length > 0 ? { drops: drops.map(d => ({ weight: displayToKg(d.weight, this.unit()), reps: d.reps })) } : {}),
       });
       this.cancelEditSet();
     } catch {
@@ -1387,7 +1608,10 @@ export class WorkoutEditorComponent implements OnDestroy {
     const w = this.workout();
     if (!w) return;
     const weightKg = displayToKg(weight!, this.unit());
-    const sets = Array.from({ length: count }, () => ({ weight: weightKg, reps: reps! }));
+    const drops = this.dropStages();
+    const sets: WorkoutSet[] = drops.length > 0
+      ? [{ weight: weightKg, reps: reps!, drops: drops.map(d => ({ weight: displayToKg(d.weight, this.unit()), reps: d.reps })) }]
+      : Array.from({ length: count }, () => ({ weight: weightKg, reps: reps! }));
     try {
       await this.workoutService.addSetsToEntry(w.id, exerciseId, sets);
       this.cancelSet();
@@ -1428,6 +1652,86 @@ export class WorkoutEditorComponent implements OnDestroy {
     } catch {
       this.feedback.error('Error en eliminar', 2000);
     }
+  }
+
+  // ── Superset grouping ───────────────────────────────────────────────────
+  toggleGroupSelect(exerciseId: string): void {
+    const s = new Set(this.selectedForGroup());
+    s.has(exerciseId) ? s.delete(exerciseId) : s.add(exerciseId);
+    this.selectedForGroup.set(s);
+  }
+
+  async confirmGroup(): Promise<void> {
+    const w = this.workout();
+    const ids = [...this.selectedForGroup()];
+    if (!w || ids.length < 2) return;
+    try {
+      await this.workoutService.groupIntoSuperset(w.id, ids);
+      this.selectedForGroup.set(new Set());
+    } catch {
+      this.feedback.error('Error en agrupar', 2000);
+    }
+  }
+
+  async ungroupSuperset(exerciseId: string): Promise<void> {
+    const w = this.workout();
+    if (!w) return;
+    try {
+      await this.workoutService.removeFromSuperset(w.id, exerciseId);
+    } catch {
+      this.feedback.error('Error en desfer el superset', 2000);
+    }
+  }
+
+  // ── Dropsets ─────────────────────────────────────────────────────────────
+  addDropStage(): void {
+    const step = weightStep(this.unit());
+    const last = this.dropStages().at(-1) ?? { weight: this.setForm.value.weight ?? 0, reps: this.setForm.value.reps ?? 8 };
+    const reduced = Math.max(0, Math.round((last.weight * 0.8) / step) * step);
+    this.dropStages.update(arr => [...arr, { weight: reduced, reps: last.reps }]);
+  }
+  removeDropStage(index: number): void {
+    this.dropStages.update(arr => arr.filter((_, i) => i !== index));
+  }
+  adjustDropWeight(index: number, delta: number): void {
+    const step = weightStep(this.unit());
+    this.dropStages.update(arr => arr.map((d, i) => i === index ? { ...d, weight: Math.max(0, Math.round((d.weight + delta * step) * 10) / 10) } : d));
+  }
+  adjustDropReps(index: number, delta: number): void {
+    this.dropStages.update(arr => arr.map((d, i) => i === index ? { ...d, reps: Math.max(1, d.reps + delta) } : d));
+  }
+  setDropWeight(index: number, raw: string): void {
+    const v = Math.max(0, Number(raw) || 0);
+    this.dropStages.update(arr => arr.map((d, i) => i === index ? { ...d, weight: v } : d));
+  }
+  setDropReps(index: number, raw: string): void {
+    const v = Math.max(1, Number(raw) || 1);
+    this.dropStages.update(arr => arr.map((d, i) => i === index ? { ...d, reps: v } : d));
+  }
+
+  addEditDropStage(): void {
+    const step = weightStep(this.unit());
+    const last = this.editDropStages().at(-1) ?? { weight: this.editSetForm.value.weight ?? 0, reps: this.editSetForm.value.reps ?? 8 };
+    const reduced = Math.max(0, Math.round((last.weight * 0.8) / step) * step);
+    this.editDropStages.update(arr => [...arr, { weight: reduced, reps: last.reps }]);
+  }
+  removeEditDropStage(index: number): void {
+    this.editDropStages.update(arr => arr.filter((_, i) => i !== index));
+  }
+  adjustEditDropWeight(index: number, delta: number): void {
+    const step = weightStep(this.unit());
+    this.editDropStages.update(arr => arr.map((d, i) => i === index ? { ...d, weight: Math.max(0, Math.round((d.weight + delta * step) * 10) / 10) } : d));
+  }
+  adjustEditDropReps(index: number, delta: number): void {
+    this.editDropStages.update(arr => arr.map((d, i) => i === index ? { ...d, reps: Math.max(1, d.reps + delta) } : d));
+  }
+  setEditDropWeight(index: number, raw: string): void {
+    const v = Math.max(0, Number(raw) || 0);
+    this.editDropStages.update(arr => arr.map((d, i) => i === index ? { ...d, weight: v } : d));
+  }
+  setEditDropReps(index: number, raw: string): void {
+    const v = Math.max(1, Number(raw) || 1);
+    this.editDropStages.update(arr => arr.map((d, i) => i === index ? { ...d, reps: v } : d));
   }
 
   // ── Rest timer ─────────────────────────────────────────────────────────────

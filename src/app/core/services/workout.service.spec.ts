@@ -49,8 +49,14 @@ describe('WorkoutService', () => {
       providers: [
         { provide: AuthService,     useValue: { uid } },
         { provide: SupabaseService, useValue: { client: { from: fromSpy, channel: () => channelStub } } },
-        { provide: ExerciseService, useValue: {} },
-        { provide: SyncService,     useValue: {} },
+        { provide: ExerciseService, useValue: { getById: () => undefined } },
+        { provide: SyncService,     useValue: {
+          markDirty:   jasmine.createSpy('markDirty'),
+          pendingIds:  signal<string[]>([]),
+          getSnapshot: () => null,
+          cancelDirty: jasmine.createSpy('cancelDirty'),
+          isInsert:    () => false,
+        } },
       ],
     });
     service = TestBed.inject(WorkoutService);
@@ -111,6 +117,91 @@ describe('WorkoutService', () => {
       fromSpy.and.callFake((table: string) => table === 'workouts' ? workoutsChain : makeQueryChain({ data: [], count: 0, error: null }));
 
       await expectAsync(service.loadWorkoutPage({ page: 0, pageSize: 20 })).toBeRejected();
+    });
+  });
+
+  describe('supersets', () => {
+    async function seedWorkout(): Promise<string> {
+      const id = await service.createWorkoutForDate('2024-03-06');
+      await service.addExerciseToWorkout(id, { exerciseId: 'a', exerciseName: 'A', sets: [] });
+      await service.addExerciseToWorkout(id, { exerciseId: 'b', exerciseName: 'B', sets: [] });
+      await service.addExerciseToWorkout(id, { exerciseId: 'c', exerciseName: 'C', sets: [] });
+      return id;
+    }
+
+    it('groupIntoSuperset() tags the given entries with a shared id and keeps them contiguous', async () => {
+      const id = await seedWorkout();
+      await service.groupIntoSuperset(id, ['a', 'c']);
+
+      const w = service.getWorkoutForDate('2024-03-06')!;
+      expect(w.entries.map(e => e.exerciseId)).toEqual(['a', 'c', 'b']);
+      expect(w.entries[0].supersetGroupId).toBeTruthy();
+      expect(w.entries[0].supersetGroupId).toBe(w.entries[1].supersetGroupId);
+      expect(w.entries[2].supersetGroupId).toBeUndefined();
+    });
+
+    it('groupIntoSuperset() does nothing with fewer than 2 exercise ids', async () => {
+      const id = await seedWorkout();
+      await service.groupIntoSuperset(id, ['a']);
+
+      const w = service.getWorkoutForDate('2024-03-06')!;
+      expect(w.entries.every(e => !e.supersetGroupId)).toBeTrue();
+    });
+
+    it('removeFromSuperset() dissolves the group when fewer than 2 members would remain', async () => {
+      const id = await seedWorkout();
+      await service.groupIntoSuperset(id, ['a', 'b']);
+
+      await service.removeFromSuperset(id, 'a');
+
+      const w = service.getWorkoutForDate('2024-03-06')!;
+      expect(w.entries.find(e => e.exerciseId === 'a')?.supersetGroupId).toBeUndefined();
+      expect(w.entries.find(e => e.exerciseId === 'b')?.supersetGroupId).toBeUndefined();
+    });
+
+    it('removeFromSuperset() keeps the group intact when 2+ members remain', async () => {
+      const id = await seedWorkout();
+      await service.groupIntoSuperset(id, ['a', 'b', 'c']);
+
+      await service.removeFromSuperset(id, 'a');
+
+      const w = service.getWorkoutForDate('2024-03-06')!;
+      expect(w.entries.find(e => e.exerciseId === 'a')?.supersetGroupId).toBeUndefined();
+      const bGroup = w.entries.find(e => e.exerciseId === 'b')?.supersetGroupId;
+      expect(bGroup).toBeTruthy();
+      expect(w.entries.find(e => e.exerciseId === 'c')?.supersetGroupId).toBe(bGroup);
+    });
+
+    it('reorderEntries() re-closes the gap if a caller splits a group apart', async () => {
+      const id = await seedWorkout();
+      await service.groupIntoSuperset(id, ['a', 'c']);
+      const grouped = service.getWorkoutForDate('2024-03-06')!.entries;
+
+      // Simulate a drag that separates the grouped pair: [a, c, b] → [c, b, a]
+      await service.reorderEntries(id, [grouped[1], grouped[2], grouped[0]]);
+
+      const after = service.getWorkoutForDate('2024-03-06')!;
+      const aIdx = after.entries.findIndex(e => e.exerciseId === 'a');
+      const cIdx = after.entries.findIndex(e => e.exerciseId === 'c');
+      expect(Math.abs(aIdx - cIdx)).toBe(1);
+    });
+  });
+
+  describe('dropsets affect max-weight lookups', () => {
+    it('getAllTimeMaxWeight() counts a drop stage heavier than the main stage', async () => {
+      const id = await service.createWorkoutForDate('2024-03-06');
+      await service.addExerciseToWorkout(id, { exerciseId: 'a', exerciseName: 'A', sets: [] });
+      await service.addSetsToEntry(id, 'a', [{ weight: 40, reps: 8, drops: [{ weight: 60, reps: 4 }] }]);
+
+      expect(service.getAllTimeMaxWeight('a')).toBe(60);
+    });
+
+    it('getLastSessionInfo() reports the drop-stage weight as maxWeight when it is higher', async () => {
+      const id = await service.createWorkoutForDate('2024-03-06');
+      await service.addExerciseToWorkout(id, { exerciseId: 'a', exerciseName: 'A', sets: [] });
+      await service.addSetsToEntry(id, 'a', [{ weight: 40, reps: 8, drops: [{ weight: 60, reps: 4 }] }]);
+
+      expect(service.getLastSessionInfo('a')?.maxWeight).toBe(60);
     });
   });
 });

@@ -258,6 +258,14 @@ describe('TrainComponent', () => {
     });
   });
 
+  // ── groupingMode ─────────────────────────────────────────────────────────
+
+  describe('groupingMode', () => {
+    it('is off by default', () => {
+      expect(component.groupingMode()).toBeFalse();
+    });
+  });
+
   // ── isToday() ────────────────────────────────────────────────────────────
 
   describe('isToday()', () => {

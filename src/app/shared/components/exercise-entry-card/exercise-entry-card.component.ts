@@ -17,7 +17,7 @@ import { kgToDisplay } from '../../utils/weight.utils';
         <span class="eec-drag material-symbols-outlined" cdkDragHandle>drag_indicator</span>
       }
 
-      <div class="eec-card" [class.eec-card--open]="!collapsed()">
+      <div class="eec-card" [class.eec-card--open]="!collapsed()" [class.eec-card--selected]="selectable() && selected()">
 
         <!-- ── Header (always visible, same look as history ex-card) ── -->
         <div class="eec-header" [class.eec-header--minimal]="hideMetaWhenCollapsed()" (click)="headerClick.emit()">
@@ -67,10 +67,16 @@ import { kgToDisplay } from '../../utils/weight.utils';
                 <span class="material-symbols-outlined">more_vert</span>
               </button>
             }
-            <span class="material-symbols-outlined eec-chevron"
-              [class.eec-chevron--big]="hideMetaWhenCollapsed()">
-              {{ collapsed() ? 'expand_more' : 'expand_less' }}
-            </span>
+            @if (selectable()) {
+              <span class="material-symbols-outlined eec-select-check" [class.eec-select-check--on]="selected()">
+                {{ selected() ? 'check_circle' : 'radio_button_unchecked' }}
+              </span>
+            } @else {
+              <span class="material-symbols-outlined eec-chevron"
+                [class.eec-chevron--big]="hideMetaWhenCollapsed()">
+                {{ collapsed() ? 'expand_more' : 'expand_less' }}
+              </span>
+            }
           </div>
         </div>
 
@@ -119,6 +125,10 @@ import { kgToDisplay } from '../../utils/weight.utils';
       border-color: color-mix(in srgb, var(--cat) 55%, var(--c-border));
       background: var(--c-card);
       box-shadow: 0 3px 12px color-mix(in srgb, var(--cat) 18%, var(--c-shadow));
+    }
+    .eec-card--selected {
+      border-color: var(--c-brand);
+      background: rgba(var(--c-brand-rgb), 0.06);
     }
     :host(.cdk-drag-preview) .eec-card {
       box-shadow: 0 8px 24px var(--c-shadow-md);
@@ -221,6 +231,12 @@ import { kgToDisplay } from '../../utils/weight.utils';
     .eec-chevron--big { font-size: 28px; }
     .eec-card--open .eec-chevron { color: var(--cat); }
 
+    .eec-select-check {
+      font-size: 24px; color: var(--c-border); align-self: center;
+      transition: color 0.15s;
+      &.eec-select-check--on { color: var(--c-brand); }
+    }
+
     .eec-header--minimal { min-height: 54px; }
 
     /* Grid-rows collapse animation */
@@ -250,6 +266,10 @@ export class ExerciseEntryCardComponent {
    *  when the card is collapsed and has no sets yet. */
   readonly showStatsAction  = input<boolean>(false);
   readonly showDeleteAction = input<boolean>(false);
+  /** Superset-grouping selection mode — shows a checkbox instead of the
+   *  chevron; `headerClick` means "toggle selection" while this is true. */
+  readonly selectable = input<boolean>(false);
+  readonly selected   = input<boolean>(false);
 
   readonly headerClick  = output<void>();
   readonly menuClick    = output<void>();
