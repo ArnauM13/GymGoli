@@ -311,6 +311,23 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           </div>
         }
 
+        <!-- ── Avui ── -->
+        <div class="today-section">
+          <div class="today-header">
+            <span class="material-symbols-outlined today-header-icon">today</span>
+            <h2 class="today-title">Avui</h2>
+            <button class="today-add-btn" (click)="chooserOpen.set(true)" aria-label="Nou entrenament">
+              <span class="material-symbols-outlined">add</span>
+            </button>
+          </div>
+
+          @if (todayFeedEntry(); as day) {
+            <ng-container [ngTemplateOutlet]="dayCards" [ngTemplateOutletContext]="{ $implicit: day }" />
+          } @else {
+            <p class="today-empty">Encara no has fet res avui.</p>
+          }
+        </div>
+
         @if (!offlineService.isOffline() && dateWorkouts().length === 0 && dateSportSessions().length === 0) {
           <app-fitness-insights />
         }
@@ -357,44 +374,22 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     </div>
 
-    <!-- ── Avui: docked panel above the nav bar, always visible ── -->
-    @if (!activeWorkout()) {
-      <div class="bottom-dock">
-        @if (!todayFeedEntry() && todaySuggestion(); as s) {
-          <button class="suggestion-float" [style.--sc]="s.color" (click)="handleSuggestionClick(s)">
-            <div class="sf-bar"></div>
-            <div class="sf-icon-wrap">
-              <span class="material-symbols-outlined sf-icon">{{ s.icon }}</span>
-            </div>
-            <div class="sf-info">
-              <span class="sf-eyebrow">Avui toca</span>
-              <span class="sf-label">{{ s.label }}</span>
-              @if (s.reason) {
-                <span class="sf-reason">{{ s.reason }}</span>
-              }
-            </div>
-            <span class="material-symbols-outlined sf-chevron">chevron_right</span>
-          </button>
-        }
-
-        <div class="today-section">
-          <div class="today-header">
-            <span class="material-symbols-outlined today-header-icon">today</span>
-            <h2 class="today-title">Avui</h2>
-            <button class="today-add-btn" (click)="chooserOpen.set(true)" aria-label="Nou entrenament">
-              <span class="material-symbols-outlined">add</span>
-            </button>
-          </div>
-
-          <div class="today-body">
-            @if (todayFeedEntry(); as day) {
-              <ng-container [ngTemplateOutlet]="dayCards" [ngTemplateOutletContext]="{ $implicit: day }" />
-            } @else {
-              <p class="today-empty">Encara no has fet res avui.</p>
-            }
-          </div>
+    <!-- ── Suggeriment flotant "Avui toca", quan encara no hi ha res fet/planificat avui ── -->
+    @if (!activeWorkout() && !todayFeedEntry() && todaySuggestion(); as s) {
+      <button class="suggestion-float" [style.--sc]="s.color" (click)="handleSuggestionClick(s)">
+        <div class="sf-bar"></div>
+        <div class="sf-icon-wrap">
+          <span class="material-symbols-outlined sf-icon">{{ s.icon }}</span>
         </div>
-      </div>
+        <div class="sf-info">
+          <span class="sf-eyebrow">Avui toca</span>
+          <span class="sf-label">{{ s.label }}</span>
+          @if (s.reason) {
+            <span class="sf-reason">{{ s.reason }}</span>
+          }
+        </div>
+        <span class="material-symbols-outlined sf-chevron">chevron_right</span>
+      </button>
     }
 
     <!-- ── "Nou entrenament" chooser bottom sheet ── -->
@@ -907,15 +902,9 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .material-symbols-outlined { font-size: 32px; color: var(--c-border); }
     }
 
-    /* ── Bottom dock: suggestion float (optional) + docked "Avui" panel ── */
-    .bottom-dock {
-      position: fixed; left: 0; right: 0; bottom: var(--nav-height);
-      z-index: 90;
-      display: flex; flex-direction: column;
-    }
-
-    /* ── "Avui toca" suggestion — floats above the docked panel ── */
+    /* ── "Avui toca" suggestion — floats above the nav bar ── */
     .suggestion-float {
+      position: fixed; left: 0; right: 0; bottom: var(--nav-height); z-index: 90;
       display: flex; align-items: center; gap: 0;
       margin: 0 16px 10px; height: 56px; border-radius: 14px; padding: 0;
       border: 1.5px solid color-mix(in srgb, var(--sc) 35%, var(--c-border-2));
@@ -949,16 +938,15 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
     .sf-chevron { font-size: 18px; color: var(--c-text-3); margin-right: 10px; flex-shrink: 0; }
 
-    /* ── "Avui" section: docked above the nav bar, not floating ── */
+    /* ── "Avui" section: bordered/tinted card at the top of the feed ── */
     .today-section {
-      background: var(--c-card);
-      border-top: 1.5px solid color-mix(in srgb, var(--c-brand) 20%, var(--c-border-2));
-      box-shadow: 0 -4px 16px var(--c-shadow);
-      padding: 10px 16px calc(env(safe-area-inset-bottom, 0px) + 10px);
-      max-height: 38vh;
-      display: flex; flex-direction: column;
+      margin: 8px 16px 4px;
+      padding: 12px 12px 4px;
+      background: color-mix(in srgb, var(--c-brand) 5%, var(--c-card));
+      border: 1.5px solid color-mix(in srgb, var(--c-brand) 16%, var(--c-border-2));
+      border-radius: 18px;
     }
-    .today-header { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; flex-shrink: 0; }
+    .today-header { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
     .today-header-icon { font-size: 19px; color: var(--c-brand); font-variation-settings: 'FILL' 1, 'wght' 400; }
     .today-title { margin: 0; flex: 1; font-size: 15px; font-weight: 800; color: var(--c-text); letter-spacing: 0.1px; }
     .today-add-btn {
@@ -970,7 +958,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       &:hover { background: var(--c-brand-dk); }
       &:active { transform: scale(0.92); }
     }
-    .today-body { overflow-y: auto; }
     .today-empty {
       margin: 0; font-size: 12.5px; color: var(--c-text-3); text-align: center;
       padding: 6px 0;
@@ -1545,7 +1532,7 @@ export class TrainComponent implements OnDestroy {
   readonly isSelectedFuture = computed(() => this.selectedDate() > TODAY());
 
   readonly pagePaddingBottom = computed(() =>
-    this.activeWorkout() ? '88px' : 'calc(38vh + 24px)' // clear the aw-menu-fab, or the docked "Avui" panel
+    '88px' // clear the FAB / bottom-bar in both modes
   );
 
   readonly dateSportSessions = computed(() =>
