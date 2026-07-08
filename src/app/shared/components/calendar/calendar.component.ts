@@ -168,7 +168,7 @@ import {
   styles: [`
     .calendar-card {
       background: var(--c-card);
-      border-radius: 16px;
+      border-radius: 16px 16px 0 0;
       overflow: hidden;
     }
 
