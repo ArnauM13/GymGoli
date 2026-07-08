@@ -15,6 +15,7 @@ import { OfflineService } from '../../core/services/offline.service';
 import { TrainerService } from '../../core/services/trainer.service';
 import { TemplateService } from '../../core/services/template.service';
 import { SharedWorkoutService } from '../../core/services/shared-workout.service';
+import { WorkoutProfileService } from '../../core/services/workout-profile.service';
 import { Workout, WorkoutEntry } from '../../core/models/workout.model';
 import { CATEGORY_COLORS } from '../../core/models/exercise.model';
 import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../../core/models/weekly-plan.model';
@@ -27,6 +28,8 @@ const TODAY = new Date().toISOString().split('T')[0];
 function makeWorkout(overrides: Partial<Workout> = {}): Workout {
   return { id: '1', date: TODAY, entries: [], createdAt: new Date(), ...overrides };
 }
+
+const EMPTY_CATEGORY_PROFILE = { daysSinceLast: 99, typicalGapDays: 4, overdueScore: 0 };
 
 describe('TrainComponent', () => {
   let component: TrainComponent;
@@ -93,6 +96,7 @@ describe('TrainComponent', () => {
         { provide: TrainerService,      useValue: { myTrainer: signal(null), hasTrainer: jasmine.createSpy().and.returnValue(false), getProposalForDate: jasmine.createSpy().and.returnValue(null) } },
         { provide: TemplateService,     useValue: { forCategory: jasmine.createSpy().and.returnValue([]), create: jasmine.createSpy().and.resolveTo(undefined), recordUse: jasmine.createSpy().and.resolveTo(undefined) } },
         { provide: SharedWorkoutService, useValue: { share: jasmine.createSpy().and.resolveTo('share-id') } },
+        { provide: WorkoutProfileService, useValue: { profile: signal({ gym: { push: EMPTY_CATEGORY_PROFILE, pull: EMPTY_CATEGORY_PROFILE, legs: EMPTY_CATEGORY_PROFILE }, favoriteSport: null, recentSport: null, minRecovery: 2 }) } },
         { provide: MatDialog,              useValue: { open: jasmine.createSpy() } },
         { provide: FeedbackService,        useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
         { provide: ConfirmDialogService,   useValue: { confirm: jasmine.createSpy('confirm').and.resolveTo(false) } },
@@ -279,20 +283,18 @@ describe('TrainComponent', () => {
     });
   });
 
-  // ── offline toggle chip label ───────────────────────────────────────────
+  // ── header quick-action chip ─────────────────────────────────────────────
 
-  describe('offline toggle chip', () => {
-    it('reads "Sense connexió" when offline mode is off', () => {
+  describe('header quick-action chip', () => {
+    it('reads "Planificar rutines"', () => {
       const chip = (fixture.nativeElement as HTMLElement).querySelector('.qa-chip');
-      expect(chip?.textContent?.trim()).toContain('Sense connexió');
+      expect(chip?.textContent?.trim()).toContain('Planificar rutines');
     });
 
-    it('reads "En línia" once forced offline mode is active', () => {
-      forceOffline.set(true);
-      fixture.detectChanges();
-      const chip = (fixture.nativeElement as HTMLElement).querySelector('.qa-chip');
-      expect(chip?.textContent?.trim()).toContain('En línia');
-      expect(chip?.textContent?.trim()).not.toContain('Sense connexió');
+    it('navigates to the weekly planner when clicked', () => {
+      const chip = (fixture.nativeElement as HTMLElement).querySelector('.qa-chip') as HTMLButtonElement;
+      chip.click();
+      expect(navigateSpy).toHaveBeenCalledWith(['/train/planner']);
     });
   });
 
