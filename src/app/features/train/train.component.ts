@@ -2023,9 +2023,8 @@ export class TrainComponent {
     if (this.selectedDate() === TODAY()) {
       const plans = this.workoutService.getPlannedForDate(TODAY());
       if (plans.length > 0) {
-        const brand = getComputedStyle(document.documentElement).getPropertyValue('--c-brand').trim() || '#006874';
         return {
-          kind: 'plan', color: brand, icon: 'event',
+          kind: 'plan', color: this.workoutPrimaryColor(plans[0]), icon: 'event',
           label: 'Tens un pla per avui',
           meta: `${plans.length} pla${plans.length > 1 ? 'ns' : ''} pendent${plans.length > 1 ? 's' : ''}`,
         };

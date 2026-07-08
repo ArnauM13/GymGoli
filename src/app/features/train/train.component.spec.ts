@@ -412,6 +412,24 @@ describe('TrainComponent', () => {
     });
   });
 
+  // ── bottomCard() ─────────────────────────────────────────────────────────
+
+  describe('bottomCard() — pending plan for today', () => {
+    it('tints the "Tens un pla per avui" card with the plan\'s category color', () => {
+      const getPlannedForDate = TestBed.inject(WorkoutService).getPlannedForDate as jasmine.Spy;
+      getPlannedForDate.and.returnValue([{ id: 'w1', category: 'legs', categories: ['legs'] } as unknown as Workout]);
+      // bottomCard() is a computed already evaluated once during the initial
+      // detectChanges() — force it to re-derive by touching its tracked
+      // selectedDate dependency now that the spy returns a plan.
+      component.selectedDate.set('2099-01-01');
+      component.selectedDate.set(TODAY);
+
+      const bc = component.bottomCard();
+      expect(bc?.kind).toBe('plan');
+      expect(bc?.color).toBe(CATEGORY_COLORS['legs']);
+    });
+  });
+
   // ── shareWorkout() ───────────────────────────────────────────────────────
 
   describe('shareWorkout()', () => {
