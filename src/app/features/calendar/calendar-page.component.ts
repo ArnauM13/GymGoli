@@ -970,8 +970,9 @@ export class CalendarPageComponent implements OnDestroy {
     return sub ? (SUBCATEGORY_LABELS[sub] ?? sub) : '';
   }
   getMaxWeight(entry: WorkoutEntry): number {
-    if (!entry.sets.length) return 0;
-    return Math.max(...entry.sets.map(s => setMaxWeight(s)));
+    const workingSets = entry.sets.filter(s => !s.warmup);
+    if (!workingSets.length) return 0;
+    return Math.max(...workingSets.map(s => setMaxWeight(s)));
   }
 
   getDay(date: string): string {
@@ -990,7 +991,7 @@ export class CalendarPageComponent implements OnDestroy {
   }
   totalVolume(workout: Workout): number {
     return Math.round(workout.entries.reduce((t, e) =>
-      t + e.sets.reduce((s, set) => s + setVolume(set), 0), 0
+      t + e.sets.reduce((s, set) => set.warmup ? s : s + setVolume(set), 0), 0
     ));
   }
   volumeFmt(workout: Workout): string {
@@ -1007,7 +1008,7 @@ export class CalendarPageComponent implements OnDestroy {
     return names.slice(0, 2).join(' · ') + ` +${names.length - 2}`;
   }
   isMaxSet(entry: WorkoutEntry, set: WorkoutSet): boolean {
-    if (entry.sets.length <= 1) return false;
+    if (set.warmup || entry.sets.length <= 1) return false;
     const max = this.getMaxWeight(entry);
     if (max === 0) return false;
     return entry.sets.some(s => setMaxWeight(s) !== max) && setMaxWeight(set) === max;

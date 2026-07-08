@@ -219,6 +219,11 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                             {{ editDropStages().length === 0 ? 'Afegir dropset' : 'Afegir un altre tram' }}
                           </button>
                         </div>
+                        <button type="button" class="we-warmup-chip" [class.we-warmup-chip--active]="editIsWarmupSet()"
+                                (click)="editIsWarmupSet.set(!editIsWarmupSet())">
+                          <span class="material-symbols-outlined">local_fire_department</span>
+                          Sèrie d'escalfament
+                        </button>
                         <div class="we-inline-actions">
                           <button type="button" class="we-inline-cancel" (click)="cancelEditSet()">Cancel·lar</button>
                           <button type="submit" class="we-inline-save" [disabled]="editSetForm.invalid">Desar</button>
@@ -227,10 +232,16 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                     </div>
                   } @else {
                     <!-- Set row: tap to edit when entry is editable -->
-                    <div class="we-set-row"
+                    <div class="we-set-row" [class.we-set-row--warmup]="set.warmup"
                          [class.we-set-row-tappable]="isEntryEditable(entry.exerciseId)"
                          (click)="isEntryEditable(entry.exerciseId) && startEditSet(entry.exerciseId, $index, set)">
-                      <span class="we-set-num">{{ $index + 1 }}</span>
+                      <span class="we-set-num">
+                        @if (set.warmup) {
+                          <span class="material-symbols-outlined we-warmup-icon" title="Sèrie d'escalfament">local_fire_department</span>
+                        } @else {
+                          {{ $index + 1 }}
+                        }
+                      </span>
                       <div class="we-set-pills">
                         @if (set.weightLeft != null) {
                           <span class="we-set-pill weight side"
@@ -268,7 +279,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                           </span>
                         } @else {
                           <span class="we-set-pill weight"
-                            [class.we-set-pill--pr]="prExerciseIds().has(entry.exerciseId) && set.weight > 0 && set.weight === entryMaxWeight(entry)"
+                            [class.we-set-pill--pr]="!set.warmup && prExerciseIds().has(entry.exerciseId) && set.weight > 0 && set.weight === entryMaxWeight(entry)"
                             [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
                             (click)="tapSetPill($event, entry.exerciseId, $index, set)">
                             {{ dispW(set.weight) }}<small>{{ unit() }}</small>
@@ -339,6 +350,11 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                       }
                     </div>
                   }
+                  <button type="button" class="we-warmup-chip" [class.we-warmup-chip--active]="isWarmupSet()"
+                          (click)="isWarmupSet.set(!isWarmupSet())">
+                    <span class="material-symbols-outlined">local_fire_department</span>
+                    Sèrie d'escalfament
+                  </button>
                   <div class="we-drop-stages">
                     @for (d of dropStages(); track $index) {
                       <div class="we-drop-stage-row">
@@ -815,11 +831,17 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
         &:hover { background: rgba(var(--c-brand-rgb), 0.05); }
         &:active { background: rgba(var(--c-brand-rgb), 0.1); }
       }
+      &.we-set-row--warmup { opacity: 0.75; }
     }
 
     .we-set-num {
+      display: flex; align-items: center; justify-content: center;
       color: var(--c-text-3); font-size: 12px; font-weight: 500;
       width: 20px; text-align: center; flex-shrink: 0;
+    }
+    .we-warmup-icon {
+      font-size: 16px; color: #ff9800;
+      font-variation-settings: 'FILL' 1, 'wght' 400;
     }
 
     .we-set-pills { flex: 1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -1010,6 +1032,21 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
         color: var(--c-brand);
       }
     }
+    .we-warmup-chip {
+      display: inline-flex; align-items: center; gap: 6px; align-self: flex-start;
+      padding: 8px 12px; border-radius: 10px;
+      border: 1.5px solid var(--c-border); background: var(--c-card);
+      color: var(--c-text-2); font-size: 13px; font-weight: 600;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 17px; }
+      &:hover { border-color: #ff9800; color: #ff9800; }
+      &:active { transform: scale(0.96); }
+      &.we-warmup-chip--active {
+        border-color: #ff9800;
+        background: rgba(255, 152, 0, 0.12);
+        color: #ff9800;
+      }
+    }
     .we-set-form-actions {
       display: flex; align-items: center; gap: 8px;
     }
@@ -1190,6 +1227,10 @@ export class WorkoutEditorComponent implements OnDestroy {
   // ── Dropsets ─────────────────────────────────────────────────────────────
   readonly dropStages     = signal<{ weight: number; reps: number }[]>([]);
   readonly editDropStages = signal<{ weight: number; reps: number }[]>([]);
+
+  // ── Warm-up sets ─────────────────────────────────────────────────────────
+  readonly isWarmupSet     = signal(false);
+  readonly editIsWarmupSet = signal(false);
 
   // ── Superset grouping ───────────────────────────────────────────────────
   readonly selectedForGroup = signal<Set<string>>(new Set());
@@ -1406,6 +1447,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     this.setQty.set(1);
     this.setForm.reset({ weight: 0, weightRight: 0, reps: 8 });
     this.dropStages.set([]);
+    this.isWarmupSet.set(false);
   }
 
   getFeelingEmoji(level: FeelingLevel): string { return FEELING_EMOJI[level]; }
@@ -1506,7 +1548,7 @@ export class WorkoutEditorComponent implements OnDestroy {
   }
 
   entryMaxWeight(entry: WorkoutEntry): number {
-    return entry.sets.reduce((m, s) => Math.max(m, setMaxWeight(s)), 0);
+    return entry.sets.reduce((m, s) => s.warmup ? m : Math.max(m, setMaxWeight(s)), 0);
   }
 
   isUnilateral(entry: WorkoutEntry): boolean {
@@ -1579,6 +1621,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     this._expandEntry(entry.exerciseId);
     this.editingSet.set(null);
     this.addingFor.set(entry.exerciseId);
+    this.isWarmupSet.set(false);
     const w    = this.workout();
     const u    = this.unit();
     const goal = this.settingsService.fitnessGoal();
@@ -1658,6 +1701,7 @@ export class WorkoutEditorComponent implements OnDestroy {
       await this.workoutService.addSetsToEntry(w.id, entry.exerciseId, [{
         weight: last.weight, reps: last.reps,
         ...(last.weightLeft != null ? { weightLeft: last.weightLeft, weightRight: last.weightRight } : {}),
+        ...(last.warmup ? { warmup: true } : {}),
       }]);
     } catch {
       this.feedback.error('Error en repetir', 2000);
@@ -1684,10 +1728,12 @@ export class WorkoutEditorComponent implements OnDestroy {
       reps: set.reps,
     });
     this.editDropStages.set((set.drops ?? []).map(d => ({ weight: kgToDisplay(d.weight, this.unit()), reps: d.reps })));
+    this.editIsWarmupSet.set(!!set.warmup);
   }
 
   cancelEditSet(): void {
     this.editingSet.set(null);
+    this.editIsWarmupSet.set(false);
     this.editDropStages.set([]);
   }
 
@@ -1709,6 +1755,7 @@ export class WorkoutEditorComponent implements OnDestroy {
         reps: reps!,
         ...(unilateral ? { weightLeft: weightKg, weightRight: weightRightKg } : {}),
         ...(drops.length > 0 ? { drops: drops.map(d => ({ weight: displayToKg(d.weight, this.unit()), reps: d.reps })) } : {}),
+        ...(this.editIsWarmupSet() ? { warmup: true } : {}),
       });
       this.cancelEditSet();
     } catch {
@@ -1726,9 +1773,10 @@ export class WorkoutEditorComponent implements OnDestroy {
     const weightKg      = displayToKg(weight!, this.unit());
     const weightRightKg = displayToKg(weightRight!, this.unit());
     const drops = this.dropStages();
+    const warmup = this.isWarmupSet();
     const baseSet: WorkoutSet = unilateral
-      ? { weight: Math.max(weightKg, weightRightKg), reps: reps!, weightLeft: weightKg, weightRight: weightRightKg }
-      : { weight: weightKg, reps: reps! };
+      ? { weight: Math.max(weightKg, weightRightKg), reps: reps!, weightLeft: weightKg, weightRight: weightRightKg, ...(warmup ? { warmup } : {}) }
+      : { weight: weightKg, reps: reps!, ...(warmup ? { warmup } : {}) };
     const sets: WorkoutSet[] = drops.length > 0
       ? [{ ...baseSet, drops: drops.map(d => ({ weight: displayToKg(d.weight, this.unit()), reps: d.reps })) }]
       : Array.from({ length: count }, () => ({ ...baseSet }));

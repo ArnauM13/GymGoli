@@ -329,7 +329,7 @@ export class ChartsComponent {
       .filter(e => !query || e.name.toLowerCase().includes(query))
       .map(ex => {
         const allWeights = this.workoutService.getWorkoutsForExercise(ex.id)
-          .flatMap(w => w.entries.filter(e => e.exerciseId === ex.id).flatMap(e => e.sets.map(s => setMaxWeight(s))))
+          .flatMap(w => w.entries.filter(e => e.exerciseId === ex.id).flatMap(e => e.sets.filter(s => !s.warmup).map(s => setMaxWeight(s))))
           .filter(w => w > 0);
         const display = allWeights.length ? kgToDisplay(Math.max(...allWeights), unit) : null;
         return { exercise: ex, display, color: CATEGORY_COLORS[ex.category] };

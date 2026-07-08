@@ -48,7 +48,7 @@ export function workoutSetsCount(w: Workout): number {
 
 export function workoutVolume(w: Workout): number {
   return w.entries.reduce((sum, e) =>
-    sum + e.sets.reduce((s2, set) => s2 + setVolume(set), 0), 0);
+    sum + e.sets.reduce((s2, set) => set.warmup ? s2 : s2 + setVolume(set), 0), 0);
 }
 
 export function workoutVolumeFmt(w: Workout): string {

@@ -218,9 +218,10 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
     const entry = w.entries.find(e => e.exerciseId === exId);
     if (!entry) return 0;
     if (metric === 'feeling') return entry.feeling ?? 0;
-    if (!entry.sets.length) return 0;
-    if (metric === 'weight') return Math.max(...entry.sets.map(s => setMaxWeight(s)));
-    return entry.sets.reduce((sum, s) => sum + setVolume(s), 0);
+    const workingSets = entry.sets.filter(s => !s.warmup);
+    if (!workingSets.length) return 0;
+    if (metric === 'weight') return Math.max(...workingSets.map(s => setMaxWeight(s)));
+    return workingSets.reduce((sum, s) => sum + setVolume(s), 0);
   }
 
   private _label(metric: Metric): string {

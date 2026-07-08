@@ -66,6 +66,14 @@ describe('workout-card.utils', () => {
       const entry: WorkoutEntry = { exerciseId: 'a', exerciseName: 'A', sets: [{ weight: 200, reps: 10 }] };
       expect(workoutVolumeFmt(makeWorkout({ entries: [entry] }))).toBe('2.0t');
     });
+
+    it('excludes warm-up sets from the volume', () => {
+      const entry: WorkoutEntry = {
+        exerciseId: 'a', exerciseName: 'A',
+        sets: [{ weight: 20, reps: 10, warmup: true }, { weight: 60, reps: 10 }],
+      };
+      expect(workoutVolumeFmt(makeWorkout({ entries: [entry] }))).toBe('600kg');
+    });
   });
 
   describe('getExerciseNames()', () => {
