@@ -36,10 +36,10 @@ export const routes: Routes = [
       import('./features/train/weekly-planner.component').then(m => m.WeeklyPlannerComponent),
   },
   {
-    path: 'history',
+    path: 'calendar',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./features/history/history.component').then(m => m.HistoryComponent),
+      import('./features/calendar/calendar-page.component').then(m => m.CalendarPageComponent),
   },
   {
     path: 'library',

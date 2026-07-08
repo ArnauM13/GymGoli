@@ -2,6 +2,7 @@ import {
   Component, computed, effect, ElementRef, inject,
   OnDestroy, signal, viewChild,
 } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import {
   CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, SUBCATEGORY_LABELS,
   ExerciseCategory,
@@ -14,21 +15,24 @@ import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
 import { AuthService } from '../../core/services/auth.service';
 import { kgToDisplay } from '../../shared/utils/weight.utils';
+import { mondayOf } from '../../shared/utils/calendar-utils';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { FilterBarComponent } from '../../shared/components/filter-bar/filter-bar.component';
+import { FeedbackService } from '../../shared/services/feedback.service';
 
 const PAGE_SIZE = 20;
+const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
 
 @Component({
-  selector: 'app-history',
+  selector: 'app-calendar-page',
   standalone: true,
-  imports: [CalendarComponent, PageHeaderComponent, FilterBarComponent],
+  imports: [RouterLink, CalendarComponent, PageHeaderComponent, FilterBarComponent],
   template: `
     <div class="page">
 
       <!-- ── Page header ── -->
-      <app-page-header title="Historial">
+      <app-page-header title="Calendari">
         <button class="cal-toggle" [class.cal-toggle--open]="calendarOpen()"
                 (click)="calendarOpen.set(!calendarOpen())"
                 [attr.aria-label]="calendarOpen() ? 'Amaga calendari' : 'Mostra calendari'">
@@ -43,7 +47,8 @@ const PAGE_SIZE = 20;
       <div class="cal-collapse" [class.cal-collapse--open]="calendarOpen()">
         <div class="cal-collapse-inner">
           <div class="calendar-wrap">
-            <app-calendar [selectedDate]="selectedDate()" (dateSelected)="selectDate($event)" />
+            <app-calendar [selectedDate]="selectedDate()" [allowFuturePlanning]="true"
+                          (dateSelected)="selectDate($event)" />
           </div>
         </div>
       </div>
@@ -69,6 +74,8 @@ const PAGE_SIZE = 20;
           }
         </div>
       } @else {
+
+      @if (!isFutureOrToday()) {
 
         <!-- ── Cerca i filtres ── -->
         <app-filter-bar
@@ -282,6 +289,78 @@ const PAGE_SIZE = 20;
           }
         }
 
+      } @else {
+
+        <!-- ── Planificació del dia (avui o futur) ── -->
+        <div class="dp-panel">
+          <div class="dp-header">
+            <span class="dp-title">{{ selectedDateLabel() }}</span>
+            <a class="dp-plan-week" [routerLink]="['/train/planner']" [queryParams]="{ week: weekMondayOf(selectedDate()!) }">
+              <span class="material-symbols-outlined">event_repeat</span>
+              Planificar la setmana
+            </a>
+          </div>
+
+          @if (dayWorkouts().length > 0 || daySports().length > 0) {
+            <div class="dp-items">
+              @for (w of dayWorkouts(); track w.id) {
+                <div class="dp-item" [style.--ic]="getWorkoutPrimaryColor(w)">
+                  <div class="dp-item-bar" [style.background]="getWorkoutPrimaryColor(w)"></div>
+                  <div class="dp-item-info">
+                    <span class="dp-item-name">
+                      {{ getCatLabel(w.category ?? (w.categories?.[0] ?? '')) }}
+                      @if ((w.status ?? 'done') === 'planned') { <span class="dp-item-tag">Planificat</span> }
+                    </span>
+                    <span class="dp-item-detail">{{ getExerciseNames(w) }}</span>
+                  </div>
+                  <button class="dp-item-remove" (click)="removeDayWorkout(w)" aria-label="Eliminar">
+                    <span class="material-symbols-outlined">delete</span>
+                  </button>
+                </div>
+              }
+              @for (item of daySports(); track item.session.id) {
+                <div class="dp-item" [style.--ic]="item.sport.color">
+                  <div class="dp-item-bar" [style.background]="item.sport.color"></div>
+                  <div class="dp-item-info">
+                    <span class="dp-item-name">
+                      {{ item.sport.name }}
+                      @if (item.session.status === 'planned') { <span class="dp-item-tag">Planificat</span> }
+                    </span>
+                    @if (item.session.subtypeId && getSubtypeName(item.sport, item.session.subtypeId); as sub) {
+                      <span class="dp-item-detail">{{ sub }}</span>
+                    }
+                  </div>
+                  <button class="dp-item-remove" (click)="removeDaySport(item.session.id)" aria-label="Eliminar">
+                    <span class="material-symbols-outlined">delete</span>
+                  </button>
+                </div>
+              }
+            </div>
+          }
+
+          <div class="dp-add">
+            <span class="dp-add-label">Afegir al pla</span>
+            <div class="dp-chips">
+              @for (cat of gymCategories; track cat) {
+                <button class="dp-chip" [class.active]="isGymPlanned(cat)"
+                        [style.--cat-color]="getCatColor(cat)" (click)="toggleGymPlan(cat)">
+                  <span class="material-symbols-outlined">{{ getCatIcon(cat) }}</span>
+                  {{ getCatLabel(cat) }}
+                </button>
+              }
+              @for (sport of sportService.sports(); track sport.id) {
+                <button class="dp-chip" [class.active]="isSportPlanned(sport.id)"
+                        [style.--cat-color]="sport.color" (click)="toggleSportPlan(sport)">
+                  <span class="material-symbols-outlined">{{ sport.icon }}</span>
+                  {{ sport.name }}
+                </button>
+              }
+            </div>
+          </div>
+        </div>
+
+      }
+
       } <!-- end @else (not initial loading) -->
 
     </div>
@@ -357,6 +436,66 @@ const PAGE_SIZE = 20;
       gap: 8px; padding: 32px 24px; color: var(--c-text-3);
       .material-symbols-outlined { font-size: 36px; }
       p { margin: 0; font-size: 14px; }
+    }
+
+    /* ── Day plan panel (today / future dates) ── */
+    .dp-panel { margin: 4px 16px 0; }
+    .dp-header {
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+      gap: 8px; margin-bottom: 10px;
+    }
+    .dp-title { font-size: 15px; font-weight: 700; color: var(--c-text); text-transform: capitalize; }
+    .dp-plan-week {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 6px 12px; border-radius: 20px;
+      border: 1.5px solid var(--c-border); background: var(--c-card);
+      color: var(--c-text-2); font-size: 12px; font-weight: 600;
+      text-decoration: none; cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 15px; }
+      &:hover { border-color: var(--c-brand); color: var(--c-brand); }
+    }
+
+    .dp-items { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+    .dp-item {
+      display: flex; align-items: center;
+      border: 1.5px solid var(--c-border-2); border-radius: 14px;
+      background: var(--c-card); overflow: hidden;
+    }
+    .dp-item-bar { width: 5px; align-self: stretch; flex-shrink: 0; }
+    .dp-item-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 10px; }
+    .dp-item-name {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 13px; font-weight: 700; color: var(--c-text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .dp-item-tag {
+      font-size: 10px; font-weight: 700; color: var(--c-text-3);
+      background: var(--c-subtle); border-radius: 8px; padding: 1px 6px;
+    }
+    .dp-item-detail { font-size: 11px; color: var(--c-text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dp-item-remove {
+      width: 36px; height: 36px; flex-shrink: 0; margin-right: 4px;
+      display: flex; align-items: center; justify-content: center;
+      border: none; background: transparent; color: var(--c-text-3);
+      cursor: pointer; touch-action: manipulation; transition: color 0.15s, background 0.15s;
+      .material-symbols-outlined { font-size: 17px; }
+      &:hover { color: #ef5350; background: rgba(239,83,80,0.08); }
+    }
+
+    .dp-add-label {
+      display: block; font-size: 11px; font-weight: 700; color: var(--c-text-3);
+      text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 8px;
+    }
+    .dp-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+    .dp-chip {
+      display: flex; align-items: center; gap: 4px;
+      padding: 6px 12px; border-radius: 20px;
+      border: 1.5px solid var(--c-border); background: var(--c-card);
+      font-size: 12px; font-weight: 600; color: var(--c-text-2);
+      cursor: pointer; white-space: nowrap; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 15px; }
+      &:hover:not(.active) { border-color: var(--cat-color, var(--c-brand)); color: var(--cat-color, var(--c-brand)); }
+      &.active { background: var(--cat-color, var(--c-brand)); border-color: var(--cat-color, var(--c-brand)); color: white; }
     }
 
     .workout-list-wrap {
@@ -584,15 +723,18 @@ const PAGE_SIZE = 20;
     .sk-chevron-ph { width: 22px; height: 22px; border-radius: 4px; flex-shrink: 0; }
   `],
 })
-export class HistoryComponent implements OnDestroy {
+export class CalendarPageComponent implements OnDestroy {
   private workoutService  = inject(WorkoutService);
   private exerciseService = inject(ExerciseService);
-  private sportService    = inject(SportService);
+  readonly sportService    = inject(SportService);
   private settingsService = inject(UserSettingsService);
   private authService     = inject(AuthService);
+  private feedback        = inject(FeedbackService);
 
   readonly unit = this.settingsService.weightUnit;
   dispW(kg: number): number { return kgToDisplay(kg, this.unit()); }
+
+  readonly gymCategories = GYM_CATEGORIES;
 
   readonly calendarOpen  = signal(true);
   readonly selectedDate  = signal<string | null>(null);
@@ -600,6 +742,72 @@ export class HistoryComponent implements OnDestroy {
   readonly sortDesc      = signal(true);
   readonly filterCat     = signal<ExerciseCategory | null>(null);
   readonly searchQuery   = signal('');
+
+  // ── Day planning (today / future dates) ─────────────────────────────────
+  readonly isFutureOrToday = computed(() => {
+    const d = this.selectedDate();
+    return !!d && d >= this.workoutService.todayDateString();
+  });
+
+  readonly dayWorkouts = computed(() => {
+    const d = this.selectedDate();
+    return d && this.isFutureOrToday() ? this.workoutService.getWorkoutsForDate(d) : [];
+  });
+
+  readonly daySports = computed(() => {
+    const d = this.selectedDate();
+    if (!d || !this.isFutureOrToday()) return [];
+    return [
+      ...this.sportService.getSportSessionsForDate(d),
+      ...this.sportService.getPlannedSportSessionsForDate(d),
+    ];
+  });
+
+  weekMondayOf(date: string): string { return mondayOf(date); }
+
+  isGymPlanned(cat: ExerciseCategory): boolean {
+    return this.dayWorkouts().some(w => (w.categories ?? (w.category ? [w.category] : [])).includes(cat));
+  }
+
+  async toggleGymPlan(cat: ExerciseCategory): Promise<void> {
+    const date = this.selectedDate();
+    if (!date) return;
+    const existing = this.dayWorkouts().find(w => (w.categories ?? (w.category ? [w.category] : [])).includes(cat));
+    try {
+      if (existing) await this.workoutService.deleteWorkout(existing.id);
+      else await this.workoutService.createPlannedWorkout(date, cat, [], 'manual');
+    } catch {
+      this.feedback.error('Error en planificar', 2500);
+    }
+  }
+
+  isSportPlanned(sportId: string): boolean {
+    return this.daySports().some(item => item.sport.id === sportId);
+  }
+
+  async toggleSportPlan(sport: Sport): Promise<void> {
+    const date = this.selectedDate();
+    if (!date) return;
+    const existing = this.daySports().find(item => item.sport.id === sport.id);
+    try {
+      if (existing) await this.sportService.deleteSession(existing.session.id, date);
+      else await this.sportService.logSession(date, sport.id, {}, 'planned', 'manual');
+    } catch {
+      this.feedback.error('Error en planificar', 2500);
+    }
+  }
+
+  async removeDayWorkout(w: Workout): Promise<void> {
+    try { await this.workoutService.deleteWorkout(w.id); }
+    catch { this.feedback.error('Error en eliminar', 2500); }
+  }
+
+  async removeDaySport(sessionId: string): Promise<void> {
+    const date = this.selectedDate();
+    if (!date) return;
+    try { await this.sportService.deleteSession(sessionId, date); }
+    catch { this.feedback.error('Error en eliminar', 2500); }
+  }
 
   // ── Pagination state ────────────────────────────────────────────────────
   private readonly _items    = signal<Workout[]>([]);

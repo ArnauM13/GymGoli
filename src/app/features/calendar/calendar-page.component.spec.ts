@@ -2,12 +2,13 @@ import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 
-import { HistoryComponent } from './history.component';
+import { CalendarPageComponent } from './calendar-page.component';
 import { WorkoutService } from '../../core/services/workout.service';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
 import { AuthService } from '../../core/services/auth.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
+import { FeedbackService } from '../../shared/services/feedback.service';
 import { FeelingLevel, Workout, WorkoutEntry } from '../../core/models/workout.model';
 
 const TODAY = new Date().toISOString().split('T')[0];
@@ -16,15 +17,18 @@ function makeWorkout(overrides: Partial<Workout> = {}): Workout {
   return { id: '1', date: TODAY, entries: [], createdAt: new Date(), ...overrides };
 }
 
-describe('HistoryComponent', () => {
-  let component: HistoryComponent;
+describe('CalendarPageComponent', () => {
+  let component: CalendarPageComponent;
 
   beforeEach(async () => {
     const mockWorkoutService = {
-      isLoading:         signal(false),
-      getWorkoutForDate: jasmine.createSpy().and.returnValue(null),
-      todayDateString:   jasmine.createSpy().and.returnValue(TODAY),
-      loadWorkoutPage:   jasmine.createSpy().and.resolveTo({ workouts: [], total: 0 }),
+      isLoading:           signal(false),
+      getWorkoutForDate:   jasmine.createSpy().and.returnValue(null),
+      getWorkoutsForDate:  jasmine.createSpy().and.returnValue([]),
+      todayDateString:     jasmine.createSpy().and.returnValue(TODAY),
+      loadWorkoutPage:     jasmine.createSpy().and.resolveTo({ workouts: [], total: 0 }),
+      createPlannedWorkout: jasmine.createSpy().and.resolveTo('w1'),
+      deleteWorkout:       jasmine.createSpy().and.resolveTo(undefined),
     };
 
     const mockExerciseService = {
@@ -35,28 +39,32 @@ describe('HistoryComponent', () => {
     };
 
     const mockSportService = {
-      sports:                  signal<any[]>([]),
-      isLoaded:                signal(true),
-      getSportSessionsForDate: jasmine.createSpy().and.returnValue([]),
-      ensureLoaded:            jasmine.createSpy().and.resolveTo(undefined),
+      sports:                        signal<any[]>([]),
+      isLoaded:                      signal(true),
+      getSportSessionsForDate:       jasmine.createSpy().and.returnValue([]),
+      getPlannedSportSessionsForDate: jasmine.createSpy().and.returnValue([]),
+      logSession:                    jasmine.createSpy().and.resolveTo(undefined),
+      deleteSession:                 jasmine.createSpy().and.resolveTo(undefined),
+      ensureLoaded:                  jasmine.createSpy().and.resolveTo(undefined),
     };
 
     await TestBed.configureTestingModule({
-      imports:   [HistoryComponent],
+      imports:   [CalendarPageComponent],
       providers: [
         { provide: WorkoutService,      useValue: mockWorkoutService },
         { provide: ExerciseService,     useValue: mockExerciseService },
         { provide: SportService,        useValue: mockSportService },
         { provide: AuthService,         useValue: { uid: signal('user-1') } },
         { provide: UserSettingsService, useValue: { weightUnit: signal<'kg' | 'lb'>('kg') } },
+        { provide: FeedbackService,     useValue: { success: jasmine.createSpy(), error: jasmine.createSpy() } },
       ],
     })
-      .overrideComponent(HistoryComponent, {
+      .overrideComponent(CalendarPageComponent, {
         set: { imports: [], schemas: [NO_ERRORS_SCHEMA] },
       })
       .compileComponents();
 
-    const fixture = TestBed.createComponent(HistoryComponent);
+    const fixture = TestBed.createComponent(CalendarPageComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
