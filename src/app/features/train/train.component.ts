@@ -265,7 +265,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         }
 
         @if (isSelectedFuture()) {
-          <div class="plan-pill">
+          <div class="plan-pill" [style.--pc]="planPillColor()">
             <span class="material-symbols-outlined">event_upcoming</span>
             <span>Planificant · {{ planPillLabel() }}</span>
           </div>
@@ -924,14 +924,16 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       &:hover { background: var(--c-brand-dk); }
     }
 
-    /* ── Planning mode pill (shown under calendar for future dates) ── */
+    /* ── Planning mode pill (shown under calendar for future dates) ──
+     * Tinted with the pending plan's category color when there is one
+     * (--pc), falling back to the brand color otherwise. */
     .plan-pill {
       display: flex; align-items: center; gap: 6px;
       margin: -2px 16px 12px; padding: 8px 14px;
-      background: rgba(var(--c-brand-rgb), 0.08);
-      border: 1px solid rgba(var(--c-brand-rgb), 0.22);
+      background: color-mix(in srgb, var(--pc, var(--c-brand)) 8%, var(--c-card));
+      border: 1px solid color-mix(in srgb, var(--pc, var(--c-brand)) 30%, var(--c-border-2));
       border-radius: 12px;
-      font-size: 12.5px; font-weight: 700; color: var(--c-brand);
+      font-size: 12.5px; font-weight: 700; color: var(--pc, var(--c-brand));
       text-transform: capitalize;
       animation: pill-in 0.2s cubic-bezier(0.34, 1.4, 0.64, 1) both;
       .material-symbols-outlined { font-size: 17px; font-variation-settings: 'FILL' 1; }
@@ -1916,6 +1918,13 @@ export class TrainComponent {
     const label = d.toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'long' });
     return label.charAt(0).toUpperCase() + label.slice(1);
   }
+
+  /** Tints the "Planificant" pill with the pending plan's category color
+   *  once one exists for the selected date; brand color otherwise. */
+  readonly planPillColor = computed(() => {
+    const planned = this.datePlanned();
+    return planned.length ? this.workoutPrimaryColor(planned[0]) : this._brand();
+  });
 
   sportPlanMeta(sport: Sport, session: SportSession): string {
     const parts: string[] = [];

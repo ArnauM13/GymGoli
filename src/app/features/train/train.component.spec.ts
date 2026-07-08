@@ -17,6 +17,7 @@ import { TemplateService } from '../../core/services/template.service';
 import { SharedWorkoutService } from '../../core/services/shared-workout.service';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
 import { Workout, WorkoutEntry } from '../../core/models/workout.model';
+import { CATEGORY_COLORS } from '../../core/models/exercise.model';
 import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../../core/models/weekly-plan.model';
 import { UserSettings, DEFAULT_USER_SETTINGS } from '../../core/models/user-settings.model';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
@@ -385,6 +386,29 @@ describe('TrainComponent', () => {
 
     it('returns null when there is no source', () => {
       expect(component.planSourceBadge(undefined)).toBeNull();
+    });
+  });
+
+  // ── planPillColor() ──────────────────────────────────────────────────────
+
+  describe('planPillColor()', () => {
+    let getPlannedForDate: jasmine.Spy;
+
+    beforeEach(() => {
+      getPlannedForDate = TestBed.inject(WorkoutService).getPlannedForDate as jasmine.Spy;
+      component.selectedDate.set('2024-03-10');
+    });
+
+    it('tints the pill with the pending plan\'s category color', () => {
+      getPlannedForDate.and.returnValue([{ id: 'w1', category: 'push', categories: ['push'] } as unknown as Workout]);
+      expect(component.planPillColor()).toBe(CATEGORY_COLORS['push']);
+    });
+
+    it('falls back to the brand color when nothing is planned yet', () => {
+      getPlannedForDate.and.returnValue([]);
+      expect(component.planPillColor()).not.toBe(CATEGORY_COLORS['push']);
+      expect(component.planPillColor()).not.toBe(CATEGORY_COLORS['pull']);
+      expect(component.planPillColor()).not.toBe(CATEGORY_COLORS['legs']);
     });
   });
 
