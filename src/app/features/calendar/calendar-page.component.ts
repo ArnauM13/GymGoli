@@ -19,6 +19,7 @@ import { mondayOf } from '../../shared/utils/calendar-utils';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { FilterBarComponent } from '../../shared/components/filter-bar/filter-bar.component';
+import { WeeklySummaryComponent } from '../train/components/weekly-summary.component';
 import { FeedbackService } from '../../shared/services/feedback.service';
 
 const PAGE_SIZE = 20;
@@ -27,7 +28,7 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
 @Component({
   selector: 'app-calendar-page',
   standalone: true,
-  imports: [RouterLink, CalendarComponent, PageHeaderComponent, FilterBarComponent],
+  imports: [RouterLink, CalendarComponent, PageHeaderComponent, FilterBarComponent, WeeklySummaryComponent],
   template: `
     <div class="page">
 
@@ -49,6 +50,7 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
           <div class="calendar-wrap">
             <app-calendar [selectedDate]="selectedDate()" [allowFuturePlanning]="true"
                           (dateSelected)="selectDate($event)" />
+            <app-weekly-summary [weekDate]="selectedDate() ?? workoutService.todayDateString()" />
           </div>
         </div>
       </div>
@@ -724,7 +726,7 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
   `],
 })
 export class CalendarPageComponent implements OnDestroy {
-  private workoutService  = inject(WorkoutService);
+  readonly workoutService = inject(WorkoutService);
   private exerciseService = inject(ExerciseService);
   readonly sportService    = inject(SportService);
   private settingsService = inject(UserSettingsService);

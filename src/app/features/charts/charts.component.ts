@@ -21,7 +21,7 @@ import { FilterBarComponent } from '../../shared/components/filter-bar/filter-ba
   imports: [RouterLink, PageHeaderComponent, ExerciseProgressInlineComponent, FilterBarComponent],
   template: `
     <div class="page">
-      <app-page-header title="Progrés" />
+      <app-page-header title="Progrés" [showBack]="true" />
 
       <!-- Summary strip (only when there is data) -->
       @if (!isLoadingRecords() && totalWorkouts() > 0) {
