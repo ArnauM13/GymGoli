@@ -32,22 +32,24 @@ interface NavItem {
   `,
   styles: [`
     .bottom-nav {
-      display: flex; align-items: stretch;
-      height: var(--nav-height);
-      padding: 6px 6px 0;
-      padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
+      position: fixed; z-index: 95;
+      left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+      transform: translateX(-50%);
+      display: flex; align-items: stretch; justify-content: center;
+      width: fit-content; max-width: 62%; min-width: min(60%, 260px);
+      padding: 6px 10px;
+      border-radius: 28px;
       background: var(--c-card);
-      box-shadow: 0 -1px 0 color-mix(in srgb, var(--c-border) 70%, transparent),
-                  0 -4px 18px color-mix(in srgb, var(--c-shadow) 80%, transparent);
-      flex-shrink: 0; gap: 2px;
+      box-shadow: 0 6px 20px color-mix(in srgb, var(--c-shadow) 90%, transparent),
+                  0 0 0 1px color-mix(in srgb, var(--c-border) 60%, transparent);
+      gap: 4px;
     }
 
     .nav-item {
-      flex: 1;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
       gap: 3px;
-      padding: 2px 0 4px;
+      padding: 4px 10px;
       text-decoration: none;
       color: var(--c-text-3);
       cursor: pointer; touch-action: manipulation;

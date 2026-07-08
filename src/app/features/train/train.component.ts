@@ -34,7 +34,7 @@ type SportSuggestion = { type: 'sport'; sport: Sport;               label: strin
 type TodaySuggestion = GymSuggestion | SportSuggestion;
 
 type BottomCard = {
-  kind: 'workout' | 'suggestion' | 'plan';
+  kind: 'workout' | 'suggestion';
   color: string;
   icon: string;
   label: string;
@@ -285,43 +285,54 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             <div class="feed-day">
               <div class="feed-day-header">{{ feedDayLabel(day.date) }}</div>
               @for (w of day.workouts; track w.id) {
-                <div class="feed-card" [style.--wc]="workoutPrimaryColor(w)" (click)="openWorkout(w.id)">
+                <div class="feed-card" [class.feed-card--planned]="isPlanned(w)"
+                     [style.--wc]="workoutPrimaryColor(w)"
+                     (click)="isPlanned(w) ? startPlan(w) : openWorkout(w.id)">
                   <div class="fc-bar" [style.background]="workoutCardColor(w)"></div>
                   <div class="fc-info">
-                    @if (workoutCategoryList(w).length > 0) {
-                      <div class="fc-badges">
-                        @for (cat of workoutCategoryList(w); track cat) {
-                          <span class="fc-badge fc-badge--{{ cat }}">{{ getCatLabel(cat) }}</span>
+                    <div class="fc-badges">
+                      @for (cat of workoutCategoryList(w); track cat) {
+                        <span class="fc-badge fc-badge--{{ cat }}">{{ getCatLabel(cat) }}</span>
+                      }
+                      @if (isPlanned(w)) {
+                        <span class="fc-badge fc-badge--planned">Planificat</span>
+                      }
+                    </div>
+                    <span class="fc-exercises">{{ w.entries.length ? getExerciseNames(w) : 'Pla buit' }}</span>
+                    @if (!isPlanned(w)) {
+                      <div class="fc-stats">
+                        <span class="fc-stat">
+                          <span class="material-symbols-outlined">fitness_center</span>
+                          <strong>{{ w.entries.length }}</strong> exerc
+                        </span>
+                        @if (workoutSetsCount(w); as n) {
+                          <span class="fc-stat-sep">·</span>
+                          <span class="fc-stat">
+                            <span class="material-symbols-outlined">repeat</span>
+                            <strong>{{ n }}</strong> sèr
+                          </span>
+                        }
+                        @if (workoutVolumeFmt(w); as vol) {
+                          <span class="fc-stat-sep">·</span>
+                          <span class="fc-stat fc-stat--vol">
+                            <span class="material-symbols-outlined">weight</span>
+                            <strong>{{ vol }}</strong>
+                          </span>
+                        }
+                        @if (w.feeling) {
+                          <span class="fc-stat-sep">·</span>
+                          <span class="fc-stat">{{ emojiOf(w.feeling) }}</span>
                         }
                       </div>
                     }
-                    <span class="fc-exercises">{{ getExerciseNames(w) }}</span>
-                    <div class="fc-stats">
-                      <span class="fc-stat">
-                        <span class="material-symbols-outlined">fitness_center</span>
-                        <strong>{{ w.entries.length }}</strong> exerc
-                      </span>
-                      @if (workoutSetsCount(w); as n) {
-                        <span class="fc-stat-sep">·</span>
-                        <span class="fc-stat">
-                          <span class="material-symbols-outlined">repeat</span>
-                          <strong>{{ n }}</strong> sèr
-                        </span>
-                      }
-                      @if (workoutVolumeFmt(w); as vol) {
-                        <span class="fc-stat-sep">·</span>
-                        <span class="fc-stat fc-stat--vol">
-                          <span class="material-symbols-outlined">weight</span>
-                          <strong>{{ vol }}</strong>
-                        </span>
-                      }
-                      @if (w.feeling) {
-                        <span class="fc-stat-sep">·</span>
-                        <span class="fc-stat">{{ emojiOf(w.feeling) }}</span>
-                      }
-                    </div>
                   </div>
-                  <span class="material-symbols-outlined fc-chevron">chevron_right</span>
+                  @if (isPlanned(w)) {
+                    <button class="fc-start" (click)="$event.stopPropagation(); startPlan(w)" title="Comença">
+                      <span class="material-symbols-outlined">play_arrow</span>
+                    </button>
+                  } @else {
+                    <span class="material-symbols-outlined fc-chevron">chevron_right</span>
+                  }
                 </div>
               }
               @for (item of day.sports; track item.session.id) {
@@ -361,7 +372,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
                     [class.sc-icon--fill]="bc.kind !== 'suggestion'">{{ bc.icon }}</span>
             </div>
             <div class="sc-info">
-              <span class="sc-eyebrow">{{ bc.kind === 'suggestion' ? 'Avui toca' : bc.kind === 'plan' ? 'Pla pendent' : 'Fet avui' }}</span>
+              <span class="sc-eyebrow">{{ bc.kind === 'suggestion' ? 'Avui toca' : 'Fet avui' }}</span>
               <span class="sc-label">{{ bc.label }}</span>
               @if (bc.kind === 'suggestion' && bc.meta) {
                 <span class="sc-reason">{{ bc.meta }}</span>
@@ -1010,6 +1021,12 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         border-color: color-mix(in srgb, var(--wc, var(--c-border)) 45%, var(--c-border));
       }
     }
+    .feed-card--planned {
+      border-style: dashed;
+      border-color: color-mix(in srgb, var(--wc, var(--c-brand)) 55%, var(--c-border-2));
+      background: color-mix(in srgb, var(--wc, var(--c-brand)) 5%, var(--c-card));
+      &:hover { background: color-mix(in srgb, var(--wc, var(--c-brand)) 9%, var(--c-card)); }
+    }
     .fc-bar { width: 5px; align-self: stretch; flex-shrink: 0; }
     .fc-info {
       flex: 1; min-width: 0;
@@ -1027,6 +1044,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     html.dark .fc-badge--push { background: rgba(229,115,115,0.18); color: #ef9a9a; }
     html.dark .fc-badge--pull { background: rgba(100,181,246,0.18); color: #90caf9; }
     html.dark .fc-badge--legs { background: rgba(129,199,132,0.18); color: #a5d6a7; }
+    .fc-badge--planned { background: rgba(var(--c-brand-rgb), 0.12); color: var(--c-brand); }
     .fc-exercises {
       font-size: 14px; font-weight: 700; color: var(--c-text);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -1043,6 +1061,15 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .fc-stat-sep { color: var(--c-border); }
     .fc-stat--vol strong { color: var(--wc, var(--c-brand)); }
     .fc-chevron { font-size: 22px; color: var(--c-text-3); flex-shrink: 0; margin-right: 8px; }
+    .fc-start {
+      width: 38px; height: 38px; border: none; border-radius: 10px; flex-shrink: 0;
+      margin-right: 10px;
+      background: var(--c-brand); color: white;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
+      .material-symbols-outlined { font-size: 20px; }
+      &:hover { background: var(--c-brand-dk); }
+    }
 
     .feed-sport-row {
       display: flex; align-items: center; gap: 12px;
@@ -1574,6 +1601,9 @@ export class TrainComponent implements OnDestroy {
     new Set(this.dateWorkouts().flatMap(w => workoutCategories(w)))
   );
 
+  /** A pending plan for today is surfaced as a card in the feed instead
+   *  (marked "Planificat", with its own start button) — the floating
+   *  bottom card only ever shows what's already done or a suggestion. */
   readonly bottomCard = computed((): BottomCard | null => {
     const workouts = this.dateWorkouts();
     if (workouts.length > 0) {
@@ -1588,15 +1618,8 @@ export class TrainComponent implements OnDestroy {
         workoutId: w.id,
       };
     }
-    if (this.selectedDate() === TODAY()) {
-      const plans = this.workoutService.getPlannedForDate(TODAY());
-      if (plans.length > 0) {
-        return {
-          kind: 'plan', color: this.workoutPrimaryColor(plans[0]), icon: 'event',
-          label: 'Tens un pla per avui',
-          meta: `${plans.length} pla${plans.length > 1 ? 'ns' : ''} pendent${plans.length > 1 ? 's' : ''}`,
-        };
-      }
+    if (this.selectedDate() === TODAY() && this.workoutService.getPlannedForDate(TODAY()).length > 0) {
+      return null;
     }
     const s = this.todaySuggestion();
     if (s) {
@@ -1608,10 +1631,6 @@ export class TrainComponent implements OnDestroy {
   handleBottomCardClick(bc: BottomCard): void {
     if (bc.kind === 'workout' && bc.workoutId) this.openWorkout(bc.workoutId);
     else if (bc.kind === 'suggestion' && bc.suggestion) this.handleSuggestionClick(bc.suggestion);
-    else if (bc.kind === 'plan') {
-      const plan = this.workoutService.getPlannedForDate(TODAY())[0];
-      if (plan) this.openWorkout(plan.id);
-    }
   }
 
 
@@ -1721,13 +1740,18 @@ export class TrainComponent implements OnDestroy {
   readonly feedDays = computed(() => {
     const monthsBack = this.feedMonthsBack();
     const today      = new Date();
+    const todayStr   = TODAY();
     const earliest   = new Date(today.getFullYear(), today.getMonth() - monthsBack, 1);
     const days: { date: string; workouts: Workout[]; sports: { sport: Sport; session: SportSession }[] }[] = [];
 
     const cursor = new Date(today);
     while (cursor >= earliest) {
       const dateStr  = cursor.toISOString().split('T')[0];
-      const workouts = this.workoutService.getDoneWorkoutsForDate(dateStr);
+      const done     = this.workoutService.getDoneWorkoutsForDate(dateStr);
+      // Today's still-pending plan shows here too, marked as planned, instead
+      // of as a separate floating card — same as it did before the feed.
+      const planned  = dateStr === todayStr ? this.workoutService.getPlannedForDate(dateStr) : [];
+      const workouts = [...planned, ...done];
       const sports   = this.sportService.getSportSessionsForDate(dateStr);
       if (workouts.length > 0 || sports.length > 0) days.push({ date: dateStr, workouts, sports });
       cursor.setDate(cursor.getDate() - 1);
@@ -1804,6 +1828,15 @@ export class TrainComponent implements OnDestroy {
     this.editor?.reset();
   }
 
+  async startPlan(w: Workout): Promise<void> {
+    try {
+      await this.workoutService.startPlannedWorkout(w.id);
+      this.openWorkout(w.id);
+    } catch {
+      this.feedback.error('Error en iniciar el pla', 2500);
+    }
+  }
+
   workoutDateLabel(w: Workout): string {
     const d = new Date(w.date + 'T12:00:00');
     const label = d.toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -1828,6 +1861,10 @@ export class TrainComponent implements OnDestroy {
 
   workoutCategoryList(w: Workout): ExerciseCategory[] {
     return workoutCategories(w) as ExerciseCategory[];
+  }
+
+  isPlanned(w: Workout): boolean {
+    return (w.status ?? 'done') === 'planned';
   }
 
   getCatLabel(cat: string): string {
