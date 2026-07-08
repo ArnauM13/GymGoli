@@ -1,4 +1,5 @@
 import { Component, ElementRef, OnDestroy, ViewChild, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
@@ -24,6 +25,7 @@ import { WorkoutService } from '../../core/services/workout.service';
 import { OfflineService } from '../../core/services/offline.service';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
+import { FitnessInsightsComponent } from '../../shared/components/fitness-insights/fitness-insights.component';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 
@@ -52,7 +54,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 @Component({
   selector: 'app-train',
   standalone: true,
-  imports: [FormsModule, WorkoutEditorComponent, PageHeaderComponent],
+  imports: [FormsModule, NgTemplateOutlet, WorkoutEditorComponent, FitnessInsightsComponent, PageHeaderComponent],
   template: `
     <div class="page" [style.padding-bottom]="pagePaddingBottom()">
 
@@ -256,13 +258,96 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           </div>
         }
 
-        <!-- ── Feed of past activity, grouped by day ── -->
-        <div class="feed-header">
-          <span class="material-symbols-outlined feed-header-icon">history</span>
-          <h2 class="feed-title">Activitat recent</h2>
+        <!-- Reusable per-day cards (used both for "Avui" and the history list) -->
+        <ng-template #dayCards let-day>
+          @for (w of day.workouts; track w.id) {
+            <div class="feed-card" [class.feed-card--planned]="isPlanned(w)"
+                 [style.--wc]="workoutPrimaryColor(w)"
+                 (click)="isPlanned(w) ? startPlan(w) : openWorkout(w.id)">
+              <div class="fc-bar" [style.background]="workoutCardColor(w)"></div>
+              <div class="fc-info">
+                <div class="fc-badges">
+                  @for (cat of workoutCategoryList(w); track cat) {
+                    <span class="fc-badge fc-badge--{{ cat }}">{{ getCatLabel(cat) }}</span>
+                  }
+                  @if (isPlanned(w)) {
+                    <span class="fc-badge fc-badge--planned">Planificat</span>
+                  }
+                </div>
+                <span class="fc-exercises">{{ w.entries.length ? getExerciseNames(w) : 'Pla buit' }}</span>
+                @if (!isPlanned(w)) {
+                  <div class="fc-stats">
+                    <span class="fc-stat">
+                      <span class="material-symbols-outlined">fitness_center</span>
+                      <strong>{{ w.entries.length }}</strong> exerc
+                    </span>
+                    @if (workoutSetsCount(w); as n) {
+                      <span class="fc-stat-sep">·</span>
+                      <span class="fc-stat">
+                        <span class="material-symbols-outlined">repeat</span>
+                        <strong>{{ n }}</strong> sèr
+                      </span>
+                    }
+                    @if (workoutVolumeFmt(w); as vol) {
+                      <span class="fc-stat-sep">·</span>
+                      <span class="fc-stat fc-stat--vol">
+                        <span class="material-symbols-outlined">weight</span>
+                        <strong>{{ vol }}</strong>
+                      </span>
+                    }
+                    @if (w.feeling) {
+                      <span class="fc-stat-sep">·</span>
+                      <span class="fc-stat">{{ emojiOf(w.feeling) }}</span>
+                    }
+                  </div>
+                }
+              </div>
+              @if (isPlanned(w)) {
+                <button class="fc-start" (click)="$event.stopPropagation(); startPlan(w)" title="Comença">
+                  <span class="material-symbols-outlined">play_arrow</span>
+                </button>
+              } @else {
+                <span class="material-symbols-outlined fc-chevron">chevron_right</span>
+              }
+            </div>
+          }
+          @for (item of day.sports; track item.session.id) {
+            <div class="feed-sport-row" [style.--ic]="item.sport.color">
+              <span class="material-symbols-outlined feed-sport-icon">{{ item.sport.icon }}</span>
+              <div class="fsr-info">
+                <span class="feed-sport-name">{{ item.sport.name }}</span>
+                @if (sportSummary(item.session, item.sport); as meta) {
+                  <span class="feed-sport-meta">{{ meta }}</span>
+                }
+              </div>
+            </div>
+          }
+        </ng-template>
+
+        <!-- ── Avui: insights + whatever's planned or done today ── -->
+        <div class="today-section">
+          <div class="today-header">
+            <span class="material-symbols-outlined today-header-icon">today</span>
+            <h2 class="today-title">Avui</h2>
+          </div>
+
+          @if (!offlineService.isOffline() && dateWorkouts().length === 0 && dateSportSessions().length === 0) {
+            <app-fitness-insights />
+          }
+
+          @if (todayFeedEntry(); as day) {
+            <ng-container [ngTemplateOutlet]="dayCards" [ngTemplateOutletContext]="{ $implicit: day }" />
+          } @else {
+            <p class="today-empty">Encara no has fet res avui.</p>
+          }
         </div>
 
-        @if ((workoutService.isLoading() || !sportService.sportsLoaded()) && feedDays().length === 0) {
+        <!-- ── Historial ── -->
+        <div class="history-divider">
+          <span class="history-divider-label">Historial</span>
+        </div>
+
+        @if ((workoutService.isLoading() || !sportService.sportsLoaded()) && historyFeedDays().length === 0) {
           <div class="feed-sk">
             @for (_ of [1,2,3]; track $index) {
               <div class="sk-card-ph">
@@ -274,78 +359,17 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               </div>
             }
           </div>
-        } @else if (feedDays().length === 0) {
+        } @else if (historyFeedDays().length === 0) {
           <div class="empty-state">
             <span class="material-symbols-outlined empty-icon">fitness_center</span>
             <h2>Encara no hi ha res</h2>
-            <p>El teu primer entrenament apareixerà aquí.</p>
+            <p>Els teus entrenaments anteriors apareixeran aquí.</p>
           </div>
         } @else {
-          @for (day of feedDays(); track day.date) {
+          @for (day of historyFeedDays(); track day.date) {
             <div class="feed-day">
               <div class="feed-day-header">{{ feedDayLabel(day.date) }}</div>
-              @for (w of day.workouts; track w.id) {
-                <div class="feed-card" [class.feed-card--planned]="isPlanned(w)"
-                     [style.--wc]="workoutPrimaryColor(w)"
-                     (click)="isPlanned(w) ? startPlan(w) : openWorkout(w.id)">
-                  <div class="fc-bar" [style.background]="workoutCardColor(w)"></div>
-                  <div class="fc-info">
-                    <div class="fc-badges">
-                      @for (cat of workoutCategoryList(w); track cat) {
-                        <span class="fc-badge fc-badge--{{ cat }}">{{ getCatLabel(cat) }}</span>
-                      }
-                      @if (isPlanned(w)) {
-                        <span class="fc-badge fc-badge--planned">Planificat</span>
-                      }
-                    </div>
-                    <span class="fc-exercises">{{ w.entries.length ? getExerciseNames(w) : 'Pla buit' }}</span>
-                    @if (!isPlanned(w)) {
-                      <div class="fc-stats">
-                        <span class="fc-stat">
-                          <span class="material-symbols-outlined">fitness_center</span>
-                          <strong>{{ w.entries.length }}</strong> exerc
-                        </span>
-                        @if (workoutSetsCount(w); as n) {
-                          <span class="fc-stat-sep">·</span>
-                          <span class="fc-stat">
-                            <span class="material-symbols-outlined">repeat</span>
-                            <strong>{{ n }}</strong> sèr
-                          </span>
-                        }
-                        @if (workoutVolumeFmt(w); as vol) {
-                          <span class="fc-stat-sep">·</span>
-                          <span class="fc-stat fc-stat--vol">
-                            <span class="material-symbols-outlined">weight</span>
-                            <strong>{{ vol }}</strong>
-                          </span>
-                        }
-                        @if (w.feeling) {
-                          <span class="fc-stat-sep">·</span>
-                          <span class="fc-stat">{{ emojiOf(w.feeling) }}</span>
-                        }
-                      </div>
-                    }
-                  </div>
-                  @if (isPlanned(w)) {
-                    <button class="fc-start" (click)="$event.stopPropagation(); startPlan(w)" title="Comença">
-                      <span class="material-symbols-outlined">play_arrow</span>
-                    </button>
-                  } @else {
-                    <span class="material-symbols-outlined fc-chevron">chevron_right</span>
-                  }
-                </div>
-              }
-              @for (item of day.sports; track item.session.id) {
-                <div class="feed-sport-row" [style.--ic]="item.sport.color">
-                  <span class="material-symbols-outlined feed-sport-icon">{{ item.sport.icon }}</span>
-                  <div class="fsr-info">
-                    <span class="feed-sport-name">{{ item.sport.name }}</span>
-                    @if (sportSummary(item.session, item.sport); as meta) {
-                      <span class="feed-sport-meta">{{ meta }}</span>
-                    }
-                  </div>
-                </div>
-              }
+              <ng-container [ngTemplateOutlet]="dayCards" [ngTemplateOutletContext]="{ $implicit: day }" />
             </div>
           }
 
@@ -992,13 +1016,36 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .material-symbols-outlined { font-size: 32px; color: var(--c-border); }
     }
 
-    /* ── Activity feed ── */
-    .feed-header {
-      display: flex; align-items: center; gap: 7px;
-      margin: 8px 16px 10px;
+    /* ── "Avui" section ── */
+    .today-section {
+      margin: 8px 16px 4px;
+      padding: 12px 12px 4px;
+      background: color-mix(in srgb, var(--c-brand) 5%, var(--c-card));
+      border: 1.5px solid color-mix(in srgb, var(--c-brand) 16%, var(--c-border-2));
+      border-radius: 18px;
     }
-    .feed-header-icon { font-size: 18px; color: var(--c-text-3); font-variation-settings: 'FILL' 0, 'wght' 300; }
-    .feed-title { margin: 0; font-size: 14px; font-weight: 700; color: var(--c-text-2); letter-spacing: 0.2px; }
+    .today-header { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
+    .today-header-icon { font-size: 19px; color: var(--c-brand); font-variation-settings: 'FILL' 1, 'wght' 400; }
+    .today-title { margin: 0; font-size: 15px; font-weight: 800; color: var(--c-text); letter-spacing: 0.1px; }
+    .today-empty {
+      margin: 0 0 10px; font-size: 12.5px; color: var(--c-text-3); text-align: center;
+      padding: 6px 0;
+    }
+
+    /* ── "Historial" divider ── */
+    .history-divider {
+      display: flex; align-items: center; gap: 10px;
+      margin: 18px 16px 10px;
+      &::before, &::after {
+        content: ''; flex: 1; height: 1px; background: var(--c-border-2);
+      }
+    }
+    .history-divider-label {
+      font-size: 11px; font-weight: 700; color: var(--c-text-3);
+      text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;
+    }
+
+    /* ── Activity feed ── */
     .feed-day { margin: 0 16px 14px; }
     .feed-day-header {
       font-size: 11px; font-weight: 700; color: var(--c-text-3);
@@ -1758,6 +1805,16 @@ export class TrainComponent implements OnDestroy {
     }
     return days;
   });
+
+  /** Today gets its own "Avui" section (with insights) instead of blending
+   *  into the historical list below. */
+  readonly todayFeedEntry = computed(() =>
+    this.feedDays().find(d => d.date === TODAY()) ?? null
+  );
+
+  readonly historyFeedDays = computed(() =>
+    this.feedDays().filter(d => d.date !== TODAY())
+  );
 
   async loadMoreFeedMonths(): Promise<void> {
     if (this.feedLoadingMore()) return;

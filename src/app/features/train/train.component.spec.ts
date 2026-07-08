@@ -346,6 +346,25 @@ describe('TrainComponent', () => {
     });
   });
 
+  // ── todayFeedEntry() / historyFeedDays() ────────────────────────────────
+
+  describe('todayFeedEntry() / historyFeedDays()', () => {
+    it('separates today from the rest of the feed', async () => {
+      const getDoneWorkoutsForDate = TestBed.inject(WorkoutService).getDoneWorkoutsForDate as jasmine.Spy;
+      getDoneWorkoutsForDate.and.callFake((date: string) =>
+        date === TODAY ? [makeWorkout({ id: 'today1' })] : []);
+      await component.loadMoreFeedMonths();
+      await component.loadMoreFeedMonths();
+
+      expect(component.todayFeedEntry()?.date).toBe(TODAY);
+      expect(component.historyFeedDays().every(d => d.date !== TODAY)).toBeTrue();
+    });
+
+    it('todayFeedEntry() is null when nothing is planned or done today', () => {
+      expect(component.todayFeedEntry()).toBeNull();
+    });
+  });
+
   // ── shareWorkout() ───────────────────────────────────────────────────────
 
   describe('shareWorkout()', () => {
