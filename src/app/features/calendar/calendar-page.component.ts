@@ -318,6 +318,10 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
                     </span>
                     <span class="dp-item-detail">{{ getExerciseNames(w) }}</span>
                   </div>
+                  <a class="dp-item-depth" [routerLink]="['/train']" [queryParams]="{ workout: w.id }"
+                     title="Planificar en profunditat" aria-label="Planificar en profunditat">
+                    <span class="material-symbols-outlined">edit_note</span>
+                  </a>
                   <button class="dp-item-remove" (click)="removeDayWorkout(w)" aria-label="Eliminar">
                     <span class="material-symbols-outlined">delete</span>
                   </button>
@@ -477,6 +481,15 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
       background: var(--c-subtle); border-radius: 8px; padding: 1px 6px;
     }
     .dp-item-detail { font-size: 11px; color: var(--c-text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dp-item-depth {
+      width: 36px; height: 36px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      border: none; background: transparent; color: var(--c-text-3);
+      cursor: pointer; touch-action: manipulation; transition: color 0.15s, background 0.15s;
+      text-decoration: none;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.08); }
+    }
     .dp-item-remove {
       width: 36px; height: 36px; flex-shrink: 0; margin-right: 4px;
       display: flex; align-items: center; justify-content: center;

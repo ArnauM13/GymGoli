@@ -136,9 +136,9 @@ describe('HomeComponent', () => {
       expect(navigateSpy).toHaveBeenCalledWith(['/train']);
     });
 
-    it('goToWorkout() navigates to /train with the workout id as a query param', () => {
+    it('goToWorkout() navigates to /train with the workout id and home origin as query params', () => {
       component.goToWorkout('abc');
-      expect(navigateSpy).toHaveBeenCalledWith(['/train'], { queryParams: { workout: 'abc' } });
+      expect(navigateSpy).toHaveBeenCalledWith(['/train'], { queryParams: { workout: 'abc', from: 'home' } });
     });
   });
 });

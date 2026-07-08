@@ -28,19 +28,26 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
       </div>
 
       <!-- ── Avui / dia seleccionat ── -->
-      <button class="today-header" (click)="goToTrain()">
-        <span class="material-symbols-outlined today-header-icon">today</span>
-        <div class="today-header-text">
-          <h2 class="today-title">{{ previewTitle() }}</h2>
-        </div>
-        <span class="material-symbols-outlined today-link-chevron">chevron_right</span>
-      </button>
+      <div class="today-card">
+        <button class="today-header" (click)="goToTrain()">
+          <span class="material-symbols-outlined today-header-icon">today</span>
+          <div class="today-header-text">
+            <h2 class="today-title">{{ previewTitle() }}</h2>
+          </div>
+          <span class="material-symbols-outlined today-link-chevron">chevron_right</span>
+        </button>
 
-      <div class="today-section">
         @if (previewFeedEntry(); as day) {
           <app-day-feed-cards [day]="day" (open)="goToWorkout($event)" />
-        } @else {
-          <p class="today-empty">Encara no {{ selectedDate() ? 'hi ha res aquell dia' : 'has fet res avui' }}.</p>
+        } @else if (!isToday()) {
+          <p class="today-empty">Encara no hi ha res aquell dia.</p>
+        }
+
+        @if (isToday()) {
+          <button class="start-workout-btn" (click)="goToNewWorkout()">
+            <span class="material-symbols-outlined">add_circle</span>
+            Comença un entrenament
+          </button>
         }
       </div>
 
@@ -49,43 +56,46 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
       }
 
       <!-- ── Historial ── -->
-      <div class="history-divider">
-        <span class="history-divider-label">Historial</span>
-      </div>
+      <div class="card-section history-card">
+        <div class="section-header">
+          <span class="material-symbols-outlined section-icon">history</span>
+          <h2 class="section-title">Historial</h2>
+        </div>
 
-      @if ((workoutService.isLoading() || !sportService.sportsLoaded()) && historyFeedDays().length === 0) {
-        <div class="feed-sk">
-          @for (_ of [1,2,3]; track $index) {
-            <div class="sk-card-ph">
-              <div class="sk sk-card-bar"></div>
-              <div class="sk-card-body">
-                <div class="sk sk-line sk-line--55"></div>
-                <div class="sk sk-line sk-line--30"></div>
+        @if ((workoutService.isLoading() || !sportService.sportsLoaded()) && historyFeedDays().length === 0) {
+          <div class="feed-sk">
+            @for (_ of [1,2,3]; track $index) {
+              <div class="sk-card-ph">
+                <div class="sk sk-card-bar"></div>
+                <div class="sk-card-body">
+                  <div class="sk sk-line sk-line--55"></div>
+                  <div class="sk sk-line sk-line--30"></div>
+                </div>
               </div>
+            }
+          </div>
+        } @else if (historyFeedDays().length === 0) {
+          <div class="empty-state">
+            <span class="material-symbols-outlined empty-icon">fitness_center</span>
+            <h2>Encara no hi ha res</h2>
+            <p>Els teus entrenaments anteriors apareixeran aquí.</p>
+          </div>
+        } @else {
+          @for (day of historyFeedDays(); track day.date) {
+            <div class="feed-day">
+              <div class="feed-day-header">{{ dayLabel(day.date) }}</div>
+              <app-day-feed-cards [day]="day" (open)="goToWorkout($event)" />
             </div>
           }
-        </div>
-      } @else if (historyFeedDays().length === 0) {
-        <div class="empty-state">
-          <span class="material-symbols-outlined empty-icon">fitness_center</span>
-          <h2>Encara no hi ha res</h2>
-          <p>Els teus entrenaments anteriors apareixeran aquí.</p>
-        </div>
-      } @else {
-        @for (day of historyFeedDays(); track day.date) {
-          <div class="feed-day">
-            <div class="feed-day-header">{{ dayLabel(day.date) }}</div>
-            <app-day-feed-cards [day]="day" (open)="goToWorkout($event)" />
-          </div>
-        }
 
-        <div #feedSentinel class="scroll-sentinel"></div>
-        @if (feedLoadingMore()) {
-          <div class="loading-state">
-            <span class="material-symbols-outlined spin">sync</span>
-          </div>
+          <div #feedSentinel class="scroll-sentinel"></div>
+          @if (feedLoadingMore()) {
+            <div class="loading-state">
+              <span class="material-symbols-outlined spin">sync</span>
+            </div>
+          }
         }
-      }
+      </div>
 
     </div>
   `,
@@ -98,10 +108,17 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
       border-radius: 16px; overflow: hidden;
     }
 
-    /* ── Avui / dia seleccionat: capçalera-enllaç cap a train ── */
+    /* ── Avui / dia seleccionat: targeta blava (mateix marge que la resta) ── */
+    .today-card {
+      margin: 8px 16px 16px;
+      padding: 12px;
+      background: color-mix(in srgb, var(--c-brand) 5%, var(--c-card));
+      border: 1.5px solid color-mix(in srgb, var(--c-brand) 24%, var(--c-border-2));
+      border-radius: 18px;
+    }
     .today-header {
       display: flex; align-items: center; gap: 7px; width: 100%;
-      margin: 8px 16px 8px; padding: 0;
+      margin: 0 0 10px; padding: 0;
       border: none; background: transparent; cursor: pointer; touch-action: manipulation;
       text-align: left;
     }
@@ -110,33 +127,45 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     .today-title { margin: 0; font-size: 15px; font-weight: 800; color: var(--c-text); letter-spacing: 0.1px; text-transform: capitalize; }
     .today-link-chevron { font-size: 22px; color: var(--c-text-3); flex-shrink: 0; }
 
-    .today-section { margin: 0 0 4px; }
     .today-empty {
-      margin: 0 16px; font-size: 12.5px; color: var(--c-text-3);
+      margin: 0; font-size: 12.5px; color: var(--c-text-3);
       padding: 6px 0;
     }
 
-    /* ── "Historial" divider ── */
-    .history-divider {
-      display: flex; align-items: center; gap: 10px;
-      margin: 18px 16px 10px;
-      &::before, &::after {
-        content: ''; flex: 1; height: 1px; background: var(--c-border-2);
-      }
-    }
-    .history-divider-label {
-      font-size: 11px; font-weight: 700; color: var(--c-text-3);
-      text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;
+    /* ── Botó gros "Comença un entrenament" ── */
+    .start-workout-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; height: 52px; margin-top: 10px; padding: 0;
+      border: none; border-radius: 14px;
+      background: var(--c-brand); color: white;
+      font-size: 15px; font-weight: 800; letter-spacing: 0.1px;
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s, transform 0.1s;
+      box-shadow: 0 4px 14px color-mix(in srgb, var(--c-brand) 35%, transparent);
+      .material-symbols-outlined { font-size: 22px; }
+      &:hover { background: var(--c-brand-dk); }
+      &:active { transform: scale(0.98); }
     }
 
+    /* ── "Historial" section card ── */
+    .history-card {
+      margin: 4px 16px 0;
+      padding: 14px 14px 16px;
+      background: var(--c-card);
+      border-radius: 18px;
+      box-shadow: 0 2px 10px var(--c-shadow);
+    }
+    .section-header { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; }
+    .section-icon  { font-size: 18px; color: var(--c-text-3); font-variation-settings: 'FILL' 0, 'wght' 300; }
+    .section-title { margin: 0; flex: 1; font-size: 14px; font-weight: 700; color: var(--c-text-2); letter-spacing: 0.2px; }
+
     /* ── Activity feed ── */
-    .feed-day { margin: 0 16px 14px; }
+    .feed-day { margin: 0 0 14px; }
     .feed-day-header {
       font-size: 11px; font-weight: 700; color: var(--c-text-3);
       text-transform: uppercase; letter-spacing: 0.3px;
       margin-bottom: 6px;
     }
-    .feed-sk { margin: 0 16px; display: flex; flex-direction: column; gap: 8px; }
+    .feed-sk { display: flex; flex-direction: column; gap: 8px; }
 
     /* ── Loading ── */
     .loading-state {
@@ -204,6 +233,8 @@ export class HomeComponent implements OnDestroy {
 
   readonly previewTitle = computed(() => feedDayLabel(this.effectiveDate(), TODAY()));
 
+  readonly isToday = computed(() => this.effectiveDate() === TODAY());
+
   dayLabel(date: string): string {
     return feedDayLabel(date, TODAY());
   }
@@ -216,8 +247,12 @@ export class HomeComponent implements OnDestroy {
     this.router.navigate(['/train']);
   }
 
+  goToNewWorkout(): void {
+    this.router.navigate(['/train'], { queryParams: { new: 1 } });
+  }
+
   goToWorkout(workoutId: string): void {
-    this.router.navigate(['/train'], { queryParams: { workout: workoutId } });
+    this.router.navigate(['/train'], { queryParams: { workout: workoutId, from: 'home' } });
   }
 
   // ── Activity feed (grouped by day, infinite scroll backwards in time) ────
