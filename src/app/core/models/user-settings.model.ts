@@ -40,6 +40,10 @@ export interface UserSettings {
   weeklyPlan: WeeklyPlan | null;
   /** User asked to stop seeing the "set up a routine" reminder on Train. */
   routineHintDismissed: boolean;
+  /** Off by default — advanced workout-editor features that clutter the
+   *  set-adding flow for most users. */
+  supersetsEnabled: boolean;
+  dropsetsEnabled:  boolean;
 }
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
@@ -55,4 +59,6 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   fitnessGoal: null,
   weeklyPlan: null,
   routineHintDismissed: false,
+  supersetsEnabled: false,
+  dropsetsEnabled: false,
 };

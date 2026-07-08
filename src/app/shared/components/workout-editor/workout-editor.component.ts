@@ -214,10 +214,12 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                               </button>
                             </div>
                           }
-                          <button type="button" class="we-add-drop-btn" (click)="addEditDropStage()">
-                            <span class="material-symbols-outlined">add</span>
-                            {{ editDropStages().length === 0 ? 'Afegir dropset' : 'Afegir un altre tram' }}
-                          </button>
+                          @if (dropsetsEnabled() || editDropStages().length > 0) {
+                            <button type="button" class="we-add-drop-btn" (click)="addEditDropStage()">
+                              <span class="material-symbols-outlined">add</span>
+                              {{ editDropStages().length === 0 ? 'Afegir dropset' : 'Afegir un altre tram' }}
+                            </button>
+                          }
                         </div>
                         <button type="button" class="we-warmup-chip" [class.we-warmup-chip--active]="editIsWarmupSet()"
                                 (click)="editIsWarmupSet.set(!editIsWarmupSet())">
@@ -374,10 +376,12 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                         </button>
                       </div>
                     }
-                    <button type="button" class="we-add-drop-btn" (click)="addDropStage()">
-                      <span class="material-symbols-outlined">add</span>
-                      {{ dropStages().length === 0 ? 'Afegir dropset' : 'Afegir un altre tram' }}
-                    </button>
+                    @if (dropsetsEnabled() || dropStages().length > 0) {
+                      <button type="button" class="we-add-drop-btn" (click)="addDropStage()">
+                        <span class="material-symbols-outlined">add</span>
+                        {{ dropStages().length === 0 ? 'Afegir dropset' : 'Afegir un altre tram' }}
+                      </button>
+                    }
                   </div>
                   <div class="we-set-form-actions">
                     <button type="button" class="we-cancel-btn" (click)="cancelSet()">
@@ -1274,6 +1278,7 @@ export class WorkoutEditorComponent implements OnDestroy {
   });
   // ── Rest timer ─────────────────────────────────────────────────────────────
   readonly restTimerEnabled = computed(() => this.settingsService.restTimerSeconds() > 0);
+  readonly dropsetsEnabled  = computed(() => this.settingsService.dropsetsEnabled());
   readonly timerActive    = signal(false);
   readonly timerRemaining = signal(0);
   readonly timerTotal     = signal(0);

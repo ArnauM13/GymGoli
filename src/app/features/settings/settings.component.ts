@@ -298,6 +298,30 @@ import {
           />
         </div>
 
+        <div class="setting-row setting-row--top">
+          <div class="setting-info">
+            <span class="setting-label">Agrupar en superset</span>
+            <span class="setting-desc">Permet enllaçar exercicis perquè es facin seguits, sense descans.</span>
+          </div>
+          <mat-slide-toggle
+            [checked]="settingsService.supersetsEnabled()"
+            (change)="toggleSupersets()"
+            color="primary"
+          />
+        </div>
+
+        <div class="setting-row setting-row--top">
+          <div class="setting-info">
+            <span class="setting-label">Dropsets</span>
+            <span class="setting-desc">Permet afegir trams a pes reduït immediatament després d'una sèrie.</span>
+          </div>
+          <mat-slide-toggle
+            [checked]="settingsService.dropsetsEnabled()"
+            (change)="toggleDropsets()"
+            color="primary"
+          />
+        </div>
+
       </div>
 
       <!-- ── Bloc 3: Mode entrenador ── -->
@@ -854,6 +878,14 @@ export class SettingsComponent {
 
   toggleMetrics(): void {
     this.settingsService.update({ metricsEnabled: !this.settingsService.metricsEnabled() });
+  }
+
+  toggleSupersets(): void {
+    this.settingsService.update({ supersetsEnabled: !this.settingsService.supersetsEnabled() });
+  }
+
+  toggleDropsets(): void {
+    this.settingsService.update({ dropsetsEnabled: !this.settingsService.dropsetsEnabled() });
   }
 
   setGoalMode(mode: GoalMode): void {

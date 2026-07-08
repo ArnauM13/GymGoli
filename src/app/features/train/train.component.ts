@@ -142,10 +142,12 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               <span class="material-symbols-outlined">{{ reorderMode() ? 'check' : 'swap_vert' }}</span>
               {{ reorderMode() ? 'Finalitzar ordenació' : 'Ordenar exercicis' }}
             </button>
-            <button class="aw-menu-item" (click)="workoutMenuOpen.set(false); groupingMode.set(!groupingMode()); reorderMode.set(false)">
-              <span class="material-symbols-outlined">{{ groupingMode() ? 'check' : 'link' }}</span>
-              {{ groupingMode() ? 'Finalitzar agrupació' : 'Agrupar en superset' }}
-            </button>
+            @if (settingsService.supersetsEnabled() || groupingMode()) {
+              <button class="aw-menu-item" (click)="workoutMenuOpen.set(false); groupingMode.set(!groupingMode()); reorderMode.set(false)">
+                <span class="material-symbols-outlined">{{ groupingMode() ? 'check' : 'link' }}</span>
+                {{ groupingMode() ? 'Finalitzar agrupació' : 'Agrupar en superset' }}
+              </button>
+            }
             @if (!offlineService.isOffline()) {
               <button class="aw-menu-item" (click)="openSaveAsTemplate(w)">
                 <span class="material-symbols-outlined">bookmark_add</span>

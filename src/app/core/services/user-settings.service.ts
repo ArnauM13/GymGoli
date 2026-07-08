@@ -34,6 +34,8 @@ export class UserSettingsService {
   readonly restTimerSeconds    = computed(() => this._settings().restTimerSeconds ?? 90);
   readonly fitnessGoal         = computed(() => (this._settings().fitnessGoal ?? null) as FitnessGoal | null);
   readonly weeklyPlan          = computed(() => this._settings().weeklyPlan ?? EMPTY_WEEKLY_PLAN);
+  readonly supersetsEnabled    = computed(() => this._settings().supersetsEnabled ?? false);
+  readonly dropsetsEnabled     = computed(() => this._settings().dropsetsEnabled ?? false);
 
   constructor() {
     if (typeof window !== 'undefined') {
