@@ -99,6 +99,18 @@ describe('ExercisePickerDialogComponent', () => {
       expect(component.catFilter()).toBe('legs');
       expect(component.filtered().map(e => e.id)).toEqual(['ex3']);
     });
+
+    it('scopes results to categoryKeys for a hybrid workout, regardless of catFilter', () => {
+      dialogData = { categoryKeys: ['push', 'pull'] };
+      setup();
+      expect(component.filtered().map(e => e.id)).toEqual(['ex1', 'ex2']);
+    });
+
+    it('scopes the filter-bar chips to categoryKeys as well', () => {
+      dialogData = { categoryKeys: ['push', 'pull'] };
+      setup();
+      expect(component.categoryChips().map(c => c.value)).toEqual(['push', 'pull']);
+    });
   });
 
   describe('groupedFiltered()', () => {

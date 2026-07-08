@@ -381,13 +381,18 @@ export class WorkoutService {
   }
 
   // ── Create ───────────────────────────────────────────────────────────────
-  async createWorkoutForDate(date: string, category?: string): Promise<string> {
+  /** `categories` additionally seeds a multi-category ("hybrid") workout —
+   *  when omitted, falls back to the single `category` (unchanged behavior
+   *  for every existing call site). `category` itself always ends up as the
+   *  first selected key, for the handful of readers that only look at it. */
+  async createWorkoutForDate(date: string, category?: string, categories?: string[]): Promise<string> {
     const id         = crypto.randomUUID();
+    const cats        = categories?.length ? categories : (category ? [category] : []);
     const newWorkout: Workout = {
       id, date,
       entries:    [],
-      categories: category ? [category] : [],
-      category,
+      categories: cats,
+      category:   cats[0] ?? category,
       createdAt:  new Date(),
       status:     'done',
     };
@@ -426,13 +431,15 @@ export class WorkoutService {
   async createPlannedWorkout(
     date: string, category?: string, entries: WorkoutEntry[] = [],
     plannedSource: PlannedSource = 'manual',
+    categories?: string[],
   ): Promise<string> {
     const id         = crypto.randomUUID();
+    const cats       = categories?.length ? categories : (category ? [category] : []);
     const newWorkout: Workout = {
       id, date,
       entries:       entries.map(e => ({ exerciseId: e.exerciseId, exerciseName: e.exerciseName, sets: [] })),
-      categories:    category ? [category] : [],
-      category,
+      categories:    cats,
+      category:      cats[0] ?? category,
       createdAt:     new Date(),
       status:        'planned',
       plannedSource,

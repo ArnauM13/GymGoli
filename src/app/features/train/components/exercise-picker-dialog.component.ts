@@ -18,6 +18,13 @@ export interface ExercisePickerData {
    * but the user can freely switch to any other category.
    */
   defaultCategory?: ExerciseCategory;
+  /**
+   * Scopes both the filter bar and the results to this set of categories —
+   * used by hybrid workouts, whose exercises may come from any of the
+   * categories selected when the workout was started. Takes priority over
+   * `defaultCategory` when both are set.
+   */
+  categoryKeys?: string[];
 }
 
 @Component({
@@ -195,7 +202,11 @@ export class ExercisePickerDialogComponent {
   private feedback        = inject(FeedbackService);
   readonly data: ExercisePickerData = inject(MAT_DIALOG_DATA);
 
-  readonly categoryChips = this.categoryService.categoryChips;
+  readonly categoryChips = computed(() => {
+    const keys = this.data.categoryKeys;
+    const all  = this.categoryService.categoryChips();
+    return keys?.length ? all.filter(c => keys.includes(c.value)) : all;
+  });
 
   readonly isLoaded    = this.exerciseService.isLoaded;
   readonly skeletonRows = [1, 2, 3, 4, 5];
@@ -206,12 +217,14 @@ export class ExercisePickerDialogComponent {
   readonly catFilter = signal<ExerciseCategory | null>(this.data.defaultCategory ?? null);
 
   readonly filtered = computed(() => {
-    const term     = this.searchTerm().toLowerCase();
-    const cat      = this.catFilter();
-    const excluded = this.data.excludeIds ?? [];
+    const term      = this.searchTerm().toLowerCase();
+    const cat       = this.catFilter();
+    const excluded  = this.data.excludeIds ?? [];
+    const scopeKeys = this.data.categoryKeys;
     return this.exerciseService
       .exercises()
       .filter(e => !excluded.includes(e.id))
+      .filter(e => !scopeKeys?.length || scopeKeys.includes(e.category))
       .filter(e => !cat || e.category === cat)
       .filter(e => !term || e.name.toLowerCase().includes(term));
   });

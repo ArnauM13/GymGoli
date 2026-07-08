@@ -232,6 +232,41 @@ describe('TrainComponent', () => {
     });
   });
 
+  // ── Hybrid workout ───────────────────────────────────────────────────────
+
+  describe('hybrid workout flow', () => {
+    it('openHybridSheet() opens the sheet with an empty selection', () => {
+      component.hybridSelection.set(new Set(['push']));
+      component.openHybridSheet();
+      expect(component.hybridSheetOpen()).toBeTrue();
+      expect(component.hybridSelection().size).toBe(0);
+    });
+
+    it('toggleHybridCat() adds and removes a category from the selection', () => {
+      component.toggleHybridCat('push');
+      expect(component.hybridSelection().has('push')).toBeTrue();
+      component.toggleHybridCat('push');
+      expect(component.hybridSelection().has('push')).toBeFalse();
+    });
+
+    it('confirmHybrid() does nothing with fewer than 2 categories selected', async () => {
+      component.toggleHybridCat('push');
+      await component.confirmHybrid();
+      expect(component.workoutService.createWorkoutForDate).not.toHaveBeenCalled();
+    });
+
+    it('confirmHybrid() creates a workout seeded with every selected category and opens it', async () => {
+      component.toggleHybridCat('push');
+      component.toggleHybridCat('legs');
+
+      await component.confirmHybrid();
+
+      expect(component.workoutService.createWorkoutForDate).toHaveBeenCalledWith(
+        TODAY, undefined, jasmine.arrayContaining(['push', 'legs']));
+      expect(component.hybridSheetOpen()).toBeFalse();
+    });
+  });
+
   // ── isToday() ────────────────────────────────────────────────────────────
 
   describe('isToday()', () => {

@@ -261,7 +261,7 @@ type TodaySuggestion = GymSuggestion | SportSuggestion;
           @if (todayExpanded()) {
             <div class="today-picker">
               <div class="chip-group-label">Gym</div>
-              <div class="type-grid" [style.grid-template-columns]="gridCols(workoutTypes().length)">
+              <div class="type-grid" [style.grid-template-columns]="gridCols(workoutTypes().length + 1)">
                 @for (cat of workoutTypes(); track cat.value) {
                   <button class="type-btn"
                     [style.--cat-color]="cat.color"
@@ -274,6 +274,10 @@ type TodaySuggestion = GymSuggestion | SportSuggestion;
                     <span class="type-label">{{ cat.label }}</span>
                   </button>
                 }
+                <button class="type-btn" [style.--cat-color]="hybridColor" (click)="openHybridSheet()">
+                  <span class="material-symbols-outlined type-icon">dashboard_customize</span>
+                  <span class="type-label">Híbrid</span>
+                </button>
               </div>
 
               @if (sportService.sports().length > 0) {
@@ -342,7 +346,7 @@ type TodaySuggestion = GymSuggestion | SportSuggestion;
         </div>
 
         <div class="chip-group-label">Gym</div>
-        <div class="type-grid" [style.grid-template-columns]="gridCols(workoutTypes().length)">
+        <div class="type-grid" [style.grid-template-columns]="gridCols(workoutTypes().length + 1)">
           @for (cat of workoutTypes(); track cat.value) {
             <button class="type-btn"
               [style.--cat-color]="cat.color"
@@ -355,6 +359,11 @@ type TodaySuggestion = GymSuggestion | SportSuggestion;
               <span class="type-label">{{ cat.label }}</span>
             </button>
           }
+          <button class="type-btn" [style.--cat-color]="hybridColor"
+                  (click)="chooserOpen.set(false); openHybridSheet()">
+            <span class="material-symbols-outlined type-icon">dashboard_customize</span>
+            <span class="type-label">Híbrid</span>
+          </button>
         </div>
 
         @if (sportService.sports().length > 0) {
@@ -387,6 +396,39 @@ type TodaySuggestion = GymSuggestion | SportSuggestion;
             </button>
           </div>
         }
+      </div>
+    }
+
+    <!-- ── Hybrid category-selection bottom sheet ── -->
+    @if (hybridSheetOpen()) {
+      <div class="tp-backdrop" (click)="closeHybridSheet()"></div>
+      <div class="tp-sheet">
+        <div class="tp-header">
+          <span class="tp-title">Entrenament híbrid</span>
+          <button class="tp-close" (click)="closeHybridSheet()" aria-label="Tancar">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+
+        <div class="chip-group-label">Selecciona 2 o més tipus</div>
+        <div class="type-grid" [style.grid-template-columns]="gridCols(workoutTypes().length)">
+          @for (cat of workoutTypes(); track cat.value) {
+            <button class="type-btn"
+              [style.--cat-color]="cat.color"
+              [class.type-btn--done]="hybridSelection().has(cat.value)"
+              (click)="toggleHybridCat(cat.value)">
+              @if (hybridSelection().has(cat.value)) {
+                <span class="type-done-check material-symbols-outlined">check_circle</span>
+              }
+              <span class="material-symbols-outlined type-icon">{{ cat.icon }}</span>
+              <span class="type-label">{{ cat.label }}</span>
+            </button>
+          }
+        </div>
+
+        <button class="tp-manage tp-manage--primary" [disabled]="hybridSelection().size < 2" (click)="confirmHybrid()">
+          <span>Comença ({{ hybridSelection().size }})</span>
+        </button>
       </div>
     }
 
@@ -1038,6 +1080,11 @@ type TodaySuggestion = GymSuggestion | SportSuggestion;
       .material-symbols-outlined { font-size: 18px; color: var(--c-text-3); }
       &:hover { background: var(--c-subtle); }
     }
+    .tp-manage--primary {
+      justify-content: center; background: var(--c-brand); color: white;
+      &:hover { background: var(--c-brand-dk); }
+      &:disabled { opacity: 0.4; cursor: not-allowed; background: var(--c-border); color: var(--c-text-3); }
+    }
 
     .type-sport-sub {
       font-size: 9px; font-weight: 700; color: var(--cat-color);
@@ -1249,6 +1296,9 @@ export class TrainComponent {
   readonly sportToggling   = signal(false);
   readonly workoutTypes    = this.categoryService.categoryChips;
   readonly chooserOpen     = signal(false);
+  readonly hybridSheetOpen = signal(false);
+  readonly hybridSelection = signal<Set<string>>(new Set());
+  readonly hybridColor     = '#7c4dff';
   readonly todayExpanded   = signal(true);
   readonly workoutMenuOpen = signal(false);
   /** Off by default — exercises can only be dragged to reorder once the
@@ -1751,6 +1801,41 @@ export class TrainComponent {
     this.router.navigate(['/templates']);
   }
 
+  // ── Hybrid workout ──────────────────────────────────────────────────────
+
+  openHybridSheet(): void {
+    this.hybridSelection.set(new Set());
+    this.hybridSheetOpen.set(true);
+  }
+
+  closeHybridSheet(): void { this.hybridSheetOpen.set(false); }
+
+  toggleHybridCat(key: string): void {
+    this.hybridSelection.update(set => {
+      const next = new Set(set);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
+
+  /** Skips the buit/repetir/plantilles sub-picker entirely — templates and
+   *  built-ins are single-category concepts that don't map onto an
+   *  arbitrary N-category set, so a hybrid workout always starts empty. */
+  async confirmHybrid(): Promise<void> {
+    const cats = Array.from(this.hybridSelection());
+    if (cats.length < 2) return;
+    this.closeHybridSheet();
+    this.creating.set(true);
+    try {
+      const id = this.isSelectedFuture()
+        ? await this.workoutService.createPlannedWorkout(this.selectedDate(), undefined, [], 'manual', cats)
+        : await this.workoutService.createWorkoutForDate(this.selectedDate(), undefined, cats);
+      this.openWorkout(id);
+    } catch {
+      this.feedback.error('Error en crear l\'entrenament', 3000);
+    } finally { this.creating.set(false); }
+  }
+
   maxWeight(entry: WorkoutEntry): number {
     return entry.sets.length ? Math.max(...entry.sets.map(s => setMaxWeight(s))) : 0;
   }
@@ -1758,10 +1843,17 @@ export class TrainComponent {
   openPicker(newCategory?: ExerciseCategory): void {
     const w               = this.activeWorkout();
     const excludeIds      = w?.entries.map(e => e.exerciseId) ?? [];
+    const wCats           = w ? workoutCategories(w) : [];
+    const isHybrid        = wCats.length > 1;
     const defaultCategory = (newCategory ?? w?.category) as ExerciseCategory | undefined;
 
     const ref = this.dialog.open(ExercisePickerDialogComponent, {
-      data: { excludeIds, defaultCategory }, width: '420px', maxHeight: '80vh',
+      data: {
+        excludeIds,
+        defaultCategory,
+        categoryKeys: isHybrid ? wCats : undefined,
+      },
+      width: '420px', maxHeight: '80vh',
     });
 
     ref.afterClosed().subscribe(async (exercise: Exercise | undefined) => {

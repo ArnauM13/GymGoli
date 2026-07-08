@@ -120,6 +120,31 @@ describe('WorkoutService', () => {
     });
   });
 
+  describe('hybrid (multi-category) workouts', () => {
+    it('createWorkoutForDate() seeds the full categories set and sets category to the first key', async () => {
+      const id = await service.createWorkoutForDate('2024-03-06', undefined, ['push', 'legs']);
+      const w  = service.getWorkoutForDate('2024-03-06')!;
+      expect(id).toBe(w.id);
+      expect(w.categories).toEqual(['push', 'legs']);
+      expect(w.category).toBe('push');
+    });
+
+    it('createWorkoutForDate() falls back to [category] when categories is omitted', async () => {
+      await service.createWorkoutForDate('2024-03-06', 'pull');
+      const w = service.getWorkoutForDate('2024-03-06')!;
+      expect(w.categories).toEqual(['pull']);
+      expect(w.category).toBe('pull');
+    });
+
+    it('createPlannedWorkout() seeds the full categories set and sets category to the first key', async () => {
+      await service.createPlannedWorkout('2024-03-10', undefined, [], 'manual', ['pull', 'legs']);
+      const w = service.getWorkoutForDate('2024-03-10')!;
+      expect(w.categories).toEqual(['pull', 'legs']);
+      expect(w.category).toBe('pull');
+      expect(w.status).toBe('planned');
+    });
+  });
+
   describe('supersets', () => {
     async function seedWorkout(): Promise<string> {
       const id = await service.createWorkoutForDate('2024-03-06');
