@@ -1,9 +1,8 @@
-import { Component, ViewChild, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, ElementRef, OnDestroy, ViewChild, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
-import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
-import { workoutCategories, mondayOf, addDays } from '../../shared/utils/calendar-utils';
+import { workoutCategories } from '../../shared/utils/calendar-utils';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { TrainerService } from '../../core/services/trainer.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -14,7 +13,7 @@ import {
 } from '../../core/models/exercise.model';
 import { Sport, SportMetricDef, SportSession } from '../../core/models/sport.model';
 import { BUILT_IN_TEMPLATES, BuiltInTemplate, WorkoutTemplate } from '../../core/models/template.model';
-import { FEELING_EMOJI, FeelingLevel, PlannedSource, Workout, WorkoutEntry, setMaxWeight, setVolume } from '../../core/models/workout.model';
+import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry, setMaxWeight, setVolume } from '../../core/models/workout.model';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { TemplateService } from '../../core/services/template.service';
 import { SharedWorkoutService } from '../../core/services/shared-workout.service';
@@ -25,8 +24,6 @@ import { WorkoutService } from '../../core/services/workout.service';
 import { OfflineService } from '../../core/services/offline.service';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
-import { FitnessInsightsComponent } from '../../shared/components/fitness-insights/fitness-insights.component';
-import { WeeklySummaryComponent } from './components/weekly-summary.component';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 
@@ -55,7 +52,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 @Component({
   selector: 'app-train',
   standalone: true,
-  imports: [FormsModule, WorkoutEditorComponent, CalendarComponent, FitnessInsightsComponent, WeeklySummaryComponent, PageHeaderComponent],
+  imports: [FormsModule, WorkoutEditorComponent, PageHeaderComponent],
   template: `
     <div class="page" [style.padding-bottom]="pagePaddingBottom()">
 
@@ -212,96 +209,73 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           </button>
         </app-page-header>
 
-        @if (showRoutineHint()) {
-          <div class="routine-hint-card">
-            <button class="rh-dismiss" (click)="dismissRoutineHint()" aria-label="No tornar a mostrar">
-              <span class="material-symbols-outlined">close</span>
-            </button>
-            <button type="button" class="rh-body" (click)="goSetRoutine()">
-              <span class="material-symbols-outlined rh-icon">event_repeat</span>
-              <span class="rh-text">
-                <span class="rh-title">Encara no tens una rutina</span>
-                <span class="rh-desc">Per què no n'estableixes una? Es planificarà automàticament cada setmana.</span>
-              </span>
-              <span class="material-symbols-outlined rh-arrow">chevron_right</span>
-            </button>
-          </div>
-        }
+        <!-- ── Primary CTA ── -->
+        <button class="start-cta" (click)="chooserOpen.set(true)">
+          <span class="material-symbols-outlined">add_circle</span>
+          Fer un nou entrenament
+        </button>
 
-        @if (!offlineService.isOffline()) {
-          <div class="calendar-wrap">
-            <app-calendar
-              [allowFuturePlanning]="true"
-              [selectedDate]="selectedDate()"
-              (dateSelected)="selectedDate.set($event)"
-              (weekChanged)="viewedWeekMonday.set($event)"
-            />
-            <app-weekly-summary [weekDate]="selectedDate()" />
-            @if (viewedWeekHasPlan()) {
-              <div class="cw-edit-row">
-                <button class="week-action-btn" (click)="goPlanWeek()">
-                  <span class="material-symbols-outlined">edit_calendar</span>
-                  Editar planificació
-                </button>
+        <!-- ── Trainer proposal card, otherwise today's status ── -->
+        @if (activeProposal(); as prop) {
+          <div class="proposal-card">
+            <div class="proposal-header">
+              <span class="material-symbols-outlined proposal-icon">sports</span>
+              <div class="proposal-header-info">
+                <span class="proposal-title">Proposta de l'entrenador</span>
+                @if (trainerService.myTrainer()?.displayName; as name) {
+                  <span class="proposal-trainer">{{ name }}</span>
+                }
               </div>
+            </div>
+            <div class="proposal-exercises">
+              @for (entry of prop.entries.slice(0, 4); track entry.exerciseName) {
+                <span class="proposal-ex">{{ entry.exerciseName }}</span>
+              }
+              @if (prop.entries.length > 4) {
+                <span class="proposal-ex proposal-ex--more">+{{ prop.entries.length - 4 }} més</span>
+              }
+            </div>
+            @if (prop.notes) {
+              <p class="proposal-notes">{{ prop.notes }}</p>
             }
-          </div>
-
-          @if (viewedWeekIsFuture() && !viewedWeekHasPlan()) {
-            <div class="card-section plan-section">
-              <div class="section-header">
-                <span class="material-symbols-outlined section-icon">event_repeat</span>
-                <h2 class="section-title">Planificació</h2>
-              </div>
-              <p class="plan-desc">Defineix ràpidament els entrenaments per a la setmana que estàs veient al calendari.</p>
-              <div class="plan-actions">
-                <button class="week-action-btn" (click)="goPlanWeek()">
-                  <span class="material-symbols-outlined">event_repeat</span>
-                  Planificar aquesta setmana
-                </button>
-              </div>
+            <div class="proposal-actions">
+              <button class="proposal-accept" (click)="acceptProposal(prop)" [disabled]="acceptingProposal()">
+                @if (acceptingProposal()) {
+                  <span class="material-symbols-outlined spin">sync</span>
+                } @else {
+                  <span class="material-symbols-outlined">check</span>
+                }
+                Accepta
+              </button>
+              <button class="proposal-ignore" (click)="ignoreProposal()">
+                <span class="material-symbols-outlined">close</span>
+                Ignora
+              </button>
             </div>
+          </div>
+        } @else {
+          @if (bottomCard(); as bc) {
+            <button class="today-card" [class.today-card--done]="bc.kind !== 'suggestion'"
+                    [style.--sc]="bc.color" (click)="handleBottomCardClick(bc)">
+              <div class="sc-bar"></div>
+              <div class="sc-icon-wrap">
+                <span class="material-symbols-outlined sc-icon"
+                      [class.sc-icon--fill]="bc.kind !== 'suggestion'">{{ bc.icon }}</span>
+              </div>
+              <div class="sc-info">
+                <span class="sc-eyebrow">{{ bc.kind === 'suggestion' ? 'Avui toca' : bc.kind === 'plan' ? 'Pla pendent' : 'Fet avui' }}</span>
+                <span class="sc-label">{{ bc.label }}</span>
+                @if (bc.kind === 'suggestion' && bc.meta) {
+                  <span class="sc-reason">{{ bc.meta }}</span>
+                }
+              </div>
+              @if (bc.kind === 'suggestion') {
+                <span class="material-symbols-outlined sc-chevron">chevron_right</span>
+              } @else if (bc.meta) {
+                <span class="sc-stats">{{ bc.meta }}</span>
+              }
+            </button>
           }
-        }
-
-        @if (isSelectedFuture()) {
-          <div class="plan-pill" [style.--pc]="planPillColor()">
-            <span class="material-symbols-outlined">event_upcoming</span>
-            <span>Planificant · {{ planPillLabel() }}</span>
-          </div>
-        }
-
-        <!-- ── Skeleton (initial data load) ── -->
-        @if ((workoutService.isLoading() || !sportService.sportsLoaded()) && dateWorkouts().length === 0 && !creating()) {
-          <div class="sk-workout-section">
-            <div class="sk-section-header">
-              <div class="sk sk-icon-ph"></div>
-              <div class="sk sk-title-ph"></div>
-            </div>
-            <div class="sk-card-ph">
-              <div class="sk sk-card-bar"></div>
-              <div class="sk-card-body">
-                <div class="sk sk-line sk-line--55"></div>
-                <div class="sk sk-line sk-line--30"></div>
-              </div>
-            </div>
-            <div class="sk-btn-grid">
-              <div class="sk sk-btn-ph"></div>
-              <div class="sk sk-btn-ph"></div>
-              <div class="sk sk-btn-ph"></div>
-            </div>
-          </div>
-          <div class="sk-sports-section">
-            <div class="sk-section-header">
-              <div class="sk sk-icon-ph"></div>
-              <div class="sk sk-title-ph"></div>
-            </div>
-            <div class="sk-btn-grid">
-              <div class="sk sk-btn-ph"></div>
-              <div class="sk sk-btn-ph"></div>
-              <div class="sk sk-btn-ph"></div>
-            </div>
-          </div>
         }
 
         <!-- ── Creating spinner (brief, while new workout is being saved) ── -->
@@ -311,298 +285,149 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           </div>
         }
 
-        @if ((!workoutService.isLoading() && sportService.sportsLoaded() || dateWorkouts().length > 0) && !creating()) {
+        <!-- ── Feed of past activity, grouped by day ── -->
+        <div class="feed-header">
+          <span class="material-symbols-outlined feed-header-icon">history</span>
+          <h2 class="feed-title">Activitat recent</h2>
+        </div>
 
-          @if (!offlineService.isOffline() && dateWorkouts().length === 0 && dateSportSessions().length === 0 && isToday()) {
-            <app-fitness-insights />
-          }
-
-          <!-- ── Trainer proposal card ── -->
-          @if (activeProposal(); as prop) {
-            <div class="proposal-card">
-              <div class="proposal-header">
-                <span class="material-symbols-outlined proposal-icon">sports</span>
-                <div class="proposal-header-info">
-                  <span class="proposal-title">Proposta de l'entrenador</span>
-                  @if (trainerService.myTrainer()?.displayName; as name) {
-                    <span class="proposal-trainer">{{ name }}</span>
-                  }
+        @if ((workoutService.isLoading() || !sportService.sportsLoaded()) && feedDays().length === 0) {
+          <div class="feed-sk">
+            @for (_ of [1,2,3]; track $index) {
+              <div class="sk-card-ph">
+                <div class="sk sk-card-bar"></div>
+                <div class="sk-card-body">
+                  <div class="sk sk-line sk-line--55"></div>
+                  <div class="sk sk-line sk-line--30"></div>
                 </div>
               </div>
-              <div class="proposal-exercises">
-                @for (entry of prop.entries.slice(0, 4); track entry.exerciseName) {
-                  <span class="proposal-ex">{{ entry.exerciseName }}</span>
-                }
-                @if (prop.entries.length > 4) {
-                  <span class="proposal-ex proposal-ex--more">+{{ prop.entries.length - 4 }} més</span>
-                }
-              </div>
-              @if (prop.notes) {
-                <p class="proposal-notes">{{ prop.notes }}</p>
-              }
-              <div class="proposal-actions">
-                <button class="proposal-accept" (click)="acceptProposal(prop)" [disabled]="acceptingProposal()">
-                  @if (acceptingProposal()) {
-                    <span class="material-symbols-outlined spin">sync</span>
-                  } @else {
-                    <span class="material-symbols-outlined">check</span>
-                  }
-                  Accepta
-                </button>
-                <button class="proposal-ignore" (click)="ignoreProposal()">
-                  <span class="material-symbols-outlined">close</span>
-                  Ignora
-                </button>
-              </div>
-            </div>
-          }
-
-          <!-- Entrenaments section -->
-          <!-- ── Entrenaments section ── -->
-          <div class="workout-section">
-            <div class="sports-header" (click)="gymCollapsed.set(!gymCollapsed())">
-              <span class="material-symbols-outlined sports-header-icon">fitness_center</span>
-              <h2 class="sports-title">Entrenaments</h2>
-              @if (sectionCount() > 0) {
-                <span class="section-count-badge">{{ sectionCount() }}</span>
-              }
-              <span class="material-symbols-outlined section-chevron"
-                    [class.rotated]="gymCollapsed()">expand_more</span>
-            </div>
-            <div class="section-body" [class.collapsed]="gymCollapsed()">
-              <div class="section-body-inner">
-                <div class="sbi-content">
-                  @for (w of dateWorkouts(); track w.id) {
-                    <div class="workout-card" [style.--wc]="workoutPrimaryColor(w)" (click)="openWorkout(w.id)">
-                      <div class="wc-bar" [style.background]="workoutCardColor(w)"></div>
-                      <div class="wc-info">
-                        <span class="wc-label">
-                          {{ workoutLabel(w) }}
-                          @if (w.feeling) {
-                            <span class="wc-feeling">{{ emojiOf(w.feeling) }}</span>
-                          }
-                        </span>
-                        <div class="wc-stats">
-                          <span class="wc-stat">
-                            <span class="material-symbols-outlined">fitness_center</span>
-                            <strong>{{ w.entries.length }}</strong> exerc
-                          </span>
-                          @if (workoutSetsCount(w); as n) {
-                            <span class="wc-stat-sep">·</span>
-                            <span class="wc-stat">
-                              <span class="material-symbols-outlined">repeat</span>
-                              <strong>{{ n }}</strong> sèr
-                            </span>
-                          }
-                          @if (workoutVolumeFmt(w); as vol) {
-                            <span class="wc-stat-sep">·</span>
-                            <span class="wc-stat wc-stat--vol">
-                              <span class="material-symbols-outlined">weight</span>
-                              <strong>{{ vol }}</strong>
-                            </span>
-                          }
-                        </div>
-                      </div>
-                      <button class="wc-delete" (click)="$event.stopPropagation(); confirmDeleteWorkout(w)" title="Eliminar">
-                        <span class="material-symbols-outlined">delete</span>
-                      </button>
-                    </div>
-                  }
-
-                  <!-- Planned workouts for the selected date -->
-                  @for (plan of datePlanned(); track plan.id) {
-                    <div class="plan-card" [style.--ic]="workoutPrimaryColor(plan)" (click)="openWorkout(plan.id)">
-                      <div class="ic-bar" [style.background]="workoutPrimaryColor(plan)"></div>
-                      <div class="ic-info">
-                        <div class="ic-label">
-                          <span class="material-symbols-outlined ic-icon">{{ planIcon(plan) }}</span>
-                          {{ workoutLabel(plan) }}
-                          @if (planSourceBadge(plan.plannedSource); as badge) {
-                            <span class="pc-badge" [class]="badge.cls">{{ badge.label }}</span>
-                          }
-                        </div>
-                        <span class="ic-meta">{{ planMeta(plan) }}</span>
-                      </div>
-                      <div class="pc-actions">
-                        @if (!isSelectedFuture()) {
-                          <button class="pc-start" (click)="$event.stopPropagation(); startPlan(plan)" title="Comença">
-                            <span class="material-symbols-outlined">play_arrow</span>
-                          </button>
-                        }
-                        <button class="pc-action-btn pc-delete" (click)="$event.stopPropagation(); confirmDeleteWorkout(plan)" title="Eliminar">
-                          <span class="material-symbols-outlined">delete</span>
-                        </button>
-                      </div>
-                    </div>
-                  }
-
-                  <div class="type-grid" [class.type-grid--mt]="sectionCount() > 0"
-                       [style.grid-template-columns]="gridCols(workoutTypes.length)">
-                    @for (cat of workoutTypes; track cat.value) {
-                      <button class="type-btn"
-                        [style.--cat-color]="cat.color"
-                        [class.type-btn--done]="doneCategories().has(cat.value)"
-                        (click)="selectType(cat.value)">
-                        @if (doneCategories().has(cat.value)) {
-                          <span class="type-done-check material-symbols-outlined">check_circle</span>
-                        }
-                        <span class="material-symbols-outlined type-icon">{{ cat.icon }}</span>
-                        <span class="type-label">{{ cat.label }}</span>
-                      </button>
-                    }
-                  </div>
-                </div>
-              </div>
-            </div>
+            }
           </div>
-
-          <!-- ── Esports section ── -->
-          <div class="sports-section">
-            <div class="sports-header" (click)="sportsCollapsed.set(!sportsCollapsed())">
-              <span class="material-symbols-outlined sports-header-icon">sports_soccer</span>
-              <h2 class="sports-title">Esports</h2>
-              @if (sportsSectionCount() > 0) {
-                <span class="section-count-badge">{{ sportsSectionCount() }}</span>
-              }
-              <span class="material-symbols-outlined section-chevron"
-                    [class.rotated]="sportsCollapsed()">expand_more</span>
-            </div>
-            <div class="section-body" [class.collapsed]="sportsCollapsed()">
-              <div class="section-body-inner">
-                <div class="sbi-content">
-
-                  <!-- Planned sport sessions for the selected date -->
-                  @for (item of datePlannedSports(); track item.session.id) {
-                    <div class="plan-card" [style.--ic]="item.sport.color" (click)="openSessionLogger(item.sport)">
-                      <div class="ic-bar" [style.background]="item.sport.color"></div>
-                      <div class="ic-info">
-                        <div class="ic-label">
-                          <span class="material-symbols-outlined ic-icon">{{ item.sport.icon }}</span>
-                          {{ item.sport.name }}
-                          @if (planSourceBadge(item.session.plannedSource); as badge) {
-                            <span class="pc-badge" [class]="badge.cls">{{ badge.label }}</span>
-                          }
-                        </div>
-                        <span class="ic-meta">{{ sportPlanMeta(item.sport, item.session) }}</span>
-                      </div>
-                      <div class="pc-actions">
-                        @if (!isSelectedFuture()) {
-                          <button class="pc-start" (click)="$event.stopPropagation(); startPlannedSport(item)" title="Comença">
-                            <span class="material-symbols-outlined">play_arrow</span>
-                          </button>
-                        }
-                        <button class="pc-action-btn pc-delete" (click)="$event.stopPropagation(); deleteSportSession(item.session.id, $event)" title="Eliminar">
-                          <span class="material-symbols-outlined">delete</span>
-                        </button>
-                      </div>
-                    </div>
-                  }
-
-                  @if (sportService.sportsLoaded() && sportService.sports().length === 0 && datePlannedSports().length === 0) {
-                    <div class="es-empty">
-                      <span class="material-symbols-outlined es-empty-icon">sports_soccer</span>
-                      <span class="es-empty-msg">Afegeix els esports que practiques</span>
-                      <button class="es-empty-btn" (click)="router.navigate(['/sports-config'])">
-                        Configurar esports
-                        <span class="material-symbols-outlined">arrow_forward</span>
-                      </button>
-                    </div>
-                  }
-
-                  @if (sportService.sports().length > 0) {
-                    <div class="type-grid" [class.type-grid--mt]="datePlannedSports().length > 0"
-                         [style.grid-template-columns]="gridCols(sportService.sports().length)">
-                      @for (sport of sportService.sports(); track sport.id) {
-                        <button class="type-btn"
-                          [style.--cat-color]="sport.color"
-                          [class.type-btn--done]="sportDoneMap().has(sport.id)"
-                          (click)="openSessionLogger(sport)"
-                          [disabled]="sportToggling()">
-                          @if (sportDoneMap().has(sport.id)) {
-                            <span class="type-done-check material-symbols-outlined">check_circle</span>
-                          }
-                          <span class="material-symbols-outlined type-icon">{{ sport.icon }}</span>
-                          <span class="type-label">{{ sport.name }}</span>
-                          @if (sportDoneMap().get(sport.id)?.subtypeId; as sid) {
-                            <span class="type-sport-sub">{{ subtypeName(sport, sid) }}</span>
-                          }
-                        </button>
+        } @else if (feedDays().length === 0) {
+          <div class="empty-state">
+            <span class="material-symbols-outlined empty-icon">fitness_center</span>
+            <h2>Encara no hi ha res</h2>
+            <p>El teu primer entrenament apareixerà aquí.</p>
+          </div>
+        } @else {
+          @for (day of feedDays(); track day.date) {
+            <div class="feed-day">
+              <div class="feed-day-header">{{ feedDayLabel(day.date) }}</div>
+              @for (w of day.workouts; track w.id) {
+                <div class="workout-card" [style.--wc]="workoutPrimaryColor(w)" (click)="openWorkout(w.id)">
+                  <div class="wc-bar" [style.background]="workoutCardColor(w)"></div>
+                  <div class="wc-info">
+                    <span class="wc-label">
+                      {{ workoutLabel(w) }}
+                      @if (w.feeling) {
+                        <span class="wc-feeling">{{ emojiOf(w.feeling) }}</span>
+                      }
+                    </span>
+                    <div class="wc-stats">
+                      <span class="wc-stat">
+                        <span class="material-symbols-outlined">fitness_center</span>
+                        <strong>{{ w.entries.length }}</strong> exerc
+                      </span>
+                      @if (workoutSetsCount(w); as n) {
+                        <span class="wc-stat-sep">·</span>
+                        <span class="wc-stat">
+                          <span class="material-symbols-outlined">repeat</span>
+                          <strong>{{ n }}</strong> sèr
+                        </span>
+                      }
+                      @if (workoutVolumeFmt(w); as vol) {
+                        <span class="wc-stat-sep">·</span>
+                        <span class="wc-stat wc-stat--vol">
+                          <span class="material-symbols-outlined">weight</span>
+                          <strong>{{ vol }}</strong>
+                        </span>
                       }
                     </div>
+                  </div>
+                </div>
+              }
+              @for (item of day.sports; track item.session.id) {
+                <div class="feed-sport-row" [style.--ic]="item.sport.color">
+                  <span class="material-symbols-outlined feed-sport-icon">{{ item.sport.icon }}</span>
+                  <span class="feed-sport-name">{{ item.sport.name }}</span>
+                  @if (sportSummary(item.session, item.sport); as meta) {
+                    <span class="feed-sport-meta">{{ meta }}</span>
                   }
                 </div>
-              </div>
+              }
             </div>
-          </div>
-
-        }
-      }
-
-    </div>
-
-    <!-- ── Speed Dial FAB (dashboard only) ── -->
-    @if (!activeWorkout()) {
-    @if (speedDialOpen()) {
-      <div class="sd-backdrop" (click)="speedDialOpen.set(false)"></div>
-    }
-
-    <!-- Bottom action row: activity/suggestion card + FAB -->
-    <div class="bottom-bar">
-      @if (bottomCard(); as bc) {
-        <button class="suggestion-card" [class.sc--done]="bc.kind !== 'suggestion'"
-                [style.--sc]="bc.color" (click)="handleBottomCardClick(bc)">
-          <div class="sc-bar"></div>
-          <div class="sc-icon-wrap">
-            <span class="material-symbols-outlined sc-icon"
-                  [class.sc-icon--fill]="bc.kind !== 'suggestion'">{{ bc.icon }}</span>
-          </div>
-          <div class="sc-info">
-            <span class="sc-eyebrow">{{ bc.kind === 'suggestion' ? 'Avui toca' : bc.kind === 'plan' ? 'Pla pendent' : 'Fet avui' }}</span>
-            <span class="sc-label">{{ bc.label }}</span>
-            @if (bc.kind === 'suggestion' && bc.meta) {
-              <span class="sc-reason">{{ bc.meta }}</span>
-            }
-          </div>
-          @if (bc.kind === 'suggestion') {
-            <span class="material-symbols-outlined sc-chevron">chevron_right</span>
-          } @else if (bc.meta) {
-            <span class="sc-stats">{{ bc.meta }}</span>
           }
-        </button>
+
+          <div #feedSentinel class="scroll-sentinel"></div>
+          @if (feedLoadingMore()) {
+            <div class="loading-state">
+              <span class="material-symbols-outlined spin">sync</span>
+            </div>
+          }
+        }
       }
 
-      <div class="sd-container">
-        @if (speedDialOpen()) {
-          <div class="sd-items">
-            @for (sport of sportService.sports(); track sport.id; let i = $index) {
-              <div class="sd-item" [style.--sd-i]="i">
-                <span class="sd-label">{{ sport.name }}</span>
-                <button class="sd-btn" [style.background]="sport.color"
-                  (click)="speedDialPickSport(sport)">
-                  <span class="material-symbols-outlined">{{ sport.icon }}</span>
-                </button>
-              </div>
-            }
-            @for (cat of workoutTypes; track cat.value; let i = $index) {
-              <div class="sd-item" [style.--sd-i]="sportService.sports().length + i">
-                <span class="sd-label">{{ cat.label }}</span>
-                <button class="sd-btn" [style.background]="cat.color"
-                  (click)="speedDialPickCategory(cat.value)">
-                  <span class="material-symbols-outlined">{{ cat.icon }}</span>
-                </button>
-              </div>
-            }
-          </div>
-        }
-        <button class="sd-fab" [class.sd-fab--open]="speedDialOpen()"
-          (click)="toggleSpeedDial()"
-          aria-label="Nou entrenament" [attr.aria-expanded]="speedDialOpen()">
-          <span class="material-symbols-outlined">add</span>
-        </button>
-      </div>
     </div>
 
-    } <!-- /!activeWorkout() -->
+    <!-- ── "Nou entrenament" chooser bottom sheet ── -->
+    @if (chooserOpen()) {
+      <div class="tp-backdrop" (click)="chooserOpen.set(false)"></div>
+      <div class="tp-sheet">
+        <div class="tp-header">
+          <span class="tp-title">Nou entrenament</span>
+          <button class="tp-close" (click)="chooserOpen.set(false)" aria-label="Tancar">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+
+        <div class="chip-group-label">Gym</div>
+        <div class="type-grid" [style.grid-template-columns]="gridCols(workoutTypes.length)">
+          @for (cat of workoutTypes; track cat.value) {
+            <button class="type-btn"
+              [style.--cat-color]="cat.color"
+              [class.type-btn--done]="doneCategories().has(cat.value)"
+              (click)="chooserOpen.set(false); selectType(cat.value)">
+              @if (doneCategories().has(cat.value)) {
+                <span class="type-done-check material-symbols-outlined">check_circle</span>
+              }
+              <span class="material-symbols-outlined type-icon">{{ cat.icon }}</span>
+              <span class="type-label">{{ cat.label }}</span>
+            </button>
+          }
+        </div>
+
+        @if (sportService.sports().length > 0) {
+          <div class="chip-group-label chip-group-label--mt">Esport</div>
+          <div class="type-grid" [style.grid-template-columns]="gridCols(sportService.sports().length)">
+            @for (sport of sportService.sports(); track sport.id) {
+              <button class="type-btn"
+                [style.--cat-color]="sport.color"
+                [class.type-btn--done]="sportDoneMap().has(sport.id)"
+                (click)="chooserOpen.set(false); openSessionLogger(sport)"
+                [disabled]="sportToggling()">
+                @if (sportDoneMap().has(sport.id)) {
+                  <span class="type-done-check material-symbols-outlined">check_circle</span>
+                }
+                <span class="material-symbols-outlined type-icon">{{ sport.icon }}</span>
+                <span class="type-label">{{ sport.name }}</span>
+                @if (sportDoneMap().get(sport.id)?.subtypeId; as sid) {
+                  <span class="type-sport-sub">{{ subtypeName(sport, sid) }}</span>
+                }
+              </button>
+            }
+          </div>
+        } @else {
+          <div class="es-empty">
+            <span class="material-symbols-outlined es-empty-icon">sports_soccer</span>
+            <span class="es-empty-msg">Afegeix els esports que practiques</span>
+            <button class="es-empty-btn" (click)="chooserOpen.set(false); router.navigate(['/sports-config'])">
+              Configurar esports
+              <span class="material-symbols-outlined">arrow_forward</span>
+            </button>
+          </div>
+        }
+      </div>
+    }
 
     <!-- ── Template picker bottom sheet ── -->
     @if (pickerCat()) {
@@ -842,101 +667,18 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       &:active { opacity: 0.7; }
     }
 
-    /* ── Calendar wrapper ── */
-    .calendar-wrap {
-      margin: 0 16px 12px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-      border-radius: 16px; overflow: hidden;
-      background: var(--c-card);
-    }
-
-    /* ── "Set up a routine" hint ── */
-    .routine-hint-card {
-      position: relative;
-      margin: 0 16px 12px;
-      background: var(--c-card);
-      border-radius: 16px;
-      border: 1.5px solid rgba(var(--c-brand-rgb), 0.2);
-      box-shadow: 0 2px 10px var(--c-shadow);
-      overflow: hidden;
-      animation: rh-in 0.25s cubic-bezier(0.34, 1.4, 0.64, 1) both;
-    }
-    @keyframes rh-in {
-      from { opacity: 0; transform: translateY(-6px) scale(0.98); }
-      to   { opacity: 1; transform: translateY(0)    scale(1); }
-    }
-    .rh-body {
-      display: flex; align-items: center; gap: 12px; width: 100%;
-      padding: 14px 40px 14px 14px;
-      border: none; background: transparent; text-align: left;
-      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
-      &:hover { background: rgba(var(--c-brand-rgb), 0.05); }
-    }
-    .rh-icon {
-      flex-shrink: 0; font-size: 22px; color: var(--c-brand);
-      font-variation-settings: 'FILL' 1;
-    }
-    .rh-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-    .rh-title { font-size: 13.5px; font-weight: 700; color: var(--c-text); }
-    .rh-desc  { font-size: 12px; color: var(--c-text-3); line-height: 1.4; }
-    .rh-arrow { flex-shrink: 0; font-size: 20px; color: var(--c-text-3); }
-    .rh-dismiss {
-      position: absolute; top: 8px; right: 8px; z-index: 1;
-      width: 28px; height: 28px; border-radius: 50%; border: none;
-      background: var(--c-subtle); color: var(--c-text-3);
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; touch-action: manipulation; transition: background 0.15s, color 0.15s;
-      .material-symbols-outlined { font-size: 15px; }
-      &:hover { background: rgba(239,83,80,0.1); color: #ef5350; }
-    }
-
-    /* ── "Editar planificació" subsection, right-aligned, when the viewed
-       week already has an active plan ── */
-    .cw-edit-row {
-      display: flex; justify-content: flex-end;
-      padding: 8px 10px; border-top: 1px solid var(--c-border-2);
-      background: var(--c-card);
-    }
-
-    /* ── Planificació section (below the calendar + goals strip) ── */
-    .card-section {
-      margin: 0 16px 12px;
-      padding: 14px 14px 16px;
-      background: var(--c-card);
-      border-radius: 18px;
-      box-shadow: 0 2px 10px var(--c-shadow);
-    }
-    .section-header { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
-    .section-icon  { font-size: 18px; color: var(--c-text-3); font-variation-settings: 'FILL' 0, 'wght' 300; }
-    .section-title { margin: 0; flex: 1; font-size: 14px; font-weight: 700; color: var(--c-text-2); letter-spacing: 0.2px; }
-    .plan-desc { margin: 0 0 12px; font-size: 12.5px; color: var(--c-text-3); line-height: 1.4; }
-    .plan-actions { display: flex; justify-content: flex-end; }
-
-    /* ── Shared format for "Planificar aquesta setmana" and "Editar
-       planificació": content-sized, right-aligned, never full-width ── */
-    .week-action-btn {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 10px 16px; border: none; border-radius: 12px;
+    /* ── Primary CTA ── */
+    .start-cta {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: calc(100% - 32px); margin: 4px 16px 12px;
+      padding: 15px; border: none; border-radius: 16px;
       background: var(--c-brand); color: white;
-      font-size: 13.5px; font-weight: 700; cursor: pointer;
-      transition: background 0.15s; touch-action: manipulation;
-      .material-symbols-outlined { font-size: 18px; }
+      font-size: 15px; font-weight: 700; cursor: pointer;
+      box-shadow: 0 4px 16px rgba(var(--c-brand-rgb), 0.32);
+      transition: background 0.15s, transform 0.1s; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 22px; }
       &:hover { background: var(--c-brand-dk); }
-    }
-
-    /* ── Planning mode pill (shown under calendar for future dates) ──
-     * Tinted with the pending plan's category color when there is one
-     * (--pc), falling back to the brand color otherwise. */
-    .plan-pill {
-      display: flex; align-items: center; gap: 6px;
-      margin: -2px 16px 12px; padding: 8px 14px;
-      background: color-mix(in srgb, var(--pc, var(--c-brand)) 8%, var(--c-card));
-      border: 1px solid color-mix(in srgb, var(--pc, var(--c-brand)) 30%, var(--c-border-2));
-      border-radius: 12px;
-      font-size: 12.5px; font-weight: 700; color: var(--pc, var(--c-brand));
-      text-transform: capitalize;
-      animation: pill-in 0.2s cubic-bezier(0.34, 1.4, 0.64, 1) both;
-      .material-symbols-outlined { font-size: 17px; font-variation-settings: 'FILL' 1; }
+      &:active { transform: scale(0.98); }
     }
 
     /* ── Active workout floating header (reuses .workout-card) ── */
@@ -1099,19 +841,19 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       to   { opacity: 1; transform: none; }
     }
 
-    /* ── "Avui toca" suggestion card (flex child in .bottom-bar, aligned with FAB) ── */
-    .suggestion-card {
-      flex: 1; min-width: 0;
+    /* ── "Avui toca" / today status card (below the CTA) ── */
+    .today-card {
+      width: calc(100% - 32px); margin: 0 16px 12px;
       display: flex; align-items: center; gap: 0;
       height: 56px; border-radius: 14px; padding: 0;
       border: 1.5px solid color-mix(in srgb, var(--sc) 35%, var(--c-border-2));
       background: color-mix(in srgb, var(--sc) 8%, var(--c-card));
-      box-shadow: 0 3px 14px var(--c-shadow-md);
+      box-shadow: 0 2px 10px var(--c-shadow);
       cursor: pointer; touch-action: manipulation; overflow: hidden;
       animation: pill-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both;
       transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s;
       &:hover {
-        box-shadow: 0 4px 18px var(--c-shadow-md);
+        box-shadow: 0 3px 14px var(--c-shadow-md);
         border-color: color-mix(in srgb, var(--sc) 55%, var(--c-border));
         background: color-mix(in srgb, var(--sc) 13%, var(--c-card));
       }
@@ -1156,9 +898,15 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       margin-right: 12px; flex-shrink: 0;
     }
     .sc-icon--fill { font-variation-settings: 'FILL' 1; }
-    .sc--done .sc-eyebrow { color: color-mix(in srgb, var(--sc) 80%, var(--c-text-3)); }
+    .today-card--done .sc-eyebrow { color: color-mix(in srgb, var(--sc) 80%, var(--c-text-3)); }
 
-    /* ── Type grid (inside workout-section) ── */
+    /* ── Type grid (inside the "nou entrenament" chooser) ── */
+    .chip-group-label {
+      font-size: 11px; font-weight: 700; color: var(--c-text-3);
+      text-transform: uppercase; letter-spacing: 0.3px;
+      margin: 0 0 8px;
+      &.chip-group-label--mt { margin-top: 16px; }
+    }
     .es-empty {
       display: flex; flex-direction: column; align-items: center; gap: 10px;
       padding: 24px 16px; text-align: center;
@@ -1207,84 +955,35 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       font-variation-settings: 'FILL' 1;
     }
 
-    /* ── Speed Dial FAB ── */
-    .sd-backdrop { position: fixed; inset: 0; z-index: 88; }
-
-    /* ── Bottom action bar: holds the suggestion card + speed dial FAB ── */
-    .bottom-bar {
-      position: fixed;
-      left: 16px; right: 20px;
-      bottom: calc(var(--nav-height) + 16px);
-      z-index: 89;
-      display: flex; align-items: flex-end; gap: 12px;
-      pointer-events: none;
-    }
-    .bottom-bar > * { pointer-events: auto; }
-
-    .sd-container {
-      flex-shrink: 0; margin-left: auto;
-      position: relative; width: 56px;
-    }
-    .sd-items {
-      position: absolute; bottom: calc(100% + 8px); right: 0;
-      display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
-      animation: sd-items-in 0.2s cubic-bezier(0.34, 1.4, 0.64, 1) both;
-    }
-    @keyframes sd-items-in {
-      from { opacity: 0; transform: scale(0.88) translateY(12px); }
-      to   { opacity: 1; transform: none; }
-    }
-    .sd-item {
-      display: flex; align-items: center; gap: 10px;
-      animation: sd-item-in 0.18s calc(var(--sd-i, 0) * 28ms) both;
-    }
-    @keyframes sd-item-in {
-      from { opacity: 0; transform: translateX(10px); }
-      to   { opacity: 1; transform: none; }
-    }
-    .sd-label {
-      background: var(--c-card); color: var(--c-text);
-      padding: 6px 12px; border-radius: 20px;
-      font-size: 13px; font-weight: 600;
-      box-shadow: 0 2px 8px var(--c-shadow); white-space: nowrap;
-    }
-    .sd-btn {
-      width: 46px; height: 46px; border-radius: 50%; border: none; color: white;
-      cursor: pointer; touch-action: manipulation;
-      display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 3px 12px rgba(0,0,0,0.22);
-      transition: transform 0.15s;
-      .material-symbols-outlined { font-size: 22px; font-variation-settings: 'FILL' 1; }
-      &:hover  { transform: scale(1.08); }
-      &:active { transform: scale(0.93); }
-    }
-    .sd-fab {
-      width: 56px; height: 56px; border-radius: 50%; border: none;
-      background: var(--c-brand); color: white;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; touch-action: manipulation;
-      box-shadow: 0 4px 16px rgba(var(--c-brand-rgb), 0.4), 0 1px 4px var(--c-shadow);
-      transition: background 0.15s, transform 0.15s;
-      .material-symbols-outlined { font-size: 28px; transition: transform 0.22s ease; }
-      &:hover { background: var(--c-brand-dk); transform: scale(1.06); }
-      &:active { transform: scale(0.94); }
-      &.sd-fab--open .material-symbols-outlined { transform: rotate(45deg); }
-    }
-
     /* ── Loading ── */
     .loading-state {
       display: flex; justify-content: center; padding: 48px;
       .material-symbols-outlined { font-size: 32px; color: var(--c-border); }
     }
 
-    /* ── Workout section (dashboard) ── */
-    .workout-section {
-      margin: 12px 16px 0;
-      padding: 14px;
-      background: var(--c-card);
-      border-radius: 18px;
-      box-shadow: 0 2px 10px var(--c-shadow);
+    /* ── Activity feed ── */
+    .feed-header {
+      display: flex; align-items: center; gap: 7px;
+      margin: 8px 16px 10px;
     }
+    .feed-header-icon { font-size: 18px; color: var(--c-text-3); font-variation-settings: 'FILL' 0, 'wght' 300; }
+    .feed-title { margin: 0; font-size: 14px; font-weight: 700; color: var(--c-text-2); letter-spacing: 0.2px; }
+    .feed-day { margin: 0 16px 14px; }
+    .feed-day-header {
+      font-size: 11px; font-weight: 700; color: var(--c-text-3);
+      text-transform: uppercase; letter-spacing: 0.3px;
+      margin-bottom: 6px;
+    }
+    .feed-sport-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 12px; margin-bottom: 6px;
+      border: 1.5px solid var(--c-border-2); border-radius: 14px;
+      background: color-mix(in srgb, var(--ic, var(--c-card)) 5%, var(--c-card));
+    }
+    .feed-sport-icon { font-size: 17px; color: var(--ic, var(--c-text-2)); font-variation-settings: 'FILL' 1; }
+    .feed-sport-name { font-size: 13px; font-weight: 700; color: var(--c-text); flex: 1; min-width: 0; }
+    .feed-sport-meta { font-size: 11px; color: var(--c-text-3); }
+    .feed-sk { margin: 0 16px; display: flex; flex-direction: column; gap: 8px; }
 
     /* ── Workout summary cards ── */
     .workout-card {
@@ -1405,98 +1104,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       &:hover { background: var(--c-subtle); }
     }
 
-    /* ── Sports section ── */
-    /* ── Planned workout card (dashed border) ── */
-    .plan-card {
-      display: flex; align-items: center; margin-bottom: 8px;
-      border: 1.5px dashed color-mix(in srgb, var(--ic, var(--c-brand)) 55%, var(--c-border-2));
-      border-radius: 14px;
-      background: color-mix(in srgb, var(--ic, var(--c-brand)) 5%, var(--c-card));
-      overflow: hidden; cursor: pointer; touch-action: manipulation;
-      transition: box-shadow 0.15s, background 0.15s;
-      &:hover { box-shadow: 0 2px 8px var(--c-shadow); background: color-mix(in srgb, var(--ic, var(--c-brand)) 9%, var(--c-card)); }
-    }
-    .ic-bar { width: 5px; align-self: stretch; flex-shrink: 0; }
-    .ic-info {
-      flex: 1; min-width: 0; padding: 10px 10px;
-      display: flex; flex-direction: column; gap: 2px;
-    }
-    .ic-label {
-      font-size: 13px; font-weight: 700; color: var(--c-text);
-      display: flex; align-items: center; gap: 5px;
-    }
-    .ic-icon { font-size: 15px; font-variation-settings: 'FILL' 1, 'wght' 400; color: var(--ic, var(--c-brand)); }
-    .ic-meta { font-size: 11px; color: var(--c-text-3); }
-    .pc-badge {
-      font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 8px; flex-shrink: 0;
-      background: rgba(var(--c-brand-rgb), 0.12); color: var(--c-brand);
-      &.pc-badge--trainer { background: rgba(255,152,0,0.12); color: #ef6c00; }
-      &.pc-badge--routine { background: rgba(var(--c-brand-rgb), 0.12); color: var(--c-brand); }
-      &.pc-badge--manual  { background: rgba(142,36,170,0.12); color: #8e24aa; }
-    }
-    .pc-actions { display: flex; align-items: center; gap: 6px; padding: 0 10px 0 0; flex-shrink: 0; }
-    .pc-start {
-      width: 34px; height: 34px; border: none; border-radius: 10px;
-      background: var(--c-brand); color: white; flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
-      .material-symbols-outlined { font-size: 18px; }
-      &:hover { background: var(--c-brand-dk); }
-    }
-    .pc-action-btn {
-      width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
-      border: 1.5px solid var(--c-border-2); background: transparent;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; touch-action: manipulation; color: var(--c-text-3);
-      .material-symbols-outlined { font-size: 15px; }
-      transition: all 0.15s;
-      &:hover { border-color: var(--c-border); color: var(--c-text-2); }
-    }
-    .pc-delete:hover { border-color: rgba(239,83,80,0.35) !important; color: #ef5350 !important; }
-
-    .sports-section {
-      margin: 12px 16px 0;
-      padding: 14px;
-      background: var(--c-card);
-      border-radius: 18px;
-      box-shadow: 0 2px 10px var(--c-shadow);
-    }
-
-    .sports-header {
-      display: flex; align-items: center; gap: 7px;
-      margin: -4px -4px 0; padding: 4px 4px;
-      border-radius: 10px;
-      cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s;
-      &:hover  { background: var(--c-hover); }
-      &:active { background: var(--c-border-2); }
-    }
-    .sports-header-icon {
-      font-size: 18px; color: var(--c-text-2);
-      font-variation-settings: 'FILL' 0, 'wght' 300;
-    }
-    .sports-title {
-      margin: 0; flex: 1; font-size: 14px; font-weight: 700;
-      color: var(--c-text-2); letter-spacing: 0.2px;
-    }
-    .section-count-badge {
-      font-size: 11px; font-weight: 700; color: var(--c-brand);
-      background: rgba(var(--c-brand-rgb), 0.1);
-      border-radius: 10px; padding: 2px 8px; flex-shrink: 0;
-    }
-    .section-chevron {
-      font-size: 18px; color: var(--c-text-3); flex-shrink: 0;
-      transition: transform 0.22s ease;
-      &.rotated { transform: rotate(-90deg); }
-    }
-    .section-body {
-      display: grid; grid-template-rows: 1fr;
-      transition: grid-template-rows 0.22s ease;
-    }
-    .section-body.collapsed { grid-template-rows: 0fr; }
-    .section-body-inner { overflow: hidden; }
-    .section-body-inner .sbi-content { padding-top: 12px; }
-
     .type-sport-sub {
       font-size: 9px; font-weight: 700; color: var(--cat-color);
       text-align: center; line-height: 1; letter-spacing: 0.1px;
@@ -1514,19 +1121,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       animation: sk-shimmer 1.5s ease-in-out infinite;
       border-radius: 8px;
     }
-    .sk-workout-section, .sk-sports-section {
-      margin: 12px 16px 0;
-      padding: 14px;
-      background: var(--c-card);
-      border-radius: 18px;
-      box-shadow: 0 2px 10px var(--c-shadow);
-    }
-    .sk-section-header {
-      display: flex; align-items: center; gap: 7px;
-      margin-bottom: 14px;
-    }
-    .sk-icon-ph  { width: 18px; height: 18px; border-radius: 4px; flex-shrink: 0; }
-    .sk-title-ph { width: 90px; height: 13px; }
     .sk-card-ph {
       display: flex; align-items: stretch;
       border: 1.5px solid var(--c-border-2); border-radius: 14px;
@@ -1540,8 +1134,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .sk-line      { height: 12px; }
     .sk-line--55  { width: 55%; }
     .sk-line--30  { width: 30%; height: 10px; }
-    .sk-btn-grid  { display: flex; gap: 10px; }
-    .sk-btn-ph    { flex: 1; height: 74px; border-radius: 16px; }
 
     /* ── Trainer proposal card ── */
     .proposal-card {
@@ -1724,7 +1316,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
   `],
 })
-export class TrainComponent {
+export class TrainComponent implements OnDestroy {
   readonly workoutService  = inject(WorkoutService);
   readonly sportService    = inject(SportService);
   readonly offlineService  = inject(OfflineService);
@@ -1742,13 +1334,9 @@ export class TrainComponent {
   @ViewChild('editor') editor?: WorkoutEditorComponent;
 
   readonly selectedDate    = signal<string>(TODAY());
-  /** Monday of whichever week the calendar is currently showing — kept in
-   *  sync via the calendar's `weekChanged` output, regardless of view mode
-   *  or how the user got there (day click vs prev/next navigation). */
-  readonly viewedWeekMonday = signal<string>(mondayOf(TODAY()));
   readonly sportToggling   = signal(false);
   readonly workoutTypes    = WORKOUT_TYPES;
-  readonly speedDialOpen   = signal(false);
+  readonly chooserOpen     = signal(false);
   readonly workoutMenuOpen = signal(false);
   /** Off by default — exercises can only be dragged to reorder once the
    *  user turns this on from the workout's three-dot menu. */
@@ -1759,8 +1347,6 @@ export class TrainComponent {
   readonly saveTemplateOpen = signal(false);
   saveTemplateName = '';
   readonly activeWorkoutId = signal<string | null>(null);
-  readonly gymCollapsed    = signal(false);
-  readonly sportsCollapsed = signal(false);
   readonly loggerSport     = signal<Sport | null>(null);
   readonly loggerSessionId = signal<string | null>(null);
   readonly loggerDuration  = signal<number>(60);
@@ -1859,44 +1445,6 @@ export class TrainComponent {
 
   readonly isSelectedFuture = computed(() => this.selectedDate() > TODAY());
 
-  readonly viewedWeekIsFuture = computed(() => this.viewedWeekMonday() > mondayOf(TODAY()));
-
-  /** Whether the week the calendar is currently showing already has at
-   *  least one planned (not-yet-done) workout or sport session, from any
-   *  source — decides whether Train offers to plan the week or to edit
-   *  what's already there. */
-  readonly viewedWeekHasPlan = computed(() => {
-    const monday = this.viewedWeekMonday();
-    for (let i = 0; i < 7; i++) {
-      const date = addDays(monday, i);
-      if (this.workoutService.getPlannedForDate(date).length > 0) return true;
-      if (this.sportService.getPlannedSportSessionsForDate(date).length > 0) return true;
-    }
-    return false;
-  });
-
-  /** Opens once per ~7 days (per device) so the "set up a routine" hint
-   *  below isn't shown on every single visit — not tied to whether it's
-   *  actually eligible to show (that's `showRoutineHint`), just throttles
-   *  how often we're willing to re-offer it. */
-  private readonly _routineHintGateOpen = signal(false);
-
-  /** Suggests setting up a recurring routine — only while none is set,
-   *  the user hasn't dismissed it for good, and the time gate is open. */
-  readonly showRoutineHint = computed(() =>
-    this._routineHintGateOpen() &&
-    !this.settingsService.weeklyPlan().recurring &&
-    !this.settingsService.settings().routineHintDismissed
-  );
-
-  readonly datePlanned = computed(() =>
-    this.workoutService.getPlannedForDate(this.selectedDate())
-  );
-
-  readonly sectionCount = computed(() =>
-    this.dateWorkouts().length + this.datePlanned().length
-  );
-
   readonly pagePaddingBottom = computed(() =>
     '88px' // clear the FAB / bottom-bar in both modes
   );
@@ -1904,51 +1452,6 @@ export class TrainComponent {
   readonly dateSportSessions = computed(() =>
     this.sportService.getSportSessionsForDate(this.selectedDate())
   );
-
-  readonly datePlannedSports = computed(() =>
-    this.sportService.getPlannedSportSessionsForDate(this.selectedDate())
-  );
-
-  readonly sportsSectionCount = computed(() =>
-    this.dateSportSessions().length + this.datePlannedSports().length
-  );
-
-  planPillLabel(): string {
-    const d = new Date(this.selectedDate() + 'T12:00:00');
-    const label = d.toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'long' });
-    return label.charAt(0).toUpperCase() + label.slice(1);
-  }
-
-  /** Tints the "Planificant" pill with the pending plan's category color
-   *  once one exists for the selected date; brand color otherwise. */
-  readonly planPillColor = computed(() => {
-    const planned = this.datePlanned();
-    return planned.length ? this.workoutPrimaryColor(planned[0]) : this._brand();
-  });
-
-  sportPlanMeta(sport: Sport, session: SportSession): string {
-    const parts: string[] = [];
-    if (session.subtypeId) {
-      const sub = sport.subtypes.find(s => s.id === session.subtypeId);
-      if (sub) parts.push(sub.name);
-    }
-    if (session.duration) parts.push(`${session.duration}min`);
-    return parts.length ? parts.join(' · ') : 'Sessió planificada';
-  }
-
-  async startPlannedSport(item: { sport: Sport; session: SportSession }): Promise<void> {
-    try {
-      await this.sportService.startPlannedSession(item.session.id, this.selectedDate());
-      this.openSessionLogger(item.sport);
-    } catch {
-      this.feedback.error('Error en iniciar el pla', 2500);
-    }
-  }
-
-  readonly pendingSports = computed(() => {
-    const doneIds = new Set(this.dateSportSessions().map(x => x.sport.id));
-    return this.sportService.sports().filter(s => !doneIds.has(s.id));
-  });
 
   readonly sportDoneMap = computed(() => {
     const map = new Map<string, { id: string; subtypeId?: string }>();
@@ -1962,18 +1465,6 @@ export class TrainComponent {
     return sport.subtypes.find(s => s.id === subtypeId)?.name ?? '';
   }
 
-  async deleteSportSession(sessionId: string, ev: Event): Promise<void> {
-    ev.stopPropagation();
-    this.sportToggling.set(true);
-    try {
-      await this.sportService.deleteSession(sessionId, this.selectedDate());
-    } catch {
-      this.feedback.error('Error en eliminar', 2500);
-    } finally {
-      this.sportToggling.set(false);
-    }
-  }
-
   sportSummary(sub: { duration?: number; feeling?: FeelingLevel; subtypeId?: string }, sport: Sport): string {
     const parts: string[] = [];
     if (sub.subtypeId) {
@@ -1985,10 +1476,13 @@ export class TrainComponent {
     return parts.join(' · ');
   }
 
+  /** Searches across every already-loaded month (not just `selectedDate`),
+   *  since the feed lets you open a workout from any past day the month
+   *  cache already covers. */
   readonly activeWorkout = computed((): Workout | null => {
     const id = this.activeWorkoutId();
     if (!id) return null;
-    return this.workoutService.getWorkoutsForDate(this.selectedDate()).find(w => w.id === id) ?? null;
+    return this.workoutService.workouts().find(w => w.id === id) ?? null;
   });
 
   readonly activeWorkoutCategories = computed((): string[] => {
@@ -2098,23 +1592,6 @@ export class TrainComponent {
   constructor() {
     this.sportService.ensureLoaded();
 
-    // Open the routine-hint time gate once settings are loaded, at most
-    // once every ~7 days per device — independent of whether it'll
-    // actually be shown (see showRoutineHint).
-    effect(() => {
-      if (this.settingsService.loaded()) {
-        untracked(() => this._openRoutineHintGateIfDue());
-      }
-    });
-
-    // Record "shown now" the moment the hint actually becomes visible, so
-    // the next time gate opens ~7 days from here, not from page load.
-    effect(() => {
-      if (this.showRoutineHint()) {
-        untracked(() => this._recordRoutineHintShown());
-      }
-    });
-
     effect(() => {
       const date = this.selectedDate();
       const [yearStr, monthStr] = date.split('-');
@@ -2139,6 +1616,80 @@ export class TrainComponent {
         this._dismissedDates = new Set(list);
       } catch { }
     });
+
+    // Re-attach the infinite-scroll observer whenever the feed's sentinel
+    // element (re)appears — e.g. after the empty/skeleton state resolves.
+    effect(() => {
+      const el = this.feedSentinelRef()?.nativeElement;
+      this._feedObserver?.disconnect();
+      if (!el) return;
+      this._feedObserver = new IntersectionObserver(
+        entries => { if (entries[0].isIntersecting && !this.feedLoadingMore()) this.loadMoreFeedMonths(); },
+        { rootMargin: '200px' }
+      );
+      this._feedObserver.observe(el);
+    });
+  }
+
+  ngOnDestroy(): void {
+    this._feedObserver?.disconnect();
+  }
+
+  // ── Activity feed (grouped by day, infinite scroll backwards in time) ────
+
+  /** How many months before the current one are loaded — 0 means only the
+   *  current month (already loaded via the selectedDate effect above). */
+  private readonly feedMonthsBack = signal(0);
+  readonly feedLoadingMore = signal(false);
+  readonly feedSentinelRef = viewChild<ElementRef<HTMLElement>>('feedSentinel');
+  private _feedObserver: IntersectionObserver | null = null;
+
+  readonly feedDays = computed(() => {
+    const monthsBack = this.feedMonthsBack();
+    const today      = new Date();
+    const earliest   = new Date(today.getFullYear(), today.getMonth() - monthsBack, 1);
+    const days: { date: string; workouts: Workout[]; sports: { sport: Sport; session: SportSession }[] }[] = [];
+
+    const cursor = new Date(today);
+    while (cursor >= earliest) {
+      const dateStr  = cursor.toISOString().split('T')[0];
+      const workouts = this.workoutService.getDoneWorkoutsForDate(dateStr);
+      const sports   = this.sportService.getSportSessionsForDate(dateStr);
+      if (workouts.length > 0 || sports.length > 0) days.push({ date: dateStr, workouts, sports });
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    return days;
+  });
+
+  async loadMoreFeedMonths(): Promise<void> {
+    if (this.feedLoadingMore()) return;
+    this.feedLoadingMore.set(true);
+    try {
+      const next  = this.feedMonthsBack() + 1;
+      const today = new Date();
+      const target = new Date(today.getFullYear(), today.getMonth() - next, 1);
+      await Promise.all([
+        this.workoutService.ensureMonthLoaded(target.getFullYear(), target.getMonth()),
+        this.sportService.ensureMonthLoaded(target.getFullYear(), target.getMonth()),
+      ]);
+      this.feedMonthsBack.set(next);
+    } finally {
+      this.feedLoadingMore.set(false);
+    }
+  }
+
+  feedDayLabel(date: string): string {
+    const today = TODAY();
+    if (date === today) return 'Avui';
+    const yesterday = (() => {
+      const d = new Date(today + 'T00:00:00');
+      d.setDate(d.getDate() - 1);
+      return d.toISOString().split('T')[0];
+    })();
+    if (date === yesterday) return 'Ahir';
+    const label = new Date(date + 'T12:00:00')
+      .toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+    return label.charAt(0).toUpperCase() + label.slice(1);
   }
 
   // ── Trainer proposal ─────────────────────────────────────────────────────
@@ -2167,37 +1718,6 @@ export class TrainComponent {
     } catch { }
   }
 
-  // ── Plan the currently-viewed week ────────────────────────────────────────
-
-  goPlanWeek(): void {
-    this.router.navigate(['/train/planner'], { queryParams: { week: this.viewedWeekMonday() } });
-  }
-
-  // ── "Set up a routine" hint ───────────────────────────────────────────────
-
-  private _routineHintKey(): string {
-    return `gymgoli_routine_hint_shown_${this.auth?.uid() ?? ''}`;
-  }
-
-  private _openRoutineHintGateIfDue(): void {
-    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
-    let last = 0;
-    try { last = Number(localStorage.getItem(this._routineHintKey()) ?? '0'); } catch { }
-    if (Date.now() - last >= sevenDaysMs) this._routineHintGateOpen.set(true);
-  }
-
-  private _recordRoutineHintShown(): void {
-    try { localStorage.setItem(this._routineHintKey(), String(Date.now())); } catch { }
-  }
-
-  goSetRoutine(): void {
-    this.router.navigate(['/train/planner']);
-  }
-
-  dismissRoutineHint(): void {
-    this.settingsService.update({ routineHintDismissed: true });
-  }
-
   // ── Workout navigation ────────────────────────────────────────────────────
 
   openWorkout(id: string): void {
@@ -2214,35 +1734,6 @@ export class TrainComponent {
     const d = new Date(w.date + 'T12:00:00');
     const label = d.toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'long' });
     return label.charAt(0).toUpperCase() + label.slice(1);
-  }
-
-  async startPlan(w: Workout): Promise<void> {
-    try {
-      await this.workoutService.startPlannedWorkout(w.id);
-      this.openWorkout(w.id);
-    } catch {
-      this.feedback.error('Error en iniciar el pla', 2500);
-    }
-  }
-
-  planIcon(w: Workout): string {
-    const cats = workoutCategories(w);
-    return cats.length ? (CATEGORY_ICONS[cats[0] as ExerciseCategory] ?? 'fitness_center') : 'fitness_center';
-  }
-
-  /** Lets the user tell at a glance whether a planned item came from their
-   *  fixed routine, their own ad-hoc planning, or a trainer proposal. */
-  planSourceBadge(source: PlannedSource | undefined): { label: string; cls: string } | null {
-    if (source === 'trainer') return { label: 'Entrenador', cls: 'pc-badge--trainer' };
-    if (source === 'routine') return { label: 'Rutina', cls: 'pc-badge--routine' };
-    if (source === 'manual' || source === 'self') return { label: 'Planificació pròpia', cls: 'pc-badge--manual' };
-    return null;
-  }
-
-  planMeta(w: Workout): string {
-    if (!w.entries.length) return 'Pla buit';
-    const names = w.entries.slice(0, 2).map(e => e.exerciseName).join(', ');
-    return w.entries.length > 2 ? `${names} +${w.entries.length - 2}` : names;
   }
 
   topbarDateLabel(w: Workout): string {
@@ -2384,19 +1875,6 @@ export class TrainComponent {
   handleSuggestionClick(s: TodaySuggestion): void {
     if (s.type === 'gym') this.selectType(s.category);
     else this.openSessionLogger(s.sport);
-  }
-
-  toggleSpeedDial(): void { this.speedDialOpen.set(!this.speedDialOpen()); }
-
-  speedDialPickCategory(cat: ExerciseCategory): void {
-    this.speedDialOpen.set(false);
-    if (this.activeWorkout()) this.openPicker(cat);
-    else this.selectType(cat);
-  }
-
-  speedDialPickSport(sport: Sport): void {
-    this.speedDialOpen.set(false);
-    this.openSessionLogger(sport);
   }
 
   selectType(category: ExerciseCategory): void {

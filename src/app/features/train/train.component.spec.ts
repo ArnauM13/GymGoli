@@ -22,9 +22,6 @@ import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../../core/models/weekly-plan.mod
 import { UserSettings, DEFAULT_USER_SETTINGS } from '../../core/models/user-settings.model';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
-import { mondayOf } from '../../shared/utils/calendar-utils';
-
-const ROUTINE_HINT_KEY = 'gymgoli_routine_hint_shown_user-1';
 
 const TODAY = new Date().toISOString().split('T')[0];
 
@@ -44,7 +41,6 @@ describe('TrainComponent', () => {
   let updateSettings: jasmine.Spy;
 
   beforeEach(async () => {
-    localStorage.removeItem(ROUTINE_HINT_KEY);
     forceOffline = signal(false);
     weeklyPlanSignal = signal<WeeklyPlan>(EMPTY_WEEKLY_PLAN);
     settingsSignal    = signal<UserSettings>(DEFAULT_USER_SETTINGS);
@@ -119,46 +115,6 @@ describe('TrainComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
-  });
-
-  // ── "Set up a routine" hint ──────────────────────────────────────────────
-
-  describe('showRoutineHint()', () => {
-    it('is shown when there is no recurring routine and it has not been dismissed', () => {
-      expect(component.showRoutineHint()).toBeTrue();
-    });
-
-    it('is hidden once a recurring routine is set', () => {
-      weeklyPlanSignal.set({ recurring: true, days: [[], [], [], [], [], [], []] });
-      expect(component.showRoutineHint()).toBeFalse();
-    });
-
-    it('is hidden once the user dismisses it for good', () => {
-      component.dismissRoutineHint();
-      expect(component.showRoutineHint()).toBeFalse();
-    });
-
-    it('does not come back the next time the app loads within ~7 days', () => {
-      // A second instance re-reads the same (per-device) throttle key that
-      // the first instance's construction just wrote to.
-      const fixture2 = TestBed.createComponent(TrainComponent);
-      fixture2.detectChanges();
-      expect(fixture2.componentInstance.showRoutineHint()).toBeFalse();
-    });
-  });
-
-  describe('dismissRoutineHint()', () => {
-    it('persists the dismissal via UserSettingsService', () => {
-      component.dismissRoutineHint();
-      expect(updateSettings).toHaveBeenCalledWith({ routineHintDismissed: true });
-    });
-  });
-
-  describe('goSetRoutine()', () => {
-    it('navigates to the routine planner with no week param (settings/recurring mode)', () => {
-      component.goSetRoutine();
-      expect(navigateSpy).toHaveBeenCalledWith(['/train/planner']);
-    });
   });
 
   // ── workoutLabel() ───────────────────────────────────────────────────────
@@ -267,6 +223,36 @@ describe('TrainComponent', () => {
     });
   });
 
+  // ── chooserOpen ──────────────────────────────────────────────────────────
+
+  describe('chooserOpen', () => {
+    it('is off by default', () => {
+      expect(component.chooserOpen()).toBeFalse();
+    });
+  });
+
+  // ── feedDays() ───────────────────────────────────────────────────────────
+
+  describe('feedDays()', () => {
+    it('includes today when there is a done workout for it', async () => {
+      const getDoneWorkoutsForDate = TestBed.inject(WorkoutService).getDoneWorkoutsForDate as jasmine.Spy;
+      getDoneWorkoutsForDate.and.callFake((date: string) => date === TODAY ? [makeWorkout()] : []);
+      // feedDays() is a computed whose only tracked signal is feedMonthsBack —
+      // bump it (as the real infinite-scroll would) so it re-derives against
+      // the spy's new return value instead of reusing the cached empty result.
+      await component.loadMoreFeedMonths();
+
+      const days = component.feedDays();
+      expect(days.length).toBe(1);
+      expect(days[0].date).toBe(TODAY);
+      expect(days[0].workouts.length).toBe(1);
+    });
+
+    it('is empty when nothing was done in the loaded range', () => {
+      expect(component.feedDays()).toEqual([]);
+    });
+  });
+
   // ── isToday() ────────────────────────────────────────────────────────────
 
   describe('isToday()', () => {
@@ -311,104 +297,6 @@ describe('TrainComponent', () => {
       const chip = (fixture.nativeElement as HTMLElement).querySelector('.qa-chip');
       expect(chip?.textContent?.trim()).toContain('En línia');
       expect(chip?.textContent?.trim()).not.toContain('Sense connexió');
-    });
-  });
-
-  // ── goPlanWeek() ─────────────────────────────────────────────────────────
-
-  describe('goPlanWeek()', () => {
-    it('navigates to the planner with the currently-viewed week', () => {
-      component.viewedWeekMonday.set('2024-04-01');
-      component.goPlanWeek();
-
-      expect(navigateSpy).toHaveBeenCalledWith(
-        ['/train/planner'], { queryParams: { week: '2024-04-01' } });
-    });
-  });
-
-  describe('viewedWeekIsFuture()', () => {
-    it('is false for the week containing today', () => {
-      component.viewedWeekMonday.set(mondayOf(TODAY));
-      expect(component.viewedWeekIsFuture()).toBeFalse();
-    });
-
-    it('is true for a week after the current one', () => {
-      const nextWeek = new Date(TODAY + 'T12:00:00');
-      nextWeek.setDate(nextWeek.getDate() + 7);
-      component.viewedWeekMonday.set(nextWeek.toISOString().split('T')[0]);
-      expect(component.viewedWeekIsFuture()).toBeTrue();
-    });
-  });
-
-  describe('viewedWeekHasPlan()', () => {
-    let getPlannedForDate: jasmine.Spy;
-    let getPlannedSportSessionsForDate: jasmine.Spy;
-
-    beforeEach(() => {
-      getPlannedForDate = TestBed.inject(WorkoutService).getPlannedForDate as jasmine.Spy;
-      getPlannedSportSessionsForDate = TestBed.inject(SportService).getPlannedSportSessionsForDate as jasmine.Spy;
-      component.viewedWeekMonday.set('2024-03-04');
-    });
-
-    it('is false when nothing is planned for any day of the viewed week', () => {
-      expect(component.viewedWeekHasPlan()).toBeFalse();
-    });
-
-    it('is true when a planned workout exists on any day of the viewed week', () => {
-      getPlannedForDate.and.callFake((date: string) => date === '2024-03-06' ? [{ id: 'w1' }] : []);
-      expect(component.viewedWeekHasPlan()).toBeTrue();
-    });
-
-    it('is true when a planned sport session exists on any day of the viewed week', () => {
-      getPlannedSportSessionsForDate.and.callFake((date: string) => date === '2024-03-08' ? [{ sport: {}, session: {} }] : []);
-      expect(component.viewedWeekHasPlan()).toBeTrue();
-    });
-  });
-
-  // ── planSourceBadge() ────────────────────────────────────────────────────
-
-  describe('planSourceBadge()', () => {
-    it('labels a trainer-sourced item', () => {
-      expect(component.planSourceBadge('trainer')).toEqual({ label: 'Entrenador', cls: 'pc-badge--trainer' });
-    });
-
-    it('labels a routine-sourced item', () => {
-      expect(component.planSourceBadge('routine')).toEqual({ label: 'Rutina', cls: 'pc-badge--routine' });
-    });
-
-    it('labels a manually-planned item', () => {
-      expect(component.planSourceBadge('manual')).toEqual({ label: 'Planificació pròpia', cls: 'pc-badge--manual' });
-    });
-
-    it('treats legacy "self" the same as "manual"', () => {
-      expect(component.planSourceBadge('self')).toEqual({ label: 'Planificació pròpia', cls: 'pc-badge--manual' });
-    });
-
-    it('returns null when there is no source', () => {
-      expect(component.planSourceBadge(undefined)).toBeNull();
-    });
-  });
-
-  // ── planPillColor() ──────────────────────────────────────────────────────
-
-  describe('planPillColor()', () => {
-    let getPlannedForDate: jasmine.Spy;
-
-    beforeEach(() => {
-      getPlannedForDate = TestBed.inject(WorkoutService).getPlannedForDate as jasmine.Spy;
-      component.selectedDate.set('2024-03-10');
-    });
-
-    it('tints the pill with the pending plan\'s category color', () => {
-      getPlannedForDate.and.returnValue([{ id: 'w1', category: 'push', categories: ['push'] } as unknown as Workout]);
-      expect(component.planPillColor()).toBe(CATEGORY_COLORS['push']);
-    });
-
-    it('falls back to the brand color when nothing is planned yet', () => {
-      getPlannedForDate.and.returnValue([]);
-      expect(component.planPillColor()).not.toBe(CATEGORY_COLORS['push']);
-      expect(component.planPillColor()).not.toBe(CATEGORY_COLORS['pull']);
-      expect(component.planPillColor()).not.toBe(CATEGORY_COLORS['legs']);
     });
   });
 
