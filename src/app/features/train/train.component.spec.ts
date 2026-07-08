@@ -225,14 +225,6 @@ describe('TrainComponent', () => {
     });
   });
 
-  // ── chooserOpen ──────────────────────────────────────────────────────────
-
-  describe('chooserOpen', () => {
-    it('is off by default', () => {
-      expect(component.chooserOpen()).toBeFalse();
-    });
-  });
-
   // ── isToday() ────────────────────────────────────────────────────────────
 
   describe('isToday()', () => {

@@ -108,12 +108,11 @@ export class NavBarComponent {
   readonly navItems = computed<NavItem[]>(() => {
     const base: NavItem[] = [
       { path: '/home',     icon: 'home',           label: 'Inici' },
-      { path: '/train',    icon: 'exercise',       label: 'Entrena' },
       { path: '/calendar', icon: 'calendar_month',  label: 'Calendari' },
       { path: '/settings', icon: 'account_circle', label: 'Perfil' },
     ];
     if (this.trainerService.isTrainer()) {
-      base.splice(3, 0, { path: '/trainer', icon: 'sports', label: 'Clients' });
+      base.splice(2, 0, { path: '/trainer', icon: 'sports', label: 'Clients' });
     }
     return base;
   });

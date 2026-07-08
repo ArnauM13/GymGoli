@@ -44,7 +44,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
         }
 
         @if (isToday()) {
-          <button class="start-workout-btn" (click)="goToNewWorkout()">
+          <button class="start-workout-btn" (click)="goToTrain()">
             <span class="material-symbols-outlined">add_circle</span>
             Comença un entrenament
           </button>
@@ -245,10 +245,6 @@ export class HomeComponent implements OnDestroy {
 
   goToTrain(): void {
     this.router.navigate(['/train']);
-  }
-
-  goToNewWorkout(): void {
-    this.router.navigate(['/train'], { queryParams: { new: 1 } });
   }
 
   goToWorkout(workoutId: string): void {

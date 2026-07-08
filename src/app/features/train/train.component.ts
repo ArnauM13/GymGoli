@@ -250,13 +250,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           </div>
         }
 
-      }
-
-    </div>
-
-    <!-- ── Fila flotant: suggeriment (opcional) + FAB "Nou entrenament" ── -->
-    @if (!activeWorkout()) {
-      <div class="today-fab-row">
         @if (todaySuggestion(); as s) {
           <button class="suggestion-float" [style.--sc]="s.color" (click)="handleSuggestionClick(s)">
             <div class="sf-bar"></div>
@@ -274,71 +267,64 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           </button>
         }
 
-        <button class="today-fab-btn" (click)="chooserOpen.set(true)" aria-label="Nou entrenament">
-          <span class="material-symbols-outlined">add</span>
-        </button>
-      </div>
-    }
+        <!-- ── Nou entrenament: contingut inline (sense desplegable) ── -->
+        <div class="card-section">
+          <div class="section-header">
+            <span class="material-symbols-outlined section-icon">add_circle</span>
+            <h2 class="section-title">Nou entrenament</h2>
+          </div>
 
-    <!-- ── "Nou entrenament" chooser bottom sheet ── -->
-    @if (chooserOpen()) {
-      <div class="tp-backdrop" (click)="chooserOpen.set(false)"></div>
-      <div class="tp-sheet">
-        <div class="tp-header">
-          <span class="tp-title">Nou entrenament</span>
-          <button class="tp-close" (click)="chooserOpen.set(false)" aria-label="Tancar">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
-
-        <div class="chip-group-label">Gym</div>
-        <div class="type-grid" [style.grid-template-columns]="gridCols(workoutTypes.length)">
-          @for (cat of workoutTypes; track cat.value) {
-            <button class="type-btn"
-              [style.--cat-color]="cat.color"
-              [class.type-btn--done]="doneCategories().has(cat.value)"
-              (click)="chooserOpen.set(false); selectType(cat.value)">
-              @if (doneCategories().has(cat.value)) {
-                <span class="type-done-check material-symbols-outlined">check_circle</span>
-              }
-              <span class="material-symbols-outlined type-icon">{{ cat.icon }}</span>
-              <span class="type-label">{{ cat.label }}</span>
-            </button>
-          }
-        </div>
-
-        @if (sportService.sports().length > 0) {
-          <div class="chip-group-label chip-group-label--mt">Esport</div>
-          <div class="type-grid" [style.grid-template-columns]="gridCols(sportService.sports().length)">
-            @for (sport of sportService.sports(); track sport.id) {
+          <div class="chip-group-label">Gym</div>
+          <div class="type-grid" [style.grid-template-columns]="gridCols(workoutTypes.length)">
+            @for (cat of workoutTypes; track cat.value) {
               <button class="type-btn"
-                [style.--cat-color]="sport.color"
-                [class.type-btn--done]="sportDoneMap().has(sport.id)"
-                (click)="chooserOpen.set(false); openSessionLogger(sport)"
-                [disabled]="sportToggling()">
-                @if (sportDoneMap().has(sport.id)) {
+                [style.--cat-color]="cat.color"
+                [class.type-btn--done]="doneCategories().has(cat.value)"
+                (click)="selectType(cat.value)">
+                @if (doneCategories().has(cat.value)) {
                   <span class="type-done-check material-symbols-outlined">check_circle</span>
                 }
-                <span class="material-symbols-outlined type-icon">{{ sport.icon }}</span>
-                <span class="type-label">{{ sport.name }}</span>
-                @if (sportDoneMap().get(sport.id)?.subtypeId; as sid) {
-                  <span class="type-sport-sub">{{ subtypeName(sport, sid) }}</span>
-                }
+                <span class="material-symbols-outlined type-icon">{{ cat.icon }}</span>
+                <span class="type-label">{{ cat.label }}</span>
               </button>
             }
           </div>
-        } @else {
-          <div class="es-empty">
-            <span class="material-symbols-outlined es-empty-icon">sports_soccer</span>
-            <span class="es-empty-msg">Afegeix els esports que practiques</span>
-            <button class="es-empty-btn" (click)="chooserOpen.set(false); router.navigate(['/sports-config'])">
-              Configurar esports
-              <span class="material-symbols-outlined">arrow_forward</span>
-            </button>
-          </div>
-        }
-      </div>
-    }
+
+          @if (sportService.sports().length > 0) {
+            <div class="chip-group-label chip-group-label--mt">Esport</div>
+            <div class="type-grid" [style.grid-template-columns]="gridCols(sportService.sports().length)">
+              @for (sport of sportService.sports(); track sport.id) {
+                <button class="type-btn"
+                  [style.--cat-color]="sport.color"
+                  [class.type-btn--done]="sportDoneMap().has(sport.id)"
+                  (click)="openSessionLogger(sport)"
+                  [disabled]="sportToggling()">
+                  @if (sportDoneMap().has(sport.id)) {
+                    <span class="type-done-check material-symbols-outlined">check_circle</span>
+                  }
+                  <span class="material-symbols-outlined type-icon">{{ sport.icon }}</span>
+                  <span class="type-label">{{ sport.name }}</span>
+                  @if (sportDoneMap().get(sport.id)?.subtypeId; as sid) {
+                    <span class="type-sport-sub">{{ subtypeName(sport, sid) }}</span>
+                  }
+                </button>
+              }
+            </div>
+          } @else {
+            <div class="es-empty">
+              <span class="material-symbols-outlined es-empty-icon">sports_soccer</span>
+              <span class="es-empty-msg">Afegeix els esports que practiques</span>
+              <button class="es-empty-btn" (click)="router.navigate(['/sports-config'])">
+                Configurar esports
+                <span class="material-symbols-outlined">arrow_forward</span>
+              </button>
+            </div>
+          }
+        </div>
+
+      }
+
+    </div>
 
     <!-- ── Template picker bottom sheet ── -->
     @if (pickerCat()) {
@@ -790,16 +776,11 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .material-symbols-outlined { font-size: 32px; color: var(--c-border); }
     }
 
-    /* ── Floating row: suggestion (optional) + FAB, above the nav bar ── */
-    .today-fab-row {
-      position: fixed; left: 0; right: 0; bottom: var(--nav-height); z-index: 90;
-      display: flex; align-items: center; justify-content: flex-end; gap: 10px;
-      padding: 0 16px 10px;
-    }
+    /* ── Suggestion card (optional, above the "Nou entrenament" picker) ── */
     .suggestion-float {
-      flex: 1; min-width: 0;
       display: flex; align-items: center; gap: 0;
       height: 56px; border-radius: 14px; padding: 0;
+      margin: 12px 16px 0;
       border: 1.5px solid color-mix(in srgb, var(--sc) 35%, var(--c-border-2));
       background: color-mix(in srgb, var(--sc) 8%, var(--c-card));
       box-shadow: 0 4px 16px var(--c-shadow-md);
@@ -831,20 +812,17 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
     .sf-chevron { font-size: 18px; color: var(--c-text-3); margin-right: 10px; flex-shrink: 0; }
 
-    .today-fab-btn {
-      width: 60px; height: 60px; border-radius: 50%; flex-shrink: 0;
-      border: 2px solid color-mix(in srgb, white 25%, var(--c-brand));
-      background: var(--c-brand); color: white;
-      display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 6px 20px color-mix(in srgb, var(--c-brand) 45%, transparent), 0 2px 6px var(--c-shadow-md);
-      cursor: pointer; touch-action: manipulation; transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
-      .material-symbols-outlined { font-size: 28px; }
-      &:hover {
-        background: var(--c-brand-dk);
-        box-shadow: 0 8px 24px color-mix(in srgb, var(--c-brand) 55%, transparent), 0 2px 6px var(--c-shadow-md);
-      }
-      &:active { transform: scale(0.92); }
+    /* ── "Nou entrenament" section card ── */
+    .card-section {
+      margin: 12px 16px 0;
+      padding: 14px 14px 16px;
+      background: var(--c-card);
+      border-radius: 18px;
+      box-shadow: 0 2px 10px var(--c-shadow);
     }
+    .section-header { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; }
+    .section-icon  { font-size: 18px; color: var(--c-text-3); font-variation-settings: 'FILL' 0, 'wght' 300; }
+    .section-title { margin: 0; flex: 1; font-size: 14px; font-weight: 700; color: var(--c-text-2); letter-spacing: 0.2px; }
 
     /* ── Workout summary cards ── */
     .workout-card {
@@ -1173,7 +1151,6 @@ export class TrainComponent {
   readonly selectedDate    = signal<string>(TODAY());
   readonly sportToggling   = signal(false);
   readonly workoutTypes    = WORKOUT_TYPES;
-  readonly chooserOpen     = signal(false);
   readonly workoutMenuOpen = signal(false);
   /** Off by default — exercises can only be dragged to reorder once the
    *  user turns this on from the workout's three-dot menu. */
@@ -1293,7 +1270,7 @@ export class TrainComponent {
   readonly isSelectedFuture = computed(() => this.selectedDate() > TODAY());
 
   readonly pagePaddingBottom = computed(() =>
-    '88px' // clear the FAB / bottom-bar in both modes
+    '88px' // clear the active-workout menu FAB
   );
 
   readonly dateSportSessions = computed(() =>
@@ -1400,14 +1377,6 @@ export class TrainComponent {
         this.openWorkout(id);
         if (this.route.snapshot.queryParamMap.get('from') === 'home') this.cameFromHome.set(true);
       });
-    });
-
-    // Coming from the home page's "Comença un entrenament" button
-    // (?new=1) — jump straight to the type chooser, same reasoning as above.
-    const queryNewWorkout = toSignal(this.route.queryParamMap.pipe(map(params => params.get('new'))));
-    effect(() => {
-      const flag = queryNewWorkout();
-      if (flag) untracked(() => this.chooserOpen.set(true));
     });
 
     let firstDateEffectRun = true;
