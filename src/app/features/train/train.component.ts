@@ -959,7 +959,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     /* ── Floating row: "Avui toca" suggestion (optional) + FAB, above the nav bar ── */
     .today-fab-row {
       position: fixed; left: 0; right: 0; bottom: var(--nav-height); z-index: 90;
-      display: flex; align-items: center; gap: 10px;
+      display: flex; align-items: center; justify-content: flex-end; gap: 10px;
       padding: 0 16px 10px;
     }
     .suggestion-float {
@@ -1000,12 +1000,12 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     /* ── "Avui" section: bordered/tinted card at the top of the feed ── */
     .today-section {
       margin: 8px 16px 4px;
-      padding: 12px 12px 4px;
+      padding: 12px;
       background: color-mix(in srgb, var(--c-brand) 5%, var(--c-card));
-      border: 1.5px solid color-mix(in srgb, var(--c-brand) 16%, var(--c-border-2));
+      border: 1.5px solid color-mix(in srgb, var(--c-brand) 24%, var(--c-border-2));
       border-radius: 18px;
     }
-    .today-header { display: flex; align-items: center; gap: 7px; }
+    .today-header { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; }
     .today-header-icon { font-size: 19px; color: var(--c-brand); font-variation-settings: 'FILL' 1, 'wght' 400; }
     .today-header-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
     .today-title { margin: 0; font-size: 15px; font-weight: 800; color: var(--c-text); letter-spacing: 0.1px; }
@@ -1021,15 +1021,18 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       font-size: 22px; transition: transform 0.2s;
       &.today-chevron--open { transform: rotate(180deg); }
     }
-    .today-picker { margin-top: 12px; }
     .today-fab-btn {
-      width: 56px; height: 56px; border-radius: 50%; border: none; flex-shrink: 0;
+      width: 60px; height: 60px; border-radius: 50%; flex-shrink: 0;
+      border: 2px solid color-mix(in srgb, white 25%, var(--c-brand));
       background: var(--c-brand); color: white;
       display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 4px 16px var(--c-shadow-md);
-      cursor: pointer; touch-action: manipulation; transition: background 0.15s, transform 0.1s;
-      .material-symbols-outlined { font-size: 26px; }
-      &:hover { background: var(--c-brand-dk); }
+      box-shadow: 0 6px 20px color-mix(in srgb, var(--c-brand) 45%, transparent), 0 2px 6px var(--c-shadow-md);
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+      .material-symbols-outlined { font-size: 28px; }
+      &:hover {
+        background: var(--c-brand-dk);
+        box-shadow: 0 8px 24px color-mix(in srgb, var(--c-brand) 55%, transparent), 0 2px 6px var(--c-shadow-md);
+      }
       &:active { transform: scale(0.92); }
     }
 
@@ -1057,7 +1060,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .feed-card {
       display: flex; align-items: center;
       margin-bottom: 8px;
-      border: 1.5px solid color-mix(in srgb, var(--wc, var(--c-border-2)) 30%, var(--c-border-2));
+      border: 1.5px solid color-mix(in srgb, var(--wc, var(--c-border-2)) 38%, var(--c-border-2));
       border-radius: 16px;
       background: color-mix(in srgb, var(--wc, var(--c-card)) 6%, var(--c-card));
       box-shadow: 0 2px 8px var(--c-shadow); overflow: hidden;
@@ -1138,7 +1141,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .workout-card {
       display: flex; align-items: center;
       margin-bottom: 8px;
-      border: 1.5px solid color-mix(in srgb, var(--wc, var(--c-border-2)) 30%, var(--c-border-2));
+      border: 1.5px solid color-mix(in srgb, var(--wc, var(--c-border-2)) 38%, var(--c-border-2));
       border-radius: 14px;
       background: color-mix(in srgb, var(--wc, var(--c-card)) 8%, var(--c-card));
       overflow: hidden;
