@@ -1,7 +1,8 @@
-import { Component, ElementRef, OnDestroy, ViewChild, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
-import { NgTemplateOutlet } from '@angular/common';
+import { Component, ViewChild, computed, effect, inject, signal, untracked } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { map } from 'rxjs/operators';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { workoutCategories } from '../../shared/utils/calendar-utils';
 import { UserSettingsService } from '../../core/services/user-settings.service';
@@ -12,9 +13,9 @@ import {
   CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_MUSCLES,
   Exercise, ExerciseCategory,
 } from '../../core/models/exercise.model';
-import { Sport, SportMetricDef, SportSession } from '../../core/models/sport.model';
+import { Sport, SportMetricDef } from '../../core/models/sport.model';
 import { BUILT_IN_TEMPLATES, BuiltInTemplate, WorkoutTemplate } from '../../core/models/template.model';
-import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry, setMaxWeight, setVolume } from '../../core/models/workout.model';
+import { FeelingLevel, Workout, WorkoutEntry, setMaxWeight } from '../../core/models/workout.model';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { TemplateService } from '../../core/services/template.service';
 import { SharedWorkoutService } from '../../core/services/shared-workout.service';
@@ -24,10 +25,12 @@ import { FeedbackService } from '../../shared/services/feedback.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { OfflineService } from '../../core/services/offline.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
-import { FitnessInsightsComponent } from '../../shared/components/fitness-insights/fitness-insights.component';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import {
+  formatFeeling, workoutCardColor, workoutPrimaryColor, workoutVolumeFmt,
+} from '../../shared/utils/workout-card.utils';
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
 
@@ -44,74 +47,8 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 @Component({
   selector: 'app-train',
   standalone: true,
-  imports: [FormsModule, NgTemplateOutlet, WorkoutEditorComponent, FitnessInsightsComponent, PageHeaderComponent],
+  imports: [FormsModule, WorkoutEditorComponent, PageHeaderComponent],
   template: `
-    <!-- Reusable per-day cards (used both by "Avui" and the history list) -->
-    <ng-template #dayCards let-day>
-      @for (w of day.workouts; track w.id) {
-        <div class="feed-card" [class.feed-card--planned]="isPlanned(w)"
-             [style.--wc]="workoutPrimaryColor(w)"
-             (click)="isPlanned(w) ? startPlan(w) : openWorkout(w.id)">
-          <div class="fc-bar" [style.background]="workoutCardColor(w)"></div>
-          <div class="fc-info">
-            <div class="fc-badges">
-              @for (cat of workoutCategoryList(w); track cat) {
-                <span class="fc-badge fc-badge--{{ cat }}">{{ getCatLabel(cat) }}</span>
-              }
-              @if (isPlanned(w)) {
-                <span class="fc-badge fc-badge--planned">Planificat</span>
-              }
-            </div>
-            <span class="fc-exercises">{{ w.entries.length ? getExerciseNames(w) : 'Pla buit' }}</span>
-            @if (!isPlanned(w)) {
-              <div class="fc-stats">
-                <span class="fc-stat">
-                  <span class="material-symbols-outlined">fitness_center</span>
-                  <strong>{{ w.entries.length }}</strong> exerc
-                </span>
-                @if (workoutSetsCount(w); as n) {
-                  <span class="fc-stat-sep">·</span>
-                  <span class="fc-stat">
-                    <span class="material-symbols-outlined">repeat</span>
-                    <strong>{{ n }}</strong> sèr
-                  </span>
-                }
-                @if (workoutVolumeFmt(w); as vol) {
-                  <span class="fc-stat-sep">·</span>
-                  <span class="fc-stat fc-stat--vol">
-                    <span class="material-symbols-outlined">weight</span>
-                    <strong>{{ vol }}</strong>
-                  </span>
-                }
-                @if (w.feeling) {
-                  <span class="fc-stat-sep">·</span>
-                  <span class="fc-stat">{{ emojiOf(w.feeling) }}</span>
-                }
-              </div>
-            }
-          </div>
-          @if (isPlanned(w)) {
-            <button class="fc-start" (click)="$event.stopPropagation(); startPlan(w)" title="Comença">
-              <span class="material-symbols-outlined">play_arrow</span>
-            </button>
-          } @else {
-            <span class="material-symbols-outlined fc-chevron">chevron_right</span>
-          }
-        </div>
-      }
-      @for (item of day.sports; track item.session.id) {
-        <div class="feed-sport-row" [style.--ic]="item.sport.color">
-          <span class="material-symbols-outlined feed-sport-icon">{{ item.sport.icon }}</span>
-          <div class="fsr-info">
-            <span class="feed-sport-name">{{ item.sport.name }}</span>
-            @if (sportSummary(item.session, item.sport); as meta) {
-              <span class="feed-sport-meta">{{ meta }}</span>
-            }
-          </div>
-        </div>
-      }
-    </ng-template>
-
     <div class="page" [style.padding-bottom]="pagePaddingBottom()">
 
       @if (activeWorkout(); as w) {
@@ -205,10 +142,12 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               <span class="material-symbols-outlined">{{ reorderMode() ? 'check' : 'swap_vert' }}</span>
               {{ reorderMode() ? 'Finalitzar ordenació' : 'Ordenar exercicis' }}
             </button>
-            <button class="aw-menu-item" (click)="workoutMenuOpen.set(false); groupingMode.set(!groupingMode()); reorderMode.set(false)">
-              <span class="material-symbols-outlined">{{ groupingMode() ? 'check' : 'link' }}</span>
-              {{ groupingMode() ? 'Finalitzar agrupació' : 'Agrupar en superset' }}
-            </button>
+            @if (settingsService.supersetsEnabled() || groupingMode()) {
+              <button class="aw-menu-item" (click)="workoutMenuOpen.set(false); groupingMode.set(!groupingMode()); reorderMode.set(false)">
+                <span class="material-symbols-outlined">{{ groupingMode() ? 'check' : 'link' }}</span>
+                {{ groupingMode() ? 'Finalitzar agrupació' : 'Agrupar en superset' }}
+              </button>
+            }
             @if (!offlineService.isOffline()) {
               <button class="aw-menu-item" (click)="openSaveAsTemplate(w)">
                 <span class="material-symbols-outlined">bookmark_add</span>
@@ -311,27 +250,21 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           </div>
         }
 
-        <!-- ── Avui ── -->
+        <!-- ── Avui: tria un entrenament o esport ── -->
         <div class="today-section">
           <div class="today-header">
             <span class="material-symbols-outlined today-header-icon">today</span>
             <div class="today-header-text">
               <h2 class="today-title">Avui</h2>
-              @if (!todayFeedEntry()) {
-                <p class="today-subtitle">Tria què vols entrenar avui</p>
-              }
+              <p class="today-subtitle">Tria què vols entrenar avui</p>
             </div>
-            @if (!todayFeedEntry()) {
-              <button class="today-toggle-btn" (click)="todayExpanded.set(!todayExpanded())"
-                      [attr.aria-label]="todayExpanded() ? 'Plegar' : 'Desplegar'">
-                <span class="material-symbols-outlined today-chevron" [class.today-chevron--open]="todayExpanded()">expand_more</span>
-              </button>
-            }
+            <button class="today-toggle-btn" (click)="todayExpanded.set(!todayExpanded())"
+                    [attr.aria-label]="todayExpanded() ? 'Plegar' : 'Desplegar'">
+              <span class="material-symbols-outlined today-chevron" [class.today-chevron--open]="todayExpanded()">expand_more</span>
+            </button>
           </div>
 
-          @if (todayFeedEntry(); as day) {
-            <ng-container [ngTemplateOutlet]="dayCards" [ngTemplateOutletContext]="{ $implicit: day }" />
-          } @else if (todayExpanded()) {
+          @if (todayExpanded()) {
             <div class="today-picker">
               <div class="chip-group-label">Gym</div>
               <div class="type-grid" [style.grid-template-columns]="gridCols(workoutTypes.length)">
@@ -373,49 +306,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             </div>
           }
         </div>
-
-        @if (!offlineService.isOffline() && dateWorkouts().length === 0 && dateSportSessions().length === 0) {
-          <app-fitness-insights />
-        }
-
-        <!-- ── Historial ── -->
-        <div class="history-divider">
-          <span class="history-divider-label">Historial</span>
-        </div>
-
-        @if ((workoutService.isLoading() || !sportService.sportsLoaded()) && historyFeedDays().length === 0) {
-          <div class="feed-sk">
-            @for (_ of [1,2,3]; track $index) {
-              <div class="sk-card-ph">
-                <div class="sk sk-card-bar"></div>
-                <div class="sk-card-body">
-                  <div class="sk sk-line sk-line--55"></div>
-                  <div class="sk sk-line sk-line--30"></div>
-                </div>
-              </div>
-            }
-          </div>
-        } @else if (historyFeedDays().length === 0) {
-          <div class="empty-state">
-            <span class="material-symbols-outlined empty-icon">fitness_center</span>
-            <h2>Encara no hi ha res</h2>
-            <p>Els teus entrenaments anteriors apareixeran aquí.</p>
-          </div>
-        } @else {
-          @for (day of historyFeedDays(); track day.date) {
-            <div class="feed-day">
-              <div class="feed-day-header">{{ feedDayLabel(day.date) }}</div>
-              <ng-container [ngTemplateOutlet]="dayCards" [ngTemplateOutletContext]="{ $implicit: day }" />
-            </div>
-          }
-
-          <div #feedSentinel class="scroll-sentinel"></div>
-          @if (feedLoadingMore()) {
-            <div class="loading-state">
-              <span class="material-symbols-outlined spin">sync</span>
-            </div>
-          }
-        }
       }
 
     </div>
@@ -423,7 +313,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     <!-- ── Fila flotant: suggeriment "Avui toca" (opcional) + FAB "Nou entrenament" ── -->
     @if (!activeWorkout()) {
       <div class="today-fab-row">
-        @if (!todayFeedEntry() && todaySuggestion(); as s) {
+        @if (todaySuggestion(); as s) {
           <button class="suggestion-float" [style.--sc]="s.color" (click)="handleSuggestionClick(s)">
             <div class="sf-bar"></div>
             <div class="sf-icon-wrap">
@@ -1036,107 +926,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       &:active { transform: scale(0.92); }
     }
 
-    /* ── "Historial" divider ── */
-    .history-divider {
-      display: flex; align-items: center; gap: 10px;
-      margin: 18px 16px 10px;
-      &::before, &::after {
-        content: ''; flex: 1; height: 1px; background: var(--c-border-2);
-      }
-    }
-    .history-divider-label {
-      font-size: 11px; font-weight: 700; color: var(--c-text-3);
-      text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;
-    }
-
-    /* ── Activity feed ── */
-    .feed-day { margin: 0 16px 14px; }
-    .feed-day-header {
-      font-size: 11px; font-weight: 700; color: var(--c-text-3);
-      text-transform: uppercase; letter-spacing: 0.3px;
-      margin-bottom: 6px;
-    }
-    /* ── Feed workout cards (bigger, richer than the compact .workout-card) ── */
-    .feed-card {
-      display: flex; align-items: center;
-      margin-bottom: 8px;
-      border: 1.5px solid color-mix(in srgb, var(--wc, var(--c-border-2)) 38%, var(--c-border-2));
-      border-radius: 16px;
-      background: color-mix(in srgb, var(--wc, var(--c-card)) 6%, var(--c-card));
-      box-shadow: 0 2px 8px var(--c-shadow); overflow: hidden;
-      cursor: pointer; touch-action: manipulation;
-      transition: box-shadow 0.15s, border-color 0.15s, background 0.15s;
-      &:hover {
-        box-shadow: 0 3px 12px var(--c-shadow-md);
-        background: color-mix(in srgb, var(--wc, var(--c-card)) 10%, var(--c-card));
-        border-color: color-mix(in srgb, var(--wc, var(--c-border)) 45%, var(--c-border));
-      }
-    }
-    .feed-card--planned {
-      border-style: dashed;
-      border-color: color-mix(in srgb, var(--wc, var(--c-brand)) 55%, var(--c-border-2));
-      background: color-mix(in srgb, var(--wc, var(--c-brand)) 5%, var(--c-card));
-      &:hover { background: color-mix(in srgb, var(--wc, var(--c-brand)) 9%, var(--c-card)); }
-    }
-    .fc-bar { width: 5px; align-self: stretch; flex-shrink: 0; }
-    .fc-info {
-      flex: 1; min-width: 0;
-      display: flex; flex-direction: column; gap: 5px;
-      padding: 13px 12px;
-    }
-    .fc-badges { display: flex; flex-wrap: wrap; gap: 4px; }
-    .fc-badge {
-      display: inline-block; padding: 2px 8px; border-radius: 8px;
-      font-size: 10px; font-weight: 700; letter-spacing: 0.2px; line-height: 1.4;
-    }
-    .fc-badge--push { background: rgba(229,115,115,0.15); color: #b71c1c; }
-    .fc-badge--pull { background: rgba(100,181,246,0.15); color: #0d47a1; }
-    .fc-badge--legs { background: rgba(129,199,132,0.15); color: #1b5e20; }
-    html.dark .fc-badge--push { background: rgba(229,115,115,0.18); color: #ef9a9a; }
-    html.dark .fc-badge--pull { background: rgba(100,181,246,0.18); color: #90caf9; }
-    html.dark .fc-badge--legs { background: rgba(129,199,132,0.18); color: #a5d6a7; }
-    .fc-badge--planned { background: rgba(var(--c-brand-rgb), 0.12); color: var(--c-brand); }
-    .fc-exercises {
-      font-size: 14px; font-weight: 700; color: var(--c-text);
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .fc-stats {
-      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-      font-size: 12px; color: var(--c-text-2); font-weight: 500;
-    }
-    .fc-stat {
-      display: inline-flex; align-items: center; gap: 3px;
-      .material-symbols-outlined { font-size: 14px; color: color-mix(in srgb, var(--wc, var(--c-text-3)) 60%, var(--c-text-3)); }
-      strong { font-weight: 700; color: var(--c-text-2); }
-    }
-    .fc-stat-sep { color: var(--c-border); }
-    .fc-stat--vol strong { color: var(--wc, var(--c-brand)); }
-    .fc-chevron { font-size: 22px; color: var(--c-text-3); flex-shrink: 0; margin-right: 8px; }
-    .fc-start {
-      width: 38px; height: 38px; border: none; border-radius: 10px; flex-shrink: 0;
-      margin-right: 10px;
-      background: var(--c-brand); color: white;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
-      .material-symbols-outlined { font-size: 20px; }
-      &:hover { background: var(--c-brand-dk); }
-    }
-
-    .feed-sport-row {
-      display: flex; align-items: center; gap: 12px;
-      padding: 13px 14px; margin-bottom: 8px;
-      border: 1.5px solid var(--c-border-2); border-radius: 16px;
-      background: color-mix(in srgb, var(--ic, var(--c-card)) 5%, var(--c-card));
-    }
-    .feed-sport-icon {
-      font-size: 22px; color: var(--ic, var(--c-text-2)); font-variation-settings: 'FILL' 1;
-      flex-shrink: 0;
-    }
-    .fsr-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-    .feed-sport-name { font-size: 14px; font-weight: 700; color: var(--c-text); }
-    .feed-sport-meta { font-size: 12px; color: var(--c-text-3); }
-    .feed-sk { margin: 0 16px; display: flex; flex-direction: column; gap: 8px; }
-
     /* ── Workout summary cards ── */
     .workout-card {
       display: flex; align-items: center;
@@ -1261,31 +1050,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       text-align: center; line-height: 1; letter-spacing: 0.1px;
       max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-
-    /* ── Skeleton screens ── */
-    @keyframes sk-shimmer {
-      from { background-position: -300px 0; }
-      to   { background-position: calc(300px + 100%) 0; }
-    }
-    .sk {
-      background: linear-gradient(90deg, var(--c-border-2) 0%, var(--c-border) 40%, var(--c-border-2) 80%);
-      background-size: 600px 100%;
-      animation: sk-shimmer 1.5s ease-in-out infinite;
-      border-radius: 8px;
-    }
-    .sk-card-ph {
-      display: flex; align-items: stretch;
-      border: 1.5px solid var(--c-border-2); border-radius: 14px;
-      overflow: hidden; margin-bottom: 12px;
-    }
-    .sk-card-bar { width: 5px; min-height: 52px; flex-shrink: 0; border-radius: 0; }
-    .sk-card-body {
-      flex: 1; padding: 10px;
-      display: flex; flex-direction: column; gap: 7px;
-    }
-    .sk-line      { height: 12px; }
-    .sk-line--55  { width: 55%; }
-    .sk-line--30  { width: 30%; height: 10px; }
 
     /* ── Trainer proposal card ── */
     .proposal-card {
@@ -1468,17 +1232,18 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
   `],
 })
-export class TrainComponent implements OnDestroy {
+export class TrainComponent {
   readonly workoutService  = inject(WorkoutService);
   readonly sportService    = inject(SportService);
   readonly offlineService  = inject(OfflineService);
   readonly trainerService  = inject(TrainerService);
-  private settingsService  = inject(UserSettingsService);
+  readonly settingsService = inject(UserSettingsService);
   private exerciseService  = inject(ExerciseService);
   private templateService  = inject(TemplateService);
   private sharedWorkoutService = inject(SharedWorkoutService);
   private profileService   = inject(WorkoutProfileService);
   readonly router          = inject(Router);
+  private route            = inject(ActivatedRoute);
   private dialog           = inject(MatDialog);
   private feedback         = inject(FeedbackService);
   private confirmDialog    = inject(ConfirmDialogService);
@@ -1625,17 +1390,6 @@ export class TrainComponent implements OnDestroy {
     return sport.subtypes.find(s => s.id === subtypeId)?.name ?? '';
   }
 
-  sportSummary(sub: { duration?: number; feeling?: FeelingLevel; subtypeId?: string }, sport: Sport): string {
-    const parts: string[] = [];
-    if (sub.subtypeId) {
-      const sub2 = sport.subtypes.find(s => s.id === sub.subtypeId);
-      if (sub2) parts.push(sub2.name);
-    }
-    if (sub.duration) parts.push(`${sub.duration}min`);
-    if (sub.feeling)  parts.push(FEELING_EMOJI[sub.feeling]);
-    return parts.join(' · ');
-  }
-
   /** Searches across every already-loaded month (not just `selectedDate`),
    *  since the feed lets you open a workout from any past day the month
    *  cache already covers. */
@@ -1712,6 +1466,18 @@ export class TrainComponent implements OnDestroy {
   constructor() {
     this.sportService.ensureLoaded();
 
+    // Coming from the home feed with a specific workout to open (e.g. tapping
+    // a day's card there navigates here with ?workout=<id>). Reactive (rather
+    // than a one-off snapshot read) since this route is kept alive and reused
+    // across nav-bar switches, so the query param can change without the
+    // component being recreated.
+    const queryWorkoutId = toSignal(this.route.queryParamMap.pipe(map(params => params.get('workout'))));
+    effect(() => {
+      const id = queryWorkoutId();
+      if (id) untracked(() => this.openWorkout(id));
+    });
+
+    let firstDateEffectRun = true;
     effect(() => {
       const date = this.selectedDate();
       const [yearStr, monthStr] = date.split('-');
@@ -1720,6 +1486,7 @@ export class TrainComponent implements OnDestroy {
       this.workoutService.ensureMonthLoaded(year, month);
       this.sportService.ensureMonthLoaded(year, month);
       untracked(() => {
+        if (firstDateEffectRun) { firstDateEffectRun = false; return; }
         this.activeWorkoutId.set(null);
         this.pickerCat.set(null);
         this.loggerSport.set(null);
@@ -1737,94 +1504,6 @@ export class TrainComponent implements OnDestroy {
       } catch { }
     });
 
-    // Re-attach the infinite-scroll observer whenever the feed's sentinel
-    // element (re)appears — e.g. after the empty/skeleton state resolves.
-    effect(() => {
-      const el = this.feedSentinelRef()?.nativeElement;
-      this._feedObserver?.disconnect();
-      if (!el) return;
-      this._feedObserver = new IntersectionObserver(
-        entries => { if (entries[0].isIntersecting && !this.feedLoadingMore()) this.loadMoreFeedMonths(); },
-        { rootMargin: '200px' }
-      );
-      this._feedObserver.observe(el);
-    });
-  }
-
-  ngOnDestroy(): void {
-    this._feedObserver?.disconnect();
-  }
-
-  // ── Activity feed (grouped by day, infinite scroll backwards in time) ────
-
-  /** How many months before the current one are loaded — 0 means only the
-   *  current month (already loaded via the selectedDate effect above). */
-  private readonly feedMonthsBack = signal(0);
-  readonly feedLoadingMore = signal(false);
-  readonly feedSentinelRef = viewChild<ElementRef<HTMLElement>>('feedSentinel');
-  private _feedObserver: IntersectionObserver | null = null;
-
-  readonly feedDays = computed(() => {
-    const monthsBack = this.feedMonthsBack();
-    const today      = new Date();
-    const todayStr   = TODAY();
-    const earliest   = new Date(today.getFullYear(), today.getMonth() - monthsBack, 1);
-    const days: { date: string; workouts: Workout[]; sports: { sport: Sport; session: SportSession }[] }[] = [];
-
-    const cursor = new Date(today);
-    while (cursor >= earliest) {
-      const dateStr  = cursor.toISOString().split('T')[0];
-      const done     = this.workoutService.getDoneWorkoutsForDate(dateStr);
-      // Today's still-pending plan shows here too, marked as planned, instead
-      // of as a separate floating card — same as it did before the feed.
-      const planned  = dateStr === todayStr ? this.workoutService.getPlannedForDate(dateStr) : [];
-      const workouts = [...planned, ...done];
-      const sports   = this.sportService.getSportSessionsForDate(dateStr);
-      if (workouts.length > 0 || sports.length > 0) days.push({ date: dateStr, workouts, sports });
-      cursor.setDate(cursor.getDate() - 1);
-    }
-    return days;
-  });
-
-  /** Today gets its own "Avui" section (with insights) instead of blending
-   *  into the historical list below. */
-  readonly todayFeedEntry = computed(() =>
-    this.feedDays().find(d => d.date === TODAY()) ?? null
-  );
-
-  readonly historyFeedDays = computed(() =>
-    this.feedDays().filter(d => d.date !== TODAY())
-  );
-
-  async loadMoreFeedMonths(): Promise<void> {
-    if (this.feedLoadingMore()) return;
-    this.feedLoadingMore.set(true);
-    try {
-      const next  = this.feedMonthsBack() + 1;
-      const today = new Date();
-      const target = new Date(today.getFullYear(), today.getMonth() - next, 1);
-      await Promise.all([
-        this.workoutService.ensureMonthLoaded(target.getFullYear(), target.getMonth()),
-        this.sportService.ensureMonthLoaded(target.getFullYear(), target.getMonth()),
-      ]);
-      this.feedMonthsBack.set(next);
-    } finally {
-      this.feedLoadingMore.set(false);
-    }
-  }
-
-  feedDayLabel(date: string): string {
-    const today = TODAY();
-    if (date === today) return 'Avui';
-    const yesterday = (() => {
-      const d = new Date(today + 'T00:00:00');
-      d.setDate(d.getDate() - 1);
-      return d.toISOString().split('T')[0];
-    })();
-    if (date === yesterday) return 'Ahir';
-    const label = new Date(date + 'T12:00:00')
-      .toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'long' });
-    return label.charAt(0).toUpperCase() + label.slice(1);
   }
 
   // ── Trainer proposal ─────────────────────────────────────────────────────
@@ -1896,66 +1575,17 @@ export class TrainComponent implements OnDestroy {
     return cats.map(c => CATEGORY_LABELS[c as ExerciseCategory] ?? c).join(' + ');
   }
 
-  workoutCategoryList(w: Workout): ExerciseCategory[] {
-    return workoutCategories(w) as ExerciseCategory[];
-  }
-
-  isPlanned(w: Workout): boolean {
-    return (w.status ?? 'done') === 'planned';
-  }
-
-  getCatLabel(cat: string): string {
-    return CATEGORY_LABELS[cat as ExerciseCategory] ?? cat;
-  }
-
-  getExerciseNames(w: Workout): string {
-    const names = w.entries.map(e => e.exerciseName);
-    if (names.length === 0) return '—';
-    if (names.length <= 3) return names.join(' · ');
-    return names.slice(0, 3).join(' · ') + ` +${names.length - 3}`;
-  }
-
-  private _brand(): string {
-    return getComputedStyle(document.documentElement).getPropertyValue('--c-brand').trim() || '#006874';
-  }
-
-  workoutCardColor(w: Workout): string {
-    const cats = workoutCategories(w);
-    if (!cats.length) return this._brand();
-    if (cats.length === 1) return CATEGORY_COLORS[cats[0] as ExerciseCategory] ?? this._brand();
-    const fallback = this._brand();
-    const colors = cats.map(c => CATEGORY_COLORS[c as ExerciseCategory] ?? fallback);
-    const step = 100 / colors.length;
-    return `linear-gradient(180deg, ${colors.map((c, i) => `${c} ${i * step}%, ${c} ${(i + 1) * step}%`).join(', ')})`;
-  }
-
   gridCols(count: number): string {
     return `repeat(${count % 2 === 0 ? 2 : 3}, 1fr)`;
   }
 
-  workoutPrimaryColor(w: Workout): string {
-    const cats   = workoutCategories(w);
-    const brand  = this._brand();
-    return cats.length ? (CATEGORY_COLORS[cats[0] as ExerciseCategory] ?? brand) : brand;
-  }
+  readonly workoutCardColor    = workoutCardColor;
+  readonly workoutPrimaryColor = workoutPrimaryColor;
+  readonly workoutVolumeFmt    = workoutVolumeFmt;
 
-  workoutSetsCount(w: Workout): number {
-    return w.entries.reduce((sum, e) => sum + e.sets.length, 0);
+  emojiOf(level: FeelingLevel): string {
+    return formatFeeling(level, this.settingsService.difficultyScale());
   }
-
-  workoutVolume(w: Workout): number {
-    return w.entries.reduce((sum, e) =>
-      sum + e.sets.reduce((s2, set) => s2 + setVolume(set), 0), 0);
-  }
-
-  workoutVolumeFmt(w: Workout): string {
-    const vol = this.workoutVolume(w);
-    if (vol <= 0) return '';
-    if (vol >= 1000) return `${(vol / 1000).toFixed(1)}t`;
-    return `${Math.round(vol)}kg`;
-  }
-
-  emojiOf(level: FeelingLevel): string { return FEELING_EMOJI[level]; }
 
   async pickWorkoutFeeling(workoutId: string, level: FeelingLevel | undefined): Promise<void> {
     this.awFeelingOpen.set(false);
@@ -2170,7 +1800,7 @@ export class TrainComponent implements OnDestroy {
     if (!s) return null;
     const parts: string[] = [];
     if (s.duration) parts.push(`${s.duration}min`);
-    if (s.feeling)  parts.push(FEELING_EMOJI[s.feeling]);
+    if (s.feeling)  parts.push(formatFeeling(s.feeling, this.settingsService.difficultyScale()));
     return parts.length ? parts.join(' ') : null;
   }
 
@@ -2192,7 +1822,9 @@ export class TrainComponent implements OnDestroy {
 
   closeSessionLogger(): void { this.loggerSport.set(null); }
 
-  feelingEmoji(level: FeelingLevel): string { return FEELING_EMOJI[level]; }
+  feelingEmoji(level: FeelingLevel): string {
+    return formatFeeling(level, this.settingsService.difficultyScale());
+  }
 
   loggerMetric(key: string): string | number | null {
     return this.loggerMetrics()[key] ?? null;

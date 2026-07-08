@@ -4,7 +4,7 @@ import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-
 import { MatDialog } from '@angular/material/dialog';
 
 import { CATEGORY_COLORS, CATEGORY_LABELS, SUBCATEGORY_LABELS } from '../../../core/models/exercise.model';
-import { FEELING_EMOJI, FEELING_LABEL, FeelingLevel, Workout, WorkoutEntry, WorkoutSet, setMaxWeight } from '../../../core/models/workout.model';
+import { FEELING_LABEL, FeelingLevel, Workout, WorkoutEntry, WorkoutSet, setMaxWeight } from '../../../core/models/workout.model';
 import { FitnessGoal, FITNESS_GOAL_LABELS } from '../../../core/models/user-settings.model';
 import { ExerciseService } from '../../../core/services/exercise.service';
 import { OfflineService } from '../../../core/services/offline.service';
@@ -12,6 +12,7 @@ import { UserSettingsService } from '../../../core/services/user-settings.servic
 import { WorkoutService } from '../../../core/services/workout.service';
 import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component';
 import { kgToDisplay, displayToKg, weightStep } from '../../utils/weight.utils';
+import { formatFeeling } from '../../utils/workout-card.utils';
 import { ExerciseEntryCardComponent } from '../exercise-entry-card/exercise-entry-card.component';
 import { FeedbackService } from '../../services/feedback.service';
 
@@ -88,6 +89,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
             [maxWeight]="entryMaxWeight(entry)"
             [unit]="unit()"
             [feelingLevel]="entry.feeling"
+            [difficultyScale]="settingsService.difficultyScale()"
             [prBadge]="prExerciseIds().has(entry.exerciseId)"
             [showStatsAction]="!offlineService.isOffline() && !groupingMode()"
             [showDeleteAction]="(alwaysEditable() || editMode()) && !groupingMode()"
@@ -121,12 +123,10 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
               </div>
             }
 
-            <!-- ── Last session info banner ── -->
+            <!-- ── Last session info banner (read-only — adding sets only ever
+                 happens via the "Afegir" button below) ── -->
             @if (lastSessionData()?.exerciseId === entry.exerciseId && entry.sets.length === 0 && addingFor() === entry.exerciseId && !recData()) {
-              <div class="we-last-session-banner" role="button" tabindex="0"
-                (click)="applyLastSession(entry.exerciseId)"
-                (keydown.enter)="applyLastSession(entry.exerciseId)"
-                (keydown.space)="applyLastSession(entry.exerciseId)">
+              <div class="we-last-session-banner">
                 <span class="material-symbols-outlined we-lsb-icon">history</span>
                 <div class="we-lsb-info">
                   <span class="we-lsb-label">Última sessió</span>
@@ -194,6 +194,18 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                               <button type="button" (click)="adjustEditReps(1)" aria-label="Més repeticions">+</button>
                             </div>
                           </div>
+                          @if (rirEnabled()) {
+                            <div class="we-inline-group">
+                              <label for="edit-rir">RIR</label>
+                              <div class="we-number-input compact">
+                                <button type="button" (click)="adjustEditRir(-1)" aria-label="Menys RIR">−</button>
+                                <input id="edit-rir" type="number" [value]="editRirValue() ?? ''" placeholder="—"
+                                       (change)="setEditRir($any($event.target).value)" min="0" step="1"
+                                       (focus)="$any($event.target).select()">
+                                <button type="button" (click)="adjustEditRir(1)" aria-label="Més RIR">+</button>
+                              </div>
+                            </div>
+                          }
                         </div>
                         <div class="we-drop-stages">
                           @for (d of editDropStages(); track $index) {
@@ -214,11 +226,18 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                               </button>
                             </div>
                           }
-                          <button type="button" class="we-add-drop-btn" (click)="addEditDropStage()">
-                            <span class="material-symbols-outlined">add</span>
-                            {{ editDropStages().length === 0 ? 'Afegir dropset' : 'Afegir un altre tram' }}
-                          </button>
+                          @if (dropsetsEnabled() || editDropStages().length > 0) {
+                            <button type="button" class="we-add-drop-btn" (click)="addEditDropStage()">
+                              <span class="material-symbols-outlined">add</span>
+                              {{ editDropStages().length === 0 ? 'Afegir dropset' : 'Afegir un altre tram' }}
+                            </button>
+                          }
                         </div>
+                        <button type="button" class="we-warmup-chip" [class.we-warmup-chip--active]="editIsWarmupSet()"
+                                (click)="editIsWarmupSet.set(!editIsWarmupSet())">
+                          <span class="material-symbols-outlined">local_fire_department</span>
+                          Sèrie d'escalfament
+                        </button>
                         <div class="we-inline-actions">
                           <button type="button" class="we-inline-cancel" (click)="cancelEditSet()">Cancel·lar</button>
                           <button type="submit" class="we-inline-save" [disabled]="editSetForm.invalid">Desar</button>
@@ -227,10 +246,16 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                     </div>
                   } @else {
                     <!-- Set row: tap to edit when entry is editable -->
-                    <div class="we-set-row"
+                    <div class="we-set-row" [class.we-set-row--warmup]="set.warmup"
                          [class.we-set-row-tappable]="isEntryEditable(entry.exerciseId)"
                          (click)="isEntryEditable(entry.exerciseId) && startEditSet(entry.exerciseId, $index, set)">
-                      <span class="we-set-num">{{ $index + 1 }}</span>
+                      <span class="we-set-num">
+                        @if (set.warmup) {
+                          <span class="material-symbols-outlined we-warmup-icon" title="Sèrie d'escalfament">local_fire_department</span>
+                        } @else {
+                          {{ $index + 1 }}
+                        }
+                      </span>
                       <div class="we-set-pills">
                         @if (set.weightLeft != null) {
                           <span class="we-set-pill weight side"
@@ -248,6 +273,9 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                             (click)="tapSetPill($event, entry.exerciseId, $index, set)">
                             {{ set.reps }}<small>r</small>
                           </span>
+                          @if (set.rir != null) {
+                            <span class="we-set-pill rir">{{ set.rir }}<small>RIR</small></span>
+                          }
                           @for (d of (set.drops ?? []); track $index) {
                             <span class="we-chain-arrow">→</span>
                             <span class="we-set-pill weight drop">{{ dispW(d.weight) }}<small>{{ unit() }}</small></span>
@@ -268,7 +296,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                           </span>
                         } @else {
                           <span class="we-set-pill weight"
-                            [class.we-set-pill--pr]="prExerciseIds().has(entry.exerciseId) && set.weight > 0 && set.weight === entryMaxWeight(entry)"
+                            [class.we-set-pill--pr]="!set.warmup && prExerciseIds().has(entry.exerciseId) && set.weight > 0 && set.weight === entryMaxWeight(entry)"
                             [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
                             (click)="tapSetPill($event, entry.exerciseId, $index, set)">
                             {{ dispW(set.weight) }}<small>{{ unit() }}</small>
@@ -278,6 +306,9 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                             (click)="tapSetPill($event, entry.exerciseId, $index, set)">
                             {{ set.reps }}<small>r</small>
                           </span>
+                          @if (set.rir != null) {
+                            <span class="we-set-pill rir">{{ set.rir }}<small>RIR</small></span>
+                          }
                         }
                       </div>
                       @if (isEntryEditable(entry.exerciseId)) {
@@ -329,6 +360,18 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                         <button type="button" (click)="adjustReps(1)" aria-label="Més repeticions">+</button>
                       </div>
                     </div>
+                    @if (rirEnabled()) {
+                      <div class="we-input-group">
+                        <label for="add-rir">RIR</label>
+                        <div class="we-number-input compact">
+                          <button type="button" (click)="adjustRir(-1)" aria-label="Menys RIR">−</button>
+                          <input id="add-rir" type="number" [value]="rirValue() ?? ''" placeholder="—"
+                                 (change)="setRir($any($event.target).value)" min="0" step="1"
+                                 (focus)="$any($event.target).select()">
+                          <button type="button" (click)="adjustRir(1)" aria-label="Més RIR">+</button>
+                        </div>
+                      </div>
+                    }
                   </div>
                   @if (dropStages().length === 0) {
                     <div class="we-qty-row">
@@ -339,6 +382,11 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                       }
                     </div>
                   }
+                  <button type="button" class="we-warmup-chip" [class.we-warmup-chip--active]="isWarmupSet()"
+                          (click)="isWarmupSet.set(!isWarmupSet())">
+                    <span class="material-symbols-outlined">local_fire_department</span>
+                    Sèrie d'escalfament
+                  </button>
                   <div class="we-drop-stages">
                     @for (d of dropStages(); track $index) {
                       <div class="we-drop-stage-row">
@@ -358,10 +406,12 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                         </button>
                       </div>
                     }
-                    <button type="button" class="we-add-drop-btn" (click)="addDropStage()">
-                      <span class="material-symbols-outlined">add</span>
-                      {{ dropStages().length === 0 ? 'Afegir dropset' : 'Afegir un altre tram' }}
-                    </button>
+                    @if (dropsetsEnabled() || dropStages().length > 0) {
+                      <button type="button" class="we-add-drop-btn" (click)="addDropStage()">
+                        <span class="material-symbols-outlined">add</span>
+                        {{ dropStages().length === 0 ? 'Afegir dropset' : 'Afegir un altre tram' }}
+                      </button>
+                    }
                   </div>
                   <div class="we-set-form-actions">
                     <button type="button" class="we-cancel-btn" (click)="cancelSet()">
@@ -679,8 +729,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       display: flex; align-items: center; gap: 10px;
       margin: 10px 14px; padding: 10px 14px;
       background: rgba(var(--c-brand-rgb), 0.07); border: 1px solid rgba(var(--c-brand-rgb), 0.15);
-      border-radius: 10px; cursor: pointer; transition: background 0.15s;
-      &:hover { background: rgba(var(--c-brand-rgb), 0.13); }
+      border-radius: 10px;
     }
     .we-lsb-icon { font-size: 20px; color: var(--c-brand); flex-shrink: 0; }
     .we-lsb-info { display: flex; flex-direction: column; gap: 1px; flex: 1; }
@@ -815,11 +864,17 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
         &:hover { background: rgba(var(--c-brand-rgb), 0.05); }
         &:active { background: rgba(var(--c-brand-rgb), 0.1); }
       }
+      &.we-set-row--warmup { opacity: 0.75; }
     }
 
     .we-set-num {
+      display: flex; align-items: center; justify-content: center;
       color: var(--c-text-3); font-size: 12px; font-weight: 500;
       width: 20px; text-align: center; flex-shrink: 0;
+    }
+    .we-warmup-icon {
+      font-size: 16px; color: #ff9800;
+      font-variation-settings: 'FILL' 1, 'wght' 400;
     }
 
     .we-set-pills { flex: 1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -830,6 +885,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       small { font-size: 11px; font-weight: 500; opacity: 0.7; }
       &.weight { background: rgba(var(--c-brand-rgb), 0.1); color: var(--c-brand); }
       &.reps   { background: var(--c-border-2); color: var(--c-text-2); }
+      &.rir    { background: rgba(255, 152, 0, 0.12); color: #ff9800; padding: 6px 10px; font-size: 13px; }
       &.we-set-pill--tap {
         cursor: pointer; transition: filter 0.12s;
         &:hover { filter: brightness(0.93); }
@@ -1010,6 +1066,21 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
         color: var(--c-brand);
       }
     }
+    .we-warmup-chip {
+      display: inline-flex; align-items: center; gap: 6px; align-self: flex-start;
+      padding: 8px 12px; border-radius: 10px;
+      border: 1.5px solid var(--c-border); background: var(--c-card);
+      color: var(--c-text-2); font-size: 13px; font-weight: 600;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 17px; }
+      &:hover { border-color: #ff9800; color: #ff9800; }
+      &:active { transform: scale(0.96); }
+      &.we-warmup-chip--active {
+        border-color: #ff9800;
+        background: rgba(255, 152, 0, 0.12);
+        color: #ff9800;
+      }
+    }
     .we-set-form-actions {
       display: flex; align-items: center; gap: 8px;
     }
@@ -1151,7 +1222,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 export class WorkoutEditorComponent implements OnDestroy {
   private workoutService   = inject(WorkoutService);
   private exerciseService  = inject(ExerciseService);
-  private settingsService  = inject(UserSettingsService);
+  readonly settingsService = inject(UserSettingsService);
   readonly offlineService  = inject(OfflineService);
   private feedback         = inject(FeedbackService);
   private fb               = inject(FormBuilder);
@@ -1190,6 +1261,14 @@ export class WorkoutEditorComponent implements OnDestroy {
   // ── Dropsets ─────────────────────────────────────────────────────────────
   readonly dropStages     = signal<{ weight: number; reps: number }[]>([]);
   readonly editDropStages = signal<{ weight: number; reps: number }[]>([]);
+
+  // ── Warm-up sets ─────────────────────────────────────────────────────────
+  readonly isWarmupSet     = signal(false);
+  readonly editIsWarmupSet = signal(false);
+
+  // ── RIR (Reps In Reserve) ────────────────────────────────────────────────
+  readonly rirValue     = signal<number | null>(null);
+  readonly editRirValue = signal<number | null>(null);
 
   // ── Superset grouping ───────────────────────────────────────────────────
   readonly selectedForGroup = signal<Set<string>>(new Set());
@@ -1233,6 +1312,8 @@ export class WorkoutEditorComponent implements OnDestroy {
   });
   // ── Rest timer ─────────────────────────────────────────────────────────────
   readonly restTimerEnabled = computed(() => this.settingsService.restTimerSeconds() > 0);
+  readonly dropsetsEnabled  = computed(() => this.settingsService.dropsetsEnabled());
+  readonly rirEnabled       = computed(() => this.settingsService.rirEnabled());
   readonly timerActive    = signal(false);
   readonly timerRemaining = signal(0);
   readonly timerTotal     = signal(0);
@@ -1406,9 +1487,13 @@ export class WorkoutEditorComponent implements OnDestroy {
     this.setQty.set(1);
     this.setForm.reset({ weight: 0, weightRight: 0, reps: 8 });
     this.dropStages.set([]);
+    this.isWarmupSet.set(false);
+    this.rirValue.set(null);
   }
 
-  getFeelingEmoji(level: FeelingLevel): string { return FEELING_EMOJI[level]; }
+  getFeelingEmoji(level: FeelingLevel): string {
+    return formatFeeling(level, this.settingsService.difficultyScale());
+  }
   getFeelingLabel(level: FeelingLevel): string { return FEELING_LABEL[level]; }
 
   openFatigaPicker(exerciseId: string): void { this.feelingPickerFor.set(exerciseId); }
@@ -1506,7 +1591,7 @@ export class WorkoutEditorComponent implements OnDestroy {
   }
 
   entryMaxWeight(entry: WorkoutEntry): number {
-    return entry.sets.reduce((m, s) => Math.max(m, setMaxWeight(s)), 0);
+    return entry.sets.reduce((m, s) => s.warmup ? m : Math.max(m, setMaxWeight(s)), 0);
   }
 
   isUnilateral(entry: WorkoutEntry): boolean {
@@ -1560,6 +1645,21 @@ export class WorkoutEditorComponent implements OnDestroy {
     this.editSetForm.patchValue({ reps: Math.max(1, v) });
   }
 
+  adjustRir(delta: number): void {
+    this.rirValue.set(Math.max(0, (this.rirValue() ?? 0) + delta));
+  }
+  setRir(raw: string): void {
+    const n = parseInt(raw, 10);
+    this.rirValue.set(isNaN(n) ? null : Math.max(0, n));
+  }
+  adjustEditRir(delta: number): void {
+    this.editRirValue.set(Math.max(0, (this.editRirValue() ?? 0) + delta));
+  }
+  setEditRir(raw: string): void {
+    const n = parseInt(raw, 10);
+    this.editRirValue.set(isNaN(n) ? null : Math.max(0, n));
+  }
+
   async setEntryFeeling(entry: WorkoutEntry, level: FeelingLevel): Promise<void> {
     const w = this.workout();
     if (!w) return;
@@ -1579,6 +1679,8 @@ export class WorkoutEditorComponent implements OnDestroy {
     this._expandEntry(entry.exerciseId);
     this.editingSet.set(null);
     this.addingFor.set(entry.exerciseId);
+    this.isWarmupSet.set(false);
+    this.rirValue.set(null);
     const w    = this.workout();
     const u    = this.unit();
     const goal = this.settingsService.fitnessGoal();
@@ -1658,6 +1760,7 @@ export class WorkoutEditorComponent implements OnDestroy {
       await this.workoutService.addSetsToEntry(w.id, entry.exerciseId, [{
         weight: last.weight, reps: last.reps,
         ...(last.weightLeft != null ? { weightLeft: last.weightLeft, weightRight: last.weightRight } : {}),
+        ...(last.warmup ? { warmup: true } : {}),
       }]);
     } catch {
       this.feedback.error('Error en repetir', 2000);
@@ -1684,11 +1787,15 @@ export class WorkoutEditorComponent implements OnDestroy {
       reps: set.reps,
     });
     this.editDropStages.set((set.drops ?? []).map(d => ({ weight: kgToDisplay(d.weight, this.unit()), reps: d.reps })));
+    this.editIsWarmupSet.set(!!set.warmup);
+    this.editRirValue.set(set.rir ?? null);
   }
 
   cancelEditSet(): void {
     this.editingSet.set(null);
+    this.editIsWarmupSet.set(false);
     this.editDropStages.set([]);
+    this.editRirValue.set(null);
   }
 
   async saveEditSet(): Promise<void> {
@@ -1709,6 +1816,8 @@ export class WorkoutEditorComponent implements OnDestroy {
         reps: reps!,
         ...(unilateral ? { weightLeft: weightKg, weightRight: weightRightKg } : {}),
         ...(drops.length > 0 ? { drops: drops.map(d => ({ weight: displayToKg(d.weight, this.unit()), reps: d.reps })) } : {}),
+        ...(this.editIsWarmupSet() ? { warmup: true } : {}),
+        ...(this.editRirValue() != null ? { rir: this.editRirValue()! } : {}),
       });
       this.cancelEditSet();
     } catch {
@@ -1726,9 +1835,12 @@ export class WorkoutEditorComponent implements OnDestroy {
     const weightKg      = displayToKg(weight!, this.unit());
     const weightRightKg = displayToKg(weightRight!, this.unit());
     const drops = this.dropStages();
+    const warmup = this.isWarmupSet();
+    const rir = this.rirValue();
+    const extra = { ...(warmup ? { warmup } : {}), ...(rir != null ? { rir } : {}) };
     const baseSet: WorkoutSet = unilateral
-      ? { weight: Math.max(weightKg, weightRightKg), reps: reps!, weightLeft: weightKg, weightRight: weightRightKg }
-      : { weight: weightKg, reps: reps! };
+      ? { weight: Math.max(weightKg, weightRightKg), reps: reps!, weightLeft: weightKg, weightRight: weightRightKg, ...extra }
+      : { weight: weightKg, reps: reps!, ...extra };
     const sets: WorkoutSet[] = drops.length > 0
       ? [{ ...baseSet, drops: drops.map(d => ({ weight: displayToKg(d.weight, this.unit()), reps: d.reps })) }]
       : Array.from({ length: count }, () => ({ ...baseSet }));
@@ -1740,18 +1852,6 @@ export class WorkoutEditorComponent implements OnDestroy {
     }
   }
 
-  async applyLastSession(exerciseId: string): Promise<void> {
-    const data = this.lastSessionData();
-    const w    = this.workout();
-    if (!data || !w || data.sets.length === 0) return;
-    try {
-      await this.workoutService.addSetsToEntry(w.id, exerciseId, data.sets);
-      this.lastSessionData.set(null);
-      this.cancelSet();
-    } catch {
-      this.feedback.error('Error en aplicar l\'última sessió', 3000);
-    }
-  }
 
   async removeSet(exerciseId: string, index: number): Promise<void> {
     const w = this.workout();

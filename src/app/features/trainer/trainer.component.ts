@@ -7,13 +7,15 @@ import { ConfirmDialogService } from '../../shared/services/confirm-dialog.servi
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { TrainerService } from '../../core/services/trainer.service';
+import { UserSettingsService } from '../../core/services/user-settings.service';
 import {
   ClientGoals, TrainerClient, TrainerProposal, WEEKDAY_FULL, WEEKDAY_LABELS,
 } from '../../core/models/trainer.model';
 import {
   FITNESS_GOAL_EMOJIS, FITNESS_GOAL_LABELS,
 } from '../../core/models/user-settings.model';
-import { Workout, FEELING_EMOJI } from '../../core/models/workout.model';
+import { FeelingLevel, Workout } from '../../core/models/workout.model';
+import { formatFeeling } from '../../shared/utils/workout-card.utils';
 
 type DashboardView = 'clients' | 'detail';
 
@@ -688,6 +690,7 @@ type DashboardView = 'clients' | 'detail';
 })
 export class TrainerComponent implements OnInit {
   readonly trainerService = inject(TrainerService);
+  private settingsService = inject(UserSettingsService);
   private feedback        = inject(FeedbackService);
   private confirmDialog   = inject(ConfirmDialogService);
 
@@ -822,8 +825,8 @@ export class TrainerComponent implements OnInit {
     return MAP[cat] ?? cat;
   }
 
-  feelingEmoji(f: number): string {
-    return FEELING_EMOJI[f as keyof typeof FEELING_EMOJI] ?? '';
+  feelingEmoji(f: FeelingLevel): string {
+    return formatFeeling(f, this.settingsService.difficultyScale());
   }
 
   // ── Invite ─────────────────────────────────────────────────────────────────

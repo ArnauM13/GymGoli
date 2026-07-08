@@ -7,7 +7,7 @@ import {
   CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, SUBCATEGORY_LABELS,
   ExerciseCategory,
 } from '../../core/models/exercise.model';
-import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry, WorkoutSet, setMaxWeight, setVolume } from '../../core/models/workout.model';
+import { FeelingLevel, Workout, WorkoutEntry, WorkoutSet, setMaxWeight, setVolume } from '../../core/models/workout.model';
 import { Sport, SportSubtype } from '../../core/models/sport.model';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
@@ -16,6 +16,7 @@ import { SportService } from '../../core/services/sport.service';
 import { AuthService } from '../../core/services/auth.service';
 import { kgToDisplay } from '../../shared/utils/weight.utils';
 import { mondayOf } from '../../shared/utils/calendar-utils';
+import { formatFeeling } from '../../shared/utils/workout-card.utils';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { FilterBarComponent } from '../../shared/components/filter-bar/filter-bar.component';
@@ -950,7 +951,9 @@ export class CalendarPageComponent implements OnDestroy {
     return cats.length > 0 ? this.getCatColor(cats[0]) : 'var(--c-border-2)';
   }
 
-  getFeelingEmoji(level: FeelingLevel): string { return FEELING_EMOJI[level]; }
+  getFeelingEmoji(level: FeelingLevel): string {
+    return formatFeeling(level, this.settingsService.difficultyScale());
+  }
   getCatColor(cat: string): string { return CATEGORY_COLORS[cat as ExerciseCategory] ?? '#bbb'; }
   getCatLabel(cat: string): string { return CATEGORY_LABELS[cat as ExerciseCategory] ?? cat; }
   getCatIcon(cat: string): string { return CATEGORY_ICONS[cat as ExerciseCategory] ?? 'fitness_center'; }
@@ -970,8 +973,9 @@ export class CalendarPageComponent implements OnDestroy {
     return sub ? (SUBCATEGORY_LABELS[sub] ?? sub) : '';
   }
   getMaxWeight(entry: WorkoutEntry): number {
-    if (!entry.sets.length) return 0;
-    return Math.max(...entry.sets.map(s => setMaxWeight(s)));
+    const workingSets = entry.sets.filter(s => !s.warmup);
+    if (!workingSets.length) return 0;
+    return Math.max(...workingSets.map(s => setMaxWeight(s)));
   }
 
   getDay(date: string): string {
@@ -990,7 +994,7 @@ export class CalendarPageComponent implements OnDestroy {
   }
   totalVolume(workout: Workout): number {
     return Math.round(workout.entries.reduce((t, e) =>
-      t + e.sets.reduce((s, set) => s + setVolume(set), 0), 0
+      t + e.sets.reduce((s, set) => set.warmup ? s : s + setVolume(set), 0), 0
     ));
   }
   volumeFmt(workout: Workout): string {
@@ -1007,7 +1011,7 @@ export class CalendarPageComponent implements OnDestroy {
     return names.slice(0, 2).join(' · ') + ` +${names.length - 2}`;
   }
   isMaxSet(entry: WorkoutEntry, set: WorkoutSet): boolean {
-    if (entry.sets.length <= 1) return false;
+    if (set.warmup || entry.sets.length <= 1) return false;
     const max = this.getMaxWeight(entry);
     if (max === 0) return false;
     return entry.sets.some(s => setMaxWeight(s) !== max) && setMaxWeight(set) === max;

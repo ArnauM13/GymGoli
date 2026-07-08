@@ -354,7 +354,7 @@ export class WorkoutService {
     for (const w of this._historical()) {
       if (w.id === excludeWorkoutId) continue;
       const entry = w.entries.find(e => e.exerciseId === exerciseId);
-      if (entry) for (const s of entry.sets) { const m = setMaxWeight(s); if (m > max) max = m; }
+      if (entry) for (const s of entry.sets) { if (s.warmup) continue; const m = setMaxWeight(s); if (m > max) max = m; }
     }
     return max;
   }
@@ -367,8 +367,9 @@ export class WorkoutService {
       )
       .sort((a, b) => b.date.localeCompare(a.date));
     if (!past.length) return null;
-    const entry     = past[0].entries.find(e => e.exerciseId === exerciseId)!;
-    const maxWeight = Math.max(...entry.sets.map(s => setMaxWeight(s)));
+    const entry       = past[0].entries.find(e => e.exerciseId === exerciseId)!;
+    const workingSets = entry.sets.filter(s => !s.warmup);
+    const maxWeight   = Math.max(...(workingSets.length ? workingSets : entry.sets).map(s => setMaxWeight(s)));
     return { date: past[0].date, maxWeight, feeling: entry.feeling };
   }
 

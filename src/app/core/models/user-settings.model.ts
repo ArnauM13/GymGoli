@@ -4,6 +4,9 @@ export type GoalMode = 'combined' | 'separate';
 export type WeightUnit = 'kg' | 'lb';
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type FitnessGoal = 'strength' | 'fitness' | 'weight' | 'sport';
+/** How exercise/set difficulty is entered and shown — the same underlying
+ *  1-5 feeling value, either as an emoji picker or a 1-10 numeric scale. */
+export type DifficultyScale = 'emoji' | 'numeric';
 
 export const FITNESS_GOAL_LABELS: Record<FitnessGoal, string> = {
   strength: 'Guanyar força',
@@ -40,6 +43,13 @@ export interface UserSettings {
   weeklyPlan: WeeklyPlan | null;
   /** User asked to stop seeing the "set up a routine" reminder on Train. */
   routineHintDismissed: boolean;
+  /** Off by default — advanced workout-editor features that clutter the
+   *  set-adding flow for most users. */
+  supersetsEnabled: boolean;
+  dropsetsEnabled:  boolean;
+  /** Off by default — logging Reps In Reserve per set. */
+  rirEnabled: boolean;
+  difficultyScale: DifficultyScale;
 }
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
@@ -55,4 +65,8 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   fitnessGoal: null,
   weeklyPlan: null,
   routineHintDismissed: false,
+  supersetsEnabled: false,
+  dropsetsEnabled: false,
+  rirEnabled: false,
+  difficultyScale: 'emoji',
 };

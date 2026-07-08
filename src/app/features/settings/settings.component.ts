@@ -13,7 +13,7 @@ import { TrainerService } from '../../core/services/trainer.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
 import {
-  FitnessGoal, GoalMode, ThemeMode, WeightUnit,
+  DifficultyScale, FitnessGoal, GoalMode, ThemeMode, WeightUnit,
   FITNESS_GOAL_EMOJIS, FITNESS_GOAL_LABELS, FITNESS_GOAL_WEEKLY_DEFAULTS,
 } from '../../core/models/user-settings.model';
 
@@ -296,6 +296,53 @@ import {
             (change)="toggleMetrics()"
             color="primary"
           />
+        </div>
+
+        <div class="setting-row setting-row--top">
+          <div class="setting-info">
+            <span class="setting-label">Agrupar en superset</span>
+            <span class="setting-desc">Permet enllaçar exercicis perquè es facin seguits, sense descans.</span>
+          </div>
+          <mat-slide-toggle
+            [checked]="settingsService.supersetsEnabled()"
+            (change)="toggleSupersets()"
+            color="primary"
+          />
+        </div>
+
+        <div class="setting-row setting-row--top">
+          <div class="setting-info">
+            <span class="setting-label">Dropsets</span>
+            <span class="setting-desc">Permet afegir trams a pes reduït immediatament després d'una sèrie.</span>
+          </div>
+          <mat-slide-toggle
+            [checked]="settingsService.dropsetsEnabled()"
+            (change)="toggleDropsets()"
+            color="primary"
+          />
+        </div>
+
+        <div class="setting-row setting-row--top">
+          <div class="setting-info">
+            <span class="setting-label">RIR (Reps In Reserve)</span>
+            <span class="setting-desc">Permet registrar quantes repeticions et quedaven a cada sèrie.</span>
+          </div>
+          <mat-slide-toggle
+            [checked]="settingsService.rirEnabled()"
+            (change)="toggleRir()"
+            color="primary"
+          />
+        </div>
+
+        <div class="setting-row setting-row--top">
+          <div class="setting-info">
+            <span class="setting-label">Escala de dificultat</span>
+            <span class="setting-desc">Com es mostra i es registra la sensació de cada exercici.</span>
+          </div>
+          <div class="unit-toggle">
+            <button class="unit-btn" [class.unit-btn--active]="settingsService.difficultyScale() === 'emoji'" (click)="setDifficultyScale('emoji')">😐</button>
+            <button class="unit-btn" [class.unit-btn--active]="settingsService.difficultyScale() === 'numeric'" (click)="setDifficultyScale('numeric')">1-10</button>
+          </div>
         </div>
 
       </div>
@@ -854,6 +901,22 @@ export class SettingsComponent {
 
   toggleMetrics(): void {
     this.settingsService.update({ metricsEnabled: !this.settingsService.metricsEnabled() });
+  }
+
+  toggleSupersets(): void {
+    this.settingsService.update({ supersetsEnabled: !this.settingsService.supersetsEnabled() });
+  }
+
+  toggleDropsets(): void {
+    this.settingsService.update({ dropsetsEnabled: !this.settingsService.dropsetsEnabled() });
+  }
+
+  toggleRir(): void {
+    this.settingsService.update({ rirEnabled: !this.settingsService.rirEnabled() });
+  }
+
+  setDifficultyScale(scale: DifficultyScale): void {
+    this.settingsService.update({ difficultyScale: scale });
   }
 
   setGoalMode(mode: GoalMode): void {

@@ -64,6 +64,10 @@ describe('SettingsComponent', () => {
             weeklyGymGoal:      mockGymGoal,
             weeklySportGoal:    mockSportGoal,
             fitnessGoal:        signal(null),
+            supersetsEnabled:   signal(false),
+            dropsetsEnabled:    signal(false),
+            rirEnabled:         signal(false),
+            difficultyScale:    signal('emoji'),
             loaded:             signal(true),
             settings:           signal({
               metricsEnabled: false,
@@ -157,6 +161,22 @@ describe('SettingsComponent', () => {
     it('calls update exactly once per toggle', () => {
       component.toggleMetrics();
       expect(mockUpdate).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ── toggleSupersets() / toggleDropsets() ────────────────────────────────
+
+  describe('toggleSupersets()', () => {
+    it('enables supersets when currently disabled', () => {
+      component.toggleSupersets();
+      expect(mockUpdate).toHaveBeenCalledWith({ supersetsEnabled: true });
+    });
+  });
+
+  describe('toggleDropsets()', () => {
+    it('enables dropsets when currently disabled', () => {
+      component.toggleDropsets();
+      expect(mockUpdate).toHaveBeenCalledWith({ dropsetsEnabled: true });
     });
   });
 

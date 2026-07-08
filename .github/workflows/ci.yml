@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check (app)
+        run: npx tsc --noEmit -p tsconfig.app.json
+
+      - name: Type-check (tests)
+        run: npx tsc --noEmit -p tsconfig.spec.json
+
+      - name: Run unit tests
+        run: npx ng test --watch=false --browsers=ChromeHeadlessNoSandbox
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
+
+      - name: Production build
+        run: npx ng build --configuration production

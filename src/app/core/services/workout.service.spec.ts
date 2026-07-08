@@ -222,4 +222,36 @@ describe('WorkoutService', () => {
       expect(service.getLastSessionInfo('a')?.maxWeight).toBe(22);
     });
   });
+
+  describe('warm-up sets are excluded from max-weight lookups', () => {
+    it('getAllTimeMaxWeight() ignores a heavier warm-up set', async () => {
+      const id = await service.createWorkoutForDate('2024-03-06');
+      await service.addExerciseToWorkout(id, { exerciseId: 'a', exerciseName: 'A', sets: [] });
+      await service.addSetsToEntry(id, 'a', [
+        { weight: 100, reps: 10, warmup: true },
+        { weight: 60, reps: 8 },
+      ]);
+
+      expect(service.getAllTimeMaxWeight('a')).toBe(60);
+    });
+
+    it('getLastSessionInfo() ignores a heavier warm-up set', async () => {
+      const id = await service.createWorkoutForDate('2024-03-06');
+      await service.addExerciseToWorkout(id, { exerciseId: 'a', exerciseName: 'A', sets: [] });
+      await service.addSetsToEntry(id, 'a', [
+        { weight: 100, reps: 10, warmup: true },
+        { weight: 60, reps: 8 },
+      ]);
+
+      expect(service.getLastSessionInfo('a')?.maxWeight).toBe(60);
+    });
+
+    it('getLastSessionInfo() falls back to warm-up sets when there are no working sets', async () => {
+      const id = await service.createWorkoutForDate('2024-03-06');
+      await service.addExerciseToWorkout(id, { exerciseId: 'a', exerciseName: 'A', sets: [] });
+      await service.addSetsToEntry(id, 'a', [{ weight: 40, reps: 10, warmup: true }]);
+
+      expect(service.getLastSessionInfo('a')?.maxWeight).toBe(40);
+    });
+  });
 });

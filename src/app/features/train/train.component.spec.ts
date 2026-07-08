@@ -90,6 +90,7 @@ describe('TrainComponent', () => {
           useValue: {
             weightUnit: signal<'kg' | 'lb'>('kg'), fitnessGoal: signal(null), loaded: signal(true),
             weeklyPlan: weeklyPlanSignal, settings: settingsSignal, update: updateSettings,
+            supersetsEnabled: signal(false), dropsetsEnabled: signal(false),
           },
         },
         { provide: OfflineService,      useValue: { isOffline: signal(false), forceOffline, toggleForceOffline: jasmine.createSpy() } },
@@ -134,24 +135,6 @@ describe('TrainComponent', () => {
 
     it('falls back to category field when categories is empty', () => {
       expect(component.workoutLabel(makeWorkout({ category: 'legs', categories: [] }))).toBe('Cames');
-    });
-  });
-
-  // ── workoutSetsCount() ───────────────────────────────────────────────────
-
-  describe('workoutSetsCount()', () => {
-    it('returns 0 when there are no entries', () => {
-      expect(component.workoutSetsCount(makeWorkout())).toBe(0);
-    });
-
-    it('sums sets across all entries', () => {
-      const w = makeWorkout({
-        entries: [
-          { exerciseId: 'a', exerciseName: 'A', sets: [{ weight: 60, reps: 10 }, { weight: 60, reps: 8 }] },
-          { exerciseId: 'b', exerciseName: 'B', sets: [{ weight: 80, reps: 5 }] },
-        ],
-      });
-      expect(component.workoutSetsCount(w)).toBe(3);
     });
   });
 
@@ -231,28 +214,6 @@ describe('TrainComponent', () => {
     });
   });
 
-  // ── feedDays() ───────────────────────────────────────────────────────────
-
-  describe('feedDays()', () => {
-    it('includes today when there is a done workout for it', async () => {
-      const getDoneWorkoutsForDate = TestBed.inject(WorkoutService).getDoneWorkoutsForDate as jasmine.Spy;
-      getDoneWorkoutsForDate.and.callFake((date: string) => date === TODAY ? [makeWorkout()] : []);
-      // feedDays() is a computed whose only tracked signal is feedMonthsBack —
-      // bump it (as the real infinite-scroll would) so it re-derives against
-      // the spy's new return value instead of reusing the cached empty result.
-      await component.loadMoreFeedMonths();
-
-      const days = component.feedDays();
-      expect(days.length).toBe(1);
-      expect(days[0].date).toBe(TODAY);
-      expect(days[0].workouts.length).toBe(1);
-    });
-
-    it('is empty when nothing was done in the loaded range', () => {
-      expect(component.feedDays()).toEqual([]);
-    });
-  });
-
   // ── isToday() ────────────────────────────────────────────────────────────
 
   describe('isToday()', () => {
@@ -295,55 +256,6 @@ describe('TrainComponent', () => {
       const chip = (fixture.nativeElement as HTMLElement).querySelector('.qa-chip') as HTMLButtonElement;
       chip.click();
       expect(navigateSpy).toHaveBeenCalledWith(['/train/planner']);
-    });
-  });
-
-  // ── isPlanned() ──────────────────────────────────────────────────────────
-
-  describe('isPlanned()', () => {
-    it('is true for a workout with status "planned"', () => {
-      expect(component.isPlanned(makeWorkout({ status: 'planned' }))).toBeTrue();
-    });
-
-    it('is false for a done workout (or one without a status)', () => {
-      expect(component.isPlanned(makeWorkout())).toBeFalse();
-    });
-  });
-
-  // ── feedDays() includes today's pending plan ────────────────────────────
-
-  describe('feedDays() — today\'s pending plan', () => {
-    it('includes a planned workout for today alongside anything already done', async () => {
-      const getPlannedForDate = TestBed.inject(WorkoutService).getPlannedForDate as jasmine.Spy;
-      getPlannedForDate.and.callFake((date: string) =>
-        date === TODAY ? [makeWorkout({ id: 'plan1', status: 'planned' })] : []);
-      // feedDays() is a computed whose only tracked signal is feedMonthsBack —
-      // bump it so it re-derives against the spy's new return value.
-      await component.loadMoreFeedMonths();
-
-      const days = component.feedDays();
-      expect(days.length).toBe(1);
-      expect(days[0].date).toBe(TODAY);
-      expect(days[0].workouts.some(w => w.id === 'plan1')).toBeTrue();
-    });
-  });
-
-  // ── todayFeedEntry() / historyFeedDays() ────────────────────────────────
-
-  describe('todayFeedEntry() / historyFeedDays()', () => {
-    it('separates today from the rest of the feed', async () => {
-      const getDoneWorkoutsForDate = TestBed.inject(WorkoutService).getDoneWorkoutsForDate as jasmine.Spy;
-      getDoneWorkoutsForDate.and.callFake((date: string) =>
-        date === TODAY ? [makeWorkout({ id: 'today1' })] : []);
-      await component.loadMoreFeedMonths();
-      await component.loadMoreFeedMonths();
-
-      expect(component.todayFeedEntry()?.date).toBe(TODAY);
-      expect(component.historyFeedDays().every(d => d.date !== TODAY)).toBeTrue();
-    });
-
-    it('todayFeedEntry() is null when nothing is planned or done today', () => {
-      expect(component.todayFeedEntry()).toBeNull();
     });
   });
 
