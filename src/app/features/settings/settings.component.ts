@@ -180,6 +180,18 @@ import {
         }
       </div>
 
+      <!-- ── Progrés ── -->
+      <div class="section">
+        <a class="nav-row" routerLink="/charts">
+          <span class="material-symbols-outlined nav-row-icon">bar_chart</span>
+          <div class="setting-info">
+            <span class="setting-label">El meu progrés</span>
+            <span class="setting-desc">Resum, gràfiques i seguiment de l'objectiu setmanal.</span>
+          </div>
+          <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
+        </a>
+      </div>
+
       <!-- ── Bloc 2: Configuració ── -->
       <div class="section">
         <h2 class="section-title">Configuració</h2>

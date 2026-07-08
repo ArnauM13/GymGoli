@@ -209,13 +209,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           </button>
         </app-page-header>
 
-        <!-- ── Primary CTA ── -->
-        <button class="start-cta" (click)="chooserOpen.set(true)">
-          <span class="material-symbols-outlined">add_circle</span>
-          Fer un nou entrenament
-        </button>
-
-        <!-- ── Trainer proposal card, otherwise today's status ── -->
+        <!-- ── Trainer proposal card ── -->
         @if (activeProposal(); as prop) {
           <div class="proposal-card">
             <div class="proposal-header">
@@ -253,29 +247,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               </button>
             </div>
           </div>
-        } @else {
-          @if (bottomCard(); as bc) {
-            <button class="today-card" [class.today-card--done]="bc.kind !== 'suggestion'"
-                    [style.--sc]="bc.color" (click)="handleBottomCardClick(bc)">
-              <div class="sc-bar"></div>
-              <div class="sc-icon-wrap">
-                <span class="material-symbols-outlined sc-icon"
-                      [class.sc-icon--fill]="bc.kind !== 'suggestion'">{{ bc.icon }}</span>
-              </div>
-              <div class="sc-info">
-                <span class="sc-eyebrow">{{ bc.kind === 'suggestion' ? 'Avui toca' : bc.kind === 'plan' ? 'Pla pendent' : 'Fet avui' }}</span>
-                <span class="sc-label">{{ bc.label }}</span>
-                @if (bc.kind === 'suggestion' && bc.meta) {
-                  <span class="sc-reason">{{ bc.meta }}</span>
-                }
-              </div>
-              @if (bc.kind === 'suggestion') {
-                <span class="material-symbols-outlined sc-chevron">chevron_right</span>
-              } @else if (bc.meta) {
-                <span class="sc-stats">{{ bc.meta }}</span>
-              }
-            </button>
-          }
         }
 
         <!-- ── Creating spinner (brief, while new workout is being saved) ── -->
@@ -314,45 +285,54 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             <div class="feed-day">
               <div class="feed-day-header">{{ feedDayLabel(day.date) }}</div>
               @for (w of day.workouts; track w.id) {
-                <div class="workout-card" [style.--wc]="workoutPrimaryColor(w)" (click)="openWorkout(w.id)">
-                  <div class="wc-bar" [style.background]="workoutCardColor(w)"></div>
-                  <div class="wc-info">
-                    <span class="wc-label">
-                      {{ workoutLabel(w) }}
-                      @if (w.feeling) {
-                        <span class="wc-feeling">{{ emojiOf(w.feeling) }}</span>
-                      }
-                    </span>
-                    <div class="wc-stats">
-                      <span class="wc-stat">
+                <div class="feed-card" [style.--wc]="workoutPrimaryColor(w)" (click)="openWorkout(w.id)">
+                  <div class="fc-bar" [style.background]="workoutCardColor(w)"></div>
+                  <div class="fc-info">
+                    @if (workoutCategoryList(w).length > 0) {
+                      <div class="fc-badges">
+                        @for (cat of workoutCategoryList(w); track cat) {
+                          <span class="fc-badge fc-badge--{{ cat }}">{{ getCatLabel(cat) }}</span>
+                        }
+                      </div>
+                    }
+                    <span class="fc-exercises">{{ getExerciseNames(w) }}</span>
+                    <div class="fc-stats">
+                      <span class="fc-stat">
                         <span class="material-symbols-outlined">fitness_center</span>
                         <strong>{{ w.entries.length }}</strong> exerc
                       </span>
                       @if (workoutSetsCount(w); as n) {
-                        <span class="wc-stat-sep">·</span>
-                        <span class="wc-stat">
+                        <span class="fc-stat-sep">·</span>
+                        <span class="fc-stat">
                           <span class="material-symbols-outlined">repeat</span>
                           <strong>{{ n }}</strong> sèr
                         </span>
                       }
                       @if (workoutVolumeFmt(w); as vol) {
-                        <span class="wc-stat-sep">·</span>
-                        <span class="wc-stat wc-stat--vol">
+                        <span class="fc-stat-sep">·</span>
+                        <span class="fc-stat fc-stat--vol">
                           <span class="material-symbols-outlined">weight</span>
                           <strong>{{ vol }}</strong>
                         </span>
                       }
+                      @if (w.feeling) {
+                        <span class="fc-stat-sep">·</span>
+                        <span class="fc-stat">{{ emojiOf(w.feeling) }}</span>
+                      }
                     </div>
                   </div>
+                  <span class="material-symbols-outlined fc-chevron">chevron_right</span>
                 </div>
               }
               @for (item of day.sports; track item.session.id) {
                 <div class="feed-sport-row" [style.--ic]="item.sport.color">
                   <span class="material-symbols-outlined feed-sport-icon">{{ item.sport.icon }}</span>
-                  <span class="feed-sport-name">{{ item.sport.name }}</span>
-                  @if (sportSummary(item.session, item.sport); as meta) {
-                    <span class="feed-sport-meta">{{ meta }}</span>
-                  }
+                  <div class="fsr-info">
+                    <span class="feed-sport-name">{{ item.sport.name }}</span>
+                    @if (sportSummary(item.session, item.sport); as meta) {
+                      <span class="feed-sport-meta">{{ meta }}</span>
+                    }
+                  </div>
                 </div>
               }
             </div>
@@ -368,6 +348,37 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       }
 
     </div>
+
+    <!-- ── Bottom bar: today status + start button (dashboard only) ── -->
+    @if (!activeWorkout()) {
+      <div class="bottom-bar">
+        @if (bottomCard(); as bc) {
+          <button class="today-card" [class.today-card--done]="bc.kind !== 'suggestion'"
+                  [style.--sc]="bc.color" (click)="handleBottomCardClick(bc)">
+            <div class="sc-bar"></div>
+            <div class="sc-icon-wrap">
+              <span class="material-symbols-outlined sc-icon"
+                    [class.sc-icon--fill]="bc.kind !== 'suggestion'">{{ bc.icon }}</span>
+            </div>
+            <div class="sc-info">
+              <span class="sc-eyebrow">{{ bc.kind === 'suggestion' ? 'Avui toca' : bc.kind === 'plan' ? 'Pla pendent' : 'Fet avui' }}</span>
+              <span class="sc-label">{{ bc.label }}</span>
+              @if (bc.kind === 'suggestion' && bc.meta) {
+                <span class="sc-reason">{{ bc.meta }}</span>
+              }
+            </div>
+            @if (bc.kind === 'suggestion') {
+              <span class="material-symbols-outlined sc-chevron">chevron_right</span>
+            } @else if (bc.meta) {
+              <span class="sc-stats">{{ bc.meta }}</span>
+            }
+          </button>
+        }
+        <button class="bb-fab" (click)="chooserOpen.set(true)" aria-label="Nou entrenament">
+          <span class="material-symbols-outlined">add</span>
+        </button>
+      </div>
+    }
 
     <!-- ── "Nou entrenament" chooser bottom sheet ── -->
     @if (chooserOpen()) {
@@ -667,18 +678,27 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       &:active { opacity: 0.7; }
     }
 
-    /* ── Primary CTA ── */
-    .start-cta {
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      width: calc(100% - 32px); margin: 4px 16px 12px;
-      padding: 15px; border: none; border-radius: 16px;
+    /* ── Bottom bar: today status + start button (dashboard only) ── */
+    .bottom-bar {
+      position: fixed;
+      left: 16px; right: 20px;
+      bottom: calc(var(--nav-height) + 16px);
+      z-index: 89;
+      display: flex; align-items: flex-end; gap: 12px;
+      pointer-events: none;
+    }
+    .bottom-bar > * { pointer-events: auto; }
+    .bb-fab {
+      flex-shrink: 0; margin-left: auto;
+      width: 56px; height: 56px; border-radius: 50%; border: none;
       background: var(--c-brand); color: white;
-      font-size: 15px; font-weight: 700; cursor: pointer;
-      box-shadow: 0 4px 16px rgba(var(--c-brand-rgb), 0.32);
-      transition: background 0.15s, transform 0.1s; touch-action: manipulation;
-      .material-symbols-outlined { font-size: 22px; }
-      &:hover { background: var(--c-brand-dk); }
-      &:active { transform: scale(0.98); }
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation;
+      box-shadow: 0 4px 16px rgba(var(--c-brand-rgb), 0.4), 0 1px 4px var(--c-shadow);
+      transition: background 0.15s, transform 0.15s;
+      .material-symbols-outlined { font-size: 28px; }
+      &:hover { background: var(--c-brand-dk); transform: scale(1.06); }
+      &:active { transform: scale(0.94); }
     }
 
     /* ── Active workout floating header (reuses .workout-card) ── */
@@ -841,19 +861,19 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       to   { opacity: 1; transform: none; }
     }
 
-    /* ── "Avui toca" / today status card (below the CTA) ── */
+    /* ── "Avui toca" / today status card (flex child in .bottom-bar) ── */
     .today-card {
-      width: calc(100% - 32px); margin: 0 16px 12px;
+      flex: 1; min-width: 0;
       display: flex; align-items: center; gap: 0;
       height: 56px; border-radius: 14px; padding: 0;
       border: 1.5px solid color-mix(in srgb, var(--sc) 35%, var(--c-border-2));
       background: color-mix(in srgb, var(--sc) 8%, var(--c-card));
-      box-shadow: 0 2px 10px var(--c-shadow);
+      box-shadow: 0 3px 14px var(--c-shadow-md);
       cursor: pointer; touch-action: manipulation; overflow: hidden;
       animation: pill-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both;
       transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s;
       &:hover {
-        box-shadow: 0 3px 14px var(--c-shadow-md);
+        box-shadow: 0 4px 18px var(--c-shadow-md);
         border-color: color-mix(in srgb, var(--sc) 55%, var(--c-border));
         background: color-mix(in srgb, var(--sc) 13%, var(--c-card));
       }
@@ -974,15 +994,69 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       text-transform: uppercase; letter-spacing: 0.3px;
       margin-bottom: 6px;
     }
+    /* ── Feed workout cards (bigger, richer than the compact .workout-card) ── */
+    .feed-card {
+      display: flex; align-items: center;
+      margin-bottom: 8px;
+      border: 1.5px solid color-mix(in srgb, var(--wc, var(--c-border-2)) 30%, var(--c-border-2));
+      border-radius: 16px;
+      background: color-mix(in srgb, var(--wc, var(--c-card)) 6%, var(--c-card));
+      box-shadow: 0 2px 8px var(--c-shadow); overflow: hidden;
+      cursor: pointer; touch-action: manipulation;
+      transition: box-shadow 0.15s, border-color 0.15s, background 0.15s;
+      &:hover {
+        box-shadow: 0 3px 12px var(--c-shadow-md);
+        background: color-mix(in srgb, var(--wc, var(--c-card)) 10%, var(--c-card));
+        border-color: color-mix(in srgb, var(--wc, var(--c-border)) 45%, var(--c-border));
+      }
+    }
+    .fc-bar { width: 5px; align-self: stretch; flex-shrink: 0; }
+    .fc-info {
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column; gap: 5px;
+      padding: 13px 12px;
+    }
+    .fc-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+    .fc-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 8px;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.2px; line-height: 1.4;
+    }
+    .fc-badge--push { background: rgba(229,115,115,0.15); color: #b71c1c; }
+    .fc-badge--pull { background: rgba(100,181,246,0.15); color: #0d47a1; }
+    .fc-badge--legs { background: rgba(129,199,132,0.15); color: #1b5e20; }
+    html.dark .fc-badge--push { background: rgba(229,115,115,0.18); color: #ef9a9a; }
+    html.dark .fc-badge--pull { background: rgba(100,181,246,0.18); color: #90caf9; }
+    html.dark .fc-badge--legs { background: rgba(129,199,132,0.18); color: #a5d6a7; }
+    .fc-exercises {
+      font-size: 14px; font-weight: 700; color: var(--c-text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .fc-stats {
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+      font-size: 12px; color: var(--c-text-2); font-weight: 500;
+    }
+    .fc-stat {
+      display: inline-flex; align-items: center; gap: 3px;
+      .material-symbols-outlined { font-size: 14px; color: color-mix(in srgb, var(--wc, var(--c-text-3)) 60%, var(--c-text-3)); }
+      strong { font-weight: 700; color: var(--c-text-2); }
+    }
+    .fc-stat-sep { color: var(--c-border); }
+    .fc-stat--vol strong { color: var(--wc, var(--c-brand)); }
+    .fc-chevron { font-size: 22px; color: var(--c-text-3); flex-shrink: 0; margin-right: 8px; }
+
     .feed-sport-row {
-      display: flex; align-items: center; gap: 8px;
-      padding: 10px 12px; margin-bottom: 6px;
-      border: 1.5px solid var(--c-border-2); border-radius: 14px;
+      display: flex; align-items: center; gap: 12px;
+      padding: 13px 14px; margin-bottom: 8px;
+      border: 1.5px solid var(--c-border-2); border-radius: 16px;
       background: color-mix(in srgb, var(--ic, var(--c-card)) 5%, var(--c-card));
     }
-    .feed-sport-icon { font-size: 17px; color: var(--ic, var(--c-text-2)); font-variation-settings: 'FILL' 1; }
-    .feed-sport-name { font-size: 13px; font-weight: 700; color: var(--c-text); flex: 1; min-width: 0; }
-    .feed-sport-meta { font-size: 11px; color: var(--c-text-3); }
+    .feed-sport-icon {
+      font-size: 22px; color: var(--ic, var(--c-text-2)); font-variation-settings: 'FILL' 1;
+      flex-shrink: 0;
+    }
+    .fsr-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+    .feed-sport-name { font-size: 14px; font-weight: 700; color: var(--c-text); }
+    .feed-sport-meta { font-size: 12px; color: var(--c-text-3); }
     .feed-sk { margin: 0 16px; display: flex; flex-direction: column; gap: 8px; }
 
     /* ── Workout summary cards ── */
@@ -1750,6 +1824,21 @@ export class TrainComponent implements OnDestroy {
     const cats = workoutCategories(w);
     if (!cats.length) return 'Entrenament';
     return cats.map(c => CATEGORY_LABELS[c as ExerciseCategory] ?? c).join(' + ');
+  }
+
+  workoutCategoryList(w: Workout): ExerciseCategory[] {
+    return workoutCategories(w) as ExerciseCategory[];
+  }
+
+  getCatLabel(cat: string): string {
+    return CATEGORY_LABELS[cat as ExerciseCategory] ?? cat;
+  }
+
+  getExerciseNames(w: Workout): string {
+    const names = w.entries.map(e => e.exerciseName);
+    if (names.length === 0) return '—';
+    if (names.length <= 3) return names.join(' · ');
+    return names.slice(0, 3).join(' · ') + ` +${names.length - 3}`;
   }
 
   private _brand(): string {

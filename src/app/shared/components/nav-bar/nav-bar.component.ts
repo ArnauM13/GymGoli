@@ -109,7 +109,6 @@ export class NavBarComponent {
     const base: NavItem[] = [
       { path: '/train',    icon: 'exercise',       label: 'Entrena' },
       { path: '/calendar', icon: 'calendar_month',  label: 'Calendari' },
-      { path: '/charts',   icon: 'bar_chart',      label: 'Progrés' },
       { path: '/settings', icon: 'account_circle', label: 'Perfil' },
     ];
     if (this.trainerService.isTrainer()) {
