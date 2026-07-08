@@ -23,27 +23,12 @@ import { ConfirmDialogService } from '../../shared/services/confirm-dialog.servi
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { OfflineService } from '../../core/services/offline.service';
-import { WorkoutProfileService } from '../../core/services/workout-profile.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
 import { FitnessInsightsComponent } from '../../shared/components/fitness-insights/fitness-insights.component';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
-
-type GymSuggestion   = { type: 'gym';   category: ExerciseCategory; label: string; color: string; icon: string; reason?: string };
-type SportSuggestion = { type: 'sport'; sport: Sport;               label: string; color: string; icon: string; reason?: string };
-type TodaySuggestion = GymSuggestion | SportSuggestion;
-
-type BottomCard = {
-  kind: 'workout' | 'suggestion';
-  color: string;
-  icon: string;
-  label: string;
-  meta: string;
-  workoutId?: string;
-  suggestion?: TodaySuggestion;
-};
 
 const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; color: string }[] = [
   { value: 'push', label: CATEGORY_LABELS.push, icon: CATEGORY_ICONS.push, color: CATEGORY_COLORS.push },
@@ -324,16 +309,15 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           }
         </ng-template>
 
-        <!-- ── Avui: insights + whatever's planned or done today ── -->
+        <!-- ── Avui: only today's planned/done workout ── -->
         <div class="today-section">
           <div class="today-header">
             <span class="material-symbols-outlined today-header-icon">today</span>
             <h2 class="today-title">Avui</h2>
+            <button class="today-add-btn" (click)="chooserOpen.set(true)" aria-label="Nou entrenament">
+              <span class="material-symbols-outlined">add</span>
+            </button>
           </div>
-
-          @if (!offlineService.isOffline() && dateWorkouts().length === 0 && dateSportSessions().length === 0) {
-            <app-fitness-insights />
-          }
 
           @if (todayFeedEntry(); as day) {
             <ng-container [ngTemplateOutlet]="dayCards" [ngTemplateOutletContext]="{ $implicit: day }" />
@@ -341,6 +325,10 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             <p class="today-empty">Encara no has fet res avui.</p>
           }
         </div>
+
+        @if (!offlineService.isOffline() && dateWorkouts().length === 0 && dateSportSessions().length === 0) {
+          <app-fitness-insights />
+        }
 
         <!-- ── Historial ── -->
         <div class="history-divider">
@@ -383,37 +371,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       }
 
     </div>
-
-    <!-- ── Bottom bar: today status + start button (dashboard only) ── -->
-    @if (!activeWorkout()) {
-      <div class="bottom-bar">
-        @if (bottomCard(); as bc) {
-          <button class="today-card" [class.today-card--done]="bc.kind !== 'suggestion'"
-                  [style.--sc]="bc.color" (click)="handleBottomCardClick(bc)">
-            <div class="sc-bar"></div>
-            <div class="sc-icon-wrap">
-              <span class="material-symbols-outlined sc-icon"
-                    [class.sc-icon--fill]="bc.kind !== 'suggestion'">{{ bc.icon }}</span>
-            </div>
-            <div class="sc-info">
-              <span class="sc-eyebrow">{{ bc.kind === 'suggestion' ? 'Avui toca' : 'Fet avui' }}</span>
-              <span class="sc-label">{{ bc.label }}</span>
-              @if (bc.kind === 'suggestion' && bc.meta) {
-                <span class="sc-reason">{{ bc.meta }}</span>
-              }
-            </div>
-            @if (bc.kind === 'suggestion') {
-              <span class="material-symbols-outlined sc-chevron">chevron_right</span>
-            } @else if (bc.meta) {
-              <span class="sc-stats">{{ bc.meta }}</span>
-            }
-          </button>
-        }
-        <button class="bb-fab" (click)="chooserOpen.set(true)" aria-label="Nou entrenament">
-          <span class="material-symbols-outlined">add</span>
-        </button>
-      </div>
-    }
 
     <!-- ── "Nou entrenament" chooser bottom sheet ── -->
     @if (chooserOpen()) {
@@ -713,29 +670,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       &:active { opacity: 0.7; }
     }
 
-    /* ── Bottom bar: today status + start button (dashboard only) ── */
-    .bottom-bar {
-      position: fixed;
-      left: 16px; right: 20px;
-      bottom: calc(var(--nav-height) + 16px);
-      z-index: 89;
-      display: flex; align-items: flex-end; gap: 12px;
-      pointer-events: none;
-    }
-    .bottom-bar > * { pointer-events: auto; }
-    .bb-fab {
-      flex-shrink: 0; margin-left: auto;
-      width: 56px; height: 56px; border-radius: 50%; border: none;
-      background: var(--c-brand); color: white;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; touch-action: manipulation;
-      box-shadow: 0 4px 16px rgba(var(--c-brand-rgb), 0.4), 0 1px 4px var(--c-shadow);
-      transition: background 0.15s, transform 0.15s;
-      .material-symbols-outlined { font-size: 28px; }
-      &:hover { background: var(--c-brand-dk); transform: scale(1.06); }
-      &:active { transform: scale(0.94); }
-    }
-
     /* ── Active workout floating header (reuses .workout-card) ── */
     .aw-header-sticky {
       position: sticky; top: 12px; z-index: 10;
@@ -891,69 +825,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       &:hover:not(:disabled) { background: var(--c-brand-dk); }
       &:disabled { opacity: 0.4; cursor: default; }
     }
-    @keyframes pill-in {
-      from { opacity: 0; transform: translateY(10px); }
-      to   { opacity: 1; transform: none; }
-    }
-
-    /* ── "Avui toca" / today status card (flex child in .bottom-bar) ── */
-    .today-card {
-      flex: 1; min-width: 0;
-      display: flex; align-items: center; gap: 0;
-      height: 56px; border-radius: 14px; padding: 0;
-      border: 1.5px solid color-mix(in srgb, var(--sc) 35%, var(--c-border-2));
-      background: color-mix(in srgb, var(--sc) 8%, var(--c-card));
-      box-shadow: 0 3px 14px var(--c-shadow-md);
-      cursor: pointer; touch-action: manipulation; overflow: hidden;
-      animation: pill-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-      transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s;
-      &:hover {
-        box-shadow: 0 4px 18px var(--c-shadow-md);
-        border-color: color-mix(in srgb, var(--sc) 55%, var(--c-border));
-        background: color-mix(in srgb, var(--sc) 13%, var(--c-card));
-      }
-      &:active { transform: scale(0.98); }
-    }
-    .sc-bar {
-      width: 5px; align-self: stretch; flex-shrink: 0;
-      background: var(--sc);
-    }
-    .sc-icon-wrap {
-      width: 46px; flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .sc-icon {
-      font-size: 22px; color: var(--sc);
-      font-variation-settings: 'FILL' 1;
-    }
-    .sc-info {
-      flex: 1; min-width: 0;
-      display: flex; flex-direction: column; gap: 2px;
-    }
-    .sc-eyebrow {
-      font-size: 9px; font-weight: 700; line-height: 1;
-      color: color-mix(in srgb, var(--sc) 70%, var(--c-text-3));
-      text-transform: uppercase; letter-spacing: 0.6px;
-    }
-    .sc-label {
-      font-size: 13px; font-weight: 700; color: var(--c-text); line-height: 1.2;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .sc-reason {
-      font-size: 10px; font-weight: 600; letter-spacing: 0.1px;
-      color: color-mix(in srgb, var(--sc) 65%, var(--c-text-3));
-    }
-    .sc-chevron {
-      font-size: 18px; color: var(--c-text-3); margin-right: 10px; flex-shrink: 0;
-    }
-    .sc-stats {
-      font-size: 11px; font-weight: 700; color: var(--sc);
-      background: color-mix(in srgb, var(--sc) 10%, var(--c-card));
-      padding: 3px 8px; border-radius: 8px; line-height: 1.3;
-      margin-right: 12px; flex-shrink: 0;
-    }
-    .sc-icon--fill { font-variation-settings: 'FILL' 1; }
-    .today-card--done .sc-eyebrow { color: color-mix(in srgb, var(--sc) 80%, var(--c-text-3)); }
 
     /* ── Type grid (inside the "nou entrenament" chooser) ── */
     .chip-group-label {
@@ -1026,7 +897,16 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
     .today-header { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
     .today-header-icon { font-size: 19px; color: var(--c-brand); font-variation-settings: 'FILL' 1, 'wght' 400; }
-    .today-title { margin: 0; font-size: 15px; font-weight: 800; color: var(--c-text); letter-spacing: 0.1px; }
+    .today-title { margin: 0; flex: 1; font-size: 15px; font-weight: 800; color: var(--c-text); letter-spacing: 0.1px; }
+    .today-add-btn {
+      width: 32px; height: 32px; border-radius: 50%; border: none; flex-shrink: 0;
+      background: var(--c-brand); color: white;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s, transform 0.1s;
+      .material-symbols-outlined { font-size: 19px; }
+      &:hover { background: var(--c-brand-dk); }
+      &:active { transform: scale(0.92); }
+    }
     .today-empty {
       margin: 0 0 10px; font-size: 12.5px; color: var(--c-text-3); text-align: center;
       padding: 6px 0;
@@ -1473,7 +1353,6 @@ export class TrainComponent implements OnDestroy {
   private exerciseService  = inject(ExerciseService);
   private templateService  = inject(TemplateService);
   private sharedWorkoutService = inject(SharedWorkoutService);
-  private profileService   = inject(WorkoutProfileService);
   readonly router          = inject(Router);
   private dialog           = inject(MatDialog);
   private feedback         = inject(FeedbackService);
@@ -1528,64 +1407,6 @@ export class TrainComponent implements OnDestroy {
   private readonly auth = inject(AuthService);
 
   readonly isToday = computed(() => this.selectedDate() === TODAY());
-
-  readonly todaySuggestion = computed((): TodaySuggestion | null => {
-    const today = TODAY();
-    if (this.selectedDate() !== today) return null;
-
-    const hasGymToday   = this.workoutService.getDoneWorkoutsForDate(today).length > 0;
-    const hasSportToday = this.sportService.getSportSessionsForDate(today).length > 0;
-    if (hasGymToday || hasSportToday) return null;
-
-    const goal    = this.settingsService.fitnessGoal();
-    const profile = this.profileService.profile();
-
-    // Score each gym category by how "overdue" it is relative to the user's
-    // actual training cycle. Only include categories that have had enough
-    // recovery time since the last session.
-    const gymCandidates = (['push', 'pull', 'legs'] as ExerciseCategory[])
-      .map(cat => ({ cat, ...profile.gym[cat] }))
-      .filter(c => c.daysSinceLast >= profile.minRecovery)
-      .sort((a, b) => b.overdueScore - a.overdueScore);
-
-    const nextGymCat = gymCandidates[0]?.cat ?? null;
-
-    // Sport: prefer the most-recently-done sport (maintains momentum),
-    // fall back to the 30-day favourite, then first available.
-    const nextSport = profile.recentSport ?? profile.favoriteSport
-                   ?? this.sportService.sports()[0] ?? null;
-
-    const mkGym = (cat: ExerciseCategory): GymSuggestion => {
-      const p = profile.gym[cat];
-      const reason = p.daysSinceLast < 99
-        ? p.daysSinceLast === 1 ? 'Fa 1 dia' : `Fa ${p.daysSinceLast} dies`
-        : undefined;
-      return {
-        type: 'gym', category: cat,
-        label: CATEGORY_LABELS[cat], color: CATEGORY_COLORS[cat], icon: CATEGORY_ICONS[cat],
-        reason,
-      };
-    };
-    const mkSport = (s: Sport): SportSuggestion => ({
-      type: 'sport', sport: s, label: s.name, color: s.color, icon: s.icon,
-    });
-
-    switch (goal) {
-      case 'strength':
-      case null:
-        return nextGymCat ? mkGym(nextGymCat) : null;
-      case 'fitness':
-        if (nextGymCat) return mkGym(nextGymCat);
-        if (nextSport)  return mkSport(nextSport);
-        return null;
-      case 'weight':
-        if (nextSport)  return mkSport(nextSport);
-        if (nextGymCat) return mkGym(nextGymCat);
-        return null;
-      case 'sport':
-        return nextSport ? mkSport(nextSport) : null;
-    }
-  });
 
   readonly dateWorkouts = computed(() =>
     this.workoutService.getDoneWorkoutsForDate(this.selectedDate())
@@ -1647,38 +1468,6 @@ export class TrainComponent implements OnDestroy {
   readonly doneCategories = computed((): Set<string> =>
     new Set(this.dateWorkouts().flatMap(w => workoutCategories(w)))
   );
-
-  /** A pending plan for today is surfaced as a card in the feed instead
-   *  (marked "Planificat", with its own start button) — the floating
-   *  bottom card only ever shows what's already done or a suggestion. */
-  readonly bottomCard = computed((): BottomCard | null => {
-    const workouts = this.dateWorkouts();
-    if (workouts.length > 0) {
-      const w = workouts[0];
-      const cats = workoutCategories(w);
-      return {
-        kind: 'workout',
-        color: this.workoutPrimaryColor(w),
-        icon: cats.length ? (CATEGORY_ICONS[cats[0] as ExerciseCategory] ?? 'fitness_center') : 'fitness_center',
-        label: this.workoutLabel(w),
-        meta: `${w.entries.length} ex · ${this.workoutSetsCount(w)} sèr`,
-        workoutId: w.id,
-      };
-    }
-    if (this.selectedDate() === TODAY() && this.workoutService.getPlannedForDate(TODAY()).length > 0) {
-      return null;
-    }
-    const s = this.todaySuggestion();
-    if (s) {
-      return { kind: 'suggestion', color: s.color, icon: s.icon, label: s.label, meta: s.reason ?? '', suggestion: s };
-    }
-    return null;
-  });
-
-  handleBottomCardClick(bc: BottomCard): void {
-    if (bc.kind === 'workout' && bc.workoutId) this.openWorkout(bc.workoutId);
-    else if (bc.kind === 'suggestion' && bc.suggestion) this.handleSuggestionClick(bc.suggestion);
-  }
 
 
 
@@ -2054,11 +1843,6 @@ export class TrainComponent implements OnDestroy {
   }
 
   // ── Workout creation ──────────────────────────────────────────────────────
-
-  handleSuggestionClick(s: TodaySuggestion): void {
-    if (s.type === 'gym') this.selectType(s.category);
-    else this.openSessionLogger(s.sport);
-  }
 
   selectType(category: ExerciseCategory): void {
     this.pickerCat.set(category);
