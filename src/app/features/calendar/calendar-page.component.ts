@@ -84,16 +84,18 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
           searchPlaceholder="Cerca per exercici..."
           [(searchQuery)]="searchQuery"
           [(sortDesc)]="sortDesc"
-          [(category)]="filterCat">
-          @if (selectedDate()) {
+          [(category)]="filterCat" />
+
+        <!-- ── Data seleccionada (sota els filtres, no inline) ── -->
+        @if (selectedDate()) {
+          <div class="date-chip-row">
             <button class="date-chip" (click)="selectDate(selectedDate()!)">
               <span class="material-symbols-outlined">event</span>
               {{ selectedDateLabel() }}
               <span class="material-symbols-outlined date-chip-x">close</span>
             </button>
-            <div class="filter-divider"></div>
-          }
-        </app-filter-bar>
+          </div>
+        }
 
         <!-- ── Esports del dia seleccionat ── -->
         @if (selectedDate() && selectedDateSports().length > 0) {
@@ -397,7 +399,10 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
       border-radius: 16px; overflow: hidden;
     }
 
-    /* ── Date filter chip ── */
+    /* ── Data seleccionada (below the filter bar, its own row) ── */
+    .date-chip-row {
+      display: flex; margin: 0 16px 12px;
+    }
     .date-chip {
       display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
       height: 34px; padding: 0 6px 0 10px; border-radius: 17px;
@@ -429,10 +434,6 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
     .sport-tag-icon { font-size: 14px; font-variation-settings: 'FILL' 1; }
     .sport-tag-subtype { font-weight: 400; opacity: 0.85; }
 
-    /* ── Filter bar extras (search/sort/category icons live in app-filter-bar) ── */
-    .filter-divider {
-      width: 1px; height: 20px; background: var(--c-border); flex-shrink: 0; margin: 0 2px;
-    }
     .filter-empty {
       display: flex; align-items: center; justify-content: center; flex-direction: column;
       gap: 8px; padding: 32px 24px; color: var(--c-text-3);

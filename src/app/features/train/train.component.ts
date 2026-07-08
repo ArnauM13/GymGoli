@@ -41,6 +41,72 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
   standalone: true,
   imports: [FormsModule, NgTemplateOutlet, WorkoutEditorComponent, FitnessInsightsComponent, PageHeaderComponent],
   template: `
+    <!-- Reusable per-day cards (used both by "Avui" and the history list) -->
+    <ng-template #dayCards let-day>
+      @for (w of day.workouts; track w.id) {
+        <div class="feed-card" [class.feed-card--planned]="isPlanned(w)"
+             [style.--wc]="workoutPrimaryColor(w)"
+             (click)="isPlanned(w) ? startPlan(w) : openWorkout(w.id)">
+          <div class="fc-bar" [style.background]="workoutCardColor(w)"></div>
+          <div class="fc-info">
+            <div class="fc-badges">
+              @for (cat of workoutCategoryList(w); track cat) {
+                <span class="fc-badge fc-badge--{{ cat }}">{{ getCatLabel(cat) }}</span>
+              }
+              @if (isPlanned(w)) {
+                <span class="fc-badge fc-badge--planned">Planificat</span>
+              }
+            </div>
+            <span class="fc-exercises">{{ w.entries.length ? getExerciseNames(w) : 'Pla buit' }}</span>
+            @if (!isPlanned(w)) {
+              <div class="fc-stats">
+                <span class="fc-stat">
+                  <span class="material-symbols-outlined">fitness_center</span>
+                  <strong>{{ w.entries.length }}</strong> exerc
+                </span>
+                @if (workoutSetsCount(w); as n) {
+                  <span class="fc-stat-sep">·</span>
+                  <span class="fc-stat">
+                    <span class="material-symbols-outlined">repeat</span>
+                    <strong>{{ n }}</strong> sèr
+                  </span>
+                }
+                @if (workoutVolumeFmt(w); as vol) {
+                  <span class="fc-stat-sep">·</span>
+                  <span class="fc-stat fc-stat--vol">
+                    <span class="material-symbols-outlined">weight</span>
+                    <strong>{{ vol }}</strong>
+                  </span>
+                }
+                @if (w.feeling) {
+                  <span class="fc-stat-sep">·</span>
+                  <span class="fc-stat">{{ emojiOf(w.feeling) }}</span>
+                }
+              </div>
+            }
+          </div>
+          @if (isPlanned(w)) {
+            <button class="fc-start" (click)="$event.stopPropagation(); startPlan(w)" title="Comença">
+              <span class="material-symbols-outlined">play_arrow</span>
+            </button>
+          } @else {
+            <span class="material-symbols-outlined fc-chevron">chevron_right</span>
+          }
+        </div>
+      }
+      @for (item of day.sports; track item.session.id) {
+        <div class="feed-sport-row" [style.--ic]="item.sport.color">
+          <span class="material-symbols-outlined feed-sport-icon">{{ item.sport.icon }}</span>
+          <div class="fsr-info">
+            <span class="feed-sport-name">{{ item.sport.name }}</span>
+            @if (sportSummary(item.session, item.sport); as meta) {
+              <span class="feed-sport-meta">{{ meta }}</span>
+            }
+          </div>
+        </div>
+      }
+    </ng-template>
+
     <div class="page" [style.padding-bottom]="pagePaddingBottom()">
 
       @if (activeWorkout(); as w) {
@@ -243,89 +309,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           </div>
         }
 
-        <!-- Reusable per-day cards (used both for "Avui" and the history list) -->
-        <ng-template #dayCards let-day>
-          @for (w of day.workouts; track w.id) {
-            <div class="feed-card" [class.feed-card--planned]="isPlanned(w)"
-                 [style.--wc]="workoutPrimaryColor(w)"
-                 (click)="isPlanned(w) ? startPlan(w) : openWorkout(w.id)">
-              <div class="fc-bar" [style.background]="workoutCardColor(w)"></div>
-              <div class="fc-info">
-                <div class="fc-badges">
-                  @for (cat of workoutCategoryList(w); track cat) {
-                    <span class="fc-badge fc-badge--{{ cat }}">{{ getCatLabel(cat) }}</span>
-                  }
-                  @if (isPlanned(w)) {
-                    <span class="fc-badge fc-badge--planned">Planificat</span>
-                  }
-                </div>
-                <span class="fc-exercises">{{ w.entries.length ? getExerciseNames(w) : 'Pla buit' }}</span>
-                @if (!isPlanned(w)) {
-                  <div class="fc-stats">
-                    <span class="fc-stat">
-                      <span class="material-symbols-outlined">fitness_center</span>
-                      <strong>{{ w.entries.length }}</strong> exerc
-                    </span>
-                    @if (workoutSetsCount(w); as n) {
-                      <span class="fc-stat-sep">·</span>
-                      <span class="fc-stat">
-                        <span class="material-symbols-outlined">repeat</span>
-                        <strong>{{ n }}</strong> sèr
-                      </span>
-                    }
-                    @if (workoutVolumeFmt(w); as vol) {
-                      <span class="fc-stat-sep">·</span>
-                      <span class="fc-stat fc-stat--vol">
-                        <span class="material-symbols-outlined">weight</span>
-                        <strong>{{ vol }}</strong>
-                      </span>
-                    }
-                    @if (w.feeling) {
-                      <span class="fc-stat-sep">·</span>
-                      <span class="fc-stat">{{ emojiOf(w.feeling) }}</span>
-                    }
-                  </div>
-                }
-              </div>
-              @if (isPlanned(w)) {
-                <button class="fc-start" (click)="$event.stopPropagation(); startPlan(w)" title="Comença">
-                  <span class="material-symbols-outlined">play_arrow</span>
-                </button>
-              } @else {
-                <span class="material-symbols-outlined fc-chevron">chevron_right</span>
-              }
-            </div>
-          }
-          @for (item of day.sports; track item.session.id) {
-            <div class="feed-sport-row" [style.--ic]="item.sport.color">
-              <span class="material-symbols-outlined feed-sport-icon">{{ item.sport.icon }}</span>
-              <div class="fsr-info">
-                <span class="feed-sport-name">{{ item.sport.name }}</span>
-                @if (sportSummary(item.session, item.sport); as meta) {
-                  <span class="feed-sport-meta">{{ meta }}</span>
-                }
-              </div>
-            </div>
-          }
-        </ng-template>
-
-        <!-- ── Avui: only today's planned/done workout ── -->
-        <div class="today-section">
-          <div class="today-header">
-            <span class="material-symbols-outlined today-header-icon">today</span>
-            <h2 class="today-title">Avui</h2>
-            <button class="today-add-btn" (click)="chooserOpen.set(true)" aria-label="Nou entrenament">
-              <span class="material-symbols-outlined">add</span>
-            </button>
-          </div>
-
-          @if (todayFeedEntry(); as day) {
-            <ng-container [ngTemplateOutlet]="dayCards" [ngTemplateOutletContext]="{ $implicit: day }" />
-          } @else {
-            <p class="today-empty">Encara no has fet res avui.</p>
-          }
-        </div>
-
         @if (!offlineService.isOffline() && dateWorkouts().length === 0 && dateSportSessions().length === 0) {
           <app-fitness-insights />
         }
@@ -371,6 +354,27 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       }
 
     </div>
+
+    <!-- ── Avui: docked panel above the nav bar, always visible ── -->
+    @if (!activeWorkout()) {
+      <div class="today-section">
+        <div class="today-header">
+          <span class="material-symbols-outlined today-header-icon">today</span>
+          <h2 class="today-title">Avui</h2>
+          <button class="today-add-btn" (click)="chooserOpen.set(true)" aria-label="Nou entrenament">
+            <span class="material-symbols-outlined">add</span>
+          </button>
+        </div>
+
+        <div class="today-body">
+          @if (todayFeedEntry(); as day) {
+            <ng-container [ngTemplateOutlet]="dayCards" [ngTemplateOutletContext]="{ $implicit: day }" />
+          } @else {
+            <p class="today-empty">Encara no has fet res avui.</p>
+          }
+        </div>
+      </div>
+    }
 
     <!-- ── "Nou entrenament" chooser bottom sheet ── -->
     @if (chooserOpen()) {
@@ -887,28 +891,32 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .material-symbols-outlined { font-size: 32px; color: var(--c-border); }
     }
 
-    /* ── "Avui" section ── */
+    /* ── "Avui" section: docked above the nav bar, not floating ── */
     .today-section {
-      margin: 8px 16px 4px;
-      padding: 12px 12px 4px;
-      background: color-mix(in srgb, var(--c-brand) 5%, var(--c-card));
-      border: 1.5px solid color-mix(in srgb, var(--c-brand) 16%, var(--c-border-2));
-      border-radius: 18px;
+      position: fixed; left: 0; right: 0; bottom: var(--nav-height);
+      z-index: 90;
+      background: var(--c-card);
+      border-top: 1.5px solid color-mix(in srgb, var(--c-brand) 20%, var(--c-border-2));
+      box-shadow: 0 -4px 16px var(--c-shadow);
+      padding: 10px 16px calc(env(safe-area-inset-bottom, 0px) + 10px);
+      max-height: 38vh;
+      display: flex; flex-direction: column;
     }
-    .today-header { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
+    .today-header { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; flex-shrink: 0; }
     .today-header-icon { font-size: 19px; color: var(--c-brand); font-variation-settings: 'FILL' 1, 'wght' 400; }
     .today-title { margin: 0; flex: 1; font-size: 15px; font-weight: 800; color: var(--c-text); letter-spacing: 0.1px; }
     .today-add-btn {
-      width: 32px; height: 32px; border-radius: 50%; border: none; flex-shrink: 0;
+      width: 34px; height: 34px; border-radius: 50%; border: none; flex-shrink: 0;
       background: var(--c-brand); color: white;
       display: flex; align-items: center; justify-content: center;
       cursor: pointer; touch-action: manipulation; transition: background 0.15s, transform 0.1s;
-      .material-symbols-outlined { font-size: 19px; }
+      .material-symbols-outlined { font-size: 20px; }
       &:hover { background: var(--c-brand-dk); }
       &:active { transform: scale(0.92); }
     }
+    .today-body { overflow-y: auto; }
     .today-empty {
-      margin: 0 0 10px; font-size: 12.5px; color: var(--c-text-3); text-align: center;
+      margin: 0; font-size: 12.5px; color: var(--c-text-3); text-align: center;
       padding: 6px 0;
     }
 
@@ -1415,7 +1423,7 @@ export class TrainComponent implements OnDestroy {
   readonly isSelectedFuture = computed(() => this.selectedDate() > TODAY());
 
   readonly pagePaddingBottom = computed(() =>
-    '88px' // clear the FAB / bottom-bar in both modes
+    this.activeWorkout() ? '88px' : 'calc(38vh + 24px)' // clear the aw-menu-fab, or the docked "Avui" panel
   );
 
   readonly dateSportSessions = computed(() =>
