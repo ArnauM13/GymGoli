@@ -1,11 +1,12 @@
 import { Injectable, computed, inject } from '@angular/core';
 
-import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../models/exercise.model';
+import { ExerciseCategory } from '../models/exercise.model';
 import { FitnessGoal } from '../models/user-settings.model';
 import { SportService } from './sport.service';
 import { UserSettingsService } from './user-settings.service';
 import { WorkoutService } from './workout.service';
 import { WorkoutProfileService } from './workout-profile.service';
+import { CategoryService } from './category.service';
 
 export type InsightType =
   | 'setmana_fluixa'
@@ -32,15 +33,6 @@ export interface FitnessInsight {
 }
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
-
-const GYM_CATS: ExerciseCategory[] = ['push', 'pull', 'legs'];
-
-// "Push day?" / "Pull day?" / "Leg day?" — gym-culture shorthand the user already uses
-const DAY_LABEL: Record<ExerciseCategory, string> = {
-  push: 'Push day?',
-  pull: 'Pull day?',
-  legs: 'Leg day?',
-};
 
 function mondayOfWeek(dateStr: string): string {
   const d   = new Date(dateStr + 'T12:00:00');
@@ -74,6 +66,12 @@ export class FitnessMetricsService {
   private sportService    = inject(SportService);
   private settingsService = inject(UserSettingsService);
   private profileService  = inject(WorkoutProfileService);
+  private categoryService = inject(CategoryService);
+
+  /** "Push day?" style gym-culture shorthand off a category's live label. */
+  private dayLabel(cat: ExerciseCategory): string {
+    return `${this.categoryService.label(cat)} day?`;
+  }
 
   readonly insights = computed((): FitnessInsight[] => {
     const today  = TODAY();
@@ -234,28 +232,29 @@ export class FitnessMetricsService {
     const last28Workouts = workouts.filter(w => w.date > last28Str && w.date <= today);
 
     if (last28Workouts.length >= 3 && fitnessGoal !== 'sport' && fitnessGoal !== 'weight') {
-      const counts = { push: 0, pull: 0, legs: 0 } as Record<ExerciseCategory, number>;
+      const gymCats = this.categoryService.categories().map(c => c.key);
+      const counts  = Object.fromEntries(gymCats.map(c => [c, 0])) as Record<ExerciseCategory, number>;
       for (const w of last28Workouts) {
         const cats = w.categories?.length ? w.categories : (w.category ? [w.category] : []);
         for (const c of cats) {
-          if (c === 'push' || c === 'pull' || c === 'legs') counts[c as ExerciseCategory]++;
+          if (c in counts) counts[c]++;
         }
       }
 
-      const activeCats = GYM_CATS.filter(c => counts[c] > 0);
+      const activeCats = gymCats.filter(c => counts[c] > 0);
       if (activeCats.length >= 2) {
-        const maxCount = Math.max(...GYM_CATS.map(c => counts[c]));
-        const minCat   = GYM_CATS.reduce((a, b) => counts[a] <= counts[b] ? a : b);
+        const maxCount = Math.max(...gymCats.map(c => counts[c]));
+        const minCat   = gymCats.reduce((a, b) => counts[a] <= counts[b] ? a : b);
         const gap      = maxCount - counts[minCat];
 
         if (gap >= 2) {
-          const others = GYM_CATS
+          const others = gymCats
             .filter(c => c !== minCat && counts[c] > 0)
             .sort((a, b) => counts[b] - counts[a]);
           const othersStr = others
-            .map(c => `${counts[c]} de ${CATEGORY_LABELS[c]}`)
+            .map(c => `${counts[c]} de ${this.categoryService.label(c)}`)
             .join(' i ');
-          const minLabel = CATEGORY_LABELS[minCat];
+          const minLabel = this.categoryService.label(minCat);
           const minStr   = counts[minCat] === 0
             ? `res de ${minLabel}`
             : `només ${counts[minCat]} de ${minLabel}`;
@@ -263,9 +262,9 @@ export class FitnessMetricsService {
           candidates.push({
             type: 'equilibra_gym',
             emoji: '🏋️',
-            title: DAY_LABEL[minCat],
+            title: this.dayLabel(minCat),
             message: `El darrer mes has fet ${othersStr}, però ${minStr}. Li fotem?`,
-            color: CATEGORY_COLORS[minCat],
+            color: this.categoryService.color(minCat),
           });
         }
       }
@@ -412,8 +411,9 @@ export class FitnessMetricsService {
     // ── Categoria endarrerida (basat en el perfil real de l'usuari) ──────
     if (fitnessGoal !== 'sport') {
       const profile = this.profileService.profile();
+      const gymCats = this.categoryService.categories().map(c => c.key);
       // Find the single most overdue category (score >= 1.5, at least 2 days over gap)
-      const overdue = GYM_CATS
+      const overdue = gymCats
         .map(cat => ({ cat, p: profile.gym[cat] }))
         .filter(({ p }) => p.overdueScore >= 1.5 && p.daysSinceLast >= p.typicalGapDays + 2)
         .sort((a, b) => b.p.overdueScore - a.p.overdueScore)[0];
@@ -428,17 +428,17 @@ export class FitnessMetricsService {
           candidates.push({
             type: 'categoria_endarrerida',
             emoji: '🎯',
-            title: `${DAY_LABEL[cat]} — planificat!`,
-            message: `Fa ${daysStr} que no fas ${CATEGORY_LABELS[cat]} i avui ho tens planificat. Moment perfecte, a per-hi!`,
-            color: CATEGORY_COLORS[cat],
+            title: `${this.dayLabel(cat)} — planificat!`,
+            message: `Fa ${daysStr} que no fas ${this.categoryService.label(cat)} i avui ho tens planificat. Moment perfecte, a per-hi!`,
+            color: this.categoryService.color(cat),
           });
         } else {
           candidates.push({
             type: 'categoria_endarrerida',
             emoji: '📆',
-            title: DAY_LABEL[cat],
-            message: `Fa ${daysStr} que no fas ${CATEGORY_LABELS[cat]} (cicle habitual cada ${p.typicalGapDays} dies). Avui toca?`,
-            color: CATEGORY_COLORS[cat],
+            title: this.dayLabel(cat),
+            message: `Fa ${daysStr} que no fas ${this.categoryService.label(cat)} (cicle habitual cada ${p.typicalGapDays} dies). Avui toca?`,
+            color: this.categoryService.color(cat),
           });
         }
       }

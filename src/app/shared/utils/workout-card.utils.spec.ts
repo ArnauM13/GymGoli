@@ -1,12 +1,18 @@
 import { Workout, WorkoutEntry } from '../../core/models/workout.model';
 import {
-  feedDayLabel, getExerciseNames, isWorkoutPlanned, workoutCardColor,
+  CategoryLookup, feedDayLabel, getExerciseNames, isWorkoutPlanned, workoutCardColor,
   workoutSetsCount, workoutVolumeFmt,
 } from './workout-card.utils';
 
 function makeWorkout(overrides: Partial<Workout> = {}): Workout {
   return { id: '1', date: '2024-01-01', entries: [], createdAt: new Date(), ...overrides };
 }
+
+const CAT_COLORS: Record<string, string> = { push: '#e57373', pull: '#64b5f6', legs: '#81c784' };
+const fakeCategories: CategoryLookup = {
+  label: cat => cat,
+  color: cat => CAT_COLORS[cat] ?? '#bbb',
+};
 
 describe('workout-card.utils', () => {
   describe('isWorkoutPlanned()', () => {
@@ -37,15 +43,15 @@ describe('workout-card.utils', () => {
 
   describe('workoutCardColor()', () => {
     it('returns the default teal when no categories', () => {
-      expect(workoutCardColor(makeWorkout())).toBe('#006874');
+      expect(workoutCardColor(makeWorkout(), fakeCategories)).toBe('#006874');
     });
 
     it('returns the category color for a single category', () => {
-      expect(workoutCardColor(makeWorkout({ categories: ['push'] }))).toBe('#e57373');
+      expect(workoutCardColor(makeWorkout({ categories: ['push'] }), fakeCategories)).toBe('#e57373');
     });
 
     it('returns a linear-gradient for multiple categories', () => {
-      const result = workoutCardColor(makeWorkout({ categories: ['push', 'legs'] }));
+      const result = workoutCardColor(makeWorkout({ categories: ['push', 'legs'] }), fakeCategories);
       expect(result).toContain('linear-gradient');
       expect(result).toContain('#e57373');
       expect(result).toContain('#81c784');

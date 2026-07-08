@@ -3,12 +3,13 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 
-import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
+import { ExerciseCategory } from '../../core/models/exercise.model';
 import { setMaxWeight } from '../../core/models/workout.model';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
+import { CategoryService } from '../../core/services/category.service';
 import { addDays, mondayOf } from '../../shared/utils/calendar-utils';
 import { kgToDisplay } from '../../shared/utils/weight.utils';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
@@ -95,7 +96,8 @@ import { FilterBarComponent } from '../../shared/components/filter-bar/filter-ba
           searchPlaceholder="Cerca per exercici..."
           [showSort]="false"
           [(searchQuery)]="searchQuery"
-          [(category)]="filterCat" />
+          [(category)]="filterCat"
+          [categories]="categoryService.categoryChips()" />
       }
 
       <!-- Exercise list: all exercises with data load up-front, expand inline for stats -->
@@ -252,6 +254,7 @@ export class ChartsComponent {
   private workoutService  = inject(WorkoutService);
   private settingsService = inject(UserSettingsService);
   private sportService    = inject(SportService);
+  readonly categoryService = inject(CategoryService);
   private route           = inject(ActivatedRoute);
 
   private readonly queryExerciseId = toSignal(
@@ -332,16 +335,16 @@ export class ChartsComponent {
           .flatMap(w => w.entries.filter(e => e.exerciseId === ex.id).flatMap(e => e.sets.filter(s => !s.warmup).map(s => setMaxWeight(s))))
           .filter(w => w > 0);
         const display = allWeights.length ? kgToDisplay(Math.max(...allWeights), unit) : null;
-        return { exercise: ex, display, color: CATEGORY_COLORS[ex.category] };
+        return { exercise: ex, display, color: this.categoryService.color(ex.category) };
       });
 
     const catFilter = this.filterCat();
-    const cats = catFilter ? [catFilter] : (['push', 'pull', 'legs'] as ExerciseCategory[]);
+    const cats = catFilter ? [catFilter] : this.categoryService.categories().map(c => c.key);
     return cats
       .map(cat => ({
         cat,
-        label: CATEGORY_LABELS[cat],
-        color: CATEGORY_COLORS[cat],
+        label: this.categoryService.label(cat),
+        color: this.categoryService.color(cat),
         records: records.filter(r => r.exercise.category === cat),
       }))
       .filter(g => g.records.length > 0);
@@ -354,6 +357,7 @@ export class ChartsComponent {
   constructor() {
     this.exerciseService.ensureLoaded();
     this.sportService.ensureLoaded();
+    this.categoryService.ensureLoaded();
     // Load full workout history up-front — the exercise list always shows
     // everything, there's no "load more" step.
     this.workoutService.loadAllWorkouts();

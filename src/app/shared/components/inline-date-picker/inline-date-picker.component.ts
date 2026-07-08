@@ -1,8 +1,8 @@
 import { Component, computed, effect, inject, input, linkedSignal, output, signal } from '@angular/core';
-import { CATEGORY_COLORS, ExerciseCategory } from '../../../core/models/exercise.model';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { SportService } from '../../../core/services/sport.service';
+import { CategoryService } from '../../../core/services/category.service';
 import {
   MONTHS_CA, CalDay,
   mondayOf, addDays, catDotBackground, sportDotBackground,
@@ -311,6 +311,7 @@ import {
 export class InlineDatePickerComponent {
   readonly workoutSvc  = inject(WorkoutService);
   private sportSvc     = inject(SportService);
+  private categoryService = inject(CategoryService);
   readonly settingsSvc = inject(UserSettingsService);
 
   readonly selectedDate = input<string | null>(null);
@@ -338,6 +339,8 @@ export class InlineDatePickerComponent {
   private _swipeStartY = 0;
 
   constructor() {
+    this.categoryService.ensureLoaded();
+
     // Single effect: preload data for visible week + expanded month (deduped)
     effect(() => {
       const loaded = new Set<string>();
@@ -549,10 +552,10 @@ export class InlineDatePickerComponent {
 
   // ── Dot helpers (delegate to shared utils) ────────────────────────────────
 
-  readonly catDotBg   = catDotBackground;
+  catDotBg(cats: string[]): string { return catDotBackground(cats, this.categoryService); }
   readonly sportDotBg = sportDotBackground;
 
   catColor(cat: string): string {
-    return CATEGORY_COLORS[cat as ExerciseCategory] ?? '#006874';
+    return this.categoryService.color(cat);
   }
 }

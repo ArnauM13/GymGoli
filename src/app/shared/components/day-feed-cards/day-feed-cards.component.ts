@@ -4,6 +4,7 @@ import { Sport, SportSession } from '../../../core/models/sport.model';
 import { FeelingLevel, Workout } from '../../../core/models/workout.model';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
+import { CategoryService } from '../../../core/services/category.service';
 import { FeedbackService } from '../../services/feedback.service';
 import {
   formatFeeling, getCatLabel, getExerciseNames, isWorkoutPlanned, sportSessionSummary,
@@ -28,7 +29,7 @@ export interface DayFeedEntry {
         <div class="fc-info">
           <div class="fc-badges">
             @for (cat of workoutCategoryList(w); track cat) {
-              <span class="fc-badge fc-badge--{{ cat }}">{{ getCatLabel(cat) }}</span>
+              <span class="fc-badge" [style.--cc]="getCatColor(cat)">{{ getCatLabel(cat) }}</span>
             }
             @if (isPlanned(w)) {
               <span class="fc-badge fc-badge--planned">Planificat</span>
@@ -116,13 +117,10 @@ export interface DayFeedEntry {
     .fc-badge {
       display: inline-block; padding: 2px 8px; border-radius: 8px;
       font-size: 10px; font-weight: 700; letter-spacing: 0.2px; line-height: 1.4;
+      background: color-mix(in srgb, var(--cc, var(--c-border)) 15%, transparent);
+      color: color-mix(in srgb, var(--cc, var(--c-text-2)) 75%, var(--c-text));
     }
-    .fc-badge--push { background: rgba(229,115,115,0.15); color: #b71c1c; }
-    .fc-badge--pull { background: rgba(100,181,246,0.15); color: #0d47a1; }
-    .fc-badge--legs { background: rgba(129,199,132,0.15); color: #1b5e20; }
-    html.dark .fc-badge--push { background: rgba(229,115,115,0.18); color: #ef9a9a; }
-    html.dark .fc-badge--pull { background: rgba(100,181,246,0.18); color: #90caf9; }
-    html.dark .fc-badge--legs { background: rgba(129,199,132,0.18); color: #a5d6a7; }
+    html.dark .fc-badge { background: color-mix(in srgb, var(--cc, var(--c-border)) 18%, transparent); }
     .fc-badge--planned { background: rgba(var(--c-brand-rgb), 0.12); color: var(--c-brand); }
     .fc-exercises {
       font-size: 14px; font-weight: 700; color: var(--c-text);
@@ -168,19 +166,22 @@ export interface DayFeedEntry {
 export class DayFeedCardsComponent {
   private workoutService = inject(WorkoutService);
   private settingsService = inject(UserSettingsService);
+  private categoryService = inject(CategoryService);
   private feedback       = inject(FeedbackService);
 
   readonly day  = input<DayFeedEntry | null>(null);
   readonly open = output<string>();
 
   readonly isPlanned          = isWorkoutPlanned;
-  readonly workoutPrimaryColor = workoutPrimaryColor;
-  readonly workoutCardColor    = workoutCardColor;
   readonly workoutCategoryList = workoutCategoryList;
-  readonly getCatLabel         = getCatLabel;
   readonly getExerciseNames    = getExerciseNames;
   readonly workoutSetsCount    = workoutSetsCount;
   readonly workoutVolumeFmt    = workoutVolumeFmt;
+
+  workoutPrimaryColor(w: Workout): string { return workoutPrimaryColor(w, this.categoryService); }
+  workoutCardColor(w: Workout): string { return workoutCardColor(w, this.categoryService); }
+  getCatLabel(cat: string): string { return getCatLabel(cat, this.categoryService); }
+  getCatColor(cat: string): string { return this.categoryService.color(cat); }
 
   emojiOf(level: FeelingLevel): string {
     return formatFeeling(level, this.settingsService.difficultyScale());

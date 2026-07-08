@@ -1,4 +1,5 @@
 import { Workout } from '../../core/models/workout.model';
+import { CategoryLookup } from '../../core/models/category.model';
 import {
   addDays, catDotBackground, mondayOf, sportDotBackground, workoutCategories,
 } from './calendar-utils';
@@ -6,6 +7,12 @@ import {
 function makeWorkout(overrides: Partial<Workout> = {}): Workout {
   return { id: '1', date: '2024-03-06', entries: [], createdAt: new Date(), ...overrides };
 }
+
+const CAT_COLORS: Record<string, string> = { push: '#e57373', pull: '#64b5f6', legs: '#81c784' };
+const fakeCategories: CategoryLookup = {
+  label: cat => cat,
+  color: cat => CAT_COLORS[cat] ?? '#bbb',
+};
 
 describe('calendar-utils', () => {
   describe('mondayOf()', () => {
@@ -68,22 +75,22 @@ describe('calendar-utils', () => {
 
   describe('catDotBackground()', () => {
     it('falls back to the brand color when there are no categories', () => {
-      expect(catDotBackground([])).toBe('#006874');
+      expect(catDotBackground([], fakeCategories)).toBe('#006874');
     });
 
     it('returns the category color directly for a single category', () => {
-      expect(catDotBackground(['push'])).toBe('#e57373');
+      expect(catDotBackground(['push'], fakeCategories)).toBe('#e57373');
     });
 
     it('returns a conic-gradient covering all categories for multiple categories', () => {
-      const result = catDotBackground(['push', 'legs']);
+      const result = catDotBackground(['push', 'legs'], fakeCategories);
       expect(result).toContain('conic-gradient');
       expect(result).toContain('#e57373');
       expect(result).toContain('#81c784');
     });
 
     it('falls back to gray for an unknown category', () => {
-      const result = catDotBackground(['push', 'unknown']);
+      const result = catDotBackground(['push', 'unknown'], fakeCategories);
       expect(result).toContain('#bbb');
     });
   });

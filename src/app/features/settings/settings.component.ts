@@ -218,6 +218,17 @@ import {
 
         <div class="setting-divider"></div>
 
+        <a class="nav-row" routerLink="/categories-config">
+          <span class="material-symbols-outlined nav-row-icon">category</span>
+          <div class="setting-info">
+            <span class="setting-label">Configurar categories</span>
+            <span class="setting-desc">Crea, edita i elimina categories d'entrenament.</span>
+          </div>
+          <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
+        </a>
+
+        <div class="setting-divider"></div>
+
         <a class="nav-row" routerLink="/train/planner">
           <span class="material-symbols-outlined nav-row-icon">event_repeat</span>
           <div class="setting-info">

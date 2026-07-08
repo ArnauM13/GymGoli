@@ -4,7 +4,7 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
-  CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, SUBCATEGORY_LABELS,
+  SUBCATEGORY_LABELS,
   ExerciseCategory,
 } from '../../core/models/exercise.model';
 import { FeelingLevel, Workout, WorkoutEntry, WorkoutSet, setMaxWeight, setVolume } from '../../core/models/workout.model';
@@ -13,6 +13,7 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
+import { CategoryService } from '../../core/services/category.service';
 import { AuthService } from '../../core/services/auth.service';
 import { kgToDisplay } from '../../shared/utils/weight.utils';
 import { mondayOf } from '../../shared/utils/calendar-utils';
@@ -24,7 +25,6 @@ import { WeeklySummaryComponent } from '../train/components/weekly-summary.compo
 import { FeedbackService } from '../../shared/services/feedback.service';
 
 const PAGE_SIZE = 20;
-const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
 
 @Component({
   selector: 'app-calendar-page',
@@ -85,7 +85,8 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
           searchPlaceholder="Cerca per exercici..."
           [(searchQuery)]="searchQuery"
           [(sortDesc)]="sortDesc"
-          [(category)]="filterCat" />
+          [(category)]="filterCat"
+          [categories]="categoryService.categoryChips()" />
 
         <!-- ── Data seleccionada (sota els filtres, no inline) ── -->
         @if (selectedDate()) {
@@ -138,7 +139,7 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
                     @if ((workout.categories ?? (workout.category ? [workout.category] : [])).length > 0) {
                       <div class="wh-badges">
                         @for (cat of (workout.categories ?? (workout.category ? [workout.category] : [])); track cat) {
-                          <span class="wh-badge wh-badge--{{ cat }}">{{ getCatLabel(cat) }}</span>
+                          <span class="wh-badge" [style.--cc]="getCatColor(cat)">{{ getCatLabel(cat) }}</span>
                         }
                         @if ((workout.categories ?? []).length > 1) {
                           <span class="wh-badge wh-badge--hybrid">Híbrid</span>
@@ -346,7 +347,7 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
           <div class="dp-add">
             <span class="dp-add-label">Afegir al pla</span>
             <div class="dp-chips">
-              @for (cat of gymCategories; track cat) {
+              @for (cat of gymCategories(); track cat) {
                 <button class="dp-chip" [class.active]="isGymPlanned(cat)"
                         [style.--cat-color]="getCatColor(cat)" (click)="toggleGymPlan(cat)">
                   <span class="material-symbols-outlined">{{ getCatIcon(cat) }}</span>
@@ -560,17 +561,14 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
     .wh-badge {
       display: inline-block; padding: 2px 8px; border-radius: 8px;
       font-size: 10px; font-weight: 700; letter-spacing: 0.2px; line-height: 1.4;
+      background: color-mix(in srgb, var(--cc, var(--c-border)) 15%, transparent);
+      color: color-mix(in srgb, var(--cc, var(--c-text-2)) 75%, var(--c-text));
     }
-    .wh-badge--push  { background: rgba(229,115,115,0.15); color: #b71c1c; }
-    .wh-badge--pull  { background: rgba(100,181,246,0.15); color: #0d47a1; }
-    .wh-badge--legs  { background: rgba(129,199,132,0.15); color: #1b5e20; }
     .wh-badge--hybrid {
       background: linear-gradient(90deg, rgba(239,83,80,0.18) 0%, rgba(156,39,176,0.18) 50%, rgba(33,150,243,0.18) 100%);
       color: var(--c-text-2);
     }
-    html.dark .wh-badge--push  { background: rgba(229,115,115,0.18); color: #ef9a9a; }
-    html.dark .wh-badge--pull  { background: rgba(100,181,246,0.18); color: #90caf9; }
-    html.dark .wh-badge--legs  { background: rgba(129,199,132,0.18); color: #a5d6a7; }
+    html.dark .wh-badge { background: color-mix(in srgb, var(--cc, var(--c-border)) 18%, transparent); }
     html.dark .wh-badge--hybrid { background: rgba(180,180,180,0.1); }
     .wh-exercises {
       font-size: 13px; font-weight: 700; color: var(--c-text);
@@ -731,6 +729,7 @@ export class CalendarPageComponent implements OnDestroy {
   readonly workoutService = inject(WorkoutService);
   private exerciseService = inject(ExerciseService);
   readonly sportService    = inject(SportService);
+  readonly categoryService = inject(CategoryService);
   private settingsService = inject(UserSettingsService);
   private authService     = inject(AuthService);
   private feedback        = inject(FeedbackService);
@@ -738,7 +737,7 @@ export class CalendarPageComponent implements OnDestroy {
   readonly unit = this.settingsService.weightUnit;
   dispW(kg: number): number { return kgToDisplay(kg, this.unit()); }
 
-  readonly gymCategories = GYM_CATEGORIES;
+  readonly gymCategories = computed(() => this.categoryService.categories().map(c => c.key));
 
   readonly calendarOpen  = signal(true);
   readonly selectedDate  = signal<string | null>(null);
@@ -834,6 +833,7 @@ export class CalendarPageComponent implements OnDestroy {
   constructor() {
     this.exerciseService.ensureLoaded();
     this.sportService.ensureLoaded();
+    this.categoryService.ensureLoaded();
 
     // Reload from page 0 whenever any filter, sort, or auth state changes.
     // Tracking uid() ensures the first load fires once auth resolves on cold start.
@@ -954,9 +954,9 @@ export class CalendarPageComponent implements OnDestroy {
   getFeelingEmoji(level: FeelingLevel): string {
     return formatFeeling(level, this.settingsService.difficultyScale());
   }
-  getCatColor(cat: string): string { return CATEGORY_COLORS[cat as ExerciseCategory] ?? '#bbb'; }
-  getCatLabel(cat: string): string { return CATEGORY_LABELS[cat as ExerciseCategory] ?? cat; }
-  getCatIcon(cat: string): string { return CATEGORY_ICONS[cat as ExerciseCategory] ?? 'fitness_center'; }
+  getCatColor(cat: string): string { return this.categoryService.color(cat); }
+  getCatLabel(cat: string): string { return this.categoryService.label(cat); }
+  getCatIcon(cat: string): string { return this.categoryService.icon(cat); }
 
   getSubtypeName(sport: Sport, subtypeId: string): string | null {
     return sport.subtypes.find((s: SportSubtype) => s.id === subtypeId)?.name ?? null;
@@ -966,7 +966,7 @@ export class CalendarPageComponent implements OnDestroy {
     return this.exerciseService.getById(entry.exerciseId)?.category ?? 'push';
   }
   getEntryCatColor(entry: WorkoutEntry): string {
-    return CATEGORY_COLORS[this.getEntryCategory(entry)] ?? '#bbb';
+    return this.categoryService.color(this.getEntryCategory(entry));
   }
   getEntrySubLabel(entry: WorkoutEntry): string {
     const sub = this.exerciseService.getById(entry.exerciseId)?.subcategory;

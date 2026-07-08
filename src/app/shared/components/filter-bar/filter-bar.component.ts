@@ -1,9 +1,8 @@
 import { Component, OnDestroy, effect, input, model, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, ExerciseCategory } from '../../../core/models/exercise.model';
-
-const CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
+import { CategoryChip } from '../../../core/models/category.model';
+import { ExerciseCategory } from '../../../core/models/exercise.model';
 
 /**
  * Shared search + quick category filter + sort bar. Used identically by the
@@ -43,12 +42,12 @@ const CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
         <span class="material-symbols-outlined">apps</span>
       </button>
       -->
-      @for (cat of categories; track cat) {
-        <button class="filter-icon" [class.active]="category() === cat"
-                [style.--cat]="catColor(cat)"
-                [attr.aria-label]="catLabel(cat)" [attr.title]="catLabel(cat)"
-                (click)="category.set(category() === cat ? null : cat)">
-          <span class="material-symbols-outlined">{{ catIcon(cat) }}</span>
+      @for (cat of categories(); track cat.value) {
+        <button class="filter-icon" [class.active]="category() === cat.value"
+                [style.--cat]="cat.color"
+                [attr.aria-label]="cat.label" [attr.title]="cat.label"
+                (click)="category.set(category() === cat.value ? null : cat.value)">
+          <span class="material-symbols-outlined">{{ cat.icon }}</span>
         </button>
       }
     </div>
@@ -124,7 +123,7 @@ export class FilterBarComponent implements OnDestroy {
   readonly sortDesc    = model(true);
   readonly category    = model<ExerciseCategory | null>(null);
 
-  readonly categories = CATEGORIES;
+  readonly categories = input<CategoryChip[]>([]);
 
   private readonly _raw = signal('');
   private _timer: ReturnType<typeof setTimeout> | null = null;
@@ -148,10 +147,6 @@ export class FilterBarComponent implements OnDestroy {
   }
 
   toggleSort(): void { this.sortDesc.update(v => !v); }
-
-  catColor(cat: ExerciseCategory): string { return CATEGORY_COLORS[cat]; }
-  catLabel(cat: ExerciseCategory): string { return CATEGORY_LABELS[cat]; }
-  catIcon(cat: ExerciseCategory): string { return CATEGORY_ICONS[cat]; }
 
   ngOnDestroy(): void { if (this._timer) clearTimeout(this._timer); }
 }

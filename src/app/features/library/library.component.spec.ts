@@ -7,12 +7,27 @@ import { LibraryComponent } from './library.component';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
 import { AuthService } from '../../core/services/auth.service';
+import { CategoryService } from '../../core/services/category.service';
 import { Exercise } from '../../core/models/exercise.model';
 import { FeedbackService } from '../../shared/services/feedback.service';
 
 function makeExercise(overrides: Partial<Exercise> = {}): Exercise {
   return { id: '1', name: 'Test', category: 'push', createdAt: new Date(), ...overrides };
 }
+
+const FAKE_CATEGORIES = [
+  { key: 'push', name: 'Empenta', icon: 'fitness_center',    color: '#e57373' },
+  { key: 'pull', name: 'Tracció', icon: 'sports_gymnastics', color: '#64b5f6' },
+  { key: 'legs', name: 'Cames',   icon: 'directions_run',    color: '#81c784' },
+];
+const CAT_BY_KEY = new Map(FAKE_CATEGORIES.map(c => [c.key, c]));
+const mockCategoryService = {
+  categoryChips: signal(FAKE_CATEGORIES.map(c => ({ value: c.key, label: c.name, icon: c.icon, color: c.color }))),
+  ensureLoaded:  jasmine.createSpy(),
+  label: (cat: string) => CAT_BY_KEY.get(cat)?.name ?? cat,
+  color: (cat: string) => CAT_BY_KEY.get(cat)?.color ?? '#bbb',
+  icon:  (cat: string) => CAT_BY_KEY.get(cat)?.icon ?? 'fitness_center',
+};
 
 describe('LibraryComponent', () => {
   let component: LibraryComponent;
@@ -45,6 +60,7 @@ describe('LibraryComponent', () => {
         provideNoopAnimations(),
         { provide: ExerciseService, useValue: mockExerciseService },
         { provide: SportService,    useValue: mockSportService },
+        { provide: CategoryService, useValue: mockCategoryService },
         { provide: AuthService,     useValue: { uid: signal('user-1') } },
         { provide: MatDialog,       useValue: { open: jasmine.createSpy() } },
         { provide: FeedbackService, useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },

@@ -1,8 +1,11 @@
-import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
+import { ExerciseCategory } from '../../core/models/exercise.model';
 import { FEELING_EMOJI, FeelingLevel, Workout, setVolume } from '../../core/models/workout.model';
 import { DifficultyScale } from '../../core/models/user-settings.model';
 import { Sport } from '../../core/models/sport.model';
+import { CategoryLookup } from '../../core/models/category.model';
 import { workoutCategories } from './calendar-utils';
+
+export type { CategoryLookup };
 
 export function getBrandColor(): string {
   return getComputedStyle(document.documentElement).getPropertyValue('--c-brand').trim() || '#006874';
@@ -16,8 +19,8 @@ export function workoutCategoryList(w: Workout): ExerciseCategory[] {
   return workoutCategories(w) as ExerciseCategory[];
 }
 
-export function getCatLabel(cat: string): string {
-  return CATEGORY_LABELS[cat as ExerciseCategory] ?? cat;
+export function getCatLabel(cat: string, cats: CategoryLookup): string {
+  return cats.label(cat);
 }
 
 export function getExerciseNames(w: Workout): string {
@@ -27,20 +30,19 @@ export function getExerciseNames(w: Workout): string {
   return names.slice(0, 3).join(' · ') + ` +${names.length - 3}`;
 }
 
-export function workoutCardColor(w: Workout): string {
-  const cats = workoutCategories(w);
-  if (!cats.length) return getBrandColor();
-  if (cats.length === 1) return CATEGORY_COLORS[cats[0] as ExerciseCategory] ?? getBrandColor();
-  const fallback = getBrandColor();
-  const colors = cats.map(c => CATEGORY_COLORS[c as ExerciseCategory] ?? fallback);
+export function workoutCardColor(w: Workout, cats: CategoryLookup): string {
+  const wCats = workoutCategories(w);
+  if (!wCats.length) return getBrandColor();
+  if (wCats.length === 1) return cats.color(wCats[0]);
+  const colors = wCats.map(c => cats.color(c));
   const step = 100 / colors.length;
   return `linear-gradient(180deg, ${colors.map((c, i) => `${c} ${i * step}%, ${c} ${(i + 1) * step}%`).join(', ')})`;
 }
 
-export function workoutPrimaryColor(w: Workout): string {
-  const cats  = workoutCategories(w);
+export function workoutPrimaryColor(w: Workout, cats: CategoryLookup): string {
+  const wCats = workoutCategories(w);
   const brand = getBrandColor();
-  return cats.length ? (CATEGORY_COLORS[cats[0] as ExerciseCategory] ?? brand) : brand;
+  return wCats.length ? cats.color(wCats[0]) : brand;
 }
 
 export function workoutSetsCount(w: Workout): number {

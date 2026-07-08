@@ -6,6 +6,7 @@ import { WorkoutService } from './workout.service';
 import { SportService } from './sport.service';
 import { UserSettingsService } from './user-settings.service';
 import { WorkoutProfileService } from './workout-profile.service';
+import { CategoryService } from './category.service';
 import { DEFAULT_USER_SETTINGS, UserSettings } from '../models/user-settings.model';
 import { Workout } from '../models/workout.model';
 import { Sport, SportSession } from '../models/sport.model';
@@ -14,6 +15,19 @@ const NEUTRAL_CAT = { daysSinceLast: 2, typicalGapDays: 4, overdueScore: 0.5 };
 const NEUTRAL_PROFILE = {
   gym: { push: NEUTRAL_CAT, pull: NEUTRAL_CAT, legs: NEUTRAL_CAT },
   favoriteSport: null, recentSport: null, minRecovery: 2,
+};
+
+const FAKE_CATEGORIES = [
+  { key: 'push', name: 'Empenta', icon: 'fitness_center',    color: '#e57373' },
+  { key: 'pull', name: 'Tracció', icon: 'sports_gymnastics', color: '#64b5f6' },
+  { key: 'legs', name: 'Cames',   icon: 'directions_run',    color: '#81c784' },
+];
+const CAT_BY_KEY = new Map(FAKE_CATEGORIES.map(c => [c.key, c]));
+const mockCategoryService = {
+  categories: signal(FAKE_CATEGORIES),
+  label: (cat: string) => CAT_BY_KEY.get(cat)?.name ?? cat,
+  color: (cat: string) => CAT_BY_KEY.get(cat)?.color ?? '#bbb',
+  icon:  (cat: string) => CAT_BY_KEY.get(cat)?.icon ?? 'fitness_center',
 };
 
 // Fixed Wednesday so all date-relative assertions are deterministic
@@ -65,6 +79,7 @@ describe('FitnessMetricsService', () => {
         { provide: SportService,          useValue: { sessions: mockSessions, sports: mockSports, getPlannedSportSessionsForDate: jasmine.createSpy().and.returnValue([]) } },
         { provide: UserSettingsService,   useValue: { settings: mockSettings, fitnessGoal: signal(null) } },
         { provide: WorkoutProfileService, useValue: { profile: signal(NEUTRAL_PROFILE) } },
+        { provide: CategoryService,       useValue: mockCategoryService },
       ],
     });
 
@@ -443,7 +458,7 @@ describe('FitnessMetricsService', () => {
       const insight = service.insights().find(i => i.type === 'equilibra_gym');
       // legs has 0 — least done; pull and push have counts but legs wins as min
       // Actually: push=3, pull=1, legs=0 → legs is min with 0
-      expect(insight?.title).toMatch(/Leg day\?/i);
+      expect(insight?.title).toMatch(/Cames day\?/i);
     });
 
     it('message includes counts for the non-neglected categories', () => {

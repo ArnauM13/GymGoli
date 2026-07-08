@@ -5,10 +5,17 @@ import { WorkoutProfileService } from './workout-profile.service';
 import { WorkoutService } from './workout.service';
 import { SportService } from './sport.service';
 import { UserSettingsService } from './user-settings.service';
+import { CategoryService } from './category.service';
 import { Workout } from '../models/workout.model';
 import { Sport, SportSession } from '../models/sport.model';
 import { ExerciseCategory } from '../models/exercise.model';
 import { FitnessGoal } from '../models/user-settings.model';
+
+const FAKE_CATEGORIES = [
+  { key: 'push', name: 'Empenta' },
+  { key: 'pull', name: 'Tracció' },
+  { key: 'legs', name: 'Cames' },
+];
 
 function makeWorkout(date: string, category: ExerciseCategory): Workout {
   return { id: date + category, date, category, categories: [category], entries: [], createdAt: new Date() };
@@ -43,6 +50,7 @@ describe('WorkoutProfileService', () => {
         { provide: WorkoutService,      useValue: { doneWorkouts } },
         { provide: SportService,        useValue: { sessions, sports } },
         { provide: UserSettingsService, useValue: { fitnessGoal } },
+        { provide: CategoryService,     useValue: { categories: () => FAKE_CATEGORIES } },
       ],
     });
     service = TestBed.inject(WorkoutProfileService);
@@ -53,20 +61,20 @@ describe('WorkoutProfileService', () => {
   describe('gym category profiles', () => {
     it('defaults daysSinceLast to 99 when a category has never been trained', () => {
       const profile = service.profile();
-      expect(profile.gym.push.daysSinceLast).toBe(99);
-      expect(profile.gym.pull.daysSinceLast).toBe(99);
-      expect(profile.gym.legs.daysSinceLast).toBe(99);
+      expect(profile.gym['push'].daysSinceLast).toBe(99);
+      expect(profile.gym['pull'].daysSinceLast).toBe(99);
+      expect(profile.gym['legs'].daysSinceLast).toBe(99);
     });
 
     it('computes daysSinceLast from the most recent matching workout', () => {
       doneWorkouts.set([makeWorkout('2024-03-10', 'push')]); // 5 days before mocked "today"
-      expect(service.profile().gym.push.daysSinceLast).toBe(5);
+      expect(service.profile().gym['push'].daysSinceLast).toBe(5);
     });
 
     it('falls back to the goal default gap with a single data point', () => {
       doneWorkouts.set([makeWorkout('2024-03-10', 'push')]);
       // no goal set -> defaults to 'strength' -> gap 4
-      expect(service.profile().gym.push.typicalGapDays).toBe(4);
+      expect(service.profile().gym['push'].typicalGapDays).toBe(4);
     });
 
     it('derives typicalGapDays from the average of recent consecutive gaps', () => {
@@ -75,7 +83,7 @@ describe('WorkoutProfileService', () => {
         makeWorkout('2024-03-10', 'push'), // gap 3
         makeWorkout('2024-03-07', 'push'), // gap 3
       ]);
-      expect(service.profile().gym.push.typicalGapDays).toBe(3);
+      expect(service.profile().gym['push'].typicalGapDays).toBe(3);
     });
 
     it('ignores gaps longer than 14 days as likely breaks, not the real cycle', () => {
@@ -84,7 +92,7 @@ describe('WorkoutProfileService', () => {
         makeWorkout('2024-03-10', 'push'), // gap 3 (kept)
         makeWorkout('2024-01-01', 'push'), // gap ~69 (ignored)
       ]);
-      expect(service.profile().gym.push.typicalGapDays).toBe(3);
+      expect(service.profile().gym['push'].typicalGapDays).toBe(3);
     });
 
     it('clamps typicalGapDays up to minRecovery when the real gap is smaller', () => {
@@ -94,7 +102,7 @@ describe('WorkoutProfileService', () => {
         makeWorkout('2024-03-14', 'push'),
         makeWorkout('2024-03-13', 'push'), // gap 1
       ]);
-      expect(service.profile().gym.push.typicalGapDays).toBe(2);
+      expect(service.profile().gym['push'].typicalGapDays).toBe(2);
     });
 
     it('computes overdueScore as daysSinceLast / typicalGapDays', () => {
@@ -102,14 +110,14 @@ describe('WorkoutProfileService', () => {
         makeWorkout('2024-03-11', 'push'), // 4 days ago
         makeWorkout('2024-03-07', 'push'), // gap 4
       ]);
-      const p = service.profile().gym.push;
+      const p = service.profile().gym['push'];
       expect(p.overdueScore).toBeCloseTo(p.daysSinceLast / p.typicalGapDays, 5);
     });
 
     it('only counts workouts matching the given category', () => {
       doneWorkouts.set([makeWorkout('2024-03-14', 'pull')]);
-      expect(service.profile().gym.push.daysSinceLast).toBe(99);
-      expect(service.profile().gym.pull.daysSinceLast).toBe(1);
+      expect(service.profile().gym['push'].daysSinceLast).toBe(99);
+      expect(service.profile().gym['pull'].daysSinceLast).toBe(1);
     });
   });
 
@@ -117,14 +125,14 @@ describe('WorkoutProfileService', () => {
     it('uses the strength defaults when no goal is set', () => {
       doneWorkouts.set([makeWorkout('2024-03-14', 'push')]);
       expect(service.profile().minRecovery).toBe(2);
-      expect(service.profile().gym.push.typicalGapDays).toBe(4);
+      expect(service.profile().gym['push'].typicalGapDays).toBe(4);
     });
 
     it('uses the sport goal defaults when the goal is "sport"', () => {
       fitnessGoal.set('sport');
       doneWorkouts.set([makeWorkout('2024-03-14', 'push')]);
       expect(service.profile().minRecovery).toBe(1);
-      expect(service.profile().gym.push.typicalGapDays).toBe(5);
+      expect(service.profile().gym['push'].typicalGapDays).toBe(5);
     });
   });
 

@@ -4,7 +4,7 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { Workout } from '../../../core/models/workout.model';
 import { SportService } from '../../../core/services/sport.service';
-import { CATEGORY_COLORS, ExerciseCategory } from '../../../core/models/exercise.model';
+import { CategoryService } from '../../../core/services/category.service';
 import {
   MONTHS_CA, CalDay,
   mondayOf, addDays, catDotBackground, sportDotBackground, workoutCategories, weekRangeLabel,
@@ -370,6 +370,7 @@ import {
 export class CalendarComponent {
   private workoutService = inject(WorkoutService);
   private sportService   = inject(SportService);
+  private categoryService = inject(CategoryService);
   private dialogRef      = inject(MatDialogRef<CalendarComponent>, { optional: true });
   private dialogData     = inject<{ selectedDate?: string; initialView?: 'week' | 'month' }>(MAT_DIALOG_DATA, { optional: true });
 
@@ -420,6 +421,7 @@ export class CalendarComponent {
     // Ensure data loaded for visible period
     effect(() => {
       this.sportService.ensureLoaded(); // sport definitions load on first calendar render
+      this.categoryService.ensureLoaded();
       if (this.view() === 'month') {
         this.workoutService.ensureMonthLoaded(this.calYear(), this.calMonth());
         this.sportService.ensureMonthLoaded(this.calYear(), this.calMonth());
@@ -627,12 +629,12 @@ export class CalendarComponent {
     return this.dayNames[(new Date(dateStr + 'T12:00:00').getDay() + 6) % 7];
   }
 
-  readonly getCatDotBackground  = catDotBackground;
+  getCatDotBackground(cats: string[]): string { return catDotBackground(cats, this.categoryService); }
   readonly getSportDotBackground = sportDotBackground;
 
   getPlanDotColor(cats: string[]): string {
     const brand = getComputedStyle(document.documentElement).getPropertyValue('--c-brand').trim() || '#006874';
     if (!cats?.length) return brand;
-    return CATEGORY_COLORS[cats[0] as ExerciseCategory] ?? brand;
+    return this.categoryService.color(cats[0]);
   }
 }

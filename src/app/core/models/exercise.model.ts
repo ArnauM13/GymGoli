@@ -1,35 +1,16 @@
-export type ExerciseCategory = 'push' | 'pull' | 'legs';
+/** Category keys are now user-defined (see CategoryService) — widened from
+ *  the previous 'push' | 'pull' | 'legs' literal union. The 3 default keys
+ *  keep working unchanged since existing data already uses them as values. */
+export type ExerciseCategory = string;
 
 export type ExerciseSubcategory =
   | 'chest' | 'shoulders' | 'triceps'       // push
   | 'back' | 'biceps' | 'forearms'          // pull
   | 'quads' | 'hamstrings' | 'glutes' | 'calves'; // legs
 
-export const CATEGORY_LABELS: Record<ExerciseCategory, string> = {
-  push: 'Empenta',
-  pull: 'Tracció',
-  legs: 'Cames',
-};
-
-export const CATEGORY_ICONS: Record<ExerciseCategory, string> = {
-  push: 'fitness_center',
-  pull: 'sports_gymnastics',
-  legs: 'directions_run',
-};
-
-export const CATEGORY_COLORS: Record<ExerciseCategory, string> = {
-  push: '#e57373',
-  pull: '#64b5f6',
-  legs: '#81c784',
-};
-
-export const CATEGORY_MUSCLES: Record<ExerciseCategory, string> = {
-  push: 'Pit · Espatlles · Tríceps',
-  pull: 'Esquena · Bíceps · Avantbraços',
-  legs: 'Quàdriceps · Isquiotibials · Glutis',
-};
-
-export const SUBCATEGORY_OPTIONS: Record<ExerciseCategory, { value: ExerciseSubcategory; label: string }[]> = {
+/** Subcategory (muscle-group) tagging only ever applies to the 3 default
+ *  categories — custom categories simply don't offer subcategory options. */
+export const SUBCATEGORY_OPTIONS: Record<'push' | 'pull' | 'legs', { value: ExerciseSubcategory; label: string }[]> = {
   push: [
     { value: 'chest', label: 'Pit' },
     { value: 'shoulders', label: 'Espatlles' },
@@ -47,6 +28,12 @@ export const SUBCATEGORY_OPTIONS: Record<ExerciseCategory, { value: ExerciseSubc
     { value: 'calves', label: 'Bessons' },
   ],
 };
+
+/** Safe lookup for an arbitrary category key — returns [] for custom
+ *  categories, which have no subcategory taxonomy. */
+export function getSubcategoryOptions(cat: string): { value: ExerciseSubcategory; label: string }[] {
+  return (SUBCATEGORY_OPTIONS as Record<string, { value: ExerciseSubcategory; label: string }[]>)[cat] ?? [];
+}
 
 export const SUBCATEGORY_LABELS: Partial<Record<ExerciseSubcategory, string>> = {
   chest: 'Pit',

@@ -4,7 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { SharedWorkoutService } from '../../core/services/shared-workout.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
-import { CATEGORY_LABELS } from '../../core/models/exercise.model';
+import { CategoryService } from '../../core/services/category.service';
 import { SharedWorkout, SharedWorkoutEntry } from '../../core/models/shared-workout.model';
 import { kgToDisplay } from '../../shared/utils/weight.utils';
 
@@ -146,6 +146,7 @@ export class ShareImportComponent implements OnInit {
   private auth                = inject(AuthService);
   private sharedWorkoutService = inject(SharedWorkoutService);
   private settingsService      = inject(UserSettingsService);
+  private categoryService      = inject(CategoryService);
 
   readonly status       = signal<Status>('loading');
   readonly errorMessage = signal('');
@@ -168,6 +169,7 @@ export class ShareImportComponent implements OnInit {
       return;
     }
 
+    this.categoryService.ensureLoaded();
     await this.loadWorkout();
   }
 
@@ -203,7 +205,7 @@ export class ShareImportComponent implements OnInit {
   }
 
   categoryLabel(cat: SharedWorkout['category']): string {
-    return cat === 'mixed' ? 'Mixt' : CATEGORY_LABELS[cat];
+    return cat === 'mixed' ? 'Mixt' : this.categoryService.label(cat);
   }
 
   setsSummary(entry: SharedWorkoutEntry): string {

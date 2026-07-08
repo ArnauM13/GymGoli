@@ -4,8 +4,14 @@ import { TestBed } from '@angular/core/testing';
 import { DayFeedCardsComponent } from './day-feed-cards.component';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
+import { CategoryService } from '../../../core/services/category.service';
 import { FeedbackService } from '../../services/feedback.service';
 import { Workout } from '../../../core/models/workout.model';
+
+const mockCategoryService = {
+  label: (cat: string) => cat,
+  color: () => '#e57373',
+};
 
 function makeWorkout(overrides: Partial<Workout> = {}): Workout {
   return { id: '1', date: '2024-01-01', entries: [], createdAt: new Date(), ...overrides };
@@ -24,6 +30,7 @@ describe('DayFeedCardsComponent', () => {
       providers: [
         { provide: WorkoutService, useValue: { startPlannedWorkout } },
         { provide: UserSettingsService, useValue: { difficultyScale: signal('emoji') } },
+        { provide: CategoryService, useValue: mockCategoryService },
         { provide: FeedbackService, useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
       ],
     })

@@ -6,6 +6,7 @@ import { of } from 'rxjs';
 import { ExercisePickerDialogComponent, ExercisePickerData } from './exercise-picker-dialog.component';
 import { ExerciseFormDialogComponent } from '../../library/components/exercise-form-dialog.component';
 import { ExerciseService } from '../../../core/services/exercise.service';
+import { CategoryService } from '../../../core/services/category.service';
 import { Exercise } from '../../../core/models/exercise.model';
 import { FeedbackService } from '../../../shared/services/feedback.service';
 
@@ -15,6 +16,18 @@ function makeExercise(overrides: Partial<Exercise> = {}): Exercise {
     ...overrides,
   };
 }
+
+const FAKE_CATEGORIES = [
+  { key: 'push', name: 'Empenta', icon: 'fitness_center',    color: '#e57373' },
+  { key: 'pull', name: 'Tracció', icon: 'sports_gymnastics', color: '#64b5f6' },
+  { key: 'legs', name: 'Cames',   icon: 'directions_run',    color: '#81c784' },
+];
+const CAT_BY_KEY = new Map(FAKE_CATEGORIES.map(c => [c.key, c]));
+const mockCategoryService = {
+  categoryChips: signal(FAKE_CATEGORIES.map(c => ({ value: c.key, label: c.name, icon: c.icon, color: c.color }))),
+  label: (cat: string) => CAT_BY_KEY.get(cat)?.name ?? cat,
+  color: (cat: string) => CAT_BY_KEY.get(cat)?.color ?? '#bbb',
+};
 
 describe('ExercisePickerDialogComponent', () => {
   let component: ExercisePickerDialogComponent;
@@ -47,6 +60,7 @@ describe('ExercisePickerDialogComponent', () => {
         { provide: MatDialog,       useValue: dialog },
         { provide: MAT_DIALOG_DATA, useValue: dialogData },
         { provide: ExerciseService, useValue: exerciseService },
+        { provide: CategoryService, useValue: mockCategoryService },
         { provide: FeedbackService, useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
       ],
     });

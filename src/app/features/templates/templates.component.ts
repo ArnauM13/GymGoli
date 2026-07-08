@@ -3,35 +3,17 @@ import { FormsModule } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 
-import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
+import { ExerciseCategory } from '../../core/models/exercise.model';
 import { TemplateEntry, WorkoutTemplate } from '../../core/models/template.model';
 import { TemplateService } from '../../core/services/template.service';
+import { CategoryService } from '../../core/services/category.service';
 import { ExercisePickerDialogComponent } from '../train/components/exercise-picker-dialog.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { FeedbackService } from '../../shared/services/feedback.service';
 
 type EditorCat = ExerciseCategory | 'mixed';
 
-const CAT_OPTIONS: { value: EditorCat; label: string; color: string }[] = [
-  { value: 'push',  label: CATEGORY_LABELS.push,  color: CATEGORY_COLORS.push  },
-  { value: 'pull',  label: CATEGORY_LABELS.pull,  color: CATEGORY_COLORS.pull  },
-  { value: 'legs',  label: CATEGORY_LABELS.legs,  color: CATEGORY_COLORS.legs  },
-  { value: 'mixed', label: 'Mixt',                color: '#607d8b'              },
-];
-
-const CAT_COLOR: Record<EditorCat, string> = {
-  push:  CATEGORY_COLORS.push,
-  pull:  CATEGORY_COLORS.pull,
-  legs:  CATEGORY_COLORS.legs,
-  mixed: '#607d8b',
-};
-
-const CAT_LABEL: Record<EditorCat, string> = {
-  push:  CATEGORY_LABELS.push,
-  pull:  CATEGORY_LABELS.pull,
-  legs:  CATEGORY_LABELS.legs,
-  mixed: 'Mixt',
-};
+const MIXED_COLOR = '#607d8b';
 
 @Component({
   selector: 'app-templates',
@@ -132,7 +114,7 @@ const CAT_LABEL: Record<EditorCat, string> = {
         <div class="editor-field">
           <label class="editor-label">Categoria</label>
           <div class="cat-chips">
-            @for (opt of catOptions; track opt.value) {
+            @for (opt of catOptions(); track opt.value) {
               <button class="cat-chip" [class.active]="editorCat === opt.value"
                       [style.--cc]="opt.color"
                       (click)="editorCat = opt.value">{{ opt.label }}</button>
@@ -392,14 +374,20 @@ const CAT_LABEL: Record<EditorCat, string> = {
 })
 export class TemplatesComponent {
   readonly templateService = inject(TemplateService);
+  readonly categoryService = inject(CategoryService);
   private dialog           = inject(MatDialog);
   private feedback         = inject(FeedbackService);
+
+  constructor() { this.categoryService.ensureLoaded(); }
 
   readonly sortedTemplates = computed(() =>
     [...this.templateService.templates()].sort((a, b) => (b.useCount ?? 0) - (a.useCount ?? 0))
   );
 
-  readonly catOptions = CAT_OPTIONS;
+  readonly catOptions = computed<{ value: EditorCat; label: string; color: string }[]>(() => [
+    ...this.categoryService.categoryChips(),
+    { value: 'mixed', label: 'Mixt', color: MIXED_COLOR },
+  ]);
 
   readonly editorOpen  = signal(false);
   readonly editingId   = signal<string | null>(null);
@@ -408,8 +396,8 @@ export class TemplatesComponent {
   editorCat: EditorCat = 'push';
   editorEntries: TemplateEntry[] = [];
 
-  catColor(cat: EditorCat | string): string { return CAT_COLOR[cat as EditorCat] ?? '#bbb'; }
-  catLabel(cat: EditorCat | string): string { return CAT_LABEL[cat as EditorCat] ?? cat; }
+  catColor(cat: EditorCat | string): string { return cat === 'mixed' ? MIXED_COLOR : this.categoryService.color(cat); }
+  catLabel(cat: EditorCat | string): string { return cat === 'mixed' ? 'Mixt' : this.categoryService.label(cat); }
 
   entryDisplay(e: TemplateEntry): string {
     let s = e.exerciseName;

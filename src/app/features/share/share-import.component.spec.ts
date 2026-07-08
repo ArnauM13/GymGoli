@@ -6,7 +6,13 @@ import { ShareImportComponent } from './share-import.component';
 import { AuthService } from '../../core/services/auth.service';
 import { SharedWorkoutService } from '../../core/services/shared-workout.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
+import { CategoryService } from '../../core/services/category.service';
 import { SharedWorkout } from '../../core/models/shared-workout.model';
+
+const mockCategoryService = {
+  ensureLoaded: jasmine.createSpy(),
+  label: (cat: string) => ({ push: 'Empenta', pull: 'Tracció', legs: 'Cames' } as Record<string, string>)[cat] ?? cat,
+};
 
 function shared(overrides: Partial<SharedWorkout> = {}): SharedWorkout {
   return {
@@ -39,6 +45,7 @@ describe('ShareImportComponent', () => {
         { provide: AuthService,    useValue: { waitForAuth } },
         { provide: SharedWorkoutService, useValue: { fetchById, importAsWorkout } },
         { provide: UserSettingsService,  useValue: { weightUnit: signal<'kg' | 'lb'>('kg') } },
+        { provide: CategoryService,      useValue: mockCategoryService },
       ],
     });
     component = TestBed.runInInjectionContext(() => new ShareImportComponent());

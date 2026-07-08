@@ -3,7 +3,8 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { MatDialog } from '@angular/material/dialog';
 
-import { CATEGORY_COLORS, CATEGORY_LABELS, SUBCATEGORY_LABELS } from '../../../core/models/exercise.model';
+import { SUBCATEGORY_LABELS } from '../../../core/models/exercise.model';
+import { CategoryService } from '../../../core/services/category.service';
 import { FEELING_LABEL, FeelingLevel, Workout, WorkoutEntry, WorkoutSet, setMaxWeight } from '../../../core/models/workout.model';
 import { FitnessGoal, FITNESS_GOAL_LABELS } from '../../../core/models/user-settings.model';
 import { ExerciseService } from '../../../core/services/exercise.service';
@@ -1222,6 +1223,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 export class WorkoutEditorComponent implements OnDestroy {
   private workoutService   = inject(WorkoutService);
   private exerciseService  = inject(ExerciseService);
+  private categoryService  = inject(CategoryService);
   readonly settingsService = inject(UserSettingsService);
   readonly offlineService  = inject(OfflineService);
   private feedback         = inject(FeedbackService);
@@ -1411,6 +1413,7 @@ export class WorkoutEditorComponent implements OnDestroy {
 
   constructor() {
     this.exerciseService.ensureLoaded();
+    this.categoryService.ensureLoaded();
 
     // Restore collapsed/done state; collapse all entries when first opening a template-loaded workout.
     effect(() => {
@@ -1543,7 +1546,7 @@ export class WorkoutEditorComponent implements OnDestroy {
 
   getCatColor(entry: WorkoutEntry): string {
     const ex = this.exerciseService.getById(entry.exerciseId);
-    return ex ? CATEGORY_COLORS[ex.category] : 'var(--c-border)';
+    return ex ? this.categoryService.color(ex.category) : 'var(--c-border)';
   }
   /** False only in the brief window before exercise data has loaded/cached — drives the loading shimmer instead of a flat gray bar. */
   isExerciseResolved(entry: WorkoutEntry): boolean {
@@ -1551,7 +1554,7 @@ export class WorkoutEditorComponent implements OnDestroy {
   }
   getCatLabel(entry: WorkoutEntry): string {
     const ex = this.exerciseService.getById(entry.exerciseId);
-    return ex ? CATEGORY_LABELS[ex.category] : '';
+    return ex ? this.categoryService.label(ex.category) : '';
   }
   getSubLabel(entry: WorkoutEntry): string {
     const ex = this.exerciseService.getById(entry.exerciseId);

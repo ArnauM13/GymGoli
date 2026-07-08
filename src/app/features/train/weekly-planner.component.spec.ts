@@ -10,6 +10,7 @@ import { WeeklyPlanService, WEEKS_RECURRING, WEEKS_SINGLE } from '../../core/ser
 import { WorkoutService } from '../../core/services/workout.service';
 import { SportService } from '../../core/services/sport.service';
 import { TemplateService } from '../../core/services/template.service';
+import { CategoryService } from '../../core/services/category.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../../core/models/weekly-plan.model';
@@ -21,6 +22,20 @@ import { Sport, SportSession } from '../../core/models/sport.model';
 function template(overrides: Partial<WorkoutTemplate> = {}): WorkoutTemplate {
   return { id: 't1', name: 'Push A', category: 'push', entries: [], createdAt: '2024-01-01', ...overrides };
 }
+
+const FAKE_CATEGORIES = [
+  { key: 'push', name: 'Empenta', icon: 'fitness_center',    color: '#e57373' },
+  { key: 'pull', name: 'Tracció', icon: 'sports_gymnastics', color: '#64b5f6' },
+  { key: 'legs', name: 'Cames',   icon: 'directions_run',    color: '#81c784' },
+];
+const CAT_BY_KEY = new Map(FAKE_CATEGORIES.map(c => [c.key, c]));
+const mockCategoryService = {
+  categories:   signal(FAKE_CATEGORIES),
+  ensureLoaded: jasmine.createSpy(),
+  label: (cat: string) => CAT_BY_KEY.get(cat)?.name ?? cat,
+  color: (cat: string) => CAT_BY_KEY.get(cat)?.color ?? '#bbb',
+  icon:  (cat: string) => CAT_BY_KEY.get(cat)?.icon ?? 'fitness_center',
+};
 
 describe('WeeklyPlannerComponent', () => {
   let component: WeeklyPlannerComponent;
@@ -72,6 +87,7 @@ describe('WeeklyPlannerComponent', () => {
         { provide: WorkoutService,      useValue: { getPlannedForDate, getWorkoutsForDate } },
         { provide: SportService,        useValue: { sports: signal([]), ensureLoaded: jasmine.createSpy(), getSportSessionsForDate, getPlannedSportSessionsForDate } },
         { provide: TemplateService,     useValue: { forCategory } },
+        { provide: CategoryService,     useValue: mockCategoryService },
         { provide: FeedbackService,     useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
         { provide: ConfirmDialogService, useValue: { confirm, chooseAction } },
         { provide: MatDialog,           useValue: { open: dialogOpen } },

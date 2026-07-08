@@ -4,14 +4,12 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
 import {
-  CATEGORY_COLORS,
-  CATEGORY_ICONS,
-  CATEGORY_LABELS,
   Exercise,
   ExerciseCategory,
   MUSCLE_OPTIONS,
-  SUBCATEGORY_OPTIONS,
+  getSubcategoryOptions,
 } from '../../../core/models/exercise.model';
+import { CategoryService } from '../../../core/services/category.service';
 
 export interface ExerciseFormDialogData {
   exercise?: Exercise;
@@ -56,7 +54,7 @@ const MUSCLE_GROUPS: { label: string; values: string[] }[] = [
           <div class="field">
             <span class="field-label">Tipus</span>
             <div class="cat-grid">
-              @for (cat of categories; track cat.value) {
+              @for (cat of categories(); track cat.value) {
                 <button type="button" class="cat-btn"
                         [class.selected]="selectedCategory() === cat.value"
                         [style.--cat-color]="cat.color"
@@ -359,6 +357,7 @@ const MUSCLE_GROUPS: { label: string; values: string[] }[] = [
 export class ExerciseFormDialogComponent {
   private fb = inject(FormBuilder);
   private dialogRef = inject(MatDialogRef<ExerciseFormDialogComponent>);
+  private categoryService = inject(CategoryService);
   readonly data: ExerciseFormDialogData = inject(MAT_DIALOG_DATA);
 
   readonly isEdit = !!this.data.exercise;
@@ -380,16 +379,11 @@ export class ExerciseFormDialogComponent {
 
   readonly unilateral = signal(!!this.data.exercise?.unilateral);
 
-  readonly categories = (Object.keys(CATEGORY_LABELS) as ExerciseCategory[]).map(value => ({
-    value,
-    label: CATEGORY_LABELS[value],
-    icon: CATEGORY_ICONS[value],
-    color: CATEGORY_COLORS[value],
-  }));
+  readonly categories = this.categoryService.categoryChips;
 
   readonly subcategoryOptions = computed(() => {
     const cat = this.selectedCategory();
-    return cat ? SUBCATEGORY_OPTIONS[cat] : [];
+    return cat ? getSubcategoryOptions(cat) : [];
   });
 
   readonly form = this.fb.group({

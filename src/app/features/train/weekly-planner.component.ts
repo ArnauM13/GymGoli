@@ -10,13 +10,13 @@ import { WeeklyPlanService, WEEKS_RECURRING, WEEKS_SINGLE } from '../../core/ser
 import { TemplateService } from '../../core/services/template.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
-import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, Exercise, ExerciseCategory } from '../../core/models/exercise.model';
+import { Exercise, ExerciseCategory } from '../../core/models/exercise.model';
+import { CategoryService } from '../../core/services/category.service';
 import { EMPTY_WEEKLY_PLAN, WEEKDAY_LABELS, WeeklyPlan, WeeklyPlanItem } from '../../core/models/weekly-plan.model';
 import { TemplateEntry, WorkoutTemplate } from '../../core/models/template.model';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
 import { addDays, weekRangeLabel } from '../../shared/utils/calendar-utils';
 
-const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
 
 @Component({
   selector: 'app-weekly-planner',
@@ -55,7 +55,7 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
 
           <div class="chip-group-label">Gym</div>
           <div class="filter-bar">
-            @for (cat of gymCategories; track cat) {
+            @for (cat of gymCategories(); track cat) {
               <button class="filter-chip"
                       [class.active]="isGymSelected(day.index, cat)"
                       [style.--cat-color]="categoryColor(cat)"
@@ -66,7 +66,7 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
             }
           </div>
 
-          @for (cat of gymCategories; track cat) {
+          @for (cat of gymCategories(); track cat) {
             @if (isGymSelected(day.index, cat)) {
               <div class="tpl-row">
                 <span class="tpl-row-label">{{ categoryLabel(cat) }}, en detall</span>
@@ -312,13 +312,14 @@ export class WeeklyPlannerComponent {
   private weeklyPlanService = inject(WeeklyPlanService);
   private workoutService   = inject(WorkoutService);
   readonly sportService    = inject(SportService);
+  private categoryService  = inject(CategoryService);
   private templateService  = inject(TemplateService);
   private feedback         = inject(FeedbackService);
   private confirmDialog    = inject(ConfirmDialogService);
   private dialog           = inject(MatDialog);
   private route            = inject(ActivatedRoute);
 
-  readonly gymCategories  = GYM_CATEGORIES;
+  readonly gymCategories = computed(() => this.categoryService.categories().map(c => c.key));
   readonly days = WEEKDAY_LABELS.map((label, index) => ({ label, index }));
 
   /** Monday of a single week to plan (from the calendar's "Planificar" action),
@@ -335,6 +336,7 @@ export class WeeklyPlannerComponent {
 
   constructor() {
     this.sportService.ensureLoaded();
+    this.categoryService.ensureLoaded();
   }
 
   private _clone(plan: WeeklyPlan): WeeklyPlan {
@@ -383,9 +385,9 @@ export class WeeklyPlannerComponent {
 
   weekRange(monday: string): string { return weekRangeLabel(monday); }
 
-  categoryLabel(cat: ExerciseCategory): string { return CATEGORY_LABELS[cat]; }
-  categoryIcon(cat: ExerciseCategory): string { return CATEGORY_ICONS[cat]; }
-  categoryColor(cat: ExerciseCategory): string { return CATEGORY_COLORS[cat]; }
+  categoryLabel(cat: ExerciseCategory): string { return this.categoryService.label(cat); }
+  categoryIcon(cat: ExerciseCategory): string { return this.categoryService.icon(cat); }
+  categoryColor(cat: ExerciseCategory): string { return this.categoryService.color(cat); }
 
   itemCount(dayIndex: number): number {
     return this.plan().days[dayIndex].length;

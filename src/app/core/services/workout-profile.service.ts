@@ -5,6 +5,7 @@ import { Sport } from '../models/sport.model';
 import { UserSettingsService } from './user-settings.service';
 import { SportService } from './sport.service';
 import { WorkoutService } from './workout.service';
+import { CategoryService } from './category.service';
 import { workoutCategories } from '../../shared/utils/calendar-utils';
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
@@ -48,13 +49,12 @@ const GOAL_MIN_RECOVERY: Record<string, number> = {
   strength: 2, fitness: 1, weight: 1, sport: 1,
 };
 
-const GYM_CATS: ExerciseCategory[] = ['push', 'pull', 'legs'];
-
 @Injectable({ providedIn: 'root' })
 export class WorkoutProfileService {
   private workoutService  = inject(WorkoutService);
   private sportService    = inject(SportService);
   private settingsService = inject(UserSettingsService);
+  private categoryService = inject(CategoryService);
 
   readonly profile = computed((): WorkoutProfile => {
     const today       = TODAY();
@@ -66,8 +66,9 @@ export class WorkoutProfileService {
     const minRecovery = GOAL_MIN_RECOVERY[goal] ?? 2;
 
     const gym = {} as Record<ExerciseCategory, CategoryProfile>;
+    const gymCats = this.categoryService.categories().map(c => c.key);
 
-    for (const cat of GYM_CATS) {
+    for (const cat of gymCats) {
       // All past dates when this category was trained, sorted newest first
       const catDates = workouts
         .filter(w => workoutCategories(w).includes(cat))

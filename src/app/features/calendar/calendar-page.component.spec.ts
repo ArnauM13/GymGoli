@@ -8,6 +8,7 @@ import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
 import { AuthService } from '../../core/services/auth.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
+import { CategoryService } from '../../core/services/category.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { FeelingLevel, Workout, WorkoutEntry } from '../../core/models/workout.model';
 
@@ -16,6 +17,20 @@ const TODAY = new Date().toISOString().split('T')[0];
 function makeWorkout(overrides: Partial<Workout> = {}): Workout {
   return { id: '1', date: TODAY, entries: [], createdAt: new Date(), ...overrides };
 }
+
+const FAKE_CATEGORIES = [
+  { key: 'push', name: 'Empenta', icon: 'fitness_center',    color: '#e57373' },
+  { key: 'pull', name: 'Tracció', icon: 'sports_gymnastics', color: '#64b5f6' },
+  { key: 'legs', name: 'Cames',   icon: 'directions_run',    color: '#81c784' },
+];
+const CAT_BY_KEY = new Map(FAKE_CATEGORIES.map(c => [c.key, c]));
+const mockCategoryService = {
+  categories:   signal(FAKE_CATEGORIES),
+  ensureLoaded: jasmine.createSpy(),
+  label: (cat: string) => CAT_BY_KEY.get(cat)?.name ?? cat,
+  color: (cat: string) => CAT_BY_KEY.get(cat)?.color ?? '#bbb',
+  icon:  (cat: string) => CAT_BY_KEY.get(cat)?.icon ?? 'fitness_center',
+};
 
 describe('CalendarPageComponent', () => {
   let component: CalendarPageComponent;
@@ -56,6 +71,7 @@ describe('CalendarPageComponent', () => {
         { provide: SportService,        useValue: mockSportService },
         { provide: AuthService,         useValue: { uid: signal('user-1') } },
         { provide: UserSettingsService, useValue: { weightUnit: signal<'kg' | 'lb'>('kg'), difficultyScale: signal('emoji') } },
+        { provide: CategoryService,     useValue: mockCategoryService },
         { provide: FeedbackService,     useValue: { success: jasmine.createSpy(), error: jasmine.createSpy() } },
       ],
     })

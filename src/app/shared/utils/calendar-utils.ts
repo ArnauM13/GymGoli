@@ -1,5 +1,5 @@
-import { CATEGORY_COLORS, ExerciseCategory } from '../../core/models/exercise.model';
 import { Workout } from '../../core/models/workout.model';
+import { CategoryLookup } from '../../core/models/category.model';
 
 export const MONTHS_CA = [
   'Gener','Febrer','Març','Abril','Maig','Juny',
@@ -50,11 +50,11 @@ export function workoutCategories(w: Workout): string[] {
   return w.categories?.length ? w.categories : (w.category ? [w.category] : []);
 }
 
-export function catDotBackground(cats: string[]): string {
+export function catDotBackground(cats: string[], categories: CategoryLookup): string {
   const brand = getComputedStyle(document.documentElement).getPropertyValue('--c-brand').trim() || '#006874';
   if (!cats?.length) return brand;
-  if (cats.length === 1) return CATEGORY_COLORS[cats[0] as ExerciseCategory] ?? brand;
-  const colors = cats.map(c => CATEGORY_COLORS[c as ExerciseCategory] ?? '#bbb');
+  if (cats.length === 1) return categories.color(cats[0]);
+  const colors = cats.map(c => categories.color(c));
   const step   = 100 / colors.length;
   return `conic-gradient(${colors.map((c, i) => `${c} ${Math.round(i * step)}% ${Math.round((i + 1) * step)}%`).join(', ')})`;
 }

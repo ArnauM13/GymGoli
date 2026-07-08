@@ -5,9 +5,6 @@ import { ConfirmDialogService } from '../../shared/services/confirm-dialog.servi
 import { FeedbackService } from '../../shared/services/feedback.service';
 
 import {
-  CATEGORY_COLORS,
-  CATEGORY_ICONS,
-  CATEGORY_LABELS,
   Exercise,
   ExerciseCategory,
   MUSCLE_LABELS,
@@ -17,6 +14,7 @@ import {
 import { Sport } from '../../core/models/sport.model';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
+import { CategoryService } from '../../core/services/category.service';
 import { ExerciseFormDialogComponent } from './components/exercise-form-dialog.component';
 import { SportFormDialogComponent } from './components/sport-form-dialog.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
@@ -33,7 +31,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
       <div class="filter-bar">
         <button class="filter-chip" [class.active]="!activeFilter() && !muscleFilter()"
                 (click)="clearFilters()">Tots</button>
-        @for (cat of categoryList; track cat.value) {
+        @for (cat of categoryList(); track cat.value) {
           <button class="filter-chip" [class.active]="activeFilter() === cat.value"
                   [style.--cat-color]="getCategoryColor(cat.value)"
                   (click)="setCategory(cat.value)">
@@ -457,6 +455,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 export class LibraryComponent {
   private exerciseService = inject(ExerciseService);
   private sportService    = inject(SportService);
+  private categoryService = inject(CategoryService);
   private dialog          = inject(MatDialog);
   private feedback        = inject(FeedbackService);
   private confirmDialog   = inject(ConfirmDialogService);
@@ -464,6 +463,7 @@ export class LibraryComponent {
   constructor() {
     this.exerciseService.ensureLoaded();
     this.sportService.ensureLoaded();
+    this.categoryService.ensureLoaded();
   }
 
   readonly exercisesLoaded = this.exerciseService.isLoaded;
@@ -476,18 +476,15 @@ export class LibraryComponent {
   readonly muscleFilter = signal<string | null>(null);
   readonly exercises = this.exerciseService.exercises;
 
-  readonly categoryList = (Object.keys(CATEGORY_LABELS) as ExerciseCategory[]).map(value => ({
-    value,
-    label: CATEGORY_LABELS[value],
-    icon: CATEGORY_ICONS[value],
-  }));
+  readonly categoryList = this.categoryService.categoryChips;
 
   readonly muscleList = MUSCLE_OPTIONS;
 
   readonly visibleCategories = computed(() => {
     const filter = this.activeFilter();
-    if (filter) return this.categoryList.filter(c => c.value === filter);
-    return this.categoryList.filter(c => this.exercisesByCategory(c.value).length > 0);
+    const list = this.categoryList();
+    if (filter) return list.filter(c => c.value === filter);
+    return list.filter(c => this.exercisesByCategory(c.value).length > 0);
   });
 
   exercisesByCategory(cat: ExerciseCategory): Exercise[] {
@@ -512,9 +509,9 @@ export class LibraryComponent {
     return `${reps} × ${sets}`;
   }
 
-  getCategoryLabel(cat: ExerciseCategory): string { return CATEGORY_LABELS[cat]; }
-  getCategoryIcon(cat: ExerciseCategory): string { return CATEGORY_ICONS[cat]; }
-  getCategoryColor(cat: ExerciseCategory): string { return CATEGORY_COLORS[cat]; }
+  getCategoryLabel(cat: ExerciseCategory): string { return this.categoryService.label(cat); }
+  getCategoryIcon(cat: ExerciseCategory): string { return this.categoryService.icon(cat); }
+  getCategoryColor(cat: ExerciseCategory): string { return this.categoryService.color(cat); }
   getSubcategoryLabel(sub: string): string { return SUBCATEGORY_LABELS[sub as keyof typeof SUBCATEGORY_LABELS] ?? sub; }
   getMuscleLabel(m: string): string { return MUSCLE_LABELS[m] ?? m; }
 

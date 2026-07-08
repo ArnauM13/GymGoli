@@ -10,7 +10,6 @@ import { TrainerService } from '../../core/services/trainer.service';
 import { AuthService } from '../../core/services/auth.service';
 
 import {
-  CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_MUSCLES,
   Exercise, ExerciseCategory,
 } from '../../core/models/exercise.model';
 import { Sport, SportMetricDef } from '../../core/models/sport.model';
@@ -20,6 +19,7 @@ import { ExerciseService } from '../../core/services/exercise.service';
 import { TemplateService } from '../../core/services/template.service';
 import { SharedWorkoutService } from '../../core/services/shared-workout.service';
 import { SportService } from '../../core/services/sport.service';
+import { CategoryService } from '../../core/services/category.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { WorkoutService } from '../../core/services/workout.service';
@@ -29,7 +29,7 @@ import { WorkoutProfileService } from '../../core/services/workout-profile.servi
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import {
-  formatFeeling, workoutCardColor, workoutPrimaryColor, workoutVolumeFmt,
+  formatFeeling, workoutCardColor as _workoutCardColor, workoutPrimaryColor as _workoutPrimaryColor, workoutVolumeFmt,
 } from '../../shared/utils/workout-card.utils';
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
@@ -37,12 +37,6 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
 type GymSuggestion   = { type: 'gym';   category: ExerciseCategory; label: string; color: string; icon: string; reason?: string };
 type SportSuggestion = { type: 'sport'; sport: Sport;               label: string; color: string; icon: string; reason?: string };
 type TodaySuggestion = GymSuggestion | SportSuggestion;
-
-const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; color: string }[] = [
-  { value: 'push', label: CATEGORY_LABELS.push, icon: CATEGORY_ICONS.push, color: CATEGORY_COLORS.push },
-  { value: 'pull', label: CATEGORY_LABELS.pull, icon: CATEGORY_ICONS.pull, color: CATEGORY_COLORS.pull },
-  { value: 'legs', label: CATEGORY_LABELS.legs, icon: CATEGORY_ICONS.legs, color: CATEGORY_COLORS.legs },
-];
 
 @Component({
   selector: 'app-train',
@@ -267,8 +261,8 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           @if (todayExpanded()) {
             <div class="today-picker">
               <div class="chip-group-label">Gym</div>
-              <div class="type-grid" [style.grid-template-columns]="gridCols(workoutTypes.length)">
-                @for (cat of workoutTypes; track cat.value) {
+              <div class="type-grid" [style.grid-template-columns]="gridCols(workoutTypes().length)">
+                @for (cat of workoutTypes(); track cat.value) {
                   <button class="type-btn"
                     [style.--cat-color]="cat.color"
                     [class.type-btn--done]="doneCategories().has(cat.value)"
@@ -348,8 +342,8 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         </div>
 
         <div class="chip-group-label">Gym</div>
-        <div class="type-grid" [style.grid-template-columns]="gridCols(workoutTypes.length)">
-          @for (cat of workoutTypes; track cat.value) {
+        <div class="type-grid" [style.grid-template-columns]="gridCols(workoutTypes().length)">
+          @for (cat of workoutTypes(); track cat.value) {
             <button class="type-btn"
               [style.--cat-color]="cat.color"
               [class.type-btn--done]="doneCategories().has(cat.value)"
@@ -1235,6 +1229,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 export class TrainComponent {
   readonly workoutService  = inject(WorkoutService);
   readonly sportService    = inject(SportService);
+  readonly categoryService = inject(CategoryService);
   readonly offlineService  = inject(OfflineService);
   readonly trainerService  = inject(TrainerService);
   readonly settingsService = inject(UserSettingsService);
@@ -1252,7 +1247,7 @@ export class TrainComponent {
 
   readonly selectedDate    = signal<string>(TODAY());
   readonly sportToggling   = signal(false);
-  readonly workoutTypes    = WORKOUT_TYPES;
+  readonly workoutTypes    = this.categoryService.categoryChips;
   readonly chooserOpen     = signal(false);
   readonly todayExpanded   = signal(true);
   readonly workoutMenuOpen = signal(false);
@@ -1315,7 +1310,7 @@ export class TrainComponent {
     // Score each gym category by how "overdue" it is relative to the user's
     // actual training cycle. Only include categories that have had enough
     // recovery time since the last session.
-    const gymCandidates = (['push', 'pull', 'legs'] as ExerciseCategory[])
+    const gymCandidates = this.categoryService.categories().map(c => c.key)
       .map(cat => ({ cat, ...profile.gym[cat] }))
       .filter(c => c.daysSinceLast >= profile.minRecovery)
       .sort((a, b) => b.overdueScore - a.overdueScore);
@@ -1334,7 +1329,7 @@ export class TrainComponent {
         : undefined;
       return {
         type: 'gym', category: cat,
-        label: CATEGORY_LABELS[cat], color: CATEGORY_COLORS[cat], icon: CATEGORY_ICONS[cat],
+        label: this.categoryService.label(cat), color: this.categoryService.color(cat), icon: this.categoryService.icon(cat),
         reason,
       };
     };
@@ -1404,11 +1399,12 @@ export class TrainComponent {
     return w ? workoutCategories(w) : [];
   });
 
-  readonly activeWorkoutCategoryItems = computed(() =>
-    this.activeWorkoutCategories()
-      .map(c => WORKOUT_TYPES.find(t => t.value === c))
-      .filter((t): t is typeof WORKOUT_TYPES[0] => !!t)
-  );
+  readonly activeWorkoutCategoryItems = computed(() => {
+    const types = this.workoutTypes();
+    return this.activeWorkoutCategories()
+      .map(c => types.find(t => t.value === c))
+      .filter((t): t is typeof types[0] => !!t);
+  });
 
   readonly doneCategories = computed((): Set<string> =>
     new Set(this.dateWorkouts().flatMap(w => workoutCategories(w)))
@@ -1425,17 +1421,17 @@ export class TrainComponent {
 
   readonly pickerLabel = computed(() => {
     const cat = this.pickerCat();
-    return cat ? (WORKOUT_TYPES.find(t => t.value === cat)?.label ?? '') : '';
+    return cat ? this.categoryService.label(cat) : '';
   });
 
   readonly pickerColor = computed(() => {
     const cat = this.pickerCat();
-    return cat ? CATEGORY_COLORS[cat] : '';
+    return cat ? this.categoryService.color(cat) : '';
   });
 
   readonly pickerMuscles = computed(() => {
     const cat = this.pickerCat();
-    return cat ? CATEGORY_MUSCLES[cat] : '';
+    return cat ? (this.categoryService.muscles(cat) ?? '') : '';
   });
 
   readonly pickerLastAgo = computed(() => {
@@ -1460,11 +1456,12 @@ export class TrainComponent {
   readonly pickerBuiltIns = computed(() => {
     const cat = this.pickerCat();
     if (!cat) return [];
-    return BUILT_IN_TEMPLATES.filter(t => t.category === cat);
+    return BUILT_IN_TEMPLATES.filter(t => t.category === cat && this.categoryService.getByKey(t.category) != null);
   });
 
   constructor() {
     this.sportService.ensureLoaded();
+    this.categoryService.ensureLoaded();
 
     // Coming from the home feed with a specific workout to open (e.g. tapping
     // a day's card there navigates here with ?workout=<id>). Reactive (rather
@@ -1572,15 +1569,15 @@ export class TrainComponent {
   workoutLabel(w: Workout): string {
     const cats = workoutCategories(w);
     if (!cats.length) return 'Entrenament';
-    return cats.map(c => CATEGORY_LABELS[c as ExerciseCategory] ?? c).join(' + ');
+    return cats.map(c => this.categoryService.label(c)).join(' + ');
   }
 
   gridCols(count: number): string {
     return `repeat(${count % 2 === 0 ? 2 : 3}, 1fr)`;
   }
 
-  readonly workoutCardColor    = workoutCardColor;
-  readonly workoutPrimaryColor = workoutPrimaryColor;
+  workoutCardColor(w: Workout): string { return _workoutCardColor(w, this.categoryService); }
+  workoutPrimaryColor(w: Workout): string { return _workoutPrimaryColor(w, this.categoryService); }
   readonly workoutVolumeFmt    = workoutVolumeFmt;
 
   emojiOf(level: FeelingLevel): string {
@@ -1600,7 +1597,7 @@ export class TrainComponent {
     this.workoutMenuOpen.set(false);
     const cats = w.categories ?? (w.category ? [w.category] : []);
     const cat = cats.length === 1 ? cats[0] as ExerciseCategory : null;
-    this.saveTemplateName = cat ? (CATEGORY_LABELS[cat] ?? '') : '';
+    this.saveTemplateName = cat ? this.categoryService.label(cat) : '';
     this.saveTemplateOpen.set(true);
   }
 

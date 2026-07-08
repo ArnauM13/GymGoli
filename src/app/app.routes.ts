@@ -65,6 +65,12 @@ export const routes: Routes = [
       import('./features/sports-config/sports-config.component').then(m => m.SportsConfigComponent),
   },
   {
+    path: 'categories-config',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/exercise-categories-config/exercise-categories-config.component').then(m => m.ExerciseCategoriesConfigComponent),
+  },
+  {
     path: 'charts',
     canActivate: [authGuard],
     loadComponent: () =>

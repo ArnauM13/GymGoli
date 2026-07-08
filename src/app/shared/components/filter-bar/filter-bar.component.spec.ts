@@ -62,8 +62,8 @@ describe('FilterBarComponent', () => {
   });
 
   describe('category', () => {
-    it('exposes push/pull/legs as the filterable categories', () => {
-      expect(component.categories).toEqual(['push', 'pull', 'legs']);
+    it('defaults to an empty list of filterable categories until the parent passes one in', () => {
+      expect(component.categories()).toEqual([]);
     });
 
     it('is settable directly, e.g. from the template chips', () => {

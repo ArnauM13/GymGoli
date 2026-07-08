@@ -16,8 +16,8 @@ import { TrainerService } from '../../core/services/trainer.service';
 import { TemplateService } from '../../core/services/template.service';
 import { SharedWorkoutService } from '../../core/services/shared-workout.service';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
+import { CategoryService } from '../../core/services/category.service';
 import { Workout, WorkoutEntry } from '../../core/models/workout.model';
-import { CATEGORY_COLORS } from '../../core/models/exercise.model';
 import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../../core/models/weekly-plan.model';
 import { UserSettings, DEFAULT_USER_SETTINGS } from '../../core/models/user-settings.model';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
@@ -30,6 +30,23 @@ function makeWorkout(overrides: Partial<Workout> = {}): Workout {
 }
 
 const EMPTY_CATEGORY_PROFILE = { daysSinceLast: 99, typicalGapDays: 4, overdueScore: 0 };
+
+const FAKE_CATEGORIES = [
+  { key: 'push', name: 'Empenta', icon: 'fitness_center',    color: '#e57373', muscles: 'Pit · Espatlles · Tríceps' },
+  { key: 'pull', name: 'Tracció', icon: 'sports_gymnastics', color: '#64b5f6', muscles: 'Esquena · Bíceps · Avantbraços' },
+  { key: 'legs', name: 'Cames',   icon: 'directions_run',    color: '#81c784', muscles: 'Quàdriceps · Isquiotibials · Glutis' },
+];
+const CAT_BY_KEY = new Map(FAKE_CATEGORIES.map(c => [c.key, c]));
+const mockCategoryService = {
+  categories:    signal(FAKE_CATEGORIES),
+  categoryChips: signal(FAKE_CATEGORIES.map(c => ({ value: c.key, label: c.name, icon: c.icon, color: c.color }))),
+  ensureLoaded:  jasmine.createSpy().and.resolveTo(undefined),
+  label:   (cat: string) => CAT_BY_KEY.get(cat)?.name ?? cat,
+  color:   (cat: string) => CAT_BY_KEY.get(cat)?.color ?? '#bbb',
+  icon:    (cat: string) => CAT_BY_KEY.get(cat)?.icon ?? 'fitness_center',
+  muscles: (cat: string) => CAT_BY_KEY.get(cat)?.muscles,
+  getByKey: (cat: string) => CAT_BY_KEY.get(cat),
+};
 
 describe('TrainComponent', () => {
   let component: TrainComponent;
@@ -98,6 +115,7 @@ describe('TrainComponent', () => {
         { provide: TemplateService,     useValue: { forCategory: jasmine.createSpy().and.returnValue([]), create: jasmine.createSpy().and.resolveTo(undefined), recordUse: jasmine.createSpy().and.resolveTo(undefined) } },
         { provide: SharedWorkoutService, useValue: { share: jasmine.createSpy().and.resolveTo('share-id') } },
         { provide: WorkoutProfileService, useValue: { profile: signal({ gym: { push: EMPTY_CATEGORY_PROFILE, pull: EMPTY_CATEGORY_PROFILE, legs: EMPTY_CATEGORY_PROFILE }, favoriteSport: null, recentSport: null, minRecovery: 2 }) } },
+        { provide: CategoryService,        useValue: mockCategoryService },
         { provide: MatDialog,              useValue: { open: jasmine.createSpy() } },
         { provide: FeedbackService,        useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
         { provide: ConfirmDialogService,   useValue: { confirm: jasmine.createSpy('confirm').and.resolveTo(false) } },

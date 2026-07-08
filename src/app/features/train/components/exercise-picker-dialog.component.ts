@@ -3,10 +3,10 @@ import { MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef } from '@angu
 
 import {
   Exercise, ExerciseCategory,
-  CATEGORY_LABELS, CATEGORY_COLORS,
   MUSCLE_LABELS, SUBCATEGORY_LABELS, SUBCATEGORY_OPTIONS,
 } from '../../../core/models/exercise.model';
 import { ExerciseService } from '../../../core/services/exercise.service';
+import { CategoryService } from '../../../core/services/category.service';
 import { FilterBarComponent } from '../../../shared/components/filter-bar/filter-bar.component';
 import { ExerciseFormDialogComponent } from '../../library/components/exercise-form-dialog.component';
 import { FeedbackService } from '../../../shared/services/feedback.service';
@@ -31,7 +31,8 @@ export interface ExercisePickerData {
       searchPlaceholder="Cerca exercici..."
       [showSort]="false"
       [(searchQuery)]="searchTerm"
-      [(category)]="catFilter" />
+      [(category)]="catFilter"
+      [categories]="categoryChips()" />
 
     <mat-dialog-content class="exercise-list">
       @if (!isLoaded()) {
@@ -190,8 +191,11 @@ export class ExercisePickerDialogComponent {
   private dialogRef       = inject(MatDialogRef<ExercisePickerDialogComponent>);
   private dialog          = inject(MatDialog);
   private exerciseService = inject(ExerciseService);
+  private categoryService = inject(CategoryService);
   private feedback        = inject(FeedbackService);
   readonly data: ExercisePickerData = inject(MAT_DIALOG_DATA);
+
+  readonly categoryChips = this.categoryService.categoryChips;
 
   readonly isLoaded    = this.exerciseService.isLoaded;
   readonly skeletonRows = [1, 2, 3, 4, 5];
@@ -235,8 +239,8 @@ export class ExercisePickerDialogComponent {
     return groups;
   });
 
-  getCategoryColor(cat: ExerciseCategory): string { return CATEGORY_COLORS[cat] ?? '#bbb'; }
-  getCategoryLabel(cat: ExerciseCategory): string { return CATEGORY_LABELS[cat]; }
+  getCategoryColor(cat: ExerciseCategory): string { return this.categoryService.color(cat); }
+  getCategoryLabel(cat: ExerciseCategory): string { return this.categoryService.label(cat); }
   getSubLabel(sub: string): string { return SUBCATEGORY_LABELS[sub as keyof typeof SUBCATEGORY_LABELS] ?? sub; }
   getMuscleLabel(m: string): string { return MUSCLE_LABELS[m] ?? m; }
 

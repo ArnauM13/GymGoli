@@ -304,7 +304,7 @@ type DashboardView = 'clients' | 'detail';
                   <div class="workout-body">
                     <div class="workout-categories">
                       @for (cat of (w.categories?.length ? w.categories : [w.category ?? '']); track cat) {
-                        <span class="cat-chip cat-chip--{{ cat }}">{{ catLabel(cat) }}</span>
+                        <span class="cat-chip" [style.--cc]="catColor(cat)">{{ catLabel(cat) }}</span>
                       }
                     </div>
                     @for (entry of w.entries; track entry.exerciseId) {
@@ -593,10 +593,8 @@ type DashboardView = 'clients' | 'detail';
     .workout-categories { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 2px; }
     .cat-chip {
       font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
-      &--push  { background: rgba(229,115,115,0.15); color: #c62828; }
-      &--pull  { background: rgba(100,181,246,0.15); color: #1565c0; }
-      &--legs  { background: rgba(129,199,132,0.15); color: #2e7d32; }
-      &--mixed { background: rgba(var(--c-brand-rgb), 0.12); color: var(--c-brand); }
+      background: color-mix(in srgb, var(--cc, var(--c-border)) 15%, transparent);
+      color: color-mix(in srgb, var(--cc, var(--c-text-2)) 75%, var(--c-text));
     }
     .workout-entry {
       display: flex; align-items: center; gap: 6px;
@@ -823,6 +821,14 @@ export class TrainerComponent implements OnInit {
   catLabel(cat: string): string {
     const MAP: Record<string, string> = { push: 'Empenta', pull: 'Tracció', legs: 'Cames', mixed: 'Mixte' };
     return MAP[cat] ?? cat;
+  }
+
+  /** A trainee's category may be one of their own custom ones the trainer
+   *  has no definition for — fall back to a neutral colour rather than
+   *  guessing, same graceful-degradation contract as CategoryService. */
+  catColor(cat: string): string {
+    const MAP: Record<string, string> = { push: '#e57373', pull: '#64b5f6', legs: '#81c784', mixed: 'var(--c-brand)' };
+    return MAP[cat] ?? '#bbb';
   }
 
   feelingEmoji(f: FeelingLevel): string {

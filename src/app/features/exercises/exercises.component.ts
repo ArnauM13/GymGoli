@@ -6,15 +6,13 @@ import { ConfirmDialogService } from '../../shared/services/confirm-dialog.servi
 import { FeedbackService } from '../../shared/services/feedback.service';
 
 import {
-  CATEGORY_COLORS,
-  CATEGORY_ICONS,
-  CATEGORY_LABELS,
   Exercise,
   ExerciseCategory,
   MUSCLE_LABELS,
   SUBCATEGORY_LABELS,
 } from '../../core/models/exercise.model';
 import { ExerciseService } from '../../core/services/exercise.service';
+import { CategoryService } from '../../core/services/category.service';
 import { ExerciseFormDialogComponent } from '../library/components/exercise-form-dialog.component';
 import { FilterBarComponent } from '../../shared/components/filter-bar/filter-bar.component';
 
@@ -36,7 +34,8 @@ import { FilterBarComponent } from '../../shared/components/filter-bar/filter-ba
         searchPlaceholder="Cerca exercici…"
         [showSort]="false"
         [(searchQuery)]="searchQuery"
-        [(category)]="activeFilter" />
+        [(category)]="activeFilter"
+        [categories]="categoryService.categoryChips()" />
 
       @if (exercises().length === 0) {
         <div class="card-section">
@@ -215,21 +214,21 @@ import { FilterBarComponent } from '../../shared/components/filter-bar/filter-ba
 })
 export class ExercisesComponent {
   private exerciseService = inject(ExerciseService);
+  readonly categoryService = inject(CategoryService);
   private dialog          = inject(MatDialog);
   private feedback        = inject(FeedbackService);
   private confirmDialog   = inject(ConfirmDialogService);
   private router          = inject(Router);
 
-  constructor() { this.exerciseService.ensureLoaded(); }
+  constructor() {
+    this.exerciseService.ensureLoaded();
+    this.categoryService.ensureLoaded();
+  }
 
   readonly searchQuery  = signal('');
   readonly activeFilter = signal<ExerciseCategory | null>(null);
 
-  readonly categoryList = (Object.keys(CATEGORY_LABELS) as ExerciseCategory[]).map(value => ({
-    value,
-    label: CATEGORY_LABELS[value],
-    icon: CATEGORY_ICONS[value],
-  }));
+  readonly categoryList = this.categoryService.categoryChips;
 
   readonly hasQuery = computed(() => this.searchQuery().trim().length > 0);
 
@@ -243,7 +242,8 @@ export class ExercisesComponent {
 
   readonly visibleCategories = computed(() => {
     const filter = this.activeFilter();
-    const cats = filter ? this.categoryList.filter(c => c.value === filter) : this.categoryList;
+    const list = this.categoryList();
+    const cats = filter ? list.filter(c => c.value === filter) : list;
     return cats.filter(c => this.filteredByCategory(c.value).length > 0);
   });
 
@@ -259,9 +259,9 @@ export class ExercisesComponent {
     return `${reps} × ${sets}`;
   }
 
-  getCategoryLabel(cat: ExerciseCategory): string { return CATEGORY_LABELS[cat]; }
-  getCategoryIcon(cat: ExerciseCategory): string  { return CATEGORY_ICONS[cat]; }
-  getCategoryColor(cat: ExerciseCategory): string { return CATEGORY_COLORS[cat]; }
+  getCategoryLabel(cat: ExerciseCategory): string { return this.categoryService.label(cat); }
+  getCategoryIcon(cat: ExerciseCategory): string  { return this.categoryService.icon(cat); }
+  getCategoryColor(cat: ExerciseCategory): string { return this.categoryService.color(cat); }
   getSubcategoryLabel(sub: string): string { return SUBCATEGORY_LABELS[sub as keyof typeof SUBCATEGORY_LABELS] ?? sub; }
   getMuscleLabel(m: string): string { return MUSCLE_LABELS[m] ?? m; }
 
