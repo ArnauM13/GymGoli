@@ -25,10 +25,15 @@ import { WorkoutService } from '../../core/services/workout.service';
 import { OfflineService } from '../../core/services/offline.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
 import { FitnessInsightsComponent } from '../../shared/components/fitness-insights/fitness-insights.component';
+import { WorkoutProfileService } from '../../core/services/workout-profile.service';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
+
+type GymSuggestion   = { type: 'gym';   category: ExerciseCategory; label: string; color: string; icon: string; reason?: string };
+type SportSuggestion = { type: 'sport'; sport: Sport;               label: string; color: string; icon: string; reason?: string };
+type TodaySuggestion = GymSuggestion | SportSuggestion;
 
 const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; color: string }[] = [
   { value: 'push', label: CATEGORY_LABELS.push, icon: CATEGORY_ICONS.push, color: CATEGORY_COLORS.push },
@@ -253,12 +258,9 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
         <!-- ══ DASHBOARD MODE ══ -->
         <app-page-header title="Entrenament">
-          <button class="qa-chip" [class.qa-chip--active]="offlineService.forceOffline()"
-                  (click)="offlineService.toggleForceOffline()">
-            <span class="material-symbols-outlined">
-              {{ offlineService.forceOffline() ? 'wifi_off' : 'wifi' }}
-            </span>
-            {{ offlineService.forceOffline() ? 'En línia' : 'Sense connexió' }}
+          <button class="qa-chip" (click)="router.navigate(['/train/planner'])">
+            <span class="material-symbols-outlined">event_repeat</span>
+            Planificar rutines
           </button>
         </app-page-header>
 
@@ -357,21 +359,40 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     <!-- ── Avui: docked panel above the nav bar, always visible ── -->
     @if (!activeWorkout()) {
-      <div class="today-section">
-        <div class="today-header">
-          <span class="material-symbols-outlined today-header-icon">today</span>
-          <h2 class="today-title">Avui</h2>
-          <button class="today-add-btn" (click)="chooserOpen.set(true)" aria-label="Nou entrenament">
-            <span class="material-symbols-outlined">add</span>
+      <div class="bottom-dock">
+        @if (!todayFeedEntry() && todaySuggestion(); as s) {
+          <button class="suggestion-float" [style.--sc]="s.color" (click)="handleSuggestionClick(s)">
+            <div class="sf-bar"></div>
+            <div class="sf-icon-wrap">
+              <span class="material-symbols-outlined sf-icon">{{ s.icon }}</span>
+            </div>
+            <div class="sf-info">
+              <span class="sf-eyebrow">Avui toca</span>
+              <span class="sf-label">{{ s.label }}</span>
+              @if (s.reason) {
+                <span class="sf-reason">{{ s.reason }}</span>
+              }
+            </div>
+            <span class="material-symbols-outlined sf-chevron">chevron_right</span>
           </button>
-        </div>
+        }
 
-        <div class="today-body">
-          @if (todayFeedEntry(); as day) {
-            <ng-container [ngTemplateOutlet]="dayCards" [ngTemplateOutletContext]="{ $implicit: day }" />
-          } @else {
-            <p class="today-empty">Encara no has fet res avui.</p>
-          }
+        <div class="today-section">
+          <div class="today-header">
+            <span class="material-symbols-outlined today-header-icon">today</span>
+            <h2 class="today-title">Avui</h2>
+            <button class="today-add-btn" (click)="chooserOpen.set(true)" aria-label="Nou entrenament">
+              <span class="material-symbols-outlined">add</span>
+            </button>
+          </div>
+
+          <div class="today-body">
+            @if (todayFeedEntry(); as day) {
+              <ng-container [ngTemplateOutlet]="dayCards" [ngTemplateOutletContext]="{ $implicit: day }" />
+            } @else {
+              <p class="today-empty">Encara no has fet res avui.</p>
+            }
+          </div>
         </div>
       </div>
     }
@@ -623,7 +644,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
   styles: [`
     .page { padding: 0; }
 
-    /* ── Offline toggle chip (in the page header) ── */
+    /* ── Quick-action chip (in the page header) ── */
     .qa-chip {
       display: inline-flex; align-items: center; gap: 5px;
       height: 34px; padding: 0 12px; border-radius: 17px;
@@ -633,11 +654,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .material-symbols-outlined { font-size: 17px; }
       &:hover { background: var(--c-border-2); color: var(--c-text); }
       &:active { transform: scale(0.96); }
-    }
-    .qa-chip--active {
-      background: var(--c-brand); border-color: var(--c-brand); color: white;
-      .material-symbols-outlined { font-variation-settings: 'FILL' 1; }
-      &:hover { background: var(--c-brand-dk); }
     }
 
     /* ── Page header ── */
@@ -891,10 +907,50 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .material-symbols-outlined { font-size: 32px; color: var(--c-border); }
     }
 
-    /* ── "Avui" section: docked above the nav bar, not floating ── */
-    .today-section {
+    /* ── Bottom dock: suggestion float (optional) + docked "Avui" panel ── */
+    .bottom-dock {
       position: fixed; left: 0; right: 0; bottom: var(--nav-height);
       z-index: 90;
+      display: flex; flex-direction: column;
+    }
+
+    /* ── "Avui toca" suggestion — floats above the docked panel ── */
+    .suggestion-float {
+      display: flex; align-items: center; gap: 0;
+      margin: 0 16px 10px; height: 56px; border-radius: 14px; padding: 0;
+      border: 1.5px solid color-mix(in srgb, var(--sc) 35%, var(--c-border-2));
+      background: color-mix(in srgb, var(--sc) 8%, var(--c-card));
+      box-shadow: 0 4px 16px var(--c-shadow-md);
+      cursor: pointer; touch-action: manipulation; overflow: hidden;
+      transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s;
+      &:hover {
+        box-shadow: 0 5px 20px var(--c-shadow-md);
+        border-color: color-mix(in srgb, var(--sc) 55%, var(--c-border));
+        background: color-mix(in srgb, var(--sc) 13%, var(--c-card));
+      }
+      &:active { transform: scale(0.98); }
+    }
+    .sf-bar { width: 5px; align-self: stretch; flex-shrink: 0; background: var(--sc); }
+    .sf-icon-wrap { width: 46px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .sf-icon { font-size: 22px; color: var(--sc); font-variation-settings: 'FILL' 1; }
+    .sf-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .sf-eyebrow {
+      font-size: 9px; font-weight: 700; line-height: 1;
+      color: color-mix(in srgb, var(--sc) 70%, var(--c-text-3));
+      text-transform: uppercase; letter-spacing: 0.6px;
+    }
+    .sf-label {
+      font-size: 13px; font-weight: 700; color: var(--c-text); line-height: 1.2;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .sf-reason {
+      font-size: 10px; font-weight: 600; letter-spacing: 0.1px;
+      color: color-mix(in srgb, var(--sc) 65%, var(--c-text-3));
+    }
+    .sf-chevron { font-size: 18px; color: var(--c-text-3); margin-right: 10px; flex-shrink: 0; }
+
+    /* ── "Avui" section: docked above the nav bar, not floating ── */
+    .today-section {
       background: var(--c-card);
       border-top: 1.5px solid color-mix(in srgb, var(--c-brand) 20%, var(--c-border-2));
       box-shadow: 0 -4px 16px var(--c-shadow);
@@ -1361,6 +1417,7 @@ export class TrainComponent implements OnDestroy {
   private exerciseService  = inject(ExerciseService);
   private templateService  = inject(TemplateService);
   private sharedWorkoutService = inject(SharedWorkoutService);
+  private profileService   = inject(WorkoutProfileService);
   readonly router          = inject(Router);
   private dialog           = inject(MatDialog);
   private feedback         = inject(FeedbackService);
@@ -1415,6 +1472,71 @@ export class TrainComponent implements OnDestroy {
   private readonly auth = inject(AuthService);
 
   readonly isToday = computed(() => this.selectedDate() === TODAY());
+
+  /** Only shown when there's nothing planned or done for today yet — the
+   *  docked "Avui" panel already covers both of those cases. */
+  readonly todaySuggestion = computed((): TodaySuggestion | null => {
+    const today = TODAY();
+    if (this.selectedDate() !== today) return null;
+
+    const hasGymToday   = this.workoutService.getDoneWorkoutsForDate(today).length > 0;
+    const hasSportToday = this.sportService.getSportSessionsForDate(today).length > 0;
+    if (hasGymToday || hasSportToday) return null;
+
+    const goal    = this.settingsService.fitnessGoal();
+    const profile = this.profileService.profile();
+
+    // Score each gym category by how "overdue" it is relative to the user's
+    // actual training cycle. Only include categories that have had enough
+    // recovery time since the last session.
+    const gymCandidates = (['push', 'pull', 'legs'] as ExerciseCategory[])
+      .map(cat => ({ cat, ...profile.gym[cat] }))
+      .filter(c => c.daysSinceLast >= profile.minRecovery)
+      .sort((a, b) => b.overdueScore - a.overdueScore);
+
+    const nextGymCat = gymCandidates[0]?.cat ?? null;
+
+    // Sport: prefer the most-recently-done sport (maintains momentum),
+    // fall back to the 30-day favourite, then first available.
+    const nextSport = profile.recentSport ?? profile.favoriteSport
+                   ?? this.sportService.sports()[0] ?? null;
+
+    const mkGym = (cat: ExerciseCategory): GymSuggestion => {
+      const p = profile.gym[cat];
+      const reason = p.daysSinceLast < 99
+        ? p.daysSinceLast === 1 ? 'Fa 1 dia' : `Fa ${p.daysSinceLast} dies`
+        : undefined;
+      return {
+        type: 'gym', category: cat,
+        label: CATEGORY_LABELS[cat], color: CATEGORY_COLORS[cat], icon: CATEGORY_ICONS[cat],
+        reason,
+      };
+    };
+    const mkSport = (s: Sport): SportSuggestion => ({
+      type: 'sport', sport: s, label: s.name, color: s.color, icon: s.icon,
+    });
+
+    switch (goal) {
+      case 'strength':
+      case null:
+        return nextGymCat ? mkGym(nextGymCat) : null;
+      case 'fitness':
+        if (nextGymCat) return mkGym(nextGymCat);
+        if (nextSport)  return mkSport(nextSport);
+        return null;
+      case 'weight':
+        if (nextSport)  return mkSport(nextSport);
+        if (nextGymCat) return mkGym(nextGymCat);
+        return null;
+      case 'sport':
+        return nextSport ? mkSport(nextSport) : null;
+    }
+  });
+
+  handleSuggestionClick(s: TodaySuggestion): void {
+    if (s.type === 'gym') this.selectType(s.category);
+    else this.openSessionLogger(s.sport);
+  }
 
   readonly dateWorkouts = computed(() =>
     this.workoutService.getDoneWorkoutsForDate(this.selectedDate())
