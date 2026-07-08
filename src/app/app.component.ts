@@ -50,6 +50,9 @@ import { OnboardingComponent } from './shared/components/onboarding/onboarding.c
       overflow-y: auto;
       overflow-x: hidden;
       position: relative;
+      /* app-nav-bar now floats (position: fixed) instead of docking as a
+         flex sibling, so this reserves the space it used to take. */
+      padding-bottom: var(--nav-height);
     }
 
     /* ── Offline page overlay ── */
