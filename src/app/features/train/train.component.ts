@@ -15,7 +15,7 @@ import {
 } from '../../core/models/exercise.model';
 import { Sport, SportMetricDef } from '../../core/models/sport.model';
 import { BUILT_IN_TEMPLATES, BuiltInTemplate, WorkoutTemplate } from '../../core/models/template.model';
-import { FEELING_EMOJI, FeelingLevel, Workout, WorkoutEntry, setMaxWeight } from '../../core/models/workout.model';
+import { FeelingLevel, Workout, WorkoutEntry, setMaxWeight } from '../../core/models/workout.model';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { TemplateService } from '../../core/services/template.service';
 import { SharedWorkoutService } from '../../core/services/shared-workout.service';
@@ -29,7 +29,7 @@ import { WorkoutProfileService } from '../../core/services/workout-profile.servi
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import {
-  emojiOf, workoutCardColor, workoutPrimaryColor, workoutVolumeFmt,
+  formatFeeling, workoutCardColor, workoutPrimaryColor, workoutVolumeFmt,
 } from '../../shared/utils/workout-card.utils';
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
@@ -1237,7 +1237,7 @@ export class TrainComponent {
   readonly sportService    = inject(SportService);
   readonly offlineService  = inject(OfflineService);
   readonly trainerService  = inject(TrainerService);
-  private settingsService  = inject(UserSettingsService);
+  readonly settingsService = inject(UserSettingsService);
   private exerciseService  = inject(ExerciseService);
   private templateService  = inject(TemplateService);
   private sharedWorkoutService = inject(SharedWorkoutService);
@@ -1582,7 +1582,10 @@ export class TrainComponent {
   readonly workoutCardColor    = workoutCardColor;
   readonly workoutPrimaryColor = workoutPrimaryColor;
   readonly workoutVolumeFmt    = workoutVolumeFmt;
-  readonly emojiOf             = emojiOf;
+
+  emojiOf(level: FeelingLevel): string {
+    return formatFeeling(level, this.settingsService.difficultyScale());
+  }
 
   async pickWorkoutFeeling(workoutId: string, level: FeelingLevel | undefined): Promise<void> {
     this.awFeelingOpen.set(false);
@@ -1797,7 +1800,7 @@ export class TrainComponent {
     if (!s) return null;
     const parts: string[] = [];
     if (s.duration) parts.push(`${s.duration}min`);
-    if (s.feeling)  parts.push(FEELING_EMOJI[s.feeling]);
+    if (s.feeling)  parts.push(formatFeeling(s.feeling, this.settingsService.difficultyScale()));
     return parts.length ? parts.join(' ') : null;
   }
 
@@ -1819,7 +1822,9 @@ export class TrainComponent {
 
   closeSessionLogger(): void { this.loggerSport.set(null); }
 
-  feelingEmoji(level: FeelingLevel): string { return FEELING_EMOJI[level]; }
+  feelingEmoji(level: FeelingLevel): string {
+    return formatFeeling(level, this.settingsService.difficultyScale());
+  }
 
   loggerMetric(key: string): string | number | null {
     return this.loggerMetrics()[key] ?? null;

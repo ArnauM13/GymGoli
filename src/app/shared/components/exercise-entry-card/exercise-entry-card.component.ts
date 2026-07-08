@@ -1,8 +1,10 @@
 import { Component, computed, input, output } from '@angular/core';
 import { DragDropModule } from '@angular/cdk/drag-drop';
 
-import { FEELING_EMOJI, FeelingLevel, WorkoutEntry } from '../../../core/models/workout.model';
+import { FeelingLevel, WorkoutEntry } from '../../../core/models/workout.model';
+import { DifficultyScale } from '../../../core/models/user-settings.model';
 import { kgToDisplay } from '../../utils/weight.utils';
+import { formatFeeling } from '../../utils/workout-card.utils';
 
 @Component({
   selector: 'app-exercise-entry-card',
@@ -259,6 +261,7 @@ export class ExerciseEntryCardComponent {
   readonly maxWeight            = input<number>(0);
   readonly unit                 = input<string>('kg');
   readonly feelingLevel         = input<FeelingLevel | undefined>(undefined);
+  readonly difficultyScale      = input<DifficultyScale>('emoji');
   readonly feelingEditable       = input<boolean>(false);
   readonly showSetsBadge         = input<boolean>(true);
   readonly hideMetaWhenCollapsed = input<boolean>(false);
@@ -279,7 +282,7 @@ export class ExerciseEntryCardComponent {
 
   readonly totalReps = computed(() => this.entry().sets.reduce((s, set) => s + set.reps, 0));
 
-  emoji(l: FeelingLevel): string { return FEELING_EMOJI[l]; }
+  emoji(l: FeelingLevel): string { return formatFeeling(l, this.difficultyScale()); }
   dispW(v: number): number { return kgToDisplay(v, this.unit() as 'kg' | 'lb'); }
 
   onFeelingClick(e: Event): void {

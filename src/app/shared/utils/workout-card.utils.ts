@@ -1,5 +1,6 @@
 import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
 import { FEELING_EMOJI, FeelingLevel, Workout, setVolume } from '../../core/models/workout.model';
+import { DifficultyScale } from '../../core/models/user-settings.model';
 import { Sport } from '../../core/models/sport.model';
 import { workoutCategories } from './calendar-utils';
 
@@ -62,9 +63,16 @@ export function emojiOf(level: FeelingLevel): string {
   return FEELING_EMOJI[level];
 }
 
+/** Same underlying 1-5 feeling value, shown either as an emoji or mapped
+ *  onto a 1-10 numeric scale (×2), depending on the user's preference. */
+export function formatFeeling(level: FeelingLevel, scale: DifficultyScale): string {
+  return scale === 'numeric' ? String(level * 2) : FEELING_EMOJI[level];
+}
+
 export function sportSessionSummary(
   sub: { duration?: number; feeling?: FeelingLevel; subtypeId?: string },
   sport: Sport,
+  scale: DifficultyScale = 'emoji',
 ): string {
   const parts: string[] = [];
   if (sub.subtypeId) {
@@ -72,7 +80,7 @@ export function sportSessionSummary(
     if (sub2) parts.push(sub2.name);
   }
   if (sub.duration) parts.push(`${sub.duration}min`);
-  if (sub.feeling)  parts.push(FEELING_EMOJI[sub.feeling]);
+  if (sub.feeling)  parts.push(formatFeeling(sub.feeling, scale));
   return parts.join(' · ');
 }
 

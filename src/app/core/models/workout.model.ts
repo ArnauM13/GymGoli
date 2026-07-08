@@ -41,6 +41,8 @@ export interface WorkoutSet {
   /** Marks this as a warm-up set — excluded from PRs, volume and the
    *  "last session" weight suggestion, which should only reflect working sets. */
   warmup?: boolean;
+  /** Reps In Reserve — how many more reps could have been done (0 = failure). */
+  rir?: number;
 }
 
 export interface WorkoutEntry {

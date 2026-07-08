@@ -66,6 +66,8 @@ describe('SettingsComponent', () => {
             fitnessGoal:        signal(null),
             supersetsEnabled:   signal(false),
             dropsetsEnabled:    signal(false),
+            rirEnabled:         signal(false),
+            difficultyScale:    signal('emoji'),
             loaded:             signal(true),
             settings:           signal({
               metricsEnabled: false,

@@ -2,10 +2,11 @@ import { Component, computed, inject, input, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
-import { FEELING_EMOJI, FEELING_LABEL, FeelingLevel, WorkoutSet } from '../../core/models/workout.model';
+import { FEELING_LABEL, FeelingLevel, WorkoutSet } from '../../core/models/workout.model';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { kgToDisplay } from '../utils/weight.utils';
+import { formatFeeling } from '../utils/workout-card.utils';
 
 interface SessionDetail {
   date: string;
@@ -238,7 +239,9 @@ export class ExerciseStatsDialogComponent {
     this.router.navigate(['/charts'], { queryParams: { exerciseId: this.resolvedId() } });
   }
 
-  getFeelingEmoji(level: FeelingLevel): string { return FEELING_EMOJI[level]; }
+  getFeelingEmoji(level: FeelingLevel): string {
+    return formatFeeling(level, this.settingsService.difficultyScale());
+  }
   getFeelingLabel(level: FeelingLevel): string  { return FEELING_LABEL[level]; }
 
   formatDate(dateStr: string): string {

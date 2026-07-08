@@ -27,3 +27,6 @@ jobs:
         run: npx ng test --watch=false --browsers=ChromeHeadlessNoSandbox
         env:
           CHROME_BIN: /usr/bin/google-chrome
+
+      - name: Production build
+        run: npx ng build --configuration production

@@ -55,7 +55,7 @@ describe('CalendarPageComponent', () => {
         { provide: ExerciseService,     useValue: mockExerciseService },
         { provide: SportService,        useValue: mockSportService },
         { provide: AuthService,         useValue: { uid: signal('user-1') } },
-        { provide: UserSettingsService, useValue: { weightUnit: signal<'kg' | 'lb'>('kg') } },
+        { provide: UserSettingsService, useValue: { weightUnit: signal<'kg' | 'lb'>('kg'), difficultyScale: signal('emoji') } },
         { provide: FeedbackService,     useValue: { success: jasmine.createSpy(), error: jasmine.createSpy() } },
       ],
     })

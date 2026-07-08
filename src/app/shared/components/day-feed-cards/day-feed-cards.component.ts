@@ -1,11 +1,12 @@
 import { Component, inject, input, output } from '@angular/core';
 
 import { Sport, SportSession } from '../../../core/models/sport.model';
-import { Workout } from '../../../core/models/workout.model';
+import { FeelingLevel, Workout } from '../../../core/models/workout.model';
 import { WorkoutService } from '../../../core/services/workout.service';
+import { UserSettingsService } from '../../../core/services/user-settings.service';
 import { FeedbackService } from '../../services/feedback.service';
 import {
-  emojiOf, getCatLabel, getExerciseNames, isWorkoutPlanned, sportSessionSummary,
+  formatFeeling, getCatLabel, getExerciseNames, isWorkoutPlanned, sportSessionSummary,
   workoutCardColor, workoutCategoryList, workoutPrimaryColor, workoutSetsCount, workoutVolumeFmt,
 } from '../../utils/workout-card.utils';
 
@@ -166,6 +167,7 @@ export interface DayFeedEntry {
 })
 export class DayFeedCardsComponent {
   private workoutService = inject(WorkoutService);
+  private settingsService = inject(UserSettingsService);
   private feedback       = inject(FeedbackService);
 
   readonly day  = input<DayFeedEntry | null>(null);
@@ -179,8 +181,14 @@ export class DayFeedCardsComponent {
   readonly getExerciseNames    = getExerciseNames;
   readonly workoutSetsCount    = workoutSetsCount;
   readonly workoutVolumeFmt    = workoutVolumeFmt;
-  readonly emojiOf             = emojiOf;
-  readonly sportSummary        = sportSessionSummary;
+
+  emojiOf(level: FeelingLevel): string {
+    return formatFeeling(level, this.settingsService.difficultyScale());
+  }
+
+  sportSummary(sub: { duration?: number; feeling?: FeelingLevel; subtypeId?: string }, sport: Sport): string {
+    return sportSessionSummary(sub, sport, this.settingsService.difficultyScale());
+  }
 
   handleWorkoutClick(w: Workout): void {
     if (this.isPlanned(w)) this.startPlan(w);

@@ -1,8 +1,9 @@
-import { NO_ERRORS_SCHEMA } from '@angular/core';
+import { NO_ERRORS_SCHEMA, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { DayFeedCardsComponent } from './day-feed-cards.component';
 import { WorkoutService } from '../../../core/services/workout.service';
+import { UserSettingsService } from '../../../core/services/user-settings.service';
 import { FeedbackService } from '../../services/feedback.service';
 import { Workout } from '../../../core/models/workout.model';
 
@@ -22,6 +23,7 @@ describe('DayFeedCardsComponent', () => {
       imports: [DayFeedCardsComponent],
       providers: [
         { provide: WorkoutService, useValue: { startPlannedWorkout } },
+        { provide: UserSettingsService, useValue: { difficultyScale: signal('emoji') } },
         { provide: FeedbackService, useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
       ],
     })
