@@ -195,10 +195,12 @@ const PAGE_SIZE = 20;
                                 <span class="esl-reps-group">
                                   <span class="esl-reps">{{ set.reps }}</span>
                                   @for (d of (set.drops ?? []); track $index) {
-                                    <span class="esl-drop-sep">→</span>
-                                    <span class="esl-weight drop">{{ dispW(d.weight) }}<small>{{ unit() }}</small></span>
-                                    <span class="esl-x">×</span>
-                                    <span class="esl-reps">{{ d.reps }}</span>
+                                    <span class="esl-drop-stage">
+                                      <span class="esl-drop-sep">→</span>
+                                      <span class="esl-weight drop">{{ dispW(d.weight) }}<small>{{ unit() }}</small></span>
+                                      <span class="esl-x">×</span>
+                                      <span class="esl-reps">{{ d.reps }}</span>
+                                    </span>
                                   }
                                 </span>
                                 @if (isMaxSet(entry, set)) { <span class="esl-pr">PR</span> }
@@ -498,6 +500,7 @@ const PAGE_SIZE = 20;
     .esl-x { font-size: 11px; color: var(--c-text-3); }
     .esl-reps { font-size: 12px; font-weight: 600; color: var(--c-text-2); }
     .esl-weight-group, .esl-reps-group { display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; }
+    .esl-drop-stage { display: inline-flex; align-items: baseline; gap: 5px; }
     .esl-weight.drop { font-size: 11px; font-weight: 600; opacity: 0.75; }
     .esl-drop-sep { font-size: 11px; color: var(--c-text-3); }
     .esl-pr {

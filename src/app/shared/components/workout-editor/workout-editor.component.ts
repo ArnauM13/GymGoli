@@ -243,6 +243,29 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                             (click)="tapSetPill($event, entry.exerciseId, $index, set)">
                             D {{ dispW(set.weightRight!) }}<small>{{ unit() }}</small>
                           </span>
+                          <span class="we-set-pill reps"
+                            [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
+                            (click)="tapSetPill($event, entry.exerciseId, $index, set)">
+                            {{ set.reps }}<small>r</small>
+                          </span>
+                          @for (d of (set.drops ?? []); track $index) {
+                            <span class="we-chain-arrow">→</span>
+                            <span class="we-set-pill weight drop">{{ dispW(d.weight) }}<small>{{ unit() }}</small></span>
+                            <span class="we-set-pill reps drop">{{ d.reps }}<small>r</small></span>
+                          }
+                        } @else if (set.drops?.length) {
+                          <!-- Dropset: one chained pill, so the arrows never get
+                               orphaned from their stage when the row wraps. -->
+                          <span class="we-set-pill weight chain"
+                            [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
+                            (click)="tapSetPill($event, entry.exerciseId, $index, set)">
+                            @for (stage of dropChainStages(set); track $index; let first = $first) {
+                              @if (!first) { <span class="we-chain-arrow">→</span> }
+                              <span class="we-chain-stage" [class.we-chain-stage--drop]="!first">
+                                {{ dispW(stage.weight) }}<small>{{ unit() }}</small><span class="we-chain-x">×</span>{{ stage.reps }}
+                              </span>
+                            }
+                          </span>
                         } @else {
                           <span class="we-set-pill weight"
                             [class.we-set-pill--pr]="prExerciseIds().has(entry.exerciseId) && set.weight > 0 && set.weight === entryMaxWeight(entry)"
@@ -250,16 +273,11 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                             (click)="tapSetPill($event, entry.exerciseId, $index, set)">
                             {{ dispW(set.weight) }}<small>{{ unit() }}</small>
                           </span>
-                        }
-                        <span class="we-set-pill reps"
-                          [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
-                          (click)="tapSetPill($event, entry.exerciseId, $index, set)">
-                          {{ set.reps }}<small>r</small>
-                        </span>
-                        @for (d of (set.drops ?? []); track $index) {
-                          <span class="material-symbols-outlined we-drop-sep">arrow_forward</span>
-                          <span class="we-set-pill weight drop">{{ dispW(d.weight) }}<small>{{ unit() }}</small></span>
-                          <span class="we-set-pill reps drop">{{ d.reps }}<small>r</small></span>
+                          <span class="we-set-pill reps"
+                            [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
+                            (click)="tapSetPill($event, entry.exerciseId, $index, set)">
+                            {{ set.reps }}<small>r</small>
+                          </span>
                         }
                       </div>
                       @if (isEntryEditable(entry.exerciseId)) {
@@ -819,8 +837,17 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       }
       &.drop { padding: 4px 9px; font-size: 12px; opacity: 0.75; }
       &.side { padding: 6px 10px; font-size: 13px; }
+      &.chain { flex-wrap: wrap; row-gap: 2px; }
     }
-    .we-drop-sep { font-size: 14px; color: var(--c-text-3); flex-shrink: 0; }
+    /* Plain-text arrow (not a discrete flex item) so a chain of dropset
+     * stages never gets orphaned from its stage when the row wraps. */
+    .we-chain-arrow { font-size: 12px; opacity: 0.55; margin: 0 1px; }
+    .we-chain-x { font-size: 11px; font-weight: 500; opacity: 0.7; margin: 0 1px; }
+    .we-chain-stage {
+      display: inline-flex; align-items: baseline;
+      small { font-size: 11px; font-weight: 500; opacity: 0.7; }
+      &.we-chain-stage--drop { font-size: 12.5px; font-weight: 600; opacity: 0.72; }
+    }
 
     /* ── Dropset stage editor (add/edit forms) ── */
     .we-drop-stages { display: flex; flex-direction: column; gap: 8px; }
@@ -1484,6 +1511,12 @@ export class WorkoutEditorComponent implements OnDestroy {
 
   isUnilateral(entry: WorkoutEntry): boolean {
     return !!this.exerciseService.getById(entry.exerciseId)?.unilateral;
+  }
+
+  /** Main stage + every drop stage, in order, so the template can render
+   *  them as one continuous chain instead of separate wrapping pills. */
+  dropChainStages(set: WorkoutSet): { weight: number; reps: number }[] {
+    return [{ weight: set.weight, reps: set.reps }, ...(set.drops ?? [])];
   }
 
   dispW(kg: number): number { return kgToDisplay(kg, this.unit()); }
