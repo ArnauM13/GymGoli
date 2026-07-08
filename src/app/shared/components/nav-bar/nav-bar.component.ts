@@ -108,7 +108,7 @@ export class NavBarComponent {
   readonly navItems = computed<NavItem[]>(() => {
     const base: NavItem[] = [
       { path: '/train',    icon: 'exercise',       label: 'Entrena' },
-      { path: '/history',  icon: 'history',        label: 'Historial' },
+      { path: '/calendar', icon: 'calendar_month',  label: 'Calendari' },
       { path: '/charts',   icon: 'bar_chart',      label: 'Progrés' },
       { path: '/settings', icon: 'account_circle', label: 'Perfil' },
     ];
