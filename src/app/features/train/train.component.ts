@@ -315,7 +315,12 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
         <div class="today-section">
           <div class="today-header">
             <span class="material-symbols-outlined today-header-icon">today</span>
-            <h2 class="today-title">Avui</h2>
+            <div class="today-header-text">
+              <h2 class="today-title">Avui</h2>
+              @if (!todayFeedEntry()) {
+                <p class="today-subtitle">Tria què vols entrenar avui</p>
+              }
+            </div>
             @if (!todayFeedEntry()) {
               <button class="today-toggle-btn" (click)="todayExpanded.set(!todayExpanded())"
                       [attr.aria-label]="todayExpanded() ? 'Plegar' : 'Desplegar'">
@@ -367,12 +372,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               }
             </div>
           }
-
-          <div class="today-footer">
-            <button class="today-add-btn" (click)="chooserOpen.set(true)" aria-label="Nou entrenament">
-              <span class="material-symbols-outlined">add</span>
-            </button>
-          </div>
         </div>
 
         @if (!offlineService.isOffline() && dateWorkouts().length === 0 && dateSportSessions().length === 0) {
@@ -421,22 +420,30 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     </div>
 
-    <!-- ── Suggeriment flotant "Avui toca", quan encara no hi ha res fet/planificat avui ── -->
-    @if (!activeWorkout() && !todayFeedEntry() && todaySuggestion(); as s) {
-      <button class="suggestion-float" [style.--sc]="s.color" (click)="handleSuggestionClick(s)">
-        <div class="sf-bar"></div>
-        <div class="sf-icon-wrap">
-          <span class="material-symbols-outlined sf-icon">{{ s.icon }}</span>
-        </div>
-        <div class="sf-info">
-          <span class="sf-eyebrow">Avui toca</span>
-          <span class="sf-label">{{ s.label }}</span>
-          @if (s.reason) {
-            <span class="sf-reason">{{ s.reason }}</span>
-          }
-        </div>
-        <span class="material-symbols-outlined sf-chevron">chevron_right</span>
-      </button>
+    <!-- ── Fila flotant: suggeriment "Avui toca" (opcional) + FAB "Nou entrenament" ── -->
+    @if (!activeWorkout()) {
+      <div class="today-fab-row">
+        @if (!todayFeedEntry() && todaySuggestion(); as s) {
+          <button class="suggestion-float" [style.--sc]="s.color" (click)="handleSuggestionClick(s)">
+            <div class="sf-bar"></div>
+            <div class="sf-icon-wrap">
+              <span class="material-symbols-outlined sf-icon">{{ s.icon }}</span>
+            </div>
+            <div class="sf-info">
+              <span class="sf-eyebrow">Avui toca</span>
+              <span class="sf-label">{{ s.label }}</span>
+              @if (s.reason) {
+                <span class="sf-reason">{{ s.reason }}</span>
+              }
+            </div>
+            <span class="material-symbols-outlined sf-chevron">chevron_right</span>
+          </button>
+        }
+
+        <button class="today-fab-btn" (click)="chooserOpen.set(true)" aria-label="Nou entrenament">
+          <span class="material-symbols-outlined">add</span>
+        </button>
+      </div>
     }
 
     <!-- ── "Nou entrenament" chooser bottom sheet ── -->
@@ -949,11 +956,16 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .material-symbols-outlined { font-size: 32px; color: var(--c-border); }
     }
 
-    /* ── "Avui toca" suggestion — floats above the nav bar ── */
-    .suggestion-float {
+    /* ── Floating row: "Avui toca" suggestion (optional) + FAB, above the nav bar ── */
+    .today-fab-row {
       position: fixed; left: 0; right: 0; bottom: var(--nav-height); z-index: 90;
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 16px 10px;
+    }
+    .suggestion-float {
+      flex: 1; min-width: 0;
       display: flex; align-items: center; gap: 0;
-      margin: 0 16px 10px; height: 56px; border-radius: 14px; padding: 0;
+      height: 56px; border-radius: 14px; padding: 0;
       border: 1.5px solid color-mix(in srgb, var(--sc) 35%, var(--c-border-2));
       background: color-mix(in srgb, var(--sc) 8%, var(--c-card));
       box-shadow: 0 4px 16px var(--c-shadow-md);
@@ -995,7 +1007,9 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
     .today-header { display: flex; align-items: center; gap: 7px; }
     .today-header-icon { font-size: 19px; color: var(--c-brand); font-variation-settings: 'FILL' 1, 'wght' 400; }
-    .today-title { margin: 0; flex: 1; font-size: 15px; font-weight: 800; color: var(--c-text); letter-spacing: 0.1px; }
+    .today-header-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .today-title { margin: 0; font-size: 15px; font-weight: 800; color: var(--c-text); letter-spacing: 0.1px; }
+    .today-subtitle { margin: 0; font-size: 11.5px; font-weight: 500; color: var(--c-text-3); }
     .today-toggle-btn {
       width: 28px; height: 28px; border-radius: 50%; border: none; flex-shrink: 0;
       background: transparent; color: var(--c-text-3);
@@ -1008,13 +1022,13 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       &.today-chevron--open { transform: rotate(180deg); }
     }
     .today-picker { margin-top: 12px; }
-    .today-footer { display: flex; justify-content: flex-end; margin-top: 8px; }
-    .today-add-btn {
-      width: 34px; height: 34px; border-radius: 50%; border: none; flex-shrink: 0;
+    .today-fab-btn {
+      width: 56px; height: 56px; border-radius: 50%; border: none; flex-shrink: 0;
       background: var(--c-brand); color: white;
       display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 16px var(--c-shadow-md);
       cursor: pointer; touch-action: manipulation; transition: background 0.15s, transform 0.1s;
-      .material-symbols-outlined { font-size: 20px; }
+      .material-symbols-outlined { font-size: 26px; }
       &:hover { background: var(--c-brand-dk); }
       &:active { transform: scale(0.92); }
     }
@@ -1472,7 +1486,7 @@ export class TrainComponent implements OnDestroy {
   readonly sportToggling   = signal(false);
   readonly workoutTypes    = WORKOUT_TYPES;
   readonly chooserOpen     = signal(false);
-  readonly todayExpanded   = signal(false);
+  readonly todayExpanded   = signal(true);
   readonly workoutMenuOpen = signal(false);
   /** Off by default — exercises can only be dragged to reorder once the
    *  user turns this on from the workout's three-dot menu. */
