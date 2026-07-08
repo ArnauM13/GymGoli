@@ -316,16 +316,63 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           <div class="today-header">
             <span class="material-symbols-outlined today-header-icon">today</span>
             <h2 class="today-title">Avui</h2>
-            <button class="today-add-btn" (click)="chooserOpen.set(true)" aria-label="Nou entrenament">
-              <span class="material-symbols-outlined">add</span>
-            </button>
+            @if (!todayFeedEntry()) {
+              <button class="today-toggle-btn" (click)="todayExpanded.set(!todayExpanded())"
+                      [attr.aria-label]="todayExpanded() ? 'Plegar' : 'Desplegar'">
+                <span class="material-symbols-outlined today-chevron" [class.today-chevron--open]="todayExpanded()">expand_more</span>
+              </button>
+            }
           </div>
 
           @if (todayFeedEntry(); as day) {
             <ng-container [ngTemplateOutlet]="dayCards" [ngTemplateOutletContext]="{ $implicit: day }" />
-          } @else {
-            <p class="today-empty">Encara no has fet res avui.</p>
+          } @else if (todayExpanded()) {
+            <div class="today-picker">
+              <div class="chip-group-label">Gym</div>
+              <div class="type-grid" [style.grid-template-columns]="gridCols(workoutTypes.length)">
+                @for (cat of workoutTypes; track cat.value) {
+                  <button class="type-btn"
+                    [style.--cat-color]="cat.color"
+                    [class.type-btn--done]="doneCategories().has(cat.value)"
+                    (click)="selectType(cat.value)">
+                    @if (doneCategories().has(cat.value)) {
+                      <span class="type-done-check material-symbols-outlined">check_circle</span>
+                    }
+                    <span class="material-symbols-outlined type-icon">{{ cat.icon }}</span>
+                    <span class="type-label">{{ cat.label }}</span>
+                  </button>
+                }
+              </div>
+
+              @if (sportService.sports().length > 0) {
+                <div class="chip-group-label chip-group-label--mt">Esport</div>
+                <div class="type-grid" [style.grid-template-columns]="gridCols(sportService.sports().length)">
+                  @for (sport of sportService.sports(); track sport.id) {
+                    <button class="type-btn"
+                      [style.--cat-color]="sport.color"
+                      [class.type-btn--done]="sportDoneMap().has(sport.id)"
+                      (click)="openSessionLogger(sport)"
+                      [disabled]="sportToggling()">
+                      @if (sportDoneMap().has(sport.id)) {
+                        <span class="type-done-check material-symbols-outlined">check_circle</span>
+                      }
+                      <span class="material-symbols-outlined type-icon">{{ sport.icon }}</span>
+                      <span class="type-label">{{ sport.name }}</span>
+                      @if (sportDoneMap().get(sport.id)?.subtypeId; as sid) {
+                        <span class="type-sport-sub">{{ subtypeName(sport, sid) }}</span>
+                      }
+                    </button>
+                  }
+                </div>
+              }
+            </div>
           }
+
+          <div class="today-footer">
+            <button class="today-add-btn" (click)="chooserOpen.set(true)" aria-label="Nou entrenament">
+              <span class="material-symbols-outlined">add</span>
+            </button>
+          </div>
         </div>
 
         @if (!offlineService.isOffline() && dateWorkouts().length === 0 && dateSportSessions().length === 0) {
@@ -946,9 +993,22 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       border: 1.5px solid color-mix(in srgb, var(--c-brand) 16%, var(--c-border-2));
       border-radius: 18px;
     }
-    .today-header { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
+    .today-header { display: flex; align-items: center; gap: 7px; }
     .today-header-icon { font-size: 19px; color: var(--c-brand); font-variation-settings: 'FILL' 1, 'wght' 400; }
     .today-title { margin: 0; flex: 1; font-size: 15px; font-weight: 800; color: var(--c-text); letter-spacing: 0.1px; }
+    .today-toggle-btn {
+      width: 28px; height: 28px; border-radius: 50%; border: none; flex-shrink: 0;
+      background: transparent; color: var(--c-text-3);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
+      &:hover { background: var(--c-subtle); }
+    }
+    .today-chevron {
+      font-size: 22px; transition: transform 0.2s;
+      &.today-chevron--open { transform: rotate(180deg); }
+    }
+    .today-picker { margin-top: 12px; }
+    .today-footer { display: flex; justify-content: flex-end; margin-top: 8px; }
     .today-add-btn {
       width: 34px; height: 34px; border-radius: 50%; border: none; flex-shrink: 0;
       background: var(--c-brand); color: white;
@@ -957,10 +1017,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .material-symbols-outlined { font-size: 20px; }
       &:hover { background: var(--c-brand-dk); }
       &:active { transform: scale(0.92); }
-    }
-    .today-empty {
-      margin: 0; font-size: 12.5px; color: var(--c-text-3); text-align: center;
-      padding: 6px 0;
     }
 
     /* ── "Historial" divider ── */
@@ -1416,6 +1472,7 @@ export class TrainComponent implements OnDestroy {
   readonly sportToggling   = signal(false);
   readonly workoutTypes    = WORKOUT_TYPES;
   readonly chooserOpen     = signal(false);
+  readonly todayExpanded   = signal(false);
   readonly workoutMenuOpen = signal(false);
   /** Off by default — exercises can only be dragged to reorder once the
    *  user turns this on from the workout's three-dot menu. */
