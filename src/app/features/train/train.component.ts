@@ -250,67 +250,11 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           </div>
         }
 
-        <!-- ── Avui: tria un entrenament o esport ── -->
-        <div class="today-section">
-          <div class="today-header">
-            <span class="material-symbols-outlined today-header-icon">today</span>
-            <div class="today-header-text">
-              <h2 class="today-title">Avui</h2>
-              <p class="today-subtitle">Tria què vols entrenar avui</p>
-            </div>
-            <button class="today-toggle-btn" (click)="todayExpanded.set(!todayExpanded())"
-                    [attr.aria-label]="todayExpanded() ? 'Plegar' : 'Desplegar'">
-              <span class="material-symbols-outlined today-chevron" [class.today-chevron--open]="todayExpanded()">expand_more</span>
-            </button>
-          </div>
-
-          @if (todayExpanded()) {
-            <div class="today-picker">
-              <div class="chip-group-label">Gym</div>
-              <div class="type-grid" [style.grid-template-columns]="gridCols(workoutTypes.length)">
-                @for (cat of workoutTypes; track cat.value) {
-                  <button class="type-btn"
-                    [style.--cat-color]="cat.color"
-                    [class.type-btn--done]="doneCategories().has(cat.value)"
-                    (click)="selectType(cat.value)">
-                    @if (doneCategories().has(cat.value)) {
-                      <span class="type-done-check material-symbols-outlined">check_circle</span>
-                    }
-                    <span class="material-symbols-outlined type-icon">{{ cat.icon }}</span>
-                    <span class="type-label">{{ cat.label }}</span>
-                  </button>
-                }
-              </div>
-
-              @if (sportService.sports().length > 0) {
-                <div class="chip-group-label chip-group-label--mt">Esport</div>
-                <div class="type-grid" [style.grid-template-columns]="gridCols(sportService.sports().length)">
-                  @for (sport of sportService.sports(); track sport.id) {
-                    <button class="type-btn"
-                      [style.--cat-color]="sport.color"
-                      [class.type-btn--done]="sportDoneMap().has(sport.id)"
-                      (click)="openSessionLogger(sport)"
-                      [disabled]="sportToggling()">
-                      @if (sportDoneMap().has(sport.id)) {
-                        <span class="type-done-check material-symbols-outlined">check_circle</span>
-                      }
-                      <span class="material-symbols-outlined type-icon">{{ sport.icon }}</span>
-                      <span class="type-label">{{ sport.name }}</span>
-                      @if (sportDoneMap().get(sport.id)?.subtypeId; as sid) {
-                        <span class="type-sport-sub">{{ subtypeName(sport, sid) }}</span>
-                      }
-                    </button>
-                  }
-                </div>
-              }
-            </div>
-          }
-        </div>
       }
 
     </div>
 
-    <!-- ── Fila flotant: suggeriment "Avui toca" (opcional) + FAB "Nou entrenament" ── -->
+    <!-- ── Fila flotant: suggeriment (opcional) + FAB "Nou entrenament" ── -->
     @if (!activeWorkout()) {
       <div class="today-fab-row">
         @if (todaySuggestion(); as s) {
@@ -320,7 +264,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               <span class="material-symbols-outlined sf-icon">{{ s.icon }}</span>
             </div>
             <div class="sf-info">
-              <span class="sf-eyebrow">Avui toca</span>
+              <span class="sf-eyebrow">Suggerit</span>
               <span class="sf-label">{{ s.label }}</span>
               @if (s.reason) {
                 <span class="sf-reason">{{ s.reason }}</span>
@@ -846,7 +790,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .material-symbols-outlined { font-size: 32px; color: var(--c-border); }
     }
 
-    /* ── Floating row: "Avui toca" suggestion (optional) + FAB, above the nav bar ── */
+    /* ── Floating row: suggestion (optional) + FAB, above the nav bar ── */
     .today-fab-row {
       position: fixed; left: 0; right: 0; bottom: var(--nav-height); z-index: 90;
       display: flex; align-items: center; justify-content: flex-end; gap: 10px;
@@ -887,30 +831,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
     .sf-chevron { font-size: 18px; color: var(--c-text-3); margin-right: 10px; flex-shrink: 0; }
 
-    /* ── "Avui" section: bordered/tinted card at the top of the feed ── */
-    .today-section {
-      margin: 8px 16px 4px;
-      padding: 12px;
-      background: color-mix(in srgb, var(--c-brand) 5%, var(--c-card));
-      border: 1.5px solid color-mix(in srgb, var(--c-brand) 24%, var(--c-border-2));
-      border-radius: 18px;
-    }
-    .today-header { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; }
-    .today-header-icon { font-size: 19px; color: var(--c-brand); font-variation-settings: 'FILL' 1, 'wght' 400; }
-    .today-header-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-    .today-title { margin: 0; font-size: 15px; font-weight: 800; color: var(--c-text); letter-spacing: 0.1px; }
-    .today-subtitle { margin: 0; font-size: 11.5px; font-weight: 500; color: var(--c-text-3); }
-    .today-toggle-btn {
-      width: 28px; height: 28px; border-radius: 50%; border: none; flex-shrink: 0;
-      background: transparent; color: var(--c-text-3);
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
-      &:hover { background: var(--c-subtle); }
-    }
-    .today-chevron {
-      font-size: 22px; transition: transform 0.2s;
-      &.today-chevron--open { transform: rotate(180deg); }
-    }
     .today-fab-btn {
       width: 60px; height: 60px; border-radius: 50%; flex-shrink: 0;
       border: 2px solid color-mix(in srgb, white 25%, var(--c-brand));
@@ -1254,7 +1174,6 @@ export class TrainComponent {
   readonly sportToggling   = signal(false);
   readonly workoutTypes    = WORKOUT_TYPES;
   readonly chooserOpen     = signal(false);
-  readonly todayExpanded   = signal(true);
   readonly workoutMenuOpen = signal(false);
   /** Off by default — exercises can only be dragged to reorder once the
    *  user turns this on from the workout's three-dot menu. */
@@ -1265,6 +1184,9 @@ export class TrainComponent {
   readonly saveTemplateOpen = signal(false);
   saveTemplateName = '';
   readonly activeWorkoutId = signal<string | null>(null);
+  /** True when the open workout was reached from the home page (?from=home) —
+   *  closing it should return there instead of staying on the train dashboard. */
+  readonly cameFromHome    = signal(false);
   readonly loggerSport     = signal<Sport | null>(null);
   readonly loggerSessionId = signal<string | null>(null);
   readonly loggerDuration  = signal<number>(60);
@@ -1474,7 +1396,18 @@ export class TrainComponent {
     const queryWorkoutId = toSignal(this.route.queryParamMap.pipe(map(params => params.get('workout'))));
     effect(() => {
       const id = queryWorkoutId();
-      if (id) untracked(() => this.openWorkout(id));
+      if (id) untracked(() => {
+        this.openWorkout(id);
+        if (this.route.snapshot.queryParamMap.get('from') === 'home') this.cameFromHome.set(true);
+      });
+    });
+
+    // Coming from the home page's "Comença un entrenament" button
+    // (?new=1) — jump straight to the type chooser, same reasoning as above.
+    const queryNewWorkout = toSignal(this.route.queryParamMap.pipe(map(params => params.get('new'))));
+    effect(() => {
+      const flag = queryNewWorkout();
+      if (flag) untracked(() => this.chooserOpen.set(true));
     });
 
     let firstDateEffectRun = true;
@@ -1537,11 +1470,15 @@ export class TrainComponent {
   openWorkout(id: string): void {
     this.activeWorkoutId.set(id);
     this.pickerCat.set(null);
+    this.cameFromHome.set(false);
   }
 
   closeWorkout(): void {
+    const goHome = this.cameFromHome();
     this.activeWorkoutId.set(null);
     this.editor?.reset();
+    this.cameFromHome.set(false);
+    if (goHome) this.router.navigate(['/home']);
   }
 
   async startPlan(w: Workout): Promise<void> {

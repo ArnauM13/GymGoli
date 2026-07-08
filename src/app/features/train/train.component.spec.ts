@@ -188,6 +188,25 @@ describe('TrainComponent', () => {
       expect(component.activeWorkoutId()).toBeNull();
     });
 
+    it('does not navigate on closeWorkout by default', () => {
+      component.openWorkout('abc');
+      component.closeWorkout();
+      expect(navigateSpy).not.toHaveBeenCalled();
+    });
+
+    it('navigates back to /home on closeWorkout when opened from home', () => {
+      component.openWorkout('abc');
+      component.cameFromHome.set(true);
+      component.closeWorkout();
+      expect(navigateSpy).toHaveBeenCalledWith(['/home']);
+    });
+
+    it('openWorkout resets cameFromHome', () => {
+      component.cameFromHome.set(true);
+      component.openWorkout('abc');
+      expect(component.cameFromHome()).toBeFalse();
+    });
+
   });
 
   // ── reorderMode ──────────────────────────────────────────────────────────
