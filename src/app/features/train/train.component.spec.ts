@@ -303,7 +303,7 @@ describe('TrainComponent', () => {
   // ── bottomCard() ─────────────────────────────────────────────────────────
 
   describe('bottomCard() — pending plan for today', () => {
-    it('tints the "Tens un pla per avui" card with the plan\'s category color', () => {
+    it('is null so the plan shows in the feed instead of a floating card', () => {
       const getPlannedForDate = TestBed.inject(WorkoutService).getPlannedForDate as jasmine.Spy;
       getPlannedForDate.and.returnValue([{ id: 'w1', category: 'legs', categories: ['legs'] } as unknown as Workout]);
       // bottomCard() is a computed already evaluated once during the initial
@@ -312,9 +312,37 @@ describe('TrainComponent', () => {
       component.selectedDate.set('2099-01-01');
       component.selectedDate.set(TODAY);
 
-      const bc = component.bottomCard();
-      expect(bc?.kind).toBe('plan');
-      expect(bc?.color).toBe(CATEGORY_COLORS['legs']);
+      expect(component.bottomCard()).toBeNull();
+    });
+  });
+
+  // ── isPlanned() ──────────────────────────────────────────────────────────
+
+  describe('isPlanned()', () => {
+    it('is true for a workout with status "planned"', () => {
+      expect(component.isPlanned(makeWorkout({ status: 'planned' }))).toBeTrue();
+    });
+
+    it('is false for a done workout (or one without a status)', () => {
+      expect(component.isPlanned(makeWorkout())).toBeFalse();
+    });
+  });
+
+  // ── feedDays() includes today's pending plan ────────────────────────────
+
+  describe('feedDays() — today\'s pending plan', () => {
+    it('includes a planned workout for today alongside anything already done', async () => {
+      const getPlannedForDate = TestBed.inject(WorkoutService).getPlannedForDate as jasmine.Spy;
+      getPlannedForDate.and.callFake((date: string) =>
+        date === TODAY ? [makeWorkout({ id: 'plan1', status: 'planned' })] : []);
+      // feedDays() is a computed whose only tracked signal is feedMonthsBack —
+      // bump it so it re-derives against the spy's new return value.
+      await component.loadMoreFeedMonths();
+
+      const days = component.feedDays();
+      expect(days.length).toBe(1);
+      expect(days[0].date).toBe(TODAY);
+      expect(days[0].workouts.some(w => w.id === 'plan1')).toBeTrue();
     });
   });
 
