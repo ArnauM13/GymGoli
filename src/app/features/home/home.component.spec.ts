@@ -7,7 +7,10 @@ import { HomeComponent } from './home.component';
 import { WorkoutService } from '../../core/services/workout.service';
 import { SportService } from '../../core/services/sport.service';
 import { OfflineService } from '../../core/services/offline.service';
+import { UserSettingsService } from '../../core/services/user-settings.service';
 import { Workout } from '../../core/models/workout.model';
+import { DEFAULT_USER_SETTINGS, UserSettings } from '../../core/models/user-settings.model';
+import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../../core/models/weekly-plan.model';
 
 const TODAY = new Date().toISOString().split('T')[0];
 
@@ -19,6 +22,8 @@ describe('HomeComponent', () => {
   let component: HomeComponent;
   let fixture: ReturnType<typeof TestBed.createComponent<HomeComponent>>;
   let navigateSpy: jasmine.Spy;
+  let settingsSignal: ReturnType<typeof signal<UserSettings>>;
+  let updateSettings: jasmine.Spy;
 
   beforeEach(async () => {
     const mockWorkoutService = {
@@ -36,13 +41,26 @@ describe('HomeComponent', () => {
       ensureLoaded:                   jasmine.createSpy(),
     };
 
+    settingsSignal = signal<UserSettings>(DEFAULT_USER_SETTINGS);
+    updateSettings = jasmine.createSpy('update').and.callFake((patch: Partial<UserSettings>) => {
+      settingsSignal.set({ ...settingsSignal(), ...patch });
+      return Promise.resolve();
+    });
+    const weeklyPlanComputed = () => settingsSignal().weeklyPlan ?? EMPTY_WEEKLY_PLAN;
+    const mockSettingsService = {
+      settings:   settingsSignal,
+      weeklyPlan: weeklyPlanComputed,
+      update:     updateSettings,
+    };
+
     await TestBed.configureTestingModule({
       imports: [HomeComponent],
       providers: [
         provideRouter([]),
-        { provide: WorkoutService, useValue: mockWorkoutService },
-        { provide: SportService,   useValue: mockSportService },
-        { provide: OfflineService, useValue: { isOffline: signal(false) } },
+        { provide: WorkoutService,      useValue: mockWorkoutService },
+        { provide: SportService,        useValue: mockSportService },
+        { provide: OfflineService,      useValue: { isOffline: signal(false) } },
+        { provide: UserSettingsService, useValue: mockSettingsService },
       ],
     })
       .overrideComponent(HomeComponent, { set: { imports: [], schemas: [NO_ERRORS_SCHEMA] } })
@@ -139,6 +157,36 @@ describe('HomeComponent', () => {
     it('goToWorkout() navigates to /train with the workout id and home origin as query params', () => {
       component.goToWorkout('abc');
       expect(navigateSpy).toHaveBeenCalledWith(['/train'], { queryParams: { workout: 'abc', from: 'home' } });
+    });
+
+    it('goToPlanner() navigates to /train/planner', () => {
+      component.goToPlanner();
+      expect(navigateSpy).toHaveBeenCalledWith(['/train/planner']);
+    });
+  });
+
+  // ── showRoutineHint() ────────────────────────────────────────────────────
+
+  describe('showRoutineHint()', () => {
+    it('is true when there is no routine and the hint has not been dismissed', () => {
+      expect(component.showRoutineHint()).toBeTrue();
+    });
+
+    it('is false once a recurring routine is set', () => {
+      settingsSignal.set({ ...settingsSignal(), weeklyPlan: { ...EMPTY_WEEKLY_PLAN, recurring: true } as WeeklyPlan });
+      expect(component.showRoutineHint()).toBeFalse();
+    });
+
+    it('is false once any day has planned items', () => {
+      const days = EMPTY_WEEKLY_PLAN.days.map((d, i) => (i === 0 ? [{ type: 'gym', category: 'push' }] : d));
+      settingsSignal.set({ ...settingsSignal(), weeklyPlan: { recurring: false, days } as WeeklyPlan });
+      expect(component.showRoutineHint()).toBeFalse();
+    });
+
+    it('is false once dismissed', () => {
+      component.dismissRoutineHint();
+      expect(updateSettings).toHaveBeenCalledWith({ routineHintDismissed: true });
+      expect(component.showRoutineHint()).toBeFalse();
     });
   });
 });
