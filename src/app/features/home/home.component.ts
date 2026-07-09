@@ -6,6 +6,7 @@ import { Workout } from '../../core/models/workout.model';
 import { WorkoutService } from '../../core/services/workout.service';
 import { SportService } from '../../core/services/sport.service';
 import { OfflineService } from '../../core/services/offline.service';
+import { UserSettingsService } from '../../core/services/user-settings.service';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
 import { DayFeedCardsComponent, DayFeedEntry } from '../../shared/components/day-feed-cards/day-feed-cards.component';
 import { FitnessInsightsComponent } from '../../shared/components/fitness-insights/fitness-insights.component';
@@ -34,7 +35,6 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
           <div class="today-header-text">
             <h2 class="today-title">{{ previewTitle() }}</h2>
           </div>
-          <span class="material-symbols-outlined today-link-chevron">chevron_right</span>
         </button>
 
         @if (previewFeedEntry(); as day) {
@@ -44,12 +44,29 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
         }
 
         @if (isToday()) {
-          <button class="start-workout-btn" (click)="goToNewWorkout()">
+          <button class="start-workout-btn" (click)="goToTrain()">
             <span class="material-symbols-outlined">add_circle</span>
             Comença un entrenament
           </button>
         }
       </div>
+
+      @if (showRoutineHint()) {
+        <div class="routine-hint-card">
+          <button class="routine-hint-dismiss" (click)="dismissRoutineHint()" aria-label="No tornar a mostrar">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+          <span class="material-symbols-outlined routine-hint-icon">event_repeat</span>
+          <div class="routine-hint-text">
+            <span class="routine-hint-title">Encara no tens cap rutina</span>
+            <span class="routine-hint-sub">Planifica la setmana i l'app et proposarà entrenaments automàticament</span>
+          </div>
+          <button class="routine-hint-btn" (click)="goToPlanner()">
+            <span class="material-symbols-outlined">event_repeat</span>
+            Planificar rutines
+          </button>
+        </div>
+      }
 
       @if (!offlineService.isOffline() && previewFeedEntry() === null) {
         <app-fitness-insights />
@@ -125,7 +142,6 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     .today-header-icon { font-size: 19px; color: var(--c-brand); font-variation-settings: 'FILL' 1, 'wght' 400; }
     .today-header-text { flex: 1; min-width: 0; }
     .today-title { margin: 0; font-size: 15px; font-weight: 800; color: var(--c-text); letter-spacing: 0.1px; text-transform: capitalize; }
-    .today-link-chevron { font-size: 22px; color: var(--c-text-3); flex-shrink: 0; }
 
     .today-empty {
       margin: 0; font-size: 12.5px; color: var(--c-text-3);
@@ -144,6 +160,38 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
       .material-symbols-outlined { font-size: 22px; }
       &:hover { background: var(--c-brand-dk); }
       &:active { transform: scale(0.98); }
+    }
+
+    /* ── "Encara no tens cap rutina" hint ── */
+    .routine-hint-card {
+      position: relative;
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      margin: 10px 16px 0; padding: 14px 34px 14px 14px;
+      background: var(--c-card);
+      border: 1.5px solid var(--c-border-2); border-radius: 16px;
+      box-shadow: 0 2px 10px var(--c-shadow);
+    }
+    .routine-hint-icon { font-size: 22px; color: var(--c-brand); flex-shrink: 0; font-variation-settings: 'FILL' 0, 'wght' 300; }
+    .routine-hint-text { flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 2px; }
+    .routine-hint-title { font-size: 13.5px; font-weight: 800; color: var(--c-text); }
+    .routine-hint-sub { font-size: 11.5px; color: var(--c-text-3); line-height: 1.35; }
+    .routine-hint-btn {
+      display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
+      padding: 9px 14px; border: none; border-radius: 11px;
+      background: var(--c-brand); color: white;
+      font-size: 12.5px; font-weight: 700; letter-spacing: 0.1px;
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover { background: var(--c-brand-dk); }
+    }
+    .routine-hint-dismiss {
+      position: absolute; top: 8px; right: 8px;
+      width: 26px; height: 26px; border-radius: 50%; border: none;
+      background: transparent; color: var(--c-text-3);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s, color 0.15s;
+      .material-symbols-outlined { font-size: 15px; }
+      &:hover { background: var(--c-subtle); color: var(--c-text-2); }
     }
 
     /* ── "Historial" section card ── */
@@ -212,14 +260,24 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
   `],
 })
 export class HomeComponent implements OnDestroy {
-  readonly workoutService = inject(WorkoutService);
-  readonly sportService   = inject(SportService);
-  readonly offlineService = inject(OfflineService);
-  private router          = inject(Router);
+  readonly workoutService  = inject(WorkoutService);
+  readonly sportService    = inject(SportService);
+  readonly offlineService  = inject(OfflineService);
+  readonly settingsService = inject(UserSettingsService);
+  private router           = inject(Router);
 
   readonly selectedDate = signal<string | null>(null);
 
   readonly effectiveDate = computed(() => this.selectedDate() ?? TODAY());
+
+  readonly hasRoutine = computed(() => {
+    const p = this.settingsService.weeklyPlan();
+    return p.recurring || p.days.some(items => items.length > 0);
+  });
+
+  readonly showRoutineHint = computed(() =>
+    !this.hasRoutine() && !this.settingsService.settings().routineHintDismissed
+  );
 
   readonly previewFeedEntry = computed((): DayFeedEntry | null => {
     const date    = this.effectiveDate();
@@ -247,12 +305,16 @@ export class HomeComponent implements OnDestroy {
     this.router.navigate(['/train']);
   }
 
-  goToNewWorkout(): void {
-    this.router.navigate(['/train'], { queryParams: { new: 1 } });
-  }
-
   goToWorkout(workoutId: string): void {
     this.router.navigate(['/train'], { queryParams: { workout: workoutId, from: 'home' } });
+  }
+
+  goToPlanner(): void {
+    this.router.navigate(['/train/planner']);
+  }
+
+  dismissRoutineHint(): void {
+    this.settingsService.update({ routineHintDismissed: true });
   }
 
   // ── Activity feed (grouped by day, infinite scroll backwards in time) ────
