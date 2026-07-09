@@ -35,11 +35,6 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
 
       <!-- ── Page header ── -->
       <app-page-header title="Calendari">
-        <a class="qa-chip" [routerLink]="['/train/planner']" [queryParams]="{ week: currentWeekMonday() }"
-           aria-label="Planificar la setmana">
-          <span class="material-symbols-outlined">event_repeat</span>
-          Planificar
-        </a>
         <button class="cal-toggle" [class.cal-toggle--open]="calendarOpen()"
                 (click)="calendarOpen.set(!calendarOpen())"
                 [attr.aria-label]="calendarOpen() ? 'Amaga calendari' : 'Mostra calendari'">
@@ -57,6 +52,14 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
             <app-calendar [selectedDate]="selectedDate()" [allowFuturePlanning]="true"
                           (dateSelected)="selectDate($event)" (weekChanged)="currentWeekMonday.set($event)" />
             <app-weekly-summary [weekDate]="selectedDate() ?? workoutService.todayDateString()" />
+
+            <div class="plan-week-strip">
+              <a class="plan-week-btn" [routerLink]="['/train/planner']" [queryParams]="{ week: currentWeekMonday() }">
+                <span class="material-symbols-outlined">event_repeat</span>
+                Planificar la setmana
+                <span class="material-symbols-outlined plan-week-arrow">chevron_right</span>
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -382,18 +385,24 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
   styles: [`
     .page { padding: 0 0 16px; }
 
-    /* ── Quick-action chip (in the page header) ── */
-    .qa-chip {
-      display: inline-flex; align-items: center; gap: 5px;
-      height: 34px; padding: 0 12px; border-radius: 17px;
-      border: 1.5px solid var(--c-border); background: var(--c-subtle);
-      color: var(--c-text-2); font-size: 12.5px; font-weight: 700;
-      text-decoration: none;
-      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 17px; }
-      &:hover { background: var(--c-border-2); color: var(--c-text); }
-      &:active { transform: scale(0.96); }
+    /* ── "Planificar la setmana" subsection, below the weekly goals ── */
+    .plan-week-strip {
+      padding: 10px 14px;
+      border-top: 1px solid var(--c-border-2);
+      background: var(--c-card);
     }
+    .plan-week-btn {
+      display: flex; align-items: center; gap: 8px;
+      width: 100%; height: 38px; padding: 0 12px; box-sizing: border-box;
+      border: 1.5px solid var(--c-border); border-radius: 10px;
+      background: var(--c-subtle); color: var(--c-text-2);
+      font-size: 13px; font-weight: 700;
+      text-decoration: none; cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { background: var(--c-border-2); color: var(--c-text); }
+      &:active { transform: scale(0.98); }
+    }
+    .plan-week-arrow { margin-left: auto; color: var(--c-text-3); }
 
     /* ── Calendar toggle ── */
     .cal-toggle {

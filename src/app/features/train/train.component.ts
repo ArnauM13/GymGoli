@@ -26,6 +26,7 @@ import { WorkoutService } from '../../core/services/workout.service';
 import { OfflineService } from '../../core/services/offline.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
+import { NavigationHistoryService } from '../../core/services/navigation-history.service';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import {
@@ -781,7 +782,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     /* ── "Nou entrenament" section card ── */
     .card-section {
-      margin: 12px 16px 0;
+      margin: 16px 16px 0;
       padding: 14px 14px 16px;
       background: var(--c-card);
       border-radius: 18px;
@@ -917,7 +918,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     /* ── Trainer proposal card ── */
     .proposal-card {
-      margin: 12px 16px 0;
+      margin: 16px 16px 0;
       padding: 14px 14px 12px;
       background: var(--c-card);
       border-radius: 18px;
@@ -1107,6 +1108,7 @@ export class TrainComponent {
   private sharedWorkoutService = inject(SharedWorkoutService);
   private profileService   = inject(WorkoutProfileService);
   readonly router          = inject(Router);
+  private readonly navigationHistory = inject(NavigationHistoryService);
   private route            = inject(ActivatedRoute);
   private dialog           = inject(MatDialog);
   private feedback         = inject(FeedbackService);
@@ -1126,10 +1128,16 @@ export class TrainComponent {
   readonly groupingMode    = signal(false);
   readonly saveTemplateOpen = signal(false);
   saveTemplateName = '';
-  readonly activeWorkoutId = signal<string | null>(null);
-  /** True when the open workout was reached from the home page (?from=home) —
-   *  closing it should return there instead of staying on the train dashboard. */
-  readonly cameFromHome    = signal(false);
+  /** Seeded synchronously from the route snapshot (rather than starting
+   *  null and waiting for the query-param effect below) so a workout opened
+   *  via ?workout=<id> renders straight into the editor on first paint,
+   *  without a flash of the dashboard first. */
+  readonly activeWorkoutId = signal<string | null>(this.route.snapshot.queryParamMap.get('workout'));
+  /** True when the open workout was reached via a deep link (?workout=<id>,
+   *  e.g. from home) rather than by tapping something inside the train
+   *  dashboard — closing it should navigate back through the app's
+   *  navigation history instead of just staying on the train dashboard. */
+  readonly cameFromDeepLink = signal(false);
   readonly loggerSport     = signal<Sport | null>(null);
   readonly loggerSessionId = signal<string | null>(null);
   readonly loggerDuration  = signal<number>(60);
@@ -1164,15 +1172,11 @@ export class TrainComponent {
 
   readonly isToday = computed(() => this.selectedDate() === TODAY());
 
-  /** Only shown when there's nothing planned or done for today yet — the
-   *  docked "Avui" panel already covers both of those cases. */
+  /** Shown regardless of what's already been done today — always suggests
+   *  the next overdue category / sport. */
   readonly todaySuggestion = computed((): TodaySuggestion | null => {
     const today = TODAY();
     if (this.selectedDate() !== today) return null;
-
-    const hasGymToday   = this.workoutService.getDoneWorkoutsForDate(today).length > 0;
-    const hasSportToday = this.sportService.getSportSessionsForDate(today).length > 0;
-    if (hasGymToday || hasSportToday) return null;
 
     const goal    = this.settingsService.fitnessGoal();
     const profile = this.profileService.profile();
@@ -1316,11 +1320,40 @@ export class TrainComponent {
       const id = queryWorkoutId();
       if (id) untracked(() => {
         this.openWorkout(id);
-        if (this.route.snapshot.queryParamMap.get('from') === 'home') this.cameFromHome.set(true);
+        this.cameFromDeepLink.set(true);
+      });
+    });
+
+    // Coming from the home feed with a specific sport session to open
+    // (e.g. tapping a sport row there navigates here with
+    // ?sport=<id>&date=<date>). Reactive on sportService.sports() too,
+    // since the list may still be loading on first visit; handledSportQueryId
+    // stops it from reopening (or, worse, toggle-closing) the sheet every
+    // time the sports list happens to change afterwards.
+    const querySportId = toSignal(this.route.queryParamMap.pipe(map(params => params.get('sport'))));
+    let handledSportQueryId: string | null = null;
+    effect(() => {
+      const sportId = querySportId();
+      const sports  = this.sportService.sports();
+      if (!sportId || sportId === handledSportQueryId) return;
+      const sport = sports.find(s => s.id === sportId);
+      if (!sport) return;
+      handledSportQueryId = sportId;
+      untracked(() => {
+        const date = this.route.snapshot.queryParamMap.get('date');
+        if (date && date !== this.selectedDate()) {
+          suppressNextDateReset = true;
+          this.selectedDate.set(date);
+        }
+        this.openSessionLogger(sport);
       });
     });
 
     let firstDateEffectRun = true;
+    // Set right before a deep-link (e.g. the sport effect above) changes
+    // selectedDate on purpose, so this effect's reset below doesn't
+    // immediately close the picker/logger it just opened.
+    let suppressNextDateReset = false;
     effect(() => {
       const date = this.selectedDate();
       const [yearStr, monthStr] = date.split('-');
@@ -1330,6 +1363,7 @@ export class TrainComponent {
       this.sportService.ensureMonthLoaded(year, month);
       untracked(() => {
         if (firstDateEffectRun) { firstDateEffectRun = false; return; }
+        if (suppressNextDateReset) { suppressNextDateReset = false; return; }
         this.activeWorkoutId.set(null);
         this.pickerCat.set(null);
         this.loggerSport.set(null);
@@ -1380,15 +1414,15 @@ export class TrainComponent {
   openWorkout(id: string): void {
     this.activeWorkoutId.set(id);
     this.pickerCat.set(null);
-    this.cameFromHome.set(false);
+    this.cameFromDeepLink.set(false);
   }
 
   closeWorkout(): void {
-    const goHome = this.cameFromHome();
+    const external = this.cameFromDeepLink();
     this.activeWorkoutId.set(null);
     this.editor?.reset();
-    this.cameFromHome.set(false);
-    if (goHome) this.router.navigate(['/home']);
+    this.cameFromDeepLink.set(false);
+    if (external) this.navigationHistory.goBack('/train');
   }
 
   async startPlan(w: Workout): Promise<void> {

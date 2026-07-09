@@ -43,7 +43,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
         </button>
 
         @if (previewFeedEntry(); as day) {
-          <app-day-feed-cards [day]="day" (open)="goToWorkout($event)" />
+          <app-day-feed-cards [day]="day" (open)="goToWorkout($event)" (openSport)="goToSport($event)" />
         } @else if (!isToday()) {
           <p class="today-empty">Encara no hi ha res aquell dia.</p>
         }
@@ -106,7 +106,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
           @for (day of historyFeedDays(); track day.date) {
             <div class="feed-day">
               <div class="feed-day-header">{{ dayLabel(day.date) }}</div>
-              <app-day-feed-cards [day]="day" (open)="goToWorkout($event)" />
+              <app-day-feed-cards [day]="day" (open)="goToWorkout($event)" (openSport)="goToSport($event)" />
             </div>
           }
 
@@ -314,7 +314,11 @@ export class HomeComponent implements OnDestroy {
   }
 
   goToWorkout(workoutId: string): void {
-    this.router.navigate(['/train'], { queryParams: { workout: workoutId, from: 'home' } });
+    this.router.navigate(['/train'], { queryParams: { workout: workoutId } });
+  }
+
+  goToSport(event: { sportId: string; date: string }): void {
+    this.router.navigate(['/train'], { queryParams: { sport: event.sportId, date: event.date } });
   }
 
   goToPlanner(): void {

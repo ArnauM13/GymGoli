@@ -16,6 +16,7 @@ import { TrainerService } from '../../core/services/trainer.service';
 import { TemplateService } from '../../core/services/template.service';
 import { SharedWorkoutService } from '../../core/services/shared-workout.service';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
+import { NavigationHistoryService } from '../../core/services/navigation-history.service';
 import { Workout, WorkoutEntry } from '../../core/models/workout.model';
 import { CATEGORY_COLORS } from '../../core/models/exercise.model';
 import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../../core/models/weekly-plan.model';
@@ -39,6 +40,7 @@ describe('TrainComponent', () => {
   let weeklyPlanSignal: ReturnType<typeof signal<WeeklyPlan>>;
   let settingsSignal: ReturnType<typeof signal<UserSettings>>;
   let updateSettings: jasmine.Spy;
+  let goBackSpy: jasmine.Spy;
 
   beforeEach(async () => {
     forceOffline = signal(false);
@@ -101,6 +103,7 @@ describe('TrainComponent', () => {
         { provide: MatDialog,              useValue: { open: jasmine.createSpy() } },
         { provide: FeedbackService,        useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
         { provide: ConfirmDialogService,   useValue: { confirm: jasmine.createSpy('confirm').and.resolveTo(false) } },
+        { provide: NavigationHistoryService, useValue: { goBack: goBackSpy = jasmine.createSpy('goBack') } },
       ],
     })
       .overrideComponent(TrainComponent, {
@@ -194,17 +197,17 @@ describe('TrainComponent', () => {
       expect(navigateSpy).not.toHaveBeenCalled();
     });
 
-    it('navigates back to /home on closeWorkout when opened from home', () => {
+    it('goes back through navigation history on closeWorkout when opened via deep link', () => {
       component.openWorkout('abc');
-      component.cameFromHome.set(true);
+      component.cameFromDeepLink.set(true);
       component.closeWorkout();
-      expect(navigateSpy).toHaveBeenCalledWith(['/home']);
+      expect(goBackSpy).toHaveBeenCalledWith('/train');
     });
 
-    it('openWorkout resets cameFromHome', () => {
-      component.cameFromHome.set(true);
+    it('openWorkout resets cameFromDeepLink', () => {
+      component.cameFromDeepLink.set(true);
       component.openWorkout('abc');
-      expect(component.cameFromHome()).toBeFalse();
+      expect(component.cameFromDeepLink()).toBeFalse();
     });
 
   });
@@ -212,19 +215,19 @@ describe('TrainComponent', () => {
   // ── deleteActiveWorkout() ────────────────────────────────────────────────
 
   describe('deleteActiveWorkout()', () => {
-    it('deletes the workout and navigates back to /home when opened from home', async () => {
+    it('deletes the workout and goes back through navigation history when opened via deep link', async () => {
       const w = makeWorkout({ id: 'abc' });
       const workoutService = TestBed.inject(WorkoutService) as unknown as { workouts: ReturnType<typeof signal<Workout[]>>; deleteWorkout: jasmine.Spy };
       workoutService.workouts.set([w]);
       (TestBed.inject(ConfirmDialogService).confirm as jasmine.Spy).and.resolveTo(true);
 
       component.openWorkout('abc');
-      component.cameFromHome.set(true);
+      component.cameFromDeepLink.set(true);
       await component.deleteActiveWorkout();
 
       expect(workoutService.deleteWorkout).toHaveBeenCalledWith('abc');
       expect(component.activeWorkoutId()).toBeNull();
-      expect(navigateSpy).toHaveBeenCalledWith(['/home']);
+      expect(goBackSpy).toHaveBeenCalledWith('/train');
     });
 
     it('does not navigate when the deleted workout was not opened from home', async () => {

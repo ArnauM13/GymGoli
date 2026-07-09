@@ -159,9 +159,14 @@ describe('HomeComponent', () => {
       expect(navigateSpy).toHaveBeenCalledWith(['/train']);
     });
 
-    it('goToWorkout() navigates to /train with the workout id and home origin as query params', () => {
+    it('goToWorkout() navigates to /train with the workout id as a query param', () => {
       component.goToWorkout('abc');
-      expect(navigateSpy).toHaveBeenCalledWith(['/train'], { queryParams: { workout: 'abc', from: 'home' } });
+      expect(navigateSpy).toHaveBeenCalledWith(['/train'], { queryParams: { workout: 'abc' } });
+    });
+
+    it('goToSport() navigates to /train with the sport id and date as query params', () => {
+      component.goToSport({ sportId: 'run', date: '2024-03-05' });
+      expect(navigateSpy).toHaveBeenCalledWith(['/train'], { queryParams: { sport: 'run', date: '2024-03-05' } });
     });
 
     it('goToPlanner() navigates to /train/planner', () => {
