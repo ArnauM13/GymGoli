@@ -280,6 +280,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               <button class="type-btn"
                 [style.--cat-color]="cat.color"
                 [class.type-btn--done]="doneCategories().has(cat.value)"
+                [class.type-btn--active]="pickerCat() === cat.value"
                 (click)="selectType(cat.value)">
                 @if (doneCategories().has(cat.value)) {
                   <span class="type-done-check material-symbols-outlined">check_circle</span>
@@ -290,6 +291,77 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
             }
           </div>
 
+          <!-- ── Fase 2 (gym): tria com començar l'entrenament ── -->
+          <div class="phase-collapse" [class.phase-collapse--open]="!!pickerCat()">
+            <div class="phase-collapse-inner">
+              @if (pickerCat()) {
+                <div class="phase-panel">
+                  <div class="tp-header">
+                    <div class="tp-header-left">
+                      <div class="tp-dot" [style.background]="pickerColor()"></div>
+                      <div class="tp-header-info">
+                        <span class="tp-title">{{ pickerLabel() }}</span>
+                        <span class="tp-muscles">{{ pickerMuscles() }}</span>
+                      </div>
+                    </div>
+                    <button class="tp-close" (click)="closePicker()" aria-label="Tancar">
+                      <span class="material-symbols-outlined">close</span>
+                    </button>
+                  </div>
+
+                  <button class="tp-option tp-option--primary" (click)="pickerStartEmpty()">
+                    <span class="material-symbols-outlined tp-opt-icon">add_circle</span>
+                    <div class="tp-opt-info">
+                      <span class="tp-opt-name">Entrenament buit</span>
+                      <span class="tp-opt-sub">Comença de zero</span>
+                    </div>
+                  </button>
+
+                  @if (pickerLast()) {
+                    <button class="tp-option" (click)="pickerStartFromLast()">
+                      <span class="material-symbols-outlined tp-opt-icon">history</span>
+                      <div class="tp-opt-info">
+                        <span class="tp-opt-name">Repetir últim</span>
+                        <span class="tp-opt-sub">{{ pickerLastAgo() }} · {{ pickerLast()!.entries.length }} exercici{{ pickerLast()!.entries.length === 1 ? '' : 's' }}</span>
+                      </div>
+                    </button>
+                  }
+
+                  @if (pickerUserTemplates().length) {
+                    <div class="tp-section">Les meves plantilles</div>
+                    @for (t of pickerUserTemplates(); track t.id) {
+                      <button class="tp-option" (click)="pickerStartFromTemplate(t)">
+                        <span class="material-symbols-outlined tp-opt-icon">bookmark</span>
+                        <div class="tp-opt-info">
+                          <span class="tp-opt-name">{{ t.name }}</span>
+                          <span class="tp-opt-sub">{{ t.entries.length ? t.entries.length + ' exercici' + (t.entries.length === 1 ? '' : 's') : 'Sense exercicis' }}</span>
+                        </div>
+                      </button>
+                    }
+                  }
+
+                  @if (pickerBuiltIns().length) {
+                    <div class="tp-section">Suggeriments</div>
+                    @for (t of pickerBuiltIns(); track t.id) {
+                      <button class="tp-option" (click)="pickerStartFromBuiltIn(t)">
+                        <span class="material-symbols-outlined tp-opt-icon">auto_awesome</span>
+                        <div class="tp-opt-info">
+                          <span class="tp-opt-name">{{ t.name }}</span>
+                          <span class="tp-opt-sub">{{ t.exerciseNames.length }} exercicis</span>
+                        </div>
+                      </button>
+                    }
+                  }
+
+                  <button class="tp-manage" (click)="goToTemplates()">
+                    <span>Gestionar plantilles</span>
+                    <span class="material-symbols-outlined">chevron_right</span>
+                  </button>
+                </div>
+              }
+            </div>
+          </div>
+
           @if (sportService.sports().length > 0) {
             <div class="chip-group-label chip-group-label--mt">Esport</div>
             <div class="type-grid" [style.grid-template-columns]="gridCols(sportService.sports().length)">
@@ -297,6 +369,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
                 <button class="type-btn"
                   [style.--cat-color]="sport.color"
                   [class.type-btn--done]="sportDoneMap().has(sport.id)"
+                  [class.type-btn--active]="loggerSport()?.id === sport.id"
                   (click)="openSessionLogger(sport)"
                   [disabled]="sportToggling()">
                   @if (sportDoneMap().has(sport.id)) {
@@ -309,6 +382,124 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
                   }
                 </button>
               }
+            </div>
+
+            <!-- ── Fase 2 (esport): registra la sessió ── -->
+            <div class="phase-collapse" [class.phase-collapse--open]="!!loggerSport()">
+              <div class="phase-collapse-inner">
+                @if (loggerSport(); as sport) {
+                  <div class="phase-panel">
+                    <div class="sl-header">
+                      <div class="sl-header-left">
+                        <span class="material-symbols-outlined sl-sport-icon" [style.color]="sport.color">
+                          {{ sport.icon }}
+                        </span>
+                        <span class="sl-sport-name">{{ sport.name }}</span>
+                      </div>
+                      <button class="sl-close" (click)="closeSessionLogger()" aria-label="Tancar">
+                        <span class="material-symbols-outlined">close</span>
+                      </button>
+                    </div>
+
+                    <!-- Duration -->
+                    <div class="sl-field">
+                      <span class="sl-field-label">Durada</span>
+                      <div class="sl-row">
+                        <div class="sl-quick-btns">
+                          @for (t of durationPresets; track t) {
+                            <button class="sl-quick-btn" [class.active]="loggerDuration() === t"
+                                    (click)="loggerDuration.set(t)">{{ t }}min</button>
+                          }
+                        </div>
+                        <div class="sl-stepper">
+                          <button class="sl-step-btn" (click)="adjustDuration(-5)">−5</button>
+                          <span class="sl-step-val">{{ loggerDuration() }}<small>min</small></span>
+                          <button class="sl-step-btn" (click)="adjustDuration(5)">+5</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Subtypes (if any) -->
+                    @if (sport.subtypes.length) {
+                      <div class="sl-field">
+                        <span class="sl-field-label">Subtipus</span>
+                        <div class="sl-chips">
+                          @for (sub of sport.subtypes; track sub.id) {
+                            <button class="sl-chip" [class.active]="loggerSubtype() === sub.id"
+                                    (click)="toggleSubtype(sub.id)">{{ sub.name }}</button>
+                          }
+                        </div>
+                      </div>
+                    }
+
+                    <!-- Metric fields -->
+                    @for (def of sport.metricDefs; track def.key) {
+                      <div class="sl-field">
+                        <span class="sl-field-label">{{ def.label }}@if (def.unit) { <small>({{ def.unit }})</small> }</span>
+                        @if (def.type === 'select') {
+                          <div class="sl-chips">
+                            @for (opt of def.options ?? []; track opt.value) {
+                              <button class="sl-chip"
+                                      [class.active]="loggerMetric(def.key) === opt.value"
+                                      (click)="setMetric(def.key, loggerMetric(def.key) === opt.value ? null : opt.value)">
+                                {{ opt.label }}
+                              </button>
+                            }
+                          </div>
+                        } @else {
+                          <div class="sl-stepper">
+                            <button class="sl-step-btn" (click)="adjustMetric(def, -1)">−</button>
+                            <span class="sl-step-val">{{ loggerMetricNum(def) }}<small>@if (def.unit) { {{ def.unit }} }</small></span>
+                            <button class="sl-step-btn" (click)="adjustMetric(def, 1)">+</button>
+                          </div>
+                        }
+                      </div>
+                    }
+
+                    <!-- Feeling (only when logging a real session, not when planning) -->
+                    @if (!isSelectedFuture()) {
+                      <div class="sl-field">
+                        <span class="sl-field-label">Sensació</span>
+                        <div class="sl-feeling-row">
+                          @for (level of feelingLevels; track level) {
+                            <button class="sl-feeling-btn" [class.active]="loggerFeeling() === level"
+                                    (click)="toggleFeeling(level)">
+                              {{ feelingEmoji(level) }}
+                            </button>
+                          }
+                        </div>
+                      </div>
+                    }
+
+                    <!-- Notes -->
+                    <div class="sl-field">
+                      <span class="sl-field-label">Notes</span>
+                      <textarea class="sl-notes"
+                        placeholder="Afegeix una nota opcional..."
+                        [value]="loggerNotes()"
+                        (input)="loggerNotes.set($any($event.target).value)"
+                        rows="2"
+                      ></textarea>
+                    </div>
+
+                    <!-- Footer actions -->
+                    <div class="sl-actions">
+                      @if (loggerSessionId()) {
+                        <button class="sl-delete-btn" (click)="deleteLoggerSession()">
+                          <span class="material-symbols-outlined">delete</span>
+                          Eliminar
+                        </button>
+                      }
+                      <div class="sl-main-actions">
+                        <button class="sl-cancel" (click)="closeSessionLogger()">Cancel·lar</button>
+                        <button class="sl-save" (click)="saveSession()" [disabled]="sportToggling()">
+                          {{ isSelectedFuture() ? 'Planificar' : 'Guardar' }}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                }
+              </div>
             </div>
           } @else {
             <div class="es-empty">
@@ -325,189 +516,6 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       }
 
     </div>
-
-    <!-- ── Template picker bottom sheet ── -->
-    @if (pickerCat()) {
-      <div class="tp-backdrop" (click)="closePicker()"></div>
-      <div class="tp-sheet">
-        <div class="tp-header">
-          <div class="tp-header-left">
-            <div class="tp-dot" [style.background]="pickerColor()"></div>
-            <div class="tp-header-info">
-              <span class="tp-title">{{ pickerLabel() }}</span>
-              <span class="tp-muscles">{{ pickerMuscles() }}</span>
-            </div>
-          </div>
-          <button class="tp-close" (click)="closePicker()" aria-label="Tancar">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
-
-        <button class="tp-option tp-option--primary" (click)="pickerStartEmpty()">
-          <span class="material-symbols-outlined tp-opt-icon">add_circle</span>
-          <div class="tp-opt-info">
-            <span class="tp-opt-name">Entrenament buit</span>
-            <span class="tp-opt-sub">Comença de zero</span>
-          </div>
-        </button>
-
-        @if (pickerLast()) {
-          <button class="tp-option" (click)="pickerStartFromLast()">
-            <span class="material-symbols-outlined tp-opt-icon">history</span>
-            <div class="tp-opt-info">
-              <span class="tp-opt-name">Repetir últim</span>
-              <span class="tp-opt-sub">{{ pickerLastAgo() }} · {{ pickerLast()!.entries.length }} exercici{{ pickerLast()!.entries.length === 1 ? '' : 's' }}</span>
-            </div>
-          </button>
-        }
-
-        @if (pickerUserTemplates().length) {
-          <div class="tp-section">Les meves plantilles</div>
-          @for (t of pickerUserTemplates(); track t.id) {
-            <button class="tp-option" (click)="pickerStartFromTemplate(t)">
-              <span class="material-symbols-outlined tp-opt-icon">bookmark</span>
-              <div class="tp-opt-info">
-                <span class="tp-opt-name">{{ t.name }}</span>
-                <span class="tp-opt-sub">{{ t.entries.length ? t.entries.length + ' exercici' + (t.entries.length === 1 ? '' : 's') : 'Sense exercicis' }}</span>
-              </div>
-            </button>
-          }
-        }
-
-        @if (pickerBuiltIns().length) {
-          <div class="tp-section">Suggeriments</div>
-          @for (t of pickerBuiltIns(); track t.id) {
-            <button class="tp-option" (click)="pickerStartFromBuiltIn(t)">
-              <span class="material-symbols-outlined tp-opt-icon">auto_awesome</span>
-              <div class="tp-opt-info">
-                <span class="tp-opt-name">{{ t.name }}</span>
-                <span class="tp-opt-sub">{{ t.exerciseNames.length }} exercicis</span>
-              </div>
-            </button>
-          }
-        }
-
-        <button class="tp-manage" (click)="goToTemplates()">
-          <span>Gestionar plantilles</span>
-          <span class="material-symbols-outlined">chevron_right</span>
-        </button>
-      </div>
-    }
-
-    <!-- ── Session logger bottom sheet ── -->
-    @if (loggerSport()) {
-      <div class="sl-backdrop" (click)="closeSessionLogger()"></div>
-      <div class="sl-sheet">
-        <div class="sl-header">
-          <div class="sl-header-left">
-            <span class="material-symbols-outlined sl-sport-icon" [style.color]="loggerSport()!.color">
-              {{ loggerSport()!.icon }}
-            </span>
-            <span class="sl-sport-name">{{ loggerSport()!.name }}</span>
-          </div>
-          <button class="sl-close" (click)="closeSessionLogger()" aria-label="Tancar">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
-
-        <!-- Duration -->
-        <div class="sl-field">
-          <span class="sl-field-label">Durada</span>
-          <div class="sl-row">
-            <div class="sl-quick-btns">
-              @for (t of durationPresets; track t) {
-                <button class="sl-quick-btn" [class.active]="loggerDuration() === t"
-                        (click)="loggerDuration.set(t)">{{ t }}min</button>
-              }
-            </div>
-            <div class="sl-stepper">
-              <button class="sl-step-btn" (click)="adjustDuration(-5)">−5</button>
-              <span class="sl-step-val">{{ loggerDuration() }}<small>min</small></span>
-              <button class="sl-step-btn" (click)="adjustDuration(5)">+5</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Subtypes (if any) -->
-        @if (loggerSport()!.subtypes.length) {
-          <div class="sl-field">
-            <span class="sl-field-label">Subtipus</span>
-            <div class="sl-chips">
-              @for (sub of loggerSport()!.subtypes; track sub.id) {
-                <button class="sl-chip" [class.active]="loggerSubtype() === sub.id"
-                        (click)="toggleSubtype(sub.id)">{{ sub.name }}</button>
-              }
-            </div>
-          </div>
-        }
-
-        <!-- Metric fields -->
-        @for (def of loggerSport()!.metricDefs; track def.key) {
-          <div class="sl-field">
-            <span class="sl-field-label">{{ def.label }}@if (def.unit) { <small>({{ def.unit }})</small> }</span>
-            @if (def.type === 'select') {
-              <div class="sl-chips">
-                @for (opt of def.options ?? []; track opt.value) {
-                  <button class="sl-chip"
-                          [class.active]="loggerMetric(def.key) === opt.value"
-                          (click)="setMetric(def.key, loggerMetric(def.key) === opt.value ? null : opt.value)">
-                    {{ opt.label }}
-                  </button>
-                }
-              </div>
-            } @else {
-              <div class="sl-stepper">
-                <button class="sl-step-btn" (click)="adjustMetric(def, -1)">−</button>
-                <span class="sl-step-val">{{ loggerMetricNum(def) }}<small>@if (def.unit) { {{ def.unit }} }</small></span>
-                <button class="sl-step-btn" (click)="adjustMetric(def, 1)">+</button>
-              </div>
-            }
-          </div>
-        }
-
-        <!-- Feeling (only when logging a real session, not when planning) -->
-        @if (!isSelectedFuture()) {
-          <div class="sl-field">
-            <span class="sl-field-label">Sensació</span>
-            <div class="sl-feeling-row">
-              @for (level of feelingLevels; track level) {
-                <button class="sl-feeling-btn" [class.active]="loggerFeeling() === level"
-                        (click)="toggleFeeling(level)">
-                  {{ feelingEmoji(level) }}
-                </button>
-              }
-            </div>
-          </div>
-        }
-
-        <!-- Notes -->
-        <div class="sl-field">
-          <span class="sl-field-label">Notes</span>
-          <textarea class="sl-notes"
-            placeholder="Afegeix una nota opcional..."
-            [value]="loggerNotes()"
-            (input)="loggerNotes.set($any($event.target).value)"
-            rows="2"
-          ></textarea>
-        </div>
-
-        <!-- Footer actions -->
-        <div class="sl-actions">
-          @if (loggerSessionId()) {
-            <button class="sl-delete-btn" (click)="deleteLoggerSession()">
-              <span class="material-symbols-outlined">delete</span>
-              Eliminar
-            </button>
-          }
-          <div class="sl-main-actions">
-            <button class="sl-cancel" (click)="closeSessionLogger()">Cancel·lar</button>
-            <button class="sl-save" (click)="saveSession()" [disabled]="sportToggling()">
-              {{ isSelectedFuture() ? 'Planificar' : 'Guardar' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    }
 
   `,
   styles: [`
@@ -874,22 +882,26 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       &:hover { color: #ef5350; background: rgba(239,83,80,0.08); }
     }
 
-    /* ── Template picker bottom sheet ── */
-    .tp-backdrop {
-      position: fixed; inset: 0; z-index: 200;
-      background: rgba(0,0,0,0.4);
+    /* ── Fase 2: panell expandible sota el tipus seleccionat ── */
+    .phase-collapse {
+      display: grid; grid-template-rows: 0fr;
+      transition: grid-template-rows 0.3s cubic-bezier(0.32, 1, 0.64, 1);
     }
-    .tp-sheet {
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 201;
-      background: var(--c-card); border-radius: 20px 20px 0 0;
-      padding: 20px 16px 40px;
-      box-shadow: 0 -4px 24px var(--c-shadow-md);
-      max-height: 80vh; overflow-y: auto;
-      animation: tp-in 0.25s cubic-bezier(0.32, 1.2, 0.64, 1) both;
+    .phase-collapse--open { grid-template-rows: 1fr; margin-top: 10px; }
+    .phase-collapse-inner { overflow: hidden; min-height: 0; }
+    .phase-panel {
+      padding: 14px; border-radius: 14px;
+      background: var(--c-subtle);
+      border: 1.5px solid var(--c-border-2);
+      animation: phase-in 0.2s cubic-bezier(0.32, 1.2, 0.64, 1) both;
     }
-    @keyframes tp-in {
-      from { transform: translateY(100%); }
-      to   { transform: translateY(0); }
+    @keyframes phase-in {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .type-btn--active {
+      border-color: var(--cat-color);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--cat-color) 35%, transparent);
     }
     .tp-header {
       display: flex; align-items: center; justify-content: space-between;
@@ -1008,27 +1020,9 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .spin { animation: spin 1s linear infinite; }
 
 
-    /* ── Session logger bottom sheet ── */
-    .sl-backdrop {
-      position: fixed; inset: 0; z-index: 200;
-      background: rgba(0,0,0,0.4);
-      animation: fade-in 0.18s ease;
-    }
-    @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-
-    .sl-sheet {
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 201;
-      background: var(--c-card); border-radius: 24px 24px 0 0;
-      padding: 0 16px calc(env(safe-area-inset-bottom) + 16px);
-      max-height: 85vh; overflow-y: auto;
-      box-shadow: 0 -4px 24px rgba(0,0,0,0.14);
-      animation: sheet-up 0.22s cubic-bezier(0.34, 1.2, 0.64, 1);
-    }
-    @keyframes sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
-
     .sl-header {
       display: flex; align-items: center;
-      padding: 16px 0 12px; border-bottom: 1px solid var(--c-border-2); margin-bottom: 12px;
+      padding: 0 0 12px; border-bottom: 1px solid var(--c-border-2); margin-bottom: 12px;
     }
     .sl-header-left { flex: 1; display: flex; align-items: center; gap: 10px; }
     .sl-sport-icon {
@@ -1572,6 +1566,7 @@ export class TrainComponent {
   // ── Workout creation ──────────────────────────────────────────────────────
 
   selectType(category: ExerciseCategory): void {
+    this.loggerSport.set(null);
     this.pickerCat.set(category);
   }
 
@@ -1717,6 +1712,7 @@ export class TrainComponent {
 
   openSessionLogger(sport: Sport): void {
     const existing = this.sportService.getSessionForDate(this.selectedDate(), sport.id);
+    this.pickerCat.set(null);
     this.loggerSport.set(sport);
     this.loggerSessionId.set(existing?.id ?? null);
     this.loggerDuration.set(existing?.duration ?? 60);

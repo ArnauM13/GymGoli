@@ -1,6 +1,7 @@
-import { Component, computed, effect, inject } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
-import { Router, RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
+import { filter } from 'rxjs/operators';
 
 import { AuthService } from './core/services/auth.service';
 import { UserSettingsService } from './core/services/user-settings.service';
@@ -20,7 +21,7 @@ import { OnboardingComponent } from './shared/components/onboarding/onboarding.c
         <app-onboarding (done)="onOnboardingDone()" />
       }
 
-      <main class="app-content">
+      <main class="app-content" [class.page-anim-a]="!pageAnimToggle()" [class.page-anim-b]="pageAnimToggle()">
         <router-outlet />
         @if (offlineService.isOffline() && !isTrainRoute()) {
           <div class="offline-page-overlay">
@@ -70,6 +71,18 @@ import { OnboardingComponent } from './shared/components/onboarding/onboarding.c
       from { opacity: 0; transform: translateY(6px); }
       to   { opacity: 1; transform: translateY(0); }
     }
+
+    /* ── Page transition: replayed on every route change. Two identically-
+     *  defined classes are toggled back and forth (rather than one class
+     *  being added/removed) so the animation restarts even when navigating
+     *  between routes that reuse the same cached component instance. ── */
+    .page-anim-a, .page-anim-b {
+      animation: page-enter 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    @keyframes page-enter {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
   `],
 })
 export class AppComponent {
@@ -78,6 +91,8 @@ export class AppComponent {
   private settingsService = inject(UserSettingsService);
   private router          = inject(Router);
   private doc             = inject(DOCUMENT);
+
+  readonly pageAnimToggle = signal(false);
 
   readonly showOnboarding = computed(() => {
     const user     = this.auth.user();
@@ -107,6 +122,10 @@ export class AppComponent {
     effect(() => {
       this.doc.documentElement.classList.toggle('dark', this.settingsService.darkMode());
     });
+
+    this.router.events
+      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+      .subscribe(() => this.pageAnimToggle.update(v => !v));
   }
 
   onOnboardingDone(): void { /* showOnboarding() reacts to settings change automatically */ }
