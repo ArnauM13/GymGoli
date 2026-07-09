@@ -65,4 +65,24 @@ describe('DayFeedCardsComponent', () => {
       expect(openSpy).toHaveBeenCalledWith('plan1');
     });
   });
+
+  describe('sport row', () => {
+    it('emits openSport with the sport id and day date when clicked', () => {
+      const openSportSpy = spyOn(component.openSport, 'emit');
+      fixture.componentRef.setInput('day', {
+        date: '2024-03-05',
+        workouts: [],
+        sports: [{
+          sport: { id: 'run', name: 'Running', icon: 'directions_run', color: '#000', subtypes: [], metricDefs: [] },
+          session: { id: 'sess1', duration: 30 },
+        }],
+      });
+      fixture.detectChanges();
+
+      const row = (fixture.nativeElement as HTMLElement).querySelector('.feed-sport-row') as HTMLElement;
+      row.click();
+
+      expect(openSportSpy).toHaveBeenCalledWith({ sportId: 'run', date: '2024-03-05' });
+    });
+  });
 });

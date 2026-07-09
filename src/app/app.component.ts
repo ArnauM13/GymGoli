@@ -6,6 +6,7 @@ import { filter } from 'rxjs/operators';
 import { AuthService } from './core/services/auth.service';
 import { UserSettingsService } from './core/services/user-settings.service';
 import { OfflineService } from './core/services/offline.service';
+import { NavigationHistoryService } from './core/services/navigation-history.service';
 import { NavBarComponent } from './shared/components/nav-bar/nav-bar.component';
 import { OnboardingComponent } from './shared/components/onboarding/onboarding.component';
 
@@ -96,6 +97,9 @@ export class AppComponent {
   private settingsService = inject(UserSettingsService);
   private router          = inject(Router);
   private doc             = inject(DOCUMENT);
+  // Injected here (unused directly) to start tracking navigation from the
+  // very first route change, before any page needs goBack().
+  private navigationHistory = inject(NavigationHistoryService);
 
   readonly pageAnimToggle = signal(false);
 

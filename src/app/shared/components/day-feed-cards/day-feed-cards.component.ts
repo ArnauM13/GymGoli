@@ -72,7 +72,8 @@ export interface DayFeedEntry {
       </div>
     }
     @for (item of day()?.sports ?? []; track item.session.id) {
-      <div class="feed-sport-row" [style.--ic]="item.sport.color">
+      <div class="feed-sport-row" [style.--ic]="item.sport.color"
+           (click)="openSport.emit({ sportId: item.sport.id, date: day()!.date })">
         <span class="material-symbols-outlined feed-sport-icon">{{ item.sport.icon }}</span>
         <div class="fsr-info">
           <span class="feed-sport-name">{{ item.sport.name }}</span>
@@ -80,6 +81,7 @@ export interface DayFeedEntry {
             <span class="feed-sport-meta">{{ meta }}</span>
           }
         </div>
+        <span class="material-symbols-outlined fsr-chevron">chevron_right</span>
       </div>
     }
   `,
@@ -155,6 +157,13 @@ export interface DayFeedEntry {
       padding: 13px 14px; margin-bottom: 8px;
       border: 1.5px solid var(--c-border-2); border-radius: 16px;
       background: color-mix(in srgb, var(--ic, var(--c-card)) 5%, var(--c-card));
+      cursor: pointer; touch-action: manipulation;
+      transition: box-shadow 0.15s, border-color 0.15s, background 0.15s;
+      &:hover {
+        box-shadow: 0 3px 12px var(--c-shadow-md);
+        background: color-mix(in srgb, var(--ic, var(--c-card)) 10%, var(--c-card));
+        border-color: color-mix(in srgb, var(--ic, var(--c-border)) 45%, var(--c-border));
+      }
     }
     .feed-sport-icon {
       font-size: 22px; color: var(--ic, var(--c-text-2)); font-variation-settings: 'FILL' 1;
@@ -163,6 +172,7 @@ export interface DayFeedEntry {
     .fsr-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
     .feed-sport-name { font-size: 14px; font-weight: 700; color: var(--c-text); }
     .feed-sport-meta { font-size: 12px; color: var(--c-text-3); }
+    .fsr-chevron { font-size: 22px; color: var(--c-text-3); flex-shrink: 0; }
   `],
 })
 export class DayFeedCardsComponent {
@@ -172,6 +182,7 @@ export class DayFeedCardsComponent {
 
   readonly day  = input<DayFeedEntry | null>(null);
   readonly open = output<string>();
+  readonly openSport = output<{ sportId: string; date: string }>();
 
   readonly isPlanned          = isWorkoutPlanned;
   readonly workoutPrimaryColor = workoutPrimaryColor;

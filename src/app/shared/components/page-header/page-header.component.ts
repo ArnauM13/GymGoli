@@ -1,5 +1,5 @@
 import { Component, inject, input } from '@angular/core';
-import { Location } from '@angular/common';
+import { NavigationHistoryService } from '../../../core/services/navigation-history.service';
 
 @Component({
   selector: 'app-page-header',
@@ -7,7 +7,7 @@ import { Location } from '@angular/common';
   template: `
     <header class="ph">
       @if (showBack()) {
-        <button class="ph-back" (click)="location.back()" aria-label="Enrere">
+        <button class="ph-back" (click)="navHistory.goBack(backFallback())" aria-label="Enrere">
           <span class="material-symbols-outlined">arrow_back</span>
         </button>
       }
@@ -41,7 +41,8 @@ import { Location } from '@angular/common';
   `],
 })
 export class PageHeaderComponent {
-  readonly title    = input.required<string>();
-  readonly showBack = input(false);
-  protected readonly location = inject(Location);
+  readonly title        = input.required<string>();
+  readonly showBack     = input(false);
+  readonly backFallback = input('/home');
+  protected readonly navHistory = inject(NavigationHistoryService);
 }
