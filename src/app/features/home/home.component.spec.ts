@@ -8,6 +8,7 @@ import { WorkoutService } from '../../core/services/workout.service';
 import { SportService } from '../../core/services/sport.service';
 import { OfflineService } from '../../core/services/offline.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
+import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { Workout } from '../../core/models/workout.model';
 import { DEFAULT_USER_SETTINGS, UserSettings } from '../../core/models/user-settings.model';
 import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../../core/models/weekly-plan.model';
@@ -24,6 +25,7 @@ describe('HomeComponent', () => {
   let navigateSpy: jasmine.Spy;
   let settingsSignal: ReturnType<typeof signal<UserSettings>>;
   let updateSettings: jasmine.Spy;
+  let confirmSpy: jasmine.Spy;
 
   beforeEach(async () => {
     const mockWorkoutService = {
@@ -53,6 +55,8 @@ describe('HomeComponent', () => {
       update:     updateSettings,
     };
 
+    confirmSpy = jasmine.createSpy('confirm').and.resolveTo(true);
+
     await TestBed.configureTestingModule({
       imports: [HomeComponent],
       providers: [
@@ -61,6 +65,7 @@ describe('HomeComponent', () => {
         { provide: SportService,        useValue: mockSportService },
         { provide: OfflineService,      useValue: { isOffline: signal(false) } },
         { provide: UserSettingsService, useValue: mockSettingsService },
+        { provide: ConfirmDialogService, useValue: { confirm: confirmSpy } },
       ],
     })
       .overrideComponent(HomeComponent, { set: { imports: [], schemas: [NO_ERRORS_SCHEMA] } })
@@ -183,10 +188,18 @@ describe('HomeComponent', () => {
       expect(component.showRoutineHint()).toBeFalse();
     });
 
-    it('is false once dismissed', () => {
-      component.dismissRoutineHint();
+    it('is false once dismissed and confirmed', async () => {
+      await component.dismissRoutineHint();
+      expect(confirmSpy).toHaveBeenCalled();
       expect(updateSettings).toHaveBeenCalledWith({ routineHintDismissed: true });
       expect(component.showRoutineHint()).toBeFalse();
+    });
+
+    it('stays visible if the confirm dialog is cancelled', async () => {
+      confirmSpy.and.resolveTo(false);
+      await component.dismissRoutineHint();
+      expect(updateSettings).not.toHaveBeenCalled();
+      expect(component.showRoutineHint()).toBeTrue();
     });
   });
 });

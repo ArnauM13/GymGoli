@@ -67,21 +67,26 @@ import { OnboardingComponent } from './shared/components/onboarding/onboarding.c
     .app-ready {
       animation: app-enter 0.45s ease both;
     }
+    /* Opacity-only: a transform here would give every position:fixed
+     * descendant (FABs, bottom sheets, the suggestion card, ...) a new
+     * containing block, detaching them from the viewport and throwing
+     * off their "bottom: calc(var(--nav-height) + Npx)" placement. */
     @keyframes app-enter {
-      from { opacity: 0; transform: translateY(6px); }
-      to   { opacity: 1; transform: translateY(0); }
+      from { opacity: 0; }
+      to   { opacity: 1; }
     }
 
     /* ── Page transition: replayed on every route change. Two identically-
      *  defined classes are toggled back and forth (rather than one class
      *  being added/removed) so the animation restarts even when navigating
-     *  between routes that reuse the same cached component instance. ── */
+     *  between routes that reuse the same cached component instance.
+     *  Opacity-only for the same reason as .app-ready above. ── */
     .page-anim-a, .page-anim-b {
-      animation: page-enter 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation: page-enter 0.24s ease both;
     }
     @keyframes page-enter {
-      from { opacity: 0; transform: translateY(10px); }
-      to   { opacity: 1; transform: translateY(0); }
+      from { opacity: 0; }
+      to   { opacity: 1; }
     }
   `],
 })

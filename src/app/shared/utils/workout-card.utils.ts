@@ -44,7 +44,7 @@ export function workoutPrimaryColor(w: Workout): string {
 }
 
 export function workoutSetsCount(w: Workout): number {
-  return w.entries.reduce((sum, e) => sum + e.sets.length, 0);
+  return w.entries.reduce((sum, e) => sum + e.sets.filter(s => !s.warmup).length, 0);
 }
 
 export function workoutVolume(w: Workout): number {

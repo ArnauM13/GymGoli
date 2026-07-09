@@ -13,7 +13,7 @@ import { TrainerService } from '../../core/services/trainer.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
 import {
-  DifficultyScale, FitnessGoal, GoalMode, ThemeMode, WeightUnit,
+  FitnessGoal, GoalMode, ThemeMode, WeightUnit,
   FITNESS_GOAL_EMOJIS, FITNESS_GOAL_LABELS, FITNESS_GOAL_WEEKLY_DEFAULTS,
 } from '../../core/models/user-settings.model';
 
@@ -226,6 +226,17 @@ import {
           </div>
           <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
         </a>
+
+        <div class="setting-divider"></div>
+
+        <a class="nav-row" routerLink="/templates">
+          <span class="material-symbols-outlined nav-row-icon">bookmark</span>
+          <div class="setting-info">
+            <span class="setting-label">Plantilles</span>
+            <span class="setting-desc">Crea i gestiona les teves plantilles d'entrenament.</span>
+          </div>
+          <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
+        </a>
       </div>
 
       <!-- ── Bloc 3: Preferències ── -->
@@ -300,50 +311,24 @@ import {
 
         <div class="setting-row setting-row--top">
           <div class="setting-info">
-            <span class="setting-label">Agrupar en superset</span>
-            <span class="setting-desc">Permet enllaçar exercicis perquè es facin seguits, sense descans.</span>
+            <span class="setting-label">Avís de rutina a Inici</span>
+            <span class="setting-desc">Recorda't de planificar una rutina quan encara no en tens cap.</span>
           </div>
           <mat-slide-toggle
-            [checked]="settingsService.supersetsEnabled()"
-            (change)="toggleSupersets()"
+            [checked]="!settingsService.settings().routineHintDismissed"
+            (change)="toggleRoutineHint()"
             color="primary"
           />
         </div>
 
-        <div class="setting-row setting-row--top">
+        <a class="nav-row nav-row--top" routerLink="/settings/advanced">
+          <span class="material-symbols-outlined nav-row-icon">tune</span>
           <div class="setting-info">
-            <span class="setting-label">Dropsets</span>
-            <span class="setting-desc">Permet afegir trams a pes reduït immediatament després d'una sèrie.</span>
+            <span class="setting-label">Paràmetres avançats</span>
+            <span class="setting-desc">Supersets, dropsets, RIR i l'escala de dificultat.</span>
           </div>
-          <mat-slide-toggle
-            [checked]="settingsService.dropsetsEnabled()"
-            (change)="toggleDropsets()"
-            color="primary"
-          />
-        </div>
-
-        <div class="setting-row setting-row--top">
-          <div class="setting-info">
-            <span class="setting-label">RIR (Reps In Reserve)</span>
-            <span class="setting-desc">Permet registrar quantes repeticions et quedaven a cada sèrie.</span>
-          </div>
-          <mat-slide-toggle
-            [checked]="settingsService.rirEnabled()"
-            (change)="toggleRir()"
-            color="primary"
-          />
-        </div>
-
-        <div class="setting-row setting-row--top">
-          <div class="setting-info">
-            <span class="setting-label">Escala de dificultat</span>
-            <span class="setting-desc">Com es mostra i es registra la sensació de cada exercici.</span>
-          </div>
-          <div class="unit-toggle">
-            <button class="unit-btn" [class.unit-btn--active]="settingsService.difficultyScale() === 'emoji'" (click)="setDifficultyScale('emoji')">😐</button>
-            <button class="unit-btn" [class.unit-btn--active]="settingsService.difficultyScale() === 'numeric'" (click)="setDifficultyScale('numeric')">1-10</button>
-          </div>
-        </div>
+          <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
+        </a>
 
       </div>
 
@@ -412,14 +397,11 @@ import {
             </div>
           }
         }
-      </div>
-
-      <!-- ── Bloc 4: El meu entrenador ── -->
-      <div class="section">
-        <h2 class="section-title">El meu entrenador</h2>
 
         @if (trainerService.hasTrainer()) {
-          <div class="setting-row">
+          <div class="setting-divider"></div>
+
+          <div class="setting-row setting-row--top">
             <div class="setting-info">
               <span class="setting-label">{{ trainerService.myTrainer()?.displayName ?? 'Entrenador' }}</span>
               <span class="setting-desc">Entrenador personal connectat.</span>
@@ -432,7 +414,9 @@ import {
             </div>
             <button class="danger-btn" (click)="disconnectTrainer()">Desconnecta</button>
           </div>
-        } @else {
+        } @else if (trainerService.isTrainer()) {
+          <div class="setting-divider"></div>
+
           <p class="section-desc">Tens un codi d'invitació? Introdueix-lo per connectar-te amb el teu entrenador.</p>
 
           @if (!showInviteInput()) {
@@ -466,19 +450,11 @@ import {
         }
       </div>
 
-      <!-- ── Bloc 6: Contingut ── -->
-      <div class="section">
-        <h2 class="section-title">Contingut</h2>
+      <!-- ── Bloc 4: Compte ── -->
+      <div class="section section--danger">
+        <h2 class="section-title">Compte</h2>
 
-        <a class="nav-row" routerLink="/templates">
-          <div class="setting-info">
-            <span class="setting-label">Plantilles</span>
-            <span class="setting-desc">Crea i gestiona les teves plantilles d'entrenament.</span>
-          </div>
-          <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
-        </a>
-
-        <div class="setting-row setting-row--top">
+        <div class="setting-row">
           <div class="setting-info">
             <span class="setting-label">Exportar les meves dades</span>
             <span class="setting-desc">Descarrega un JSON amb tots els teus entrenaments, esports i configuració.</span>
@@ -487,13 +463,8 @@ import {
             <span class="material-symbols-outlined">download</span>
           </button>
         </div>
-      </div>
 
-      <!-- ── Bloc 4: Compte ── -->
-      <div class="section section--danger">
-        <h2 class="section-title">Compte</h2>
-
-        <div class="setting-row">
+        <div class="setting-row setting-row--top">
           <div class="setting-info">
             <span class="setting-label">Tancar sessió</span>
             <span class="setting-desc">Sortiràs de l'aplicació en aquest dispositiu.</span>
@@ -903,20 +874,8 @@ export class SettingsComponent {
     this.settingsService.update({ metricsEnabled: !this.settingsService.metricsEnabled() });
   }
 
-  toggleSupersets(): void {
-    this.settingsService.update({ supersetsEnabled: !this.settingsService.supersetsEnabled() });
-  }
-
-  toggleDropsets(): void {
-    this.settingsService.update({ dropsetsEnabled: !this.settingsService.dropsetsEnabled() });
-  }
-
-  toggleRir(): void {
-    this.settingsService.update({ rirEnabled: !this.settingsService.rirEnabled() });
-  }
-
-  setDifficultyScale(scale: DifficultyScale): void {
-    this.settingsService.update({ difficultyScale: scale });
+  toggleRoutineHint(): void {
+    this.settingsService.update({ routineHintDismissed: !this.settingsService.settings().routineHintDismissed });
   }
 
   setGoalMode(mode: GoalMode): void {

@@ -110,7 +110,7 @@ export class JoinComponent implements OnInit {
     }
   }
 
-  goHome(): void  { this.router.navigate(['/train']); }
+  goHome(): void  { this.router.navigate(['/home']); }
   goLogin(): void { this.router.navigate(['/login']); }
 
   /** Called from LoginComponent after successful login to handle pending tokens */

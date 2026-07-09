@@ -30,7 +30,7 @@ import { UserSettingsService } from '../../../core/services/user-settings.servic
   styles: [`
     .insights-wrap {
       display: flex; flex-direction: column; gap: 10px;
-      margin: 12px 16px 0;
+      margin: 4px 16px 0;
     }
 
     .insight-card {

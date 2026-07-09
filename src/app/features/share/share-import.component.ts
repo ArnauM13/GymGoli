@@ -64,7 +64,7 @@ type Status = 'loading' | 'confirm' | 'importing' | 'success' | 'error' | 'needs
               <br>{{ skippedNote() }}
             }
           </p>
-          <button class="btn-primary" (click)="goHome()">Anar a Entrena</button>
+          <button class="btn-primary" (click)="goTrain()">Anar a Entrena</button>
         } @else if (status() === 'error') {
           <span class="material-symbols-outlined error-icon">error</span>
           <p class="share-desc">{{ errorMessage() }}</p>
@@ -220,6 +220,7 @@ export class ShareImportComponent implements OnInit {
       + `perquè no ${plural ? 'existeixen' : 'existeix'} a la teva llista d'exercicis.)`;
   }
 
-  goHome(): void  { this.router.navigate(['/train']); }
+  goHome(): void  { this.router.navigate(['/home']); }
+  goTrain(): void { this.router.navigate(['/train']); }
   goLogin(): void { this.router.navigate(['/login']); }
 }

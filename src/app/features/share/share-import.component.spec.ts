@@ -97,6 +97,12 @@ describe('ShareImportComponent', () => {
   it('navigates home when goHome() is called', () => {
     setup('share-1');
     component.goHome();
+    expect(router.navigate).toHaveBeenCalledWith(['/home']);
+  });
+
+  it('navigates to train when goTrain() is called', () => {
+    setup('share-1');
+    component.goTrain();
     expect(router.navigate).toHaveBeenCalledWith(['/train']);
   });
 

@@ -35,6 +35,11 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
 
       <!-- ── Page header ── -->
       <app-page-header title="Calendari">
+        <a class="qa-chip" [routerLink]="['/train/planner']" [queryParams]="{ week: currentWeekMonday() }"
+           aria-label="Planificar la setmana">
+          <span class="material-symbols-outlined">event_repeat</span>
+          Planificar
+        </a>
         <button class="cal-toggle" [class.cal-toggle--open]="calendarOpen()"
                 (click)="calendarOpen.set(!calendarOpen())"
                 [attr.aria-label]="calendarOpen() ? 'Amaga calendari' : 'Mostra calendari'">
@@ -50,7 +55,7 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
         <div class="cal-collapse-inner">
           <div class="calendar-wrap">
             <app-calendar [selectedDate]="selectedDate()" [allowFuturePlanning]="true"
-                          (dateSelected)="selectDate($event)" />
+                          (dateSelected)="selectDate($event)" (weekChanged)="currentWeekMonday.set($event)" />
             <app-weekly-summary [weekDate]="selectedDate() ?? workoutService.todayDateString()" />
           </div>
         </div>
@@ -376,6 +381,19 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
   `,
   styles: [`
     .page { padding: 0 0 16px; }
+
+    /* ── Quick-action chip (in the page header) ── */
+    .qa-chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      height: 34px; padding: 0 12px; border-radius: 17px;
+      border: 1.5px solid var(--c-border); background: var(--c-subtle);
+      color: var(--c-text-2); font-size: 12.5px; font-weight: 700;
+      text-decoration: none;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 17px; }
+      &:hover { background: var(--c-border-2); color: var(--c-text); }
+      &:active { transform: scale(0.96); }
+    }
 
     /* ── Calendar toggle ── */
     .cal-toggle {
@@ -754,6 +772,10 @@ export class CalendarPageComponent implements OnDestroy {
   readonly gymCategories = GYM_CATEGORIES;
 
   readonly calendarOpen  = signal(true);
+  /** Monday of whichever week the calendar widget currently has in view
+   *  (updated on every navigation, independent of a tapped date) — powers
+   *  the "Planificar la setmana" quick action in the header. */
+  readonly currentWeekMonday = signal<string>(mondayOf(new Date().toISOString().split('T')[0]));
   readonly selectedDate  = signal<string | null>(null);
   readonly expandedId    = signal<string | null>(null);
   readonly sortDesc      = signal(true);
@@ -1003,7 +1025,7 @@ export class CalendarPageComponent implements OnDestroy {
   }
 
   totalSets(workout: Workout): number {
-    return workout.entries.reduce((s, e) => s + e.sets.length, 0);
+    return workout.entries.reduce((s, e) => s + e.sets.filter(set => !set.warmup).length, 0);
   }
   totalVolume(workout: Workout): number {
     return Math.round(workout.entries.reduce((t, e) =>

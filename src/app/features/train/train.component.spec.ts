@@ -209,6 +209,74 @@ describe('TrainComponent', () => {
 
   });
 
+  // ── deleteActiveWorkout() ────────────────────────────────────────────────
+
+  describe('deleteActiveWorkout()', () => {
+    it('deletes the workout and navigates back to /home when opened from home', async () => {
+      const w = makeWorkout({ id: 'abc' });
+      const workoutService = TestBed.inject(WorkoutService) as unknown as { workouts: ReturnType<typeof signal<Workout[]>>; deleteWorkout: jasmine.Spy };
+      workoutService.workouts.set([w]);
+      (TestBed.inject(ConfirmDialogService).confirm as jasmine.Spy).and.resolveTo(true);
+
+      component.openWorkout('abc');
+      component.cameFromHome.set(true);
+      await component.deleteActiveWorkout();
+
+      expect(workoutService.deleteWorkout).toHaveBeenCalledWith('abc');
+      expect(component.activeWorkoutId()).toBeNull();
+      expect(navigateSpy).toHaveBeenCalledWith(['/home']);
+    });
+
+    it('does not navigate when the deleted workout was not opened from home', async () => {
+      const w = makeWorkout({ id: 'abc' });
+      const workoutService = TestBed.inject(WorkoutService) as unknown as { workouts: ReturnType<typeof signal<Workout[]>>; deleteWorkout: jasmine.Spy };
+      workoutService.workouts.set([w]);
+      (TestBed.inject(ConfirmDialogService).confirm as jasmine.Spy).and.resolveTo(true);
+
+      component.openWorkout('abc');
+      await component.deleteActiveWorkout();
+
+      expect(workoutService.deleteWorkout).toHaveBeenCalledWith('abc');
+      expect(navigateSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── selectType() / openSessionLogger() toggle behaviour ─────────────────
+
+  describe('selectType()', () => {
+    it('opens the picker for the tapped category', () => {
+      component.selectType('push');
+      expect(component.pickerCat()).toBe('push');
+    });
+
+    it('closes the picker when tapping the already-active category again', () => {
+      component.selectType('push');
+      component.selectType('push');
+      expect(component.pickerCat()).toBeNull();
+    });
+
+    it('switches to the newly-tapped category without closing', () => {
+      component.selectType('push');
+      component.selectType('pull');
+      expect(component.pickerCat()).toBe('pull');
+    });
+  });
+
+  describe('openSessionLogger()', () => {
+    const sport = { id: 's1', name: 'Running', icon: 'directions_run', color: '#000', subtypes: [], metricDefs: [] } as any;
+
+    it('opens the logger for the tapped sport', () => {
+      component.openSessionLogger(sport);
+      expect(component.loggerSport()).toEqual(sport);
+    });
+
+    it('closes the logger when tapping the already-active sport again', () => {
+      component.openSessionLogger(sport);
+      component.openSessionLogger(sport);
+      expect(component.loggerSport()).toBeNull();
+    });
+  });
+
   // ── reorderMode ──────────────────────────────────────────────────────────
 
   describe('reorderMode', () => {
@@ -252,21 +320,6 @@ describe('TrainComponent', () => {
       const result = component.topbarDateLabel(makeWorkout({ date: '2024-03-10' }));
       expect(result).not.toBe('Avui');
       expect(result.length).toBeGreaterThan(0);
-    });
-  });
-
-  // ── header quick-action chip ─────────────────────────────────────────────
-
-  describe('header quick-action chip', () => {
-    it('reads "Planificar rutines"', () => {
-      const chip = (fixture.nativeElement as HTMLElement).querySelector('.qa-chip');
-      expect(chip?.textContent?.trim()).toContain('Planificar rutines');
-    });
-
-    it('navigates to the weekly planner when clicked', () => {
-      const chip = (fixture.nativeElement as HTMLElement).querySelector('.qa-chip') as HTMLButtonElement;
-      chip.click();
-      expect(navigateSpy).toHaveBeenCalledWith(['/train/planner']);
     });
   });
 
