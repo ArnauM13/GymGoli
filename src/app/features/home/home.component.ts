@@ -34,7 +34,6 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
           <div class="today-header-text">
             <h2 class="today-title">{{ previewTitle() }}</h2>
           </div>
-          <span class="material-symbols-outlined today-link-chevron">chevron_right</span>
         </button>
 
         @if (previewFeedEntry(); as day) {
@@ -125,7 +124,6 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     .today-header-icon { font-size: 19px; color: var(--c-brand); font-variation-settings: 'FILL' 1, 'wght' 400; }
     .today-header-text { flex: 1; min-width: 0; }
     .today-title { margin: 0; font-size: 15px; font-weight: 800; color: var(--c-text); letter-spacing: 0.1px; text-transform: capitalize; }
-    .today-link-chevron { font-size: 22px; color: var(--c-text-3); flex-shrink: 0; }
 
     .today-empty {
       margin: 0; font-size: 12.5px; color: var(--c-text-3);
