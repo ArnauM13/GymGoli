@@ -77,6 +77,12 @@ export const routes: Routes = [
       import('./features/settings/settings.component').then(m => m.SettingsComponent),
   },
   {
+    path: 'settings/advanced',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/settings/settings-advanced.component').then(m => m.SettingsAdvancedComponent),
+  },
+  {
     path: 'templates',
     canActivate: [authGuard],
     loadComponent: () =>

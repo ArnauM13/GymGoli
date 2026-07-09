@@ -79,6 +79,7 @@ describe('SettingsComponent', () => {
               weeklySportGoal: null,
               goalMode: 'combined',
               onboardingDone: false,
+              routineHintDismissed: false,
             }),
             update: mockUpdate,
           },
@@ -164,19 +165,10 @@ describe('SettingsComponent', () => {
     });
   });
 
-  // ── toggleSupersets() / toggleDropsets() ────────────────────────────────
-
-  describe('toggleSupersets()', () => {
-    it('enables supersets when currently disabled', () => {
-      component.toggleSupersets();
-      expect(mockUpdate).toHaveBeenCalledWith({ supersetsEnabled: true });
-    });
-  });
-
-  describe('toggleDropsets()', () => {
-    it('enables dropsets when currently disabled', () => {
-      component.toggleDropsets();
-      expect(mockUpdate).toHaveBeenCalledWith({ dropsetsEnabled: true });
+  describe('toggleRoutineHint()', () => {
+    it('dismisses the hint when currently shown', () => {
+      component.toggleRoutineHint();
+      expect(mockUpdate).toHaveBeenCalledWith({ routineHintDismissed: true });
     });
   });
 

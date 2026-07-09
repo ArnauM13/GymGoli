@@ -41,8 +41,8 @@ import { formatFeeling } from '../../utils/workout-card.utils';
             } @else if (totalReps() > 0) {
               <span class="eec-max">{{ totalReps() }}<small>r</small></span>
             }
-            @if (entry().sets.length > 0 && showSetsBadge()) {
-              <span class="eec-sets-badge">{{ entry().sets.length }} sèr</span>
+            @if (workingSetsCount() > 0 && showSetsBadge()) {
+              <span class="eec-sets-badge">{{ workingSetsCount() }} sèr</span>
             }
             @if (prBadge()) {
               <span class="eec-pr">PR</span>
@@ -281,6 +281,7 @@ export class ExerciseEntryCardComponent {
   readonly deleteClick  = output<void>();
 
   readonly totalReps = computed(() => this.entry().sets.reduce((s, set) => s + set.reps, 0));
+  readonly workingSetsCount = computed(() => this.entry().sets.filter(set => !set.warmup).length);
 
   emoji(l: FeelingLevel): string { return formatFeeling(l, this.difficultyScale()); }
   dispW(v: number): number { return kgToDisplay(v, this.unit() as 'kg' | 'lb'); }

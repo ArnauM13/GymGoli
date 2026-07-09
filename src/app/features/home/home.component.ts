@@ -7,6 +7,7 @@ import { WorkoutService } from '../../core/services/workout.service';
 import { SportService } from '../../core/services/sport.service';
 import { OfflineService } from '../../core/services/offline.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
+import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
 import { DayFeedCardsComponent, DayFeedEntry } from '../../shared/components/day-feed-cards/day-feed-cards.component';
 import { FitnessInsightsComponent } from '../../shared/components/fitness-insights/fitness-insights.component';
@@ -27,6 +28,10 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
       <div class="calendar-wrap">
         <app-calendar [selectedDate]="selectedDate()" (dateSelected)="selectDate($event)" />
       </div>
+
+      @if (!offlineService.isOffline() && previewFeedEntry() === null) {
+        <app-fitness-insights />
+      }
 
       <!-- ── Avui / dia seleccionat ── -->
       <div class="today-card">
@@ -56,20 +61,20 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
           <button class="routine-hint-dismiss" (click)="dismissRoutineHint()" aria-label="No tornar a mostrar">
             <span class="material-symbols-outlined">close</span>
           </button>
-          <span class="material-symbols-outlined routine-hint-icon">event_repeat</span>
-          <div class="routine-hint-text">
-            <span class="routine-hint-title">Encara no tens cap rutina</span>
-            <span class="routine-hint-sub">Planifica la setmana i l'app et proposarà entrenaments automàticament</span>
+          <div class="routine-hint-top">
+            <span class="material-symbols-outlined routine-hint-icon">event_repeat</span>
+            <div class="routine-hint-text">
+              <span class="routine-hint-title">Encara no tens cap rutina</span>
+              <span class="routine-hint-sub">Planifica la setmana i l'app et proposarà entrenaments automàticament</span>
+            </div>
           </div>
-          <button class="routine-hint-btn" (click)="goToPlanner()">
-            <span class="material-symbols-outlined">event_repeat</span>
-            Planificar rutines
-          </button>
+          <div class="routine-hint-actions">
+            <button class="routine-hint-btn" (click)="goToPlanner()">
+              <span class="material-symbols-outlined">event_repeat</span>
+              Planificar rutines
+            </button>
+          </div>
         </div>
-      }
-
-      @if (!offlineService.isOffline() && previewFeedEntry() === null) {
-        <app-fitness-insights />
       }
 
       <!-- ── Historial ── -->
@@ -120,14 +125,14 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     .page { padding: 0 0 16px; }
 
     .calendar-wrap {
-      margin: 4px 16px 12px;
+      margin: 4px 16px 0;
       box-shadow: 0 2px 12px rgba(0,0,0,0.08);
       border-radius: 16px; overflow: hidden;
     }
 
     /* ── Avui / dia seleccionat: targeta blava (mateix marge que la resta) ── */
     .today-card {
-      margin: 8px 16px 16px;
+      margin: 4px 16px 0;
       padding: 12px;
       background: color-mix(in srgb, var(--c-brand) 5%, var(--c-card));
       border: 1.5px solid color-mix(in srgb, var(--c-brand) 24%, var(--c-border-2));
@@ -165,16 +170,18 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     /* ── "Encara no tens cap rutina" hint ── */
     .routine-hint-card {
       position: relative;
-      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-      margin: 10px 16px 0; padding: 14px 34px 14px 14px;
+      display: flex; flex-direction: column; gap: 10px;
+      margin: 4px 16px 0; padding: 14px 34px 14px 14px;
       background: var(--c-card);
       border: 1.5px solid var(--c-border-2); border-radius: 16px;
       box-shadow: 0 2px 10px var(--c-shadow);
     }
+    .routine-hint-top { display: flex; align-items: flex-start; gap: 10px; }
     .routine-hint-icon { font-size: 22px; color: var(--c-brand); flex-shrink: 0; font-variation-settings: 'FILL' 0, 'wght' 300; }
-    .routine-hint-text { flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 2px; }
+    .routine-hint-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
     .routine-hint-title { font-size: 13.5px; font-weight: 800; color: var(--c-text); }
     .routine-hint-sub { font-size: 11.5px; color: var(--c-text-3); line-height: 1.35; }
+    .routine-hint-actions { display: flex; justify-content: flex-end; }
     .routine-hint-btn {
       display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
       padding: 9px 14px; border: none; border-radius: 11px;
@@ -265,6 +272,7 @@ export class HomeComponent implements OnDestroy {
   readonly offlineService  = inject(OfflineService);
   readonly settingsService = inject(UserSettingsService);
   private router           = inject(Router);
+  private confirmDialog    = inject(ConfirmDialogService);
 
   readonly selectedDate = signal<string | null>(null);
 
@@ -313,7 +321,12 @@ export class HomeComponent implements OnDestroy {
     this.router.navigate(['/train/planner']);
   }
 
-  dismissRoutineHint(): void {
+  async dismissRoutineHint(): Promise<void> {
+    const ok = await this.confirmDialog.confirm(
+      'Si l\'amagues, no tornaràs a veure aquest avís. Podràs reactivar-lo des del teu Perfil.',
+      { title: 'Amagar avís de rutina', confirmLabel: 'Amagar', cancelLabel: 'Cancel·lar' },
+    );
+    if (!ok) return;
     this.settingsService.update({ routineHintDismissed: true });
   }
 

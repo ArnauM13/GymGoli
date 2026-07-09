@@ -363,7 +363,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                     @if (rirEnabled()) {
                       <div class="we-input-group">
                         <label for="add-rir">RIR</label>
-                        <div class="we-number-input compact">
+                        <div class="we-number-input">
                           <button type="button" (click)="adjustRir(-1)" aria-label="Menys RIR">−</button>
                           <input id="add-rir" type="number" [value]="rirValue() ?? ''" placeholder="—"
                                  (change)="setRir($any($event.target).value)" min="0" step="1"
@@ -382,11 +382,6 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                       }
                     </div>
                   }
-                  <button type="button" class="we-warmup-chip" [class.we-warmup-chip--active]="isWarmupSet()"
-                          (click)="isWarmupSet.set(!isWarmupSet())">
-                    <span class="material-symbols-outlined">local_fire_department</span>
-                    Sèrie d'escalfament
-                  </button>
                   <div class="we-drop-stages">
                     @for (d of dropStages(); track $index) {
                       <div class="we-drop-stage-row">
@@ -416,6 +411,11 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                   <div class="we-set-form-actions">
                     <button type="button" class="we-cancel-btn" (click)="cancelSet()">
                       <span class="material-symbols-outlined">close</span>
+                    </button>
+                    <button type="button" class="we-warmup-chip" [class.we-warmup-chip--active]="isWarmupSet()"
+                            (click)="isWarmupSet.set(!isWarmupSet())">
+                      <span class="material-symbols-outlined">local_fire_department</span>
+                      Escalfament
                     </button>
                     <button type="button" class="we-submit-btn"
                             (click)="submitSets(entry.exerciseId, setQty())"
@@ -1082,10 +1082,10 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       }
     }
     .we-set-form-actions {
-      display: flex; align-items: center; gap: 8px;
+      display: flex; align-items: center; gap: 6px;
     }
     .we-cancel-btn {
-      width: 44px; height: 44px; flex-shrink: 0; border-radius: 10px;
+      width: 40px; height: 40px; flex-shrink: 0; border-radius: 10px;
       border: 1.5px solid var(--c-border); background: transparent;
       color: var(--c-text-3); cursor: pointer; touch-action: manipulation;
       display: flex; align-items: center; justify-content: center; transition: all 0.15s;
@@ -1093,13 +1093,21 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       &:hover { background: var(--c-subtle); color: var(--c-text-2); }
       &:active { transform: scale(0.94); }
     }
+    /* Compact variant when the warm-up toggle sits in the cancel/submit row */
+    .we-set-form-actions .we-warmup-chip {
+      align-self: auto; flex-shrink: 0;
+      height: 40px; padding: 0 10px; gap: 4px;
+      font-size: 11.5px;
+      .material-symbols-outlined { font-size: 16px; }
+    }
     .we-submit-btn {
-      flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
-      padding: 12px 16px; border-radius: 10px;
+      flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 4px;
+      padding: 10px 8px; border-radius: 10px;
       border: none; background: var(--c-brand);
-      color: white; font-size: 15px; font-weight: 700;
+      color: white; font-size: 13.5px; font-weight: 700;
       cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 18px; }
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      .material-symbols-outlined { font-size: 17px; flex-shrink: 0; }
       &:hover:not(:disabled) { background: var(--c-brand-dk); }
       &:active:not(:disabled) { transform: scale(0.97); }
       &:disabled { opacity: 0.4; cursor: default; }

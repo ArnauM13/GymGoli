@@ -14,7 +14,7 @@ import {
 import {
   FITNESS_GOAL_EMOJIS, FITNESS_GOAL_LABELS,
 } from '../../core/models/user-settings.model';
-import { FeelingLevel, Workout } from '../../core/models/workout.model';
+import { FeelingLevel, Workout, WorkoutEntry } from '../../core/models/workout.model';
 import { formatFeeling } from '../../shared/utils/workout-card.utils';
 
 type DashboardView = 'clients' | 'detail';
@@ -310,7 +310,7 @@ type DashboardView = 'clients' | 'detail';
                     @for (entry of w.entries; track entry.exerciseId) {
                       <div class="workout-entry">
                         <span class="entry-name-text">{{ entry.exerciseName }}</span>
-                        <span class="entry-sets">{{ entry.sets.length }} sèr.</span>
+                        <span class="entry-sets">{{ workingSetsCount(entry) }} sèr.</span>
                         @if (entry.feeling) {
                           <span class="entry-feeling">{{ feelingEmoji(entry.feeling) }}</span>
                         }
@@ -827,6 +827,10 @@ export class TrainerComponent implements OnInit {
 
   feelingEmoji(f: FeelingLevel): string {
     return formatFeeling(f, this.settingsService.difficultyScale());
+  }
+
+  workingSetsCount(entry: WorkoutEntry): number {
+    return entry.sets.filter(s => !s.warmup).length;
   }
 
   // ── Invite ─────────────────────────────────────────────────────────────────
