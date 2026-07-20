@@ -12,6 +12,7 @@ import { CalendarComponent } from '../../shared/components/calendar/calendar.com
 import { DayFeedCardsComponent, DayFeedEntry } from '../../shared/components/day-feed-cards/day-feed-cards.component';
 import { FitnessInsightsComponent } from '../../shared/components/fitness-insights/fitness-insights.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { DiscoveryHintComponent } from '../../shared/components/discovery-hint/discovery-hint.component';
 import { feedDayLabel } from '../../shared/utils/workout-card.utils';
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
@@ -19,7 +20,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CalendarComponent, DayFeedCardsComponent, FitnessInsightsComponent, PageHeaderComponent],
+  imports: [CalendarComponent, DayFeedCardsComponent, FitnessInsightsComponent, PageHeaderComponent, DiscoveryHintComponent],
   template: `
     <div class="page">
 
@@ -78,6 +79,8 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
             </button>
           </div>
         </div>
+      } @else {
+        <app-discovery-hint />
       }
 
       <!-- ── Historial ── -->

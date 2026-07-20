@@ -45,6 +45,9 @@ export interface UserSettings {
   routineHintDismissed: boolean;
   /** Built-in template suggestions (Plantilles page) the user dismissed. */
   dismissedBuiltInTemplateIds: string[];
+  /** Ids of one-off discovery hints/nudges the user has dismissed
+   *  (see AppHintService). */
+  dismissedHints: string[];
   /** Off by default — advanced workout-editor features that clutter the
    *  set-adding flow for most users. */
   supersetsEnabled: boolean;
@@ -68,6 +71,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   weeklyPlan: null,
   routineHintDismissed: false,
   dismissedBuiltInTemplateIds: [],
+  dismissedHints: [],
   supersetsEnabled: false,
   dropsetsEnabled: false,
   rirEnabled: false,

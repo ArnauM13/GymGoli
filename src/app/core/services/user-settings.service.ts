@@ -39,6 +39,7 @@ export class UserSettingsService {
   readonly rirEnabled          = computed(() => this._settings().rirEnabled ?? false);
   readonly difficultyScale     = computed(() => (this._settings().difficultyScale ?? 'emoji') as DifficultyScale);
   readonly dismissedBuiltInTemplateIds = computed(() => this._settings().dismissedBuiltInTemplateIds ?? []);
+  readonly dismissedHints              = computed(() => this._settings().dismissedHints ?? []);
 
   constructor() {
     if (typeof window !== 'undefined') {
