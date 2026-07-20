@@ -1,5 +1,6 @@
 import { ErrorHandler, Injectable, NgZone, inject, isDevMode } from '@angular/core';
 
+import { reloadOncePerMinute } from './update.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
 
 @Injectable()
@@ -12,9 +13,14 @@ export class AppErrorHandler implements ErrorHandler {
       console.error('[AppError]', error);
     }
 
-    // Ignore chunk-load errors on SW update (page will reload automatically)
+    // A chunk that fails to load means the deployed files no longer match
+    // the running version (typically right after a deploy) — the page is
+    // half-broken and only a reload fixes it.
     const msg = error instanceof Error ? error.message : String(error);
-    if (msg.includes('ChunkLoadError') || msg.includes('Loading chunk')) return;
+    if (msg.includes('ChunkLoadError') || msg.includes('Loading chunk')) {
+      reloadOncePerMinute('gymgoli_chunk_reload_at');
+      return;
+    }
 
     this.zone.run(() => {
       this.feedback.error('S\'ha produït un error inesperat. Torna-ho a provar.', 5000);

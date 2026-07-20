@@ -1,12 +1,14 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { filter } from 'rxjs/operators';
 
 import { AuthService } from './core/services/auth.service';
 import { UserSettingsService } from './core/services/user-settings.service';
 import { OfflineService } from './core/services/offline.service';
 import { NavigationHistoryService } from './core/services/navigation-history.service';
+import { UpdateService } from './core/services/update.service';
 import { NavBarComponent } from './shared/components/nav-bar/nav-bar.component';
 import { OnboardingComponent } from './shared/components/onboarding/onboarding.component';
 
@@ -97,6 +99,8 @@ export class AppComponent {
   private settingsService = inject(UserSettingsService);
   private router          = inject(Router);
   private doc             = inject(DOCUMENT);
+  private snackBar        = inject(MatSnackBar);
+  private updateService   = inject(UpdateService);
   // Injected here (unused directly) to start tracking navigation from the
   // very first route change, before any page needs goBack().
   private navigationHistory = inject(NavigationHistoryService);
@@ -126,6 +130,15 @@ export class AppComponent {
 
     effect(() => {
       if (this.auth.isPasswordRecovery()) this.router.navigate(['/reset-password']);
+    });
+
+    effect(() => {
+      if (!this.updateService.updateReady()) return;
+      const ref = this.snackBar.open('Hi ha una versió nova disponible', 'Actualitza', {
+        horizontalPosition: 'center',
+        verticalPosition: 'bottom',
+      });
+      ref.onAction().subscribe(() => this.updateService.reloadToUpdate());
     });
 
     effect(() => {
