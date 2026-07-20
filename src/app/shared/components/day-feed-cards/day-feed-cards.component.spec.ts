@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 
 import { DayFeedCardsComponent } from './day-feed-cards.component';
 import { WorkoutService } from '../../../core/services/workout.service';
+import { SportService } from '../../../core/services/sport.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 import { FeedbackService } from '../../services/feedback.service';
 import { Workout } from '../../../core/models/workout.model';
@@ -15,14 +16,19 @@ describe('DayFeedCardsComponent', () => {
   let component: DayFeedCardsComponent;
   let fixture: ReturnType<typeof TestBed.createComponent<DayFeedCardsComponent>>;
   let startPlannedWorkout: jasmine.Spy;
+  let updateSession: jasmine.Spy;
+  let deleteSession: jasmine.Spy;
 
   beforeEach(async () => {
     startPlannedWorkout = jasmine.createSpy().and.resolveTo(undefined);
+    updateSession = jasmine.createSpy().and.resolveTo(undefined);
+    deleteSession = jasmine.createSpy().and.resolveTo(undefined);
 
     await TestBed.configureTestingModule({
       imports: [DayFeedCardsComponent],
       providers: [
         { provide: WorkoutService, useValue: { startPlannedWorkout } },
+        { provide: SportService, useValue: { updateSession, deleteSession } },
         { provide: UserSettingsService, useValue: { difficultyScale: signal('emoji') } },
         { provide: FeedbackService, useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
       ],
@@ -67,22 +73,47 @@ describe('DayFeedCardsComponent', () => {
   });
 
   describe('sport row', () => {
-    it('emits openSport with the sport id and day date when clicked', () => {
-      const openSportSpy = spyOn(component.openSport, 'emit');
-      fixture.componentRef.setInput('day', {
-        date: '2024-03-05',
-        workouts: [],
-        sports: [{
-          sport: { id: 'run', name: 'Running', icon: 'directions_run', color: '#000', subtypes: [], metricDefs: [] },
-          session: { id: 'sess1', duration: 30 },
-        }],
-      });
+    const day = {
+      date: '2024-03-05',
+      workouts: [],
+      sports: [{
+        sport: { id: 'run', name: 'Running', icon: 'directions_run', color: '#000', subtypes: [], metricDefs: [], createdAt: new Date() },
+        session: { id: 'sess1', date: '2024-03-05', sportId: 'run', duration: 30, createdAt: new Date() },
+      }],
+    };
+
+    it('expands inline in place of navigating away when clicked, and collapses on a second click', () => {
+      fixture.componentRef.setInput('day', day);
       fixture.detectChanges();
 
       const row = (fixture.nativeElement as HTMLElement).querySelector('.feed-sport-row') as HTMLElement;
       row.click();
+      fixture.detectChanges();
+      expect(component.expandedSportId()).toBe('sess1');
+      expect((fixture.nativeElement as HTMLElement).querySelector('.sport-detail')).toBeTruthy();
 
-      expect(openSportSpy).toHaveBeenCalledWith({ sportId: 'run', date: '2024-03-05' });
+      row.click();
+      fixture.detectChanges();
+      expect(component.expandedSportId()).toBeNull();
+    });
+
+    it('saveSportEdit() updates the session with the edited fields and collapses', async () => {
+      component.toggleSportExpand(day.sports[0]);
+      component.editDuration.set(45);
+
+      await component.saveSportEdit(day.sports[0]);
+
+      expect(updateSession).toHaveBeenCalledWith('sess1', '2024-03-05', jasmine.objectContaining({ duration: 45 }));
+      expect(component.expandedSportId()).toBeNull();
+    });
+
+    it('deleteSportEdit() deletes the session and collapses', async () => {
+      component.toggleSportExpand(day.sports[0]);
+
+      await component.deleteSportEdit(day.sports[0]);
+
+      expect(deleteSession).toHaveBeenCalledWith('sess1', '2024-03-05');
+      expect(component.expandedSportId()).toBeNull();
     });
   });
 });

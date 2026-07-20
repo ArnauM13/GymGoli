@@ -164,11 +164,6 @@ describe('HomeComponent', () => {
       expect(navigateSpy).toHaveBeenCalledWith(['/train'], { queryParams: { workout: 'abc' } });
     });
 
-    it('goToSport() navigates to /train with the sport id and date as query params', () => {
-      component.goToSport({ sportId: 'run', date: '2024-03-05' });
-      expect(navigateSpy).toHaveBeenCalledWith(['/train'], { queryParams: { sport: 'run', date: '2024-03-05' } });
-    });
-
     it('goToPlanner() navigates to /train/planner', () => {
       component.goToPlanner();
       expect(navigateSpy).toHaveBeenCalledWith(['/train/planner']);

@@ -43,7 +43,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
         </button>
 
         @if (previewFeedEntry(); as day) {
-          <app-day-feed-cards [day]="day" (open)="goToWorkout($event)" (openSport)="goToSport($event)" />
+          <app-day-feed-cards [day]="day" (open)="goToWorkout($event)" />
         } @else if (!isToday()) {
           <p class="today-empty">Encara no hi ha res aquell dia.</p>
         }
@@ -106,7 +106,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
           @for (day of historyFeedDays(); track day.date) {
             <div class="feed-day">
               <div class="feed-day-header">{{ dayLabel(day.date) }}</div>
-              <app-day-feed-cards [day]="day" (open)="goToWorkout($event)" (openSport)="goToSport($event)" />
+              <app-day-feed-cards [day]="day" (open)="goToWorkout($event)" />
             </div>
           }
 
@@ -132,7 +132,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
 
     /* ── Avui / dia seleccionat: targeta blava (mateix marge que la resta) ── */
     .today-card {
-      margin: 4px 16px 0;
+      margin: 16px 16px 0;
       padding: 12px;
       background: color-mix(in srgb, var(--c-brand) 5%, var(--c-card));
       border: 1.5px solid color-mix(in srgb, var(--c-brand) 24%, var(--c-border-2));
@@ -153,16 +153,16 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
       padding: 6px 0;
     }
 
-    /* ── Botó gros "Comença un entrenament" ── */
+    /* ── Botó "Comença un entrenament" ── */
     .start-workout-btn {
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      width: 100%; height: 52px; margin-top: 10px; padding: 0;
-      border: none; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      width: 100%; height: 42px; margin-top: 10px; padding: 0;
+      border: none; border-radius: 12px;
       background: var(--c-brand); color: white;
-      font-size: 15px; font-weight: 800; letter-spacing: 0.1px;
+      font-size: 13.5px; font-weight: 700;
       cursor: pointer; touch-action: manipulation; transition: background 0.15s, transform 0.1s;
-      box-shadow: 0 4px 14px color-mix(in srgb, var(--c-brand) 35%, transparent);
-      .material-symbols-outlined { font-size: 22px; }
+      box-shadow: 0 2px 8px color-mix(in srgb, var(--c-brand) 30%, transparent);
+      .material-symbols-outlined { font-size: 17px; }
       &:hover { background: var(--c-brand-dk); }
       &:active { transform: scale(0.98); }
     }
@@ -171,7 +171,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     .routine-hint-card {
       position: relative;
       display: flex; flex-direction: column; gap: 10px;
-      margin: 4px 16px 0; padding: 14px 34px 14px 14px;
+      margin: 16px 16px 0; padding: 14px 34px 14px 14px;
       background: var(--c-card);
       border: 1.5px solid var(--c-border-2); border-radius: 16px;
       box-shadow: 0 2px 10px var(--c-shadow);
@@ -203,7 +203,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
 
     /* ── "Historial" section card ── */
     .history-card {
-      margin: 4px 16px 0;
+      margin: 16px 16px 0;
       padding: 14px 14px 16px;
       background: var(--c-card);
       border-radius: 18px;
@@ -315,10 +315,6 @@ export class HomeComponent implements OnDestroy {
 
   goToWorkout(workoutId: string): void {
     this.router.navigate(['/train'], { queryParams: { workout: workoutId } });
-  }
-
-  goToSport(event: { sportId: string; date: string }): void {
-    this.router.navigate(['/train'], { queryParams: { sport: event.sportId, date: event.date } });
   }
 
   goToPlanner(): void {
