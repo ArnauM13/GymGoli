@@ -40,7 +40,7 @@ describe('WorkoutProfileService', () => {
 
     TestBed.configureTestingModule({
       providers: [
-        { provide: WorkoutService,      useValue: { doneWorkouts } },
+        { provide: WorkoutService,      useValue: { doneWorkouts, workouts: signal<Workout[]>([]), loadAllWorkouts: jasmine.createSpy('loadAllWorkouts').and.resolveTo(undefined) } },
         { provide: SportService,        useValue: { sessions, sports } },
         { provide: UserSettingsService, useValue: { fitnessGoal } },
       ],

@@ -1,4 +1,4 @@
-import { Injectable, computed, inject } from '@angular/core';
+import { Injectable, computed, effect, inject } from '@angular/core';
 
 import { ExerciseCategory } from '../models/exercise.model';
 import { Sport } from '../models/sport.model';
@@ -55,6 +55,18 @@ export class WorkoutProfileService {
   private workoutService  = inject(WorkoutService);
   private sportService    = inject(SportService);
   private settingsService = inject(UserSettingsService);
+
+  constructor() {
+    // "Days since last <category>" is only right if the *whole* history is
+    // loaded. Otherwise a category last trained in an earlier month (not yet
+    // in the lazy month cache) looks like it was never trained. `workouts()`
+    // is read so this re-runs after a login clears the cache; loadAllWorkouts
+    // is guarded so it runs a single query per session.
+    effect(() => {
+      this.workoutService.workouts();
+      this.workoutService.loadAllWorkouts();
+    });
+  }
 
   readonly profile = computed((): WorkoutProfile => {
     const today       = TODAY();
