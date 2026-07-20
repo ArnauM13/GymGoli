@@ -66,36 +66,32 @@ const CAT_LABEL: Record<EditorCat, string> = {
                     <span class="tc-name">{{ t.name }}</span>
                     <span class="tc-badge" [style.background]="catColor(t.category)">{{ catLabel(t.category) }}</span>
                   </div>
-                  <div class="tc-meta-row">
-                    <span class="tc-sub">
-                      @if (t.entries.length === 0) { Sense exercicis }
-                      @else { {{ t.entries.length }} exercici{{ t.entries.length === 1 ? '' : 's' }} }
-                    </span>
-                    @if (t.useCount && t.useCount > 0) {
-                      <span class="tc-use-count">
-                        <span class="material-symbols-outlined">replay</span>
-                        {{ t.useCount }}
-                      </span>
-                    }
-                  </div>
+
                   @if (t.entries.length > 0) {
-                    <div class="tc-exercises">
-                      @for (e of t.entries.slice(0, 4); track e.exerciseId) {
-                        <span class="tc-ex-pill">{{ entryDisplay(e) }}</span>
+                    <ul class="tc-ex-list">
+                      @for (e of t.entries; track e.exerciseId) {
+                        <li class="tc-ex-row">
+                          <span class="tc-ex-name">{{ e.exerciseName }}</span>
+                          @if (entryParams(e); as p) { <span class="tc-ex-params">{{ p }}</span> }
+                        </li>
                       }
-                      @if (t.entries.length > 4) {
-                        <span class="tc-ex-pill tc-ex-more">+{{ t.entries.length - 4 }}</span>
-                      }
-                    </div>
+                    </ul>
+                  } @else {
+                    <span class="tc-empty-ex">Sense exercicis</span>
                   }
-                </div>
-                <div class="tc-actions">
-                  <button class="tc-action-btn" (click)="openEditor(t)" title="Editar">
-                    <span class="material-symbols-outlined">edit</span>
-                  </button>
-                  <button class="tc-action-btn danger" (click)="deleteTemplate(t.id)" title="Eliminar">
-                    <span class="material-symbols-outlined">delete</span>
-                  </button>
+
+                  <div class="tc-footer">
+                    <button class="tc-foot-icon danger" (click)="deleteTemplate(t.id)" aria-label="Eliminar">
+                      <span class="material-symbols-outlined">delete</span>
+                    </button>
+                    @if (t.useCount && t.useCount > 0) {
+                      <span class="tc-uses"><span class="material-symbols-outlined">replay</span>{{ t.useCount }}</span>
+                    }
+                    <button class="tc-foot-main" (click)="openEditor(t)">
+                      <span class="material-symbols-outlined">edit</span>
+                      Editar
+                    </button>
+                  </div>
                 </div>
               </div>
             }
@@ -126,22 +122,22 @@ const CAT_LABEL: Record<EditorCat, string> = {
                     <span class="tc-name">{{ t.name }}</span>
                     <span class="tc-badge" [style.background]="catColor(t.category)">{{ catLabel(t.category) }}</span>
                   </div>
-                  <div class="tc-exercises">
-                    @for (name of t.exerciseNames.slice(0, 4); track name) {
-                      <span class="tc-ex-pill">{{ name }}</span>
+
+                  <ul class="tc-ex-list">
+                    @for (name of t.exerciseNames; track name) {
+                      <li class="tc-ex-row"><span class="tc-ex-name">{{ name }}</span></li>
                     }
-                    @if (t.exerciseNames.length > 4) {
-                      <span class="tc-ex-pill tc-ex-more">+{{ t.exerciseNames.length - 4 }}</span>
-                    }
+                  </ul>
+
+                  <div class="tc-footer">
+                    <button class="tc-foot-icon danger" (click)="dismissSuggested(t.id)" aria-label="Descartar">
+                      <span class="material-symbols-outlined">close</span>
+                    </button>
+                    <button class="tc-foot-main brand" (click)="addSuggested(t)">
+                      <span class="material-symbols-outlined">add</span>
+                      Afegir
+                    </button>
                   </div>
-                </div>
-                <div class="tc-actions">
-                  <button class="tc-action-btn brand" (click)="addSuggested(t)" title="Afegir a les meves plantilles">
-                    <span class="material-symbols-outlined">add</span>
-                  </button>
-                  <button class="tc-action-btn danger" (click)="dismissSuggested(t.id)" title="Eliminar">
-                    <span class="material-symbols-outlined">delete</span>
-                  </button>
                 </div>
               </div>
             }
@@ -247,40 +243,69 @@ const CAT_LABEL: Record<EditorCat, string> = {
       box-shadow: 0 2px 8px var(--c-shadow); overflow: hidden;
     }
     .tc-accent { width: 5px; flex-shrink: 0; background: var(--tc); }
-    .tc-body { flex: 1; padding: 12px 10px 12px 12px; min-width: 0; }
-    .tc-top { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
-    .tc-name { font-size: 15px; font-weight: 700; color: var(--c-text); flex: 1; }
+    .tc-body { flex: 1; min-width: 0; padding: 12px 14px 10px; display: flex; flex-direction: column; }
+
+    .tc-top { display: flex; align-items: center; gap: 8px; }
+    .tc-name {
+      flex: 1; min-width: 0;
+      font-size: 15px; font-weight: 700; color: var(--c-text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
     .tc-badge {
-      padding: 2px 8px; border-radius: 10px;
-      font-size: 11px; font-weight: 600; color: white; flex-shrink: 0;
+      padding: 2px 8px; border-radius: 10px; flex-shrink: 0;
+      font-size: 11px; font-weight: 600; color: white;
     }
-    .tc-meta-row { display: flex; align-items: center; gap: 8px; margin-top: 1px; }
-    .tc-sub { font-size: 12px; color: var(--c-text-3); flex: 1; }
-    .tc-use-count {
-      display: flex; align-items: center; gap: 3px;
-      font-size: 11px; font-weight: 600; color: var(--c-text-3);
-      .material-symbols-outlined { font-size: 13px; }
+
+    /* ── Vertical exercise list ── */
+    .tc-ex-list { list-style: none; margin: 10px 0 0; padding: 0; }
+    .tc-ex-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 7px 0;
+      border-bottom: 1px solid var(--c-border-2);
+      &:last-child { border-bottom: none; }
     }
-    .tc-exercises { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-    .tc-ex-pill {
-      padding: 2px 8px; border-radius: 10px;
-      background: var(--c-border-2); color: var(--c-text-2);
-      font-size: 11px; font-weight: 500;
+    .tc-ex-name {
+      flex: 1; min-width: 0;
+      font-size: 13px; font-weight: 500; color: var(--c-text-2);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .tc-ex-more { background: var(--c-subtle); color: var(--c-text-3); }
-    .tc-actions {
-      display: flex; flex-direction: column; justify-content: center;
-      padding: 8px 10px 8px 4px; gap: 4px;
+    .tc-ex-params {
+      flex-shrink: 0; font-size: 12px; font-weight: 700; color: var(--c-text-3);
+      font-variant-numeric: tabular-nums;
     }
-    .tc-action-btn {
-      width: 34px; height: 34px; border-radius: 8px;
-      border: 1px solid var(--c-border-2); background: var(--c-subtle);
-      cursor: pointer; color: var(--c-text-3); display: flex; align-items: center; justify-content: center;
-      touch-action: manipulation; transition: all 0.15s;
+    .tc-empty-ex { margin-top: 8px; font-size: 12.5px; color: var(--c-text-3); font-style: italic; }
+
+    /* ── Footer actions (delete left, primary right — app detail pattern) ── */
+    .tc-footer {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 10px; padding-top: 10px;
+      border-top: 1px solid var(--c-border-2);
+    }
+    .tc-foot-icon {
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      width: 34px; height: 34px; border-radius: 9px;
+      border: 1.5px solid var(--c-border-2); background: var(--c-card);
+      color: var(--c-text-3); cursor: pointer; touch-action: manipulation; transition: all 0.15s;
       .material-symbols-outlined { font-size: 17px; }
-      &:hover { background: var(--c-hover); color: var(--c-text-2); }
       &.danger:hover { background: rgba(239,83,80,0.1); color: #ef5350; border-color: rgba(239,83,80,0.3); }
-      &.brand:hover { background: rgba(var(--c-brand-rgb), 0.1); color: var(--c-brand); border-color: rgba(var(--c-brand-rgb), 0.3); }
+    }
+    .tc-uses {
+      display: flex; align-items: center; gap: 3px;
+      font-size: 11.5px; font-weight: 600; color: var(--c-text-3);
+      .material-symbols-outlined { font-size: 14px; }
+    }
+    .tc-foot-main {
+      display: inline-flex; align-items: center; gap: 5px; margin-left: auto; flex-shrink: 0;
+      height: 34px; padding: 0 14px; border-radius: 9px;
+      border: 1.5px solid var(--c-border); background: var(--c-card);
+      color: var(--c-text-2); font-size: 13px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover { border-color: var(--c-text-3); color: var(--c-text); }
+      &.brand {
+        border: none; background: var(--c-brand); color: white;
+        &:hover { background: var(--c-brand-dk); }
+      }
     }
 
     /* ── Empty state (nested under "Les meves plantilles") ── */
@@ -466,11 +491,13 @@ export class TemplatesComponent {
   catColor(cat: EditorCat | string): string { return CAT_COLOR[cat as EditorCat] ?? '#bbb'; }
   catLabel(cat: EditorCat | string): string { return CAT_LABEL[cat as EditorCat] ?? cat; }
 
-  entryDisplay(e: TemplateEntry): string {
-    let s = e.exerciseName;
-    if (e.sets && e.reps) s += ` · ${e.sets}×${e.reps}`;
-    if (e.weight) s += ` · ${e.weight}kg`;
-    return s;
+  /** Compact "sets×reps · weight" suffix for an exercise row (empty when
+   *  the template didn't specify any). */
+  entryParams(e: TemplateEntry): string {
+    const parts: string[] = [];
+    if (e.sets && e.reps) parts.push(`${e.sets}×${e.reps}`);
+    if (e.weight) parts.push(`${e.weight}kg`);
+    return parts.join(' · ');
   }
 
   openEditor(template: WorkoutTemplate | null): void {
