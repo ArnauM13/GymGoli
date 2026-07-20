@@ -153,16 +153,16 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
       padding: 6px 0;
     }
 
-    /* ── Botó gros "Comença un entrenament" ── */
+    /* ── Botó "Comença un entrenament" ── */
     .start-workout-btn {
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      width: 100%; height: 52px; margin-top: 10px; padding: 0;
-      border: none; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      width: 100%; height: 42px; margin-top: 10px; padding: 0;
+      border: none; border-radius: 12px;
       background: var(--c-brand); color: white;
-      font-size: 15px; font-weight: 800; letter-spacing: 0.1px;
+      font-size: 13.5px; font-weight: 700;
       cursor: pointer; touch-action: manipulation; transition: background 0.15s, transform 0.1s;
-      box-shadow: 0 4px 14px color-mix(in srgb, var(--c-brand) 35%, transparent);
-      .material-symbols-outlined { font-size: 22px; }
+      box-shadow: 0 2px 8px color-mix(in srgb, var(--c-brand) 30%, transparent);
+      .material-symbols-outlined { font-size: 17px; }
       &:hover { background: var(--c-brand-dk); }
       &:active { transform: scale(0.98); }
     }
