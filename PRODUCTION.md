@@ -17,9 +17,9 @@ RLS a totes les taules per-usuari.
 
 | # | Punt | Prioritat | Estat |
 |---|------|-----------|-------|
-| 1 | Migració `delete_my_account` inexistent | 🔴 P0 | `[ ]` |
-| 2 | "Avui" congelat a mitjanit | 🔴 P0 | `[ ]` |
-| 3 | Cap gestió de `SwUpdate` + chunk errors silenciats | 🔴 P0 | `[ ]` |
+| 1 | Migració `delete_my_account` inexistent | 🔴 P0 | `[~]` |
+| 2 | "Avui" congelat a mitjanit | 🔴 P0 | `[x]` |
+| 3 | Cap gestió de `SwUpdate` + chunk errors silenciats | 🔴 P0 | `[~]` |
 | 4 | Errors de xarxa silenciats (buit ≠ error) | 🔴 P0 | `[ ]` |
 | 5 | Zero observabilitat en producció | 🔴 P0 | `[ ]` |
 | 6 | Pla de còpies de seguretat | 🔴 P0 | `[ ]` |
@@ -44,7 +44,15 @@ RLS a totes les taules per-usuari.
 
 ## 🔴 P0 — Bloquejants
 
-### 1. `[ ]` Migració `delete_my_account`
+### 1. `[~]` Migració `delete_my_account`
+
+> **Progrés (2026-07-20, branca `claude/app-state-analysis-x73qzl`):**
+> escrita `supabase/migrations/023_delete_my_account.sql` (SECURITY DEFINER,
+> REVOKE/GRANT a authenticated) i afegida a `schema_full.sql`. Verificat que
+> **totes** les taules per-usuari ja tenen `ON DELETE CASCADE` (005, 007/015,
+> 010, 014, 016; `shared_workouts` no referencia usuaris des de la 018).
+> **Pendent:** aplicar-la a la BD viva (pot ja existir-hi una versió — el pas 1
+> del pla) i fer el test manual complet amb un compte de prova.
 
 **Context.** `AuthService.deleteAccount()` (`src/app/core/services/auth.service.ts:101`)
 crida l'RPC `delete_my_account`, que no està definit a cap migració ni a
@@ -71,7 +79,17 @@ compte de prova, i no queden files òrfenes a cap taula.
 
 ---
 
-### 2. `[ ]` "Avui" congelat a mitjanit
+### 2. `[x]` "Avui" congelat a mitjanit — **fet 2026-07-20** (branca `claude/app-state-analysis-x73qzl`)
+
+> **Com s'ha resolt:** nou `ClockService` amb `today` com a signal, refrescat
+> amb `focus`, `visibilitychange` i un interval d'1 minut. `WorkoutService` i
+> `SportService` ja no guarden `_todayStr`: tots els computeds (`todayWorkout`,
+> `pastWorkouts`, `todaySessions`) llegeixen `clock.today()` i un `effect`
+> refetcheja "avui" i el mes nou quan el dia canvia. `TrainComponent` segueix
+> el canvi de dia si l'usuari era a "avui" (keep-alive) i `HomeComponent` té
+> els computeds reactius al dia. Cobert amb `clock.service.spec.ts` (4 tests)
+> i 2 tests de rollover a `workout.service.spec.ts` que simulen el canvi de
+> dia i verifiquen que la creació d'entrenaments usa la data nova.
 
 **Context.** `WorkoutService._todayStr` (`workout.service.ts:51`) i
 `SportService._todayStr` (`sport.service.ts:60`) es calculen una sola vegada
@@ -103,7 +121,17 @@ crear un entrenament el desa amb la data correcta i home/train mostren el dia no
 
 ---
 
-### 3. `[ ]` Gestió d'actualitzacions del service worker
+### 3. `[~]` Gestió d'actualitzacions del service worker
+
+> **Progrés (2026-07-20, branca `claude/app-state-analysis-x73qzl`):** nou
+> `UpdateService` (SwUpdate opcional — inactiu en dev/tests): comprovació
+> d'actualitzacions cada 30 min i en tornar a primer pla; en `VERSION_READY`,
+> snackbar "Hi ha una versió nova disponible — Actualitza" a `AppComponent`
+> que activa i recarrega; en `VERSION_INSTALLATION_FAILED`, recàrrega amb
+> guard d'1 minut contra bucles. `AppErrorHandler` ara recarrega de veritat
+> (amb el mateix guard) en `ChunkLoadError` en lloc de silenciar-lo.
+> **Pendent:** verificar amb un desplegament real que un client obert rep la
+> versió nova (criteri d'acceptació).
 
 **Context.** No hi ha cap ús de `SwUpdate`. Els usuaris poden quedar-se en
 versions velles indefinidament. A més, `AppErrorHandler`
