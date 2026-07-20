@@ -53,110 +53,126 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
             }
           </div>
 
-          <div class="chip-group-label">Gym</div>
-          <div class="filter-bar">
-            @for (cat of gymCategories; track cat) {
-              <button class="filter-chip"
-                      [class.active]="isGymSelected(day.index, cat)"
-                      [style.--cat-color]="categoryColor(cat)"
-                      (click)="toggleGym(day.index, cat)">
-                <span class="material-symbols-outlined">{{ categoryIcon(cat) }}</span>
-                {{ categoryLabel(cat) }}
-              </button>
-            }
-          </div>
-
-          @for (cat of gymCategories; track cat) {
-            @if (isGymSelected(day.index, cat)) {
-              <div class="tpl-row">
-                <span class="tpl-row-label">{{ categoryLabel(cat) }}, en detall</span>
-
-                @if (templatesFor(cat).length > 0) {
-                  <div class="filter-bar tpl-chips">
-                    <button class="filter-chip tpl-chip"
-                            [class.active]="!gymTemplate(day.index, cat)"
-                            (click)="setGymTemplate(day.index, cat, undefined)">
-                      Buit
-                    </button>
-                    @for (t of templatesFor(cat); track t.id) {
-                      <button class="filter-chip tpl-chip"
-                              [class.active]="gymTemplate(day.index, cat) === t.id"
-                              (click)="setGymTemplate(day.index, cat, t.id)">
-                        <span class="material-symbols-outlined">bookmark</span>
-                        {{ t.name }}
-                      </button>
-                    }
-                  </div>
-                }
-
-                <div class="custom-ex-row">
-                  <div class="custom-ex-chips">
-                    @for (e of gymEntries(day.index, cat); track e.exerciseId) {
-                      <span class="custom-ex-chip">
-                        {{ e.exerciseName }}
-                        <button type="button" class="custom-ex-remove"
-                                (click)="removeGymEntry(day.index, cat, e.exerciseId)"
-                                aria-label="Treure exercici">
-                          <span class="material-symbols-outlined">close</span>
-                        </button>
-                      </span>
-                    }
-                    <button type="button" class="add-ex-btn" (click)="openExercisePicker(day.index, cat)">
-                      <span class="material-symbols-outlined">add</span>
-                      Afegir exercici
-                    </button>
-                  </div>
-                </div>
-              </div>
-            }
-          }
-
-          @if (sportService.sports().length > 0) {
-            <div class="chip-group-label">Esport</div>
+          <div class="plan-group">
+            <div class="plan-group-header">
+              <span class="material-symbols-outlined plan-group-icon">fitness_center</span>
+              <span class="plan-group-title">Gym</span>
+            </div>
             <div class="filter-bar">
-              @for (sport of sportService.sports(); track sport.id) {
+              @for (cat of gymCategories; track cat) {
                 <button class="filter-chip"
-                        [class.active]="isSportSelected(day.index, sport.id)"
-                        [style.--cat-color]="sport.color"
-                        (click)="toggleSport(day.index, sport.id)">
-                  <span class="material-symbols-outlined">{{ sport.icon }}</span>
-                  {{ sport.name }}
+                        [class.active]="isGymSelected(day.index, cat)"
+                        [style.--cat-color]="categoryColor(cat)"
+                        (click)="toggleGym(day.index, cat)">
+                  <span class="material-symbols-outlined">{{ categoryIcon(cat) }}</span>
+                  {{ categoryLabel(cat) }}
                 </button>
               }
             </div>
 
-            @for (sport of sportService.sports(); track sport.id) {
-              @if (isSportSelected(day.index, sport.id)) {
-                <div class="tpl-row">
-                  <span class="tpl-row-label">{{ sport.name }}, en detall</span>
+            @for (cat of gymCategories; track cat) {
+              @if (isGymSelected(day.index, cat)) {
+                <div class="plan-detail-card" [style.--pc]="categoryColor(cat)">
+                  <div class="plan-detail-bar"></div>
+                  <div class="plan-detail-body">
+                    <span class="plan-detail-title">{{ categoryLabel(cat) }}</span>
 
-                  @if (sport.subtypes.length > 0) {
-                    <div class="filter-bar tpl-chips">
-                      <button class="filter-chip tpl-chip"
-                              [class.active]="!sportSubtype(day.index, sport.id)"
-                              (click)="setSportSubtype(day.index, sport.id, undefined)">
-                        Cap
-                      </button>
-                      @for (st of sport.subtypes; track st.id) {
+                    @if (templatesFor(cat).length > 0) {
+                      <div class="filter-bar tpl-chips">
                         <button class="filter-chip tpl-chip"
-                                [class.active]="sportSubtype(day.index, sport.id) === st.id"
-                                (click)="setSportSubtype(day.index, sport.id, st.id)">
-                          {{ st.name }}
+                                [class.active]="!gymTemplate(day.index, cat)"
+                                (click)="setGymTemplate(day.index, cat, undefined)">
+                          Buit
                         </button>
-                      }
-                    </div>
-                  }
+                        @for (t of templatesFor(cat); track t.id) {
+                          <button class="filter-chip tpl-chip"
+                                  [class.active]="gymTemplate(day.index, cat) === t.id"
+                                  (click)="setGymTemplate(day.index, cat, t.id)">
+                            <span class="material-symbols-outlined">bookmark</span>
+                            {{ t.name }}
+                          </button>
+                        }
+                      </div>
+                    }
 
-                  <div class="sport-duration-row">
-                    <span class="sport-duration-label">Durada (min)</span>
-                    <input class="sport-duration-input" type="number" min="0" step="5"
-                           [value]="sportDuration(day.index, sport.id) ?? ''"
-                           (change)="setSportDuration(day.index, sport.id, numFromEvent($event))"
-                           placeholder="Opcional">
+                    <div class="custom-ex-chips">
+                      @for (e of gymEntries(day.index, cat); track e.exerciseId) {
+                        <span class="custom-ex-chip">
+                          {{ e.exerciseName }}
+                          <button type="button" class="custom-ex-remove"
+                                  (click)="removeGymEntry(day.index, cat, e.exerciseId)"
+                                  aria-label="Treure exercici">
+                            <span class="material-symbols-outlined">close</span>
+                          </button>
+                        </span>
+                      }
+                      <button type="button" class="add-ex-btn" (click)="openExercisePicker(day.index, cat)">
+                        <span class="material-symbols-outlined">add</span>
+                        Afegir exercici
+                      </button>
+                    </div>
                   </div>
                 </div>
               }
             }
+          </div>
+
+          @if (sportService.sports().length > 0) {
+            <div class="plan-group-divider"></div>
+
+            <div class="plan-group">
+              <div class="plan-group-header">
+                <span class="material-symbols-outlined plan-group-icon">directions_run</span>
+                <span class="plan-group-title">Esport</span>
+              </div>
+              <div class="filter-bar">
+                @for (sport of sportService.sports(); track sport.id) {
+                  <button class="filter-chip"
+                          [class.active]="isSportSelected(day.index, sport.id)"
+                          [style.--cat-color]="sport.color"
+                          (click)="toggleSport(day.index, sport.id)">
+                    <span class="material-symbols-outlined">{{ sport.icon }}</span>
+                    {{ sport.name }}
+                  </button>
+                }
+              </div>
+
+              @for (sport of sportService.sports(); track sport.id) {
+                @if (isSportSelected(day.index, sport.id)) {
+                  <div class="plan-detail-card" [style.--pc]="sport.color">
+                    <div class="plan-detail-bar"></div>
+                    <div class="plan-detail-body">
+                      <span class="plan-detail-title">{{ sport.name }}</span>
+
+                      @if (sport.subtypes.length > 0) {
+                        <div class="filter-bar tpl-chips">
+                          <button class="filter-chip tpl-chip"
+                                  [class.active]="!sportSubtype(day.index, sport.id)"
+                                  (click)="setSportSubtype(day.index, sport.id, undefined)">
+                            Cap
+                          </button>
+                          @for (st of sport.subtypes; track st.id) {
+                            <button class="filter-chip tpl-chip"
+                                    [class.active]="sportSubtype(day.index, sport.id) === st.id"
+                                    (click)="setSportSubtype(day.index, sport.id, st.id)">
+                              {{ st.name }}
+                            </button>
+                          }
+                        </div>
+                      }
+
+                      <div class="sport-duration-row">
+                        <span class="sport-duration-label">Durada (min)</span>
+                        <input class="sport-duration-input" type="number" min="0" step="5"
+                               [value]="sportDuration(day.index, sport.id) ?? ''"
+                               (change)="setSportDuration(day.index, sport.id, numFromEvent($event))"
+                               placeholder="Opcional">
+                      </div>
+                    </div>
+                  </div>
+                }
+              }
+            </div>
           }
 
         </div>
@@ -204,11 +220,16 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
     }
     .mode-banner-text { font-size: 12px; color: var(--c-text-2); line-height: 1.4; }
 
-    .chip-group-label {
+    /* ── Gym / Esport groups (kept visually separate within each day) ── */
+    .plan-group + .plan-group { margin-top: 4px; }
+    .plan-group-header { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+    .plan-group-icon { font-size: 15px; color: var(--c-text-3); font-variation-settings: 'FILL' 0, 'wght' 400; }
+    .plan-group-title {
       font-size: 11px; font-weight: 700; color: var(--c-text-3);
       text-transform: uppercase; letter-spacing: 0.3px;
-      margin: 0 0 6px;
     }
+    .plan-group-divider { height: 1px; background: var(--c-border-2); margin: 16px 0 14px; }
+
     .filter-bar {
       display: flex; gap: 6px; flex-wrap: wrap;
       padding: 0 0 12px;
@@ -227,18 +248,26 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
       &.active { background: var(--cat-color, var(--c-brand)); border-color: var(--cat-color, var(--c-brand)); color: white; }
     }
 
-    .tpl-row { margin: 10px 0 12px; padding-left: 4px; }
-    .tpl-row-label {
-      display: block; font-size: 10.5px; font-weight: 600; color: var(--c-text-3);
-      margin-bottom: 6px;
+    /* ── Selected category/sport detail, as its own accented item-card ── */
+    .plan-detail-card {
+      display: flex; align-items: stretch;
+      margin: 8px 0 4px;
+      border: 1.5px solid color-mix(in srgb, var(--pc, var(--c-border-2)) 30%, var(--c-border-2));
+      border-radius: 14px; overflow: hidden;
+      background: color-mix(in srgb, var(--pc, var(--c-card)) 5%, var(--c-card));
     }
-    .tpl-chips { padding: 0 0 8px; }
+    .plan-detail-bar { width: 4px; flex-shrink: 0; background: var(--pc, var(--c-border)); }
+    .plan-detail-body {
+      flex: 1; min-width: 0; padding: 10px 12px 12px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .plan-detail-title { font-size: 12.5px; font-weight: 700; color: var(--c-text); }
+    .tpl-chips { padding: 0; }
     .tpl-chip {
       padding: 4px 10px; font-size: 11px;
       .material-symbols-outlined { font-size: 13px; }
     }
 
-    .custom-ex-row { }
     .custom-ex-chips { display: flex; flex-wrap: wrap; gap: 6px; }
     .custom-ex-chip {
       display: flex; align-items: center; gap: 4px;

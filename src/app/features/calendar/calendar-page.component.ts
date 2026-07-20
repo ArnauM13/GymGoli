@@ -15,7 +15,7 @@ import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
 import { AuthService } from '../../core/services/auth.service';
 import { kgToDisplay } from '../../shared/utils/weight.utils';
-import { mondayOf } from '../../shared/utils/calendar-utils';
+import { addDays, mondayOf } from '../../shared/utils/calendar-utils';
 import { formatFeeling } from '../../shared/utils/workout-card.utils';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
@@ -98,10 +98,16 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
         <!-- ── Data seleccionada (sota els filtres, no inline) ── -->
         @if (selectedDate()) {
           <div class="date-chip-row">
+            <button class="day-nav-btn" (click)="shiftSelectedDate(-1)" aria-label="Dia anterior">
+              <span class="material-symbols-outlined">chevron_left</span>
+            </button>
             <button class="date-chip" (click)="selectDate(selectedDate()!)">
               <span class="material-symbols-outlined">event</span>
               {{ selectedDateLabel() }}
               <span class="material-symbols-outlined date-chip-x">close</span>
+            </button>
+            <button class="day-nav-btn" (click)="shiftSelectedDate(1)" aria-label="Dia següent">
+              <span class="material-symbols-outlined">chevron_right</span>
             </button>
           </div>
         }
@@ -307,11 +313,13 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
         <!-- ── Planificació del dia (avui o futur) ── -->
         <div class="dp-panel">
           <div class="dp-header">
+            <button class="day-nav-btn" (click)="shiftSelectedDate(-1)" aria-label="Dia anterior">
+              <span class="material-symbols-outlined">chevron_left</span>
+            </button>
             <span class="dp-title">{{ selectedDateLabel() }}</span>
-            <a class="dp-plan-week" [routerLink]="['/train/planner']" [queryParams]="{ week: weekMondayOf(selectedDate()!) }">
-              <span class="material-symbols-outlined">event_repeat</span>
-              Planificar la setmana
-            </a>
+            <button class="day-nav-btn" (click)="shiftSelectedDate(1)" aria-label="Dia següent">
+              <span class="material-symbols-outlined">chevron_right</span>
+            </button>
           </div>
 
           @if (dayWorkouts().length > 0 || daySports().length > 0) {
@@ -387,22 +395,24 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
 
     /* ── "Planificar la setmana" subsection, below the weekly goals ── */
     .plan-week-strip {
+      display: flex; justify-content: flex-end;
       padding: 10px 14px;
       border-top: 1px solid var(--c-border-2);
       background: var(--c-card);
     }
     .plan-week-btn {
-      display: flex; align-items: center; gap: 8px;
-      width: 100%; height: 38px; padding: 0 12px; box-sizing: border-box;
-      border: 1.5px solid var(--c-border); border-radius: 10px;
-      background: var(--c-subtle); color: var(--c-text-2);
+      display: inline-flex; align-items: center; gap: 6px;
+      height: 38px; padding: 0 16px; box-sizing: border-box;
+      border: none; border-radius: 12px;
+      background: var(--c-brand); color: white;
       font-size: 13px; font-weight: 700;
-      text-decoration: none; cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 18px; }
-      &:hover { background: var(--c-border-2); color: var(--c-text); }
+      text-decoration: none; cursor: pointer; touch-action: manipulation; transition: background 0.15s, transform 0.1s;
+      box-shadow: 0 3px 10px color-mix(in srgb, var(--c-brand) 35%, transparent);
+      .material-symbols-outlined { font-size: 17px; }
+      &:hover { background: var(--c-brand-dk); }
       &:active { transform: scale(0.98); }
     }
-    .plan-week-arrow { margin-left: auto; color: var(--c-text-3); }
+    .plan-week-arrow { color: rgba(255,255,255,0.85); }
 
     /* ── Calendar toggle ── */
     .cal-toggle {
@@ -431,9 +441,20 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
       border-radius: 16px; overflow: hidden;
     }
 
+    /* ── Prev/next day navigation, next to the "planificar" and selected-date titles ── */
+    .day-nav-btn {
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      width: 32px; height: 32px; border-radius: 10px;
+      border: 1.5px solid var(--c-border); background: var(--c-subtle);
+      color: var(--c-text-2); cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 20px; }
+      &:hover { border-color: var(--c-brand); color: var(--c-brand); }
+      &:active { transform: scale(0.94); }
+    }
+
     /* ── Data seleccionada (below the filter bar, its own row) ── */
     .date-chip-row {
-      display: flex; margin: 0 16px 12px;
+      display: flex; align-items: center; gap: 8px; margin: 0 16px 12px;
     }
     .date-chip {
       display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
@@ -476,18 +497,12 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
     /* ── Day plan panel (today / future dates) ── */
     .dp-panel { margin: 4px 16px 0; }
     .dp-header {
-      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+      display: flex; align-items: center;
       gap: 8px; margin-bottom: 10px;
     }
-    .dp-title { font-size: 15px; font-weight: 700; color: var(--c-text); text-transform: capitalize; }
-    .dp-plan-week {
-      display: inline-flex; align-items: center; gap: 4px;
-      padding: 6px 12px; border-radius: 20px;
-      border: 1.5px solid var(--c-border); background: var(--c-card);
-      color: var(--c-text-2); font-size: 12px; font-weight: 600;
-      text-decoration: none; cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 15px; }
-      &:hover { border-color: var(--c-brand); color: var(--c-brand); }
+    .dp-title {
+      flex: 1; min-width: 0; text-align: center;
+      font-size: 15px; font-weight: 700; color: var(--c-text); text-transform: capitalize;
     }
 
     .dp-items { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
@@ -811,8 +826,6 @@ export class CalendarPageComponent implements OnDestroy {
     ];
   });
 
-  weekMondayOf(date: string): string { return mondayOf(date); }
-
   isGymPlanned(cat: ExerciseCategory): boolean {
     return this.dayWorkouts().some(w => (w.categories ?? (w.category ? [w.category] : [])).includes(cat));
   }
@@ -962,9 +975,17 @@ export class CalendarPageComponent implements OnDestroy {
   });
 
   selectDate(date: string): void {
-    const next = this.selectedDate() === date ? null : date;
-    this.selectedDate.set(next);
-    if (next) {
+    this._setSelectedDate(this.selectedDate() === date ? null : date);
+  }
+
+  shiftSelectedDate(delta: number): void {
+    const base = this.selectedDate() ?? this.workoutService.todayDateString();
+    this._setSelectedDate(addDays(base, delta));
+  }
+
+  private _setSelectedDate(date: string | null): void {
+    this.selectedDate.set(date);
+    if (date) {
       const found = this._items().find(w => w.date === date)
                  ?? this.workoutService.getWorkoutForDate(date);
       this.expandedId.set(found?.id ?? null);
