@@ -3,6 +3,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute } from '@angular/router';
 
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { NavigationHistoryService } from '../../core/services/navigation-history.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { SportService } from '../../core/services/sport.service';
@@ -44,14 +45,33 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
       </div>
 
       @for (day of days; track day.index) {
-        <div class="card-section">
-          <div class="section-header">
+        <div class="card-section" [class.day-open]="isDayExpanded(day.index)">
+          <button type="button" class="day-toggle" (click)="toggleDay(day.index)">
             <span class="material-symbols-outlined section-icon">today</span>
             <h2 class="section-title">{{ day.label }}</h2>
             @if (itemCount(day.index) > 0) {
               <span class="section-count">{{ itemCount(day.index) }}</span>
             }
-          </div>
+            <span class="material-symbols-outlined day-chevron">{{ isDayExpanded(day.index) ? 'expand_less' : 'expand_more' }}</span>
+          </button>
+
+          @if (!isDayExpanded(day.index)) {
+            @if (daySummary(day.index); as summary) {
+              @if (summary.length > 0) {
+                <div class="day-summary">
+                  @for (s of summary; track s.key) {
+                    <span class="day-summary-chip" [style.--sc]="s.color">
+                      <span class="material-symbols-outlined">{{ s.icon }}</span>
+                      {{ s.label }}
+                    </span>
+                  }
+                </div>
+              } @else {
+                <span class="day-summary-rest">Dia de descans</span>
+              }
+            }
+          } @else {
+          <div class="day-body">
 
           <div class="plan-group">
             <div class="plan-group-header">
@@ -175,10 +195,13 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
             </div>
           }
 
+          </div>
+          }
         </div>
       }
 
       <div class="save-bar">
+        <button class="cancel-btn" (click)="cancel()" [disabled]="saving()">Cancel·lar</button>
         <button class="save-btn" (click)="save()" [disabled]="saving()">
           @if (saving()) {
             <span class="material-symbols-outlined spin">sync</span>
@@ -195,17 +218,43 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
 
     .card-section {
       margin: 12px 16px 0;
-      padding: 14px 14px 16px;
+      padding: 12px 14px;
       background: var(--c-card);
       border-radius: 18px;
       box-shadow: 0 2px 10px var(--c-shadow);
     }
-    .section-header { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; }
+    .card-section.day-open { padding-bottom: 16px; }
+
+    /* ── Collapsible day header ── */
+    .day-toggle {
+      display: flex; align-items: center; gap: 7px; width: 100%;
+      padding: 0; border: none; background: transparent;
+      cursor: pointer; touch-action: manipulation; text-align: left;
+    }
     .section-icon  { font-size: 18px; color: var(--c-text-3); font-variation-settings: 'FILL' 0, 'wght' 300; }
     .section-title { margin: 0; flex: 1; font-size: 14px; font-weight: 700; color: var(--c-text-2); letter-spacing: 0.2px; }
     .section-count {
       font-size: 11px; font-weight: 700; color: var(--c-text-3);
       background: var(--c-subtle); border-radius: 10px; padding: 2px 8px;
+    }
+    .day-chevron { font-size: 20px; color: var(--c-text-3); flex-shrink: 0; }
+
+    .day-body { margin-top: 12px; }
+
+    /* ── Collapsed-day summary ── */
+    .day-summary { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .day-summary-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 10px; border-radius: 20px;
+      background: color-mix(in srgb, var(--sc, var(--c-brand)) 12%, var(--c-card));
+      border: 1px solid color-mix(in srgb, var(--sc, var(--c-brand)) 30%, transparent);
+      color: var(--sc, var(--c-brand));
+      font-size: 12px; font-weight: 600;
+      .material-symbols-outlined { font-size: 14px; }
+    }
+    .day-summary-rest {
+      display: inline-block; margin-top: 10px;
+      font-size: 12px; color: var(--c-text-3); font-style: italic;
     }
 
     .mode-banner {
@@ -309,7 +358,17 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
       position: fixed; left: 16px; right: 16px;
       bottom: calc(var(--nav-height) + 16px);
       z-index: 89;
-      display: flex; justify-content: flex-end;
+      display: flex; justify-content: flex-end; gap: 8px;
+    }
+    .cancel-btn {
+      display: inline-flex; align-items: center;
+      padding: 10px 16px; border-radius: 12px;
+      border: 1.5px solid var(--c-border); background: var(--c-card);
+      color: var(--c-text-2); font-size: 13.5px; font-weight: 600; cursor: pointer;
+      transition: all 0.15s; touch-action: manipulation;
+      box-shadow: 0 4px 16px var(--c-shadow-md);
+      &:hover { border-color: var(--c-text-3); color: var(--c-text); }
+      &:disabled { opacity: 0.6; cursor: default; }
     }
     .save-btn {
       display: inline-flex; align-items: center; gap: 6px;
@@ -346,9 +405,14 @@ export class WeeklyPlannerComponent {
   private confirmDialog    = inject(ConfirmDialogService);
   private dialog           = inject(MatDialog);
   private route            = inject(ActivatedRoute);
+  private navHistory       = inject(NavigationHistoryService);
 
   readonly gymCategories  = GYM_CATEGORIES;
   readonly days = WEEKDAY_LABELS.map((label, index) => ({ label, index }));
+
+  /** Days shown expanded (collapsed by default so the week is easy to scan
+   *  and plan one day at a time). */
+  private readonly expandedDays = signal<ReadonlySet<number>>(new Set());
 
   /** Monday of a single week to plan (from the calendar's "Planificar" action),
    *  or null when editing the persistent routine from Configuració. */
@@ -357,6 +421,10 @@ export class WeeklyPlannerComponent {
   readonly saving = signal(false);
   readonly plan = signal<WeeklyPlan>(this._initialPlan());
 
+  /** Snapshot of the plan as it was when the page opened, so "Cancel·lar"
+   *  can discard every edit and restore exactly that state. */
+  private readonly _originalPlan = this._clone(this.plan());
+
   readonly hasSavedPlan = computed(() => {
     const p = this.settingsService.weeklyPlan();
     return p.recurring || p.days.some(items => items.length > 0);
@@ -364,6 +432,42 @@ export class WeeklyPlannerComponent {
 
   constructor() {
     this.sportService.ensureLoaded();
+  }
+
+  isDayExpanded(dayIndex: number): boolean {
+    return this.expandedDays().has(dayIndex);
+  }
+
+  toggleDay(dayIndex: number): void {
+    this.expandedDays.update(set => {
+      const next = new Set(set);
+      if (next.has(dayIndex)) next.delete(dayIndex); else next.add(dayIndex);
+      return next;
+    });
+  }
+
+  /** Compact list of what's planned for a collapsed day (gym categories +
+   *  sports), so the user can scan the week without expanding every day. */
+  daySummary(dayIndex: number): { key: string; label: string; icon: string; color: string }[] {
+    const items = this.plan().days[dayIndex];
+    const out: { key: string; label: string; icon: string; color: string }[] = [];
+    for (const cat of this.gymCategories) {
+      if (items.some(i => i.type === 'gym' && i.category === cat)) {
+        out.push({ key: 'gym-' + cat, label: this.categoryLabel(cat), icon: this.categoryIcon(cat), color: this.categoryColor(cat) });
+      }
+    }
+    for (const sport of this.sportService.sports()) {
+      if (items.some(i => i.type === 'sport' && i.sportId === sport.id)) {
+        out.push({ key: 'sport-' + sport.id, label: sport.name, icon: sport.icon, color: sport.color });
+      }
+    }
+    return out;
+  }
+
+  /** Discards every edit made since opening and leaves the planner. */
+  cancel(): void {
+    this.plan.set(this._clone(this._originalPlan));
+    this.navHistory.goBack('/train');
   }
 
   private _clone(plan: WeeklyPlan): WeeklyPlan {

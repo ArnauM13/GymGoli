@@ -11,6 +11,7 @@ import { WorkoutService } from '../../core/services/workout.service';
 import { SportService } from '../../core/services/sport.service';
 import { TemplateService } from '../../core/services/template.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
+import { NavigationHistoryService } from '../../core/services/navigation-history.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../../core/models/weekly-plan.model';
 import { WorkoutTemplate } from '../../core/models/template.model';
@@ -36,6 +37,7 @@ describe('WeeklyPlannerComponent', () => {
   let getSportSessionsForDate: jasmine.Spy;
   let getPlannedSportSessionsForDate: jasmine.Spy;
   let dialogOpen: jasmine.Spy;
+  let goBack: jasmine.Spy;
   let afterClosedResult: Exercise | undefined;
 
   function setup(
@@ -61,6 +63,7 @@ describe('WeeklyPlannerComponent', () => {
     getPlannedSportSessionsForDate = jasmine.createSpy('getPlannedSportSessionsForDate')
       .and.callFake(initial.getPlannedSportSessionsForDate ?? (() => []));
     afterClosedResult = undefined;
+    goBack = jasmine.createSpy('goBack');
     dialogOpen = jasmine.createSpy('open').and.returnValue({
       afterClosed: () => of(afterClosedResult),
     });
@@ -74,6 +77,7 @@ describe('WeeklyPlannerComponent', () => {
         { provide: TemplateService,     useValue: { forCategory } },
         { provide: FeedbackService,     useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
         { provide: ConfirmDialogService, useValue: { confirm, chooseAction } },
+        { provide: NavigationHistoryService, useValue: { goBack } },
         { provide: MatDialog,           useValue: { open: dialogOpen } },
         { provide: ActivatedRoute,      useValue: { snapshot: { queryParamMap: { get: () => week } } } },
       ],
@@ -135,6 +139,47 @@ describe('WeeklyPlannerComponent', () => {
 
       expect(component.gymTemplate(0, 'push')).toBe('t1');
       expect(component.gymEntries(0, 'push')).toEqual([]);
+    });
+  });
+
+  describe('collapsible days', () => {
+    it('starts every day collapsed', () => {
+      expect(component.isDayExpanded(0)).toBeFalse();
+      expect(component.isDayExpanded(6)).toBeFalse();
+    });
+
+    it('toggleDay() expands and collapses a single day independently', () => {
+      component.toggleDay(2);
+      expect(component.isDayExpanded(2)).toBeTrue();
+      expect(component.isDayExpanded(3)).toBeFalse();
+      component.toggleDay(2);
+      expect(component.isDayExpanded(2)).toBeFalse();
+    });
+  });
+
+  describe('daySummary()', () => {
+    it('is empty for a day with nothing planned', () => {
+      expect(component.daySummary(0)).toEqual([]);
+    });
+
+    it('lists selected gym categories with their label/icon/color', () => {
+      component.toggleGym(0, 'push');
+      const summary = component.daySummary(0);
+      expect(summary.length).toBe(1);
+      expect(summary[0].key).toBe('gym-push');
+      expect(summary[0].label).toBe('Empenta');
+    });
+  });
+
+  describe('cancel()', () => {
+    it('restores the plan to its state on entry and navigates back', () => {
+      component.toggleGym(0, 'push');
+      expect(component.daySummary(0).length).toBe(1);
+
+      component.cancel();
+
+      expect(component.daySummary(0)).toEqual([]);
+      expect(goBack).toHaveBeenCalledWith('/train');
     });
   });
 

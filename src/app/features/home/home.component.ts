@@ -44,17 +44,22 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
 
         @if (previewFeedEntry(); as day) {
           <app-day-feed-cards [day]="day" (open)="goToWorkout($event)" />
-        } @else if (!isToday()) {
-          <p class="today-empty">Encara no hi ha res aquell dia.</p>
-        }
-
-        @if (isToday()) {
-          <button class="start-workout-btn" (click)="goToTrain()">
-            <span class="material-symbols-outlined">add_circle</span>
-            Comença un entrenament
-          </button>
+        } @else {
+          <div class="today-empty">
+            <span class="material-symbols-outlined today-empty-icon">bedtime</span>
+            <span class="today-empty-text">
+              {{ isToday() ? 'Encara no has registrat res avui.' : 'No hi ha res aquest dia.' }}
+            </span>
+          </div>
         }
       </div>
+
+      @if (isToday()) {
+        <button class="start-workout-btn" (click)="goToTrain()">
+          <span class="material-symbols-outlined">add_circle</span>
+          Comença un entrenament
+        </button>
+      }
 
       @if (showRoutineHint()) {
         <div class="routine-hint-card">
@@ -149,14 +154,16 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     .today-title { margin: 0; font-size: 15px; font-weight: 800; color: var(--c-text); letter-spacing: 0.1px; text-transform: capitalize; }
 
     .today-empty {
-      margin: 0; font-size: 12.5px; color: var(--c-text-3);
-      padding: 6px 0;
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      padding: 16px 12px 8px; text-align: center;
     }
+    .today-empty-icon { font-size: 32px; color: color-mix(in srgb, var(--c-brand) 35%, var(--c-border)); }
+    .today-empty-text { font-size: 13px; color: var(--c-text-3); line-height: 1.4; }
 
-    /* ── Botó "Comença un entrenament" ── */
+    /* ── Botó "Comença un entrenament" (separat de la targeta d'avui) ── */
     .start-workout-btn {
       display: flex; align-items: center; justify-content: center; gap: 6px;
-      width: 100%; height: 42px; margin-top: 10px; padding: 0;
+      width: calc(100% - 32px); height: 42px; margin: 12px 16px 0; padding: 0;
       border: none; border-radius: 12px;
       background: var(--c-brand); color: white;
       font-size: 13.5px; font-weight: 700;

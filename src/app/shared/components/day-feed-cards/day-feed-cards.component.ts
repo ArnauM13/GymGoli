@@ -167,9 +167,9 @@ export interface DayFeedEntry {
             </div>
 
             <div class="sd-actions">
-              <button class="sd-delete-btn" [disabled]="editSaving()" (click)="deleteSportEdit(item)">
+              <button class="sd-delete-btn" [disabled]="editSaving()" (click)="deleteSportEdit(item)"
+                      aria-label="Eliminar" title="Eliminar">
                 <span class="material-symbols-outlined">delete</span>
-                Eliminar
               </button>
               <div class="sd-main-actions">
                 <button class="sd-cancel" (click)="collapseSport()">Cancel·lar</button>
@@ -338,12 +338,12 @@ export interface DayFeedEntry {
       margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--c-border-2);
     }
     .sd-delete-btn {
-      display: flex; align-items: center; gap: 4px;
-      padding: 0 12px; height: 38px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      width: 38px; height: 38px; border-radius: 10px;
       border: 1.5px solid rgba(239,83,80,0.3); background: rgba(239,83,80,0.06);
-      color: #ef5350; font-size: 12px; font-weight: 700;
+      color: #ef5350;
       cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      .material-symbols-outlined { font-size: 15px; }
+      .material-symbols-outlined { font-size: 18px; }
       &:hover { background: rgba(239,83,80,0.12); border-color: #ef5350; }
       &:disabled { opacity: 0.6; cursor: default; }
     }
