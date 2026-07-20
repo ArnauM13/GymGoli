@@ -132,7 +132,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
 
     /* ── Avui / dia seleccionat: targeta blava (mateix marge que la resta) ── */
     .today-card {
-      margin: 4px 16px 0;
+      margin: 16px 16px 0;
       padding: 12px;
       background: color-mix(in srgb, var(--c-brand) 5%, var(--c-card));
       border: 1.5px solid color-mix(in srgb, var(--c-brand) 24%, var(--c-border-2));
@@ -171,7 +171,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     .routine-hint-card {
       position: relative;
       display: flex; flex-direction: column; gap: 10px;
-      margin: 4px 16px 0; padding: 14px 34px 14px 14px;
+      margin: 16px 16px 0; padding: 14px 34px 14px 14px;
       background: var(--c-card);
       border: 1.5px solid var(--c-border-2); border-radius: 16px;
       box-shadow: 0 2px 10px var(--c-shadow);
@@ -203,7 +203,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
 
     /* ── "Historial" section card ── */
     .history-card {
-      margin: 4px 16px 0;
+      margin: 16px 16px 0;
       padding: 14px 14px 16px;
       background: var(--c-card);
       border-radius: 18px;
