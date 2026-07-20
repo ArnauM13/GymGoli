@@ -1,6 +1,7 @@
-import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 
 import { AuthService } from './auth.service';
+import { ClockService } from './clock.service';
 import { SupabaseService } from './supabase.service';
 import { DEFAULT_SPORTS, Sport, SportMetricDef, SportSession, SportSessionStatus, SportSubtype } from '../models/sport.model';
 import { FeelingLevel, PlannedSource } from '../models/workout.model';
@@ -56,8 +57,7 @@ function sportSessionFromCache(raw: Record<string, unknown>): SportSession {
 export class SportService {
   private supabase = inject(SupabaseService).client;
   private auth     = inject(AuthService);
-
-  private readonly _todayStr = new Date().toISOString().split('T')[0];
+  private clock    = inject(ClockService);
 
   // ── Sport definitions ────────────────────────────────────────────────────
   private readonly _sports = signal<Sport[]>([]);
@@ -84,7 +84,7 @@ export class SportService {
   );
 
   readonly todaySessions = computed(() =>
-    this.sessions().filter(s => s.date === this._todayStr)
+    this.sessions().filter(s => s.date === this.clock.today())
   );
 
   constructor() {
@@ -111,6 +111,17 @@ export class SportService {
     if (typeof window !== 'undefined') {
       window.addEventListener('online', () => this._flushPending());
     }
+
+    // Make sure the new month's sessions are cached when the calendar day
+    // rolls over while the app stays open past midnight. The first run is
+    // skipped — the uid effect above already preloads.
+    let firstRun = true;
+    effect(() => {
+      this.clock.today();
+      if (firstRun) { firstRun = false; return; }
+      const uid = untracked(() => this.auth.uid());
+      if (uid) this._preloadCurrentMonth();
+    });
   }
 
   // ── Lazy initialisation — call once per feature that needs sport definitions
@@ -258,7 +269,7 @@ export class SportService {
 
   // ── Queries ───────────────────────────────────────────────────────────────
 
-  todayDateString(): string { return this._todayStr; }
+  todayDateString(): string { return this.clock.today(); }
 
   /** Returns full Sport objects (DONE sessions) for a given date. */
   getSportsForDate(date: string): Sport[] {

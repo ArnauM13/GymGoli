@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 
 import { Sport, SportSession } from '../../core/models/sport.model';
 import { Workout } from '../../core/models/workout.model';
+import { ClockService } from '../../core/services/clock.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { SportService } from '../../core/services/sport.service';
 import { OfflineService } from '../../core/services/offline.service';
@@ -278,10 +279,11 @@ export class HomeComponent implements OnDestroy {
   readonly settingsService = inject(UserSettingsService);
   private router           = inject(Router);
   private confirmDialog    = inject(ConfirmDialogService);
+  private readonly clock   = inject(ClockService);
 
   readonly selectedDate = signal<string | null>(null);
 
-  readonly effectiveDate = computed(() => this.selectedDate() ?? TODAY());
+  readonly effectiveDate = computed(() => this.selectedDate() ?? this.clock.today());
 
   readonly hasRoutine = computed(() => {
     const p = this.settingsService.weeklyPlan();
@@ -294,7 +296,7 @@ export class HomeComponent implements OnDestroy {
 
   readonly previewFeedEntry = computed((): DayFeedEntry | null => {
     const date    = this.effectiveDate();
-    const planned = date === TODAY() ? this.workoutService.getPlannedForDate(date) : [];
+    const planned = date === this.clock.today() ? this.workoutService.getPlannedForDate(date) : [];
     const done    = this.workoutService.getDoneWorkoutsForDate(date);
     const workouts: Workout[] = [...planned, ...done];
     const sports: { sport: Sport; session: SportSession }[] = this.sportService.getSportSessionsForDate(date);
@@ -302,9 +304,9 @@ export class HomeComponent implements OnDestroy {
     return { date, workouts, sports };
   });
 
-  readonly previewTitle = computed(() => feedDayLabel(this.effectiveDate(), TODAY()));
+  readonly previewTitle = computed(() => feedDayLabel(this.effectiveDate(), this.clock.today()));
 
-  readonly isToday = computed(() => this.effectiveDate() === TODAY());
+  readonly isToday = computed(() => this.effectiveDate() === this.clock.today());
 
   dayLabel(date: string): string {
     return feedDayLabel(date, TODAY());

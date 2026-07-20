@@ -1,8 +1,9 @@
-import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
 import { ExerciseService } from './exercise.service';
 import { AuthService } from './auth.service';
+import { ClockService } from './clock.service';
 import { SupabaseService } from './supabase.service';
 import { SyncService } from './sync.service';
 import { FeelingLevel, PlannedSource, Workout, WorkoutEntry, WorkoutSet, WorkoutStatus, setMaxWeight } from '../models/workout.model';
@@ -45,10 +46,9 @@ function workoutFromCache(raw: Record<string, unknown>): Workout {
 export class WorkoutService {
   private supabase        = inject(SupabaseService).client;
   private auth            = inject(AuthService);
+  private clock           = inject(ClockService);
   private exerciseService = inject(ExerciseService);
   private syncService     = inject(SyncService);
-
-  private readonly _todayStr = new Date().toISOString().split('T')[0];
 
   // ── Single unified cache (all dates including today) ─────────────────────
   private readonly _monthCache = new Map<string, Workout[]>();
@@ -65,7 +65,7 @@ export class WorkoutService {
   // ── Public signals ───────────────────────────────────────────────────────
 
   readonly todayWorkout = computed((): Workout | null =>
-    this._historical().find(w => w.date === this._todayStr) ?? null
+    this._historical().find(w => w.date === this.clock.today()) ?? null
   );
 
   readonly workouts = computed((): Workout[] =>
@@ -73,7 +73,7 @@ export class WorkoutService {
   );
 
   readonly pastWorkouts = computed(() =>
-    this.workouts().filter(w => w.date !== this._todayStr)
+    this.workouts().filter(w => w.date !== this.clock.today())
   );
 
   readonly plannedWorkouts = computed(() =>
@@ -119,6 +119,20 @@ export class WorkoutService {
         this._preloadCurrentMonth();
       }
     });
+
+    // Refetch "today" (and make sure the new month is cached) when the
+    // calendar day rolls over while the app stays open past midnight.
+    // The first run is skipped — the uid effect above already fetches.
+    let firstRun = true;
+    effect(() => {
+      this.clock.today();
+      if (firstRun) { firstRun = false; return; }
+      const uid = untracked(() => this.auth.uid());
+      if (uid) {
+        this._fetchToday(uid);
+        this._preloadCurrentMonth();
+      }
+    });
   }
 
   // ── Realtime subscription for today ─────────────────────────────────────
@@ -136,19 +150,20 @@ export class WorkoutService {
   }
 
   private async _fetchToday(uid: string): Promise<void> {
+    const today = untracked(() => this.clock.today());
     const { data } = await this.supabase
       .from('workouts')
       .select('*')
       .eq('user_id', uid)
-      .eq('date', this._todayStr);
+      .eq('date', today);
 
     const fresh    = (data ?? []).map(r => toWorkout(r as Record<string, unknown>));
-    const key      = this._todayStr.substring(0, 7);
-    const existing = (this._monthCache.get(key) ?? []).filter(w => w.date !== this._todayStr);
+    const key      = today.substring(0, 7);
+    const existing = (this._monthCache.get(key) ?? []).filter(w => w.date !== today);
     // Keep local dirty versions — don't overwrite unsent changes with stale server data
     const dirtyIds = new Set(this.syncService.pendingIds());
     const inCache  = this._monthCache.get(key) ?? [];
-    const dirtyLocal = inCache.filter(w => dirtyIds.has(w.id) && w.date === this._todayStr);
+    const dirtyLocal = inCache.filter(w => dirtyIds.has(w.id) && w.date === today);
     const freshClean = fresh.filter(w => !dirtyIds.has(w.id));
     this._monthCache.set(key, [...freshClean, ...dirtyLocal, ...existing]);
     this._rebuildHistorical();
@@ -325,7 +340,7 @@ export class WorkoutService {
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
-  todayDateString(): string { return this._todayStr; }
+  todayDateString(): string { return this.clock.today(); }
 
   getWorkoutForDate(date: string): Workout | null {
     return this.workouts().find(w => w.date === date) ?? null;
@@ -399,7 +414,7 @@ export class WorkoutService {
   }
 
   async createTodayWorkout(category?: string): Promise<string> {
-    return this.createWorkoutForDate(this._todayStr, category);
+    return this.createWorkoutForDate(this.clock.today(), category);
   }
 
   async createWorkoutFromProposal(date: string, proposalId: string, entries: WorkoutEntry[]): Promise<string> {

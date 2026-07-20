@@ -8,6 +8,7 @@ import { workoutCategories } from '../../shared/utils/calendar-utils';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { TrainerService } from '../../core/services/trainer.service';
 import { AuthService } from '../../core/services/auth.service';
+import { ClockService } from '../../core/services/clock.service';
 
 import {
   CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_MUSCLES,
@@ -1169,14 +1170,15 @@ export class TrainComponent {
     return alreadyAccepted ? null : prop;
   });
 
-  private readonly auth = inject(AuthService);
+  private readonly auth  = inject(AuthService);
+  private readonly clock = inject(ClockService);
 
-  readonly isToday = computed(() => this.selectedDate() === TODAY());
+  readonly isToday = computed(() => this.selectedDate() === this.clock.today());
 
   /** Shown regardless of what's already been done today — always suggests
    *  the next overdue category / sport. */
   readonly todaySuggestion = computed((): TodaySuggestion | null => {
-    const today = TODAY();
+    const today = this.clock.today();
     if (this.selectedDate() !== today) return null;
 
     const goal    = this.settingsService.fitnessGoal();
@@ -1236,7 +1238,7 @@ export class TrainComponent {
     else this.openSessionLogger(s.sport);
   }
 
-  readonly isSelectedFuture = computed(() => this.selectedDate() > TODAY());
+  readonly isSelectedFuture = computed(() => this.selectedDate() > this.clock.today());
 
   readonly pagePaddingBottom = computed(() =>
     '88px' // clear the active-workout menu FAB / the floating suggestion card
@@ -1306,6 +1308,18 @@ export class TrainComponent {
 
   constructor() {
     this.sportService.ensureLoaded();
+
+    // This route is kept alive (AppReuseStrategy), so after midnight the
+    // page would keep showing yesterday. Follow the day rollover unless
+    // the user deliberately navigated to another date.
+    let prevToday = this.clock.today();
+    effect(() => {
+      const today = this.clock.today();
+      if (today !== prevToday) {
+        if (untracked(() => this.selectedDate()) === prevToday) this.selectedDate.set(today);
+        prevToday = today;
+      }
+    });
 
     // Coming from the home feed with a specific workout to open (e.g. tapping
     // a day's card there navigates here with ?workout=<id>). Reactive (rather

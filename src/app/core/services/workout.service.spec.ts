@@ -3,6 +3,7 @@ import { signal } from '@angular/core';
 
 import { WorkoutService } from './workout.service';
 import { AuthService } from './auth.service';
+import { ClockService } from './clock.service';
 import { SupabaseService } from './supabase.service';
 import { ExerciseService } from './exercise.service';
 import { SyncService } from './sync.service';
@@ -28,12 +29,16 @@ function makeQueryChain(result: { data?: unknown; count?: number; error?: unknow
 
 describe('WorkoutService', () => {
   let uid: ReturnType<typeof signal<string | null>>;
+  let clockToday: ReturnType<typeof signal<string>>;
+  let dirtyIds: Set<string>;
   let fromSpy: jasmine.Spy;
   let workoutsChain: ReturnType<typeof makeQueryChain>;
   let service: WorkoutService;
 
   function setup(): void {
     uid = signal<string | null>('user-1');
+    clockToday = signal('2026-07-20');
+    dirtyIds = new Set<string>();
     workoutsChain = makeQueryChain({ data: [], count: 0, error: null });
 
     fromSpy = jasmine.createSpy('from').and.callFake((table: string) =>
@@ -48,13 +53,16 @@ describe('WorkoutService', () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: AuthService,     useValue: { uid } },
+        { provide: ClockService,    useValue: { today: clockToday } },
         { provide: SupabaseService, useValue: { client: { from: fromSpy, channel: () => channelStub } } },
         { provide: ExerciseService, useValue: { getById: () => undefined } },
         { provide: SyncService,     useValue: {
-          markDirty:   jasmine.createSpy('markDirty'),
-          pendingIds:  signal<string[]>([]),
+          // Track dirty ids like the real service does — the today/month
+          // refetch merges rely on pendingIds() to not wipe local changes.
+          markDirty:   jasmine.createSpy('markDirty').and.callFake((id: string) => dirtyIds.add(id)),
+          pendingIds:  () => [...dirtyIds],
           getSnapshot: () => null,
-          cancelDirty: jasmine.createSpy('cancelDirty'),
+          cancelDirty: jasmine.createSpy('cancelDirty').and.callFake((id: string) => dirtyIds.delete(id)),
           isInsert:    () => false,
         } },
       ],
@@ -117,6 +125,31 @@ describe('WorkoutService', () => {
       fromSpy.and.callFake((table: string) => table === 'workouts' ? workoutsChain : makeQueryChain({ data: [], count: 0, error: null }));
 
       await expectAsync(service.loadWorkoutPage({ page: 0, pageSize: 20 })).toBeRejected();
+    });
+  });
+
+  describe('day rollover (midnight while the app stays open)', () => {
+    it('createTodayWorkout() and todayWorkout() follow the new date', async () => {
+      const id1 = await service.createTodayWorkout();
+      expect(service.getWorkoutsForDate('2026-07-20').some(w => w.id === id1)).toBeTrue();
+      expect(service.todayWorkout()?.id).toBe(id1);
+      expect(service.todayDateString()).toBe('2026-07-20');
+
+      clockToday.set('2026-07-21');
+      TestBed.flushEffects();
+
+      const id2 = await service.createTodayWorkout();
+      expect(service.getWorkoutsForDate('2026-07-21').some(w => w.id === id2)).toBeTrue();
+      expect(service.todayWorkout()?.id).toBe(id2);
+      expect(service.todayDateString()).toBe('2026-07-21');
+      expect(service.pastWorkouts().some(w => w.id === id1)).toBeTrue();
+    });
+
+    it('refetches today from the server when the day rolls over', () => {
+      clockToday.set('2026-07-21');
+      TestBed.flushEffects();
+
+      expect(workoutsChain.eq).toHaveBeenCalledWith('date', '2026-07-21');
     });
   });
 
