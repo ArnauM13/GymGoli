@@ -43,6 +43,8 @@ export interface UserSettings {
   weeklyPlan: WeeklyPlan | null;
   /** User asked to stop seeing the "set up a routine" reminder on Train. */
   routineHintDismissed: boolean;
+  /** Built-in template suggestions (Plantilles page) the user dismissed. */
+  dismissedBuiltInTemplateIds: string[];
   /** Off by default — advanced workout-editor features that clutter the
    *  set-adding flow for most users. */
   supersetsEnabled: boolean;
@@ -65,6 +67,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   fitnessGoal: null,
   weeklyPlan: null,
   routineHintDismissed: false,
+  dismissedBuiltInTemplateIds: [],
   supersetsEnabled: false,
   dropsetsEnabled: false,
   rirEnabled: false,

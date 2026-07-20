@@ -3,9 +3,11 @@ import { FormsModule } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 
-import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
-import { TemplateEntry, WorkoutTemplate } from '../../core/models/template.model';
+import { CATEGORY_COLORS, CATEGORY_LABELS, Exercise, ExerciseCategory } from '../../core/models/exercise.model';
+import { BUILT_IN_TEMPLATES, BuiltInTemplate, TemplateEntry, WorkoutTemplate } from '../../core/models/template.model';
 import { TemplateService } from '../../core/services/template.service';
+import { ExerciseService } from '../../core/services/exercise.service';
+import { UserSettingsService } from '../../core/services/user-settings.service';
 import { ExercisePickerDialogComponent } from '../train/components/exercise-picker-dialog.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { FeedbackService } from '../../shared/services/feedback.service';
@@ -42,18 +44,19 @@ const CAT_LABEL: Record<EditorCat, string> = {
 
       <app-page-header title="Plantilles" [showBack]="true" />
 
-      <!-- Empty state -->
-      @if (sortedTemplates().length === 0 && !editorOpen() && templateService.isLoaded()) {
-        <div class="empty-state">
-          <span class="material-symbols-outlined empty-icon">bookmark_border</span>
-          <p class="empty-title">Sense plantilles</p>
-          <p class="empty-sub">Crea una plantilla per començar entrenaments ràpidament.</p>
+      <!-- ── Les meves plantilles ── -->
+      <div class="section">
+        <div class="section-header">
+          <span class="material-symbols-outlined section-icon">bookmark</span>
+          <h2 class="section-title">Les meves plantilles</h2>
         </div>
-      }
 
-      <!-- Template list -->
-      @if (sortedTemplates().length > 0) {
-        <div class="section">
+        @if (sortedTemplates().length === 0 && templateService.isLoaded()) {
+          <div class="empty-state">
+            <span class="material-symbols-outlined empty-icon">bookmark_border</span>
+            <p class="empty-sub">Encara no tens cap plantilla pròpia.</p>
+          </div>
+        } @else if (sortedTemplates().length > 0) {
           <div class="list">
             @for (t of sortedTemplates(); track t.id) {
               <div class="template-card" [style.--tc]="catColor(t.category)">
@@ -97,15 +100,53 @@ const CAT_LABEL: Record<EditorCat, string> = {
               </div>
             }
           </div>
-        </div>
-      }
+        }
 
-      <!-- New template button -->
-      @if (!editorOpen()) {
-        <button class="add-btn" (click)="openEditor(null)">
-          <span class="material-symbols-outlined">add</span>
-          Nova plantilla
-        </button>
+        @if (!editorOpen()) {
+          <button class="add-btn" (click)="openEditor(null)">
+            <span class="material-symbols-outlined">add</span>
+            Crea una plantilla
+          </button>
+        }
+      </div>
+
+      <!-- ── Suggeriments ── -->
+      @if (visibleBuiltIns().length > 0) {
+        <div class="section">
+          <div class="section-header">
+            <span class="material-symbols-outlined section-icon">auto_awesome</span>
+            <h2 class="section-title">Suggeriments</h2>
+          </div>
+          <div class="list">
+            @for (t of visibleBuiltIns(); track t.id) {
+              <div class="template-card" [style.--tc]="catColor(t.category)">
+                <div class="tc-accent"></div>
+                <div class="tc-body">
+                  <div class="tc-top">
+                    <span class="tc-name">{{ t.name }}</span>
+                    <span class="tc-badge" [style.background]="catColor(t.category)">{{ catLabel(t.category) }}</span>
+                  </div>
+                  <div class="tc-exercises">
+                    @for (name of t.exerciseNames.slice(0, 4); track name) {
+                      <span class="tc-ex-pill">{{ name }}</span>
+                    }
+                    @if (t.exerciseNames.length > 4) {
+                      <span class="tc-ex-pill tc-ex-more">+{{ t.exerciseNames.length - 4 }}</span>
+                    }
+                  </div>
+                </div>
+                <div class="tc-actions">
+                  <button class="tc-action-btn brand" (click)="addSuggested(t)" title="Afegir a les meves plantilles">
+                    <span class="material-symbols-outlined">add</span>
+                  </button>
+                  <button class="tc-action-btn danger" (click)="dismissSuggested(t.id)" title="Eliminar">
+                    <span class="material-symbols-outlined">delete</span>
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
       }
 
     </div>
@@ -192,7 +233,10 @@ const CAT_LABEL: Record<EditorCat, string> = {
   styles: [`
     .page { min-height: 100vh; background: var(--c-bg); padding-bottom: 32px; }
 
-    .section { padding: 0 16px; margin-top: 8px; }
+    .section { padding: 0 16px; margin-top: 16px; }
+    .section-header { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
+    .section-icon  { font-size: 17px; color: var(--c-text-3); font-variation-settings: 'FILL' 0, 'wght' 300; }
+    .section-title { margin: 0; font-size: 14px; font-weight: 700; color: var(--c-text-2); letter-spacing: 0.2px; }
 
     .list { display: flex; flex-direction: column; gap: 10px; }
 
@@ -236,21 +280,21 @@ const CAT_LABEL: Record<EditorCat, string> = {
       .material-symbols-outlined { font-size: 17px; }
       &:hover { background: var(--c-hover); color: var(--c-text-2); }
       &.danger:hover { background: rgba(239,83,80,0.1); color: #ef5350; border-color: rgba(239,83,80,0.3); }
+      &.brand:hover { background: rgba(var(--c-brand-rgb), 0.1); color: var(--c-brand); border-color: rgba(var(--c-brand-rgb), 0.3); }
     }
 
-    /* ── Empty state ── */
+    /* ── Empty state (nested under "Les meves plantilles") ── */
     .empty-state {
       display: flex; flex-direction: column; align-items: center;
-      padding: 60px 32px 24px; text-align: center;
+      padding: 20px 16px 6px; text-align: center;
     }
-    .empty-icon { font-size: 52px; color: var(--c-border); margin-bottom: 12px; }
-    .empty-title { font-size: 17px; font-weight: 700; color: var(--c-text-2); margin: 0 0 6px; }
-    .empty-sub { font-size: 14px; color: var(--c-text-3); margin: 0; line-height: 1.5; }
+    .empty-icon { font-size: 42px; color: var(--c-border); margin-bottom: 10px; }
+    .empty-sub { font-size: 13.5px; color: var(--c-text-3); margin: 0; line-height: 1.5; }
 
     /* ── Add button ── */
     .add-btn {
       display: flex; align-items: center; justify-content: center; gap: 8px;
-      width: calc(100% - 32px); margin: 16px 16px 0;
+      width: 100%; margin: 14px 0 0; box-sizing: border-box;
       padding: 15px; border: 2px dashed rgba(var(--c-brand-rgb), 0.4);
       border-radius: 14px; background: rgba(var(--c-brand-rgb), 0.05);
       color: var(--c-brand); font-size: 14px; font-weight: 700;
@@ -392,12 +436,19 @@ const CAT_LABEL: Record<EditorCat, string> = {
 })
 export class TemplatesComponent {
   readonly templateService = inject(TemplateService);
+  private exerciseService  = inject(ExerciseService);
+  private settingsService  = inject(UserSettingsService);
   private dialog           = inject(MatDialog);
   private feedback         = inject(FeedbackService);
 
   readonly sortedTemplates = computed(() =>
     [...this.templateService.templates()].sort((a, b) => (b.useCount ?? 0) - (a.useCount ?? 0))
   );
+
+  readonly visibleBuiltIns = computed(() => {
+    const dismissed = new Set(this.settingsService.dismissedBuiltInTemplateIds());
+    return BUILT_IN_TEMPLATES.filter(t => !dismissed.has(t.id));
+  });
 
   readonly catOptions = CAT_OPTIONS;
 
@@ -407,6 +458,10 @@ export class TemplatesComponent {
   editorName    = '';
   editorCat: EditorCat = 'push';
   editorEntries: TemplateEntry[] = [];
+
+  constructor() {
+    this.exerciseService.ensureLoaded();
+  }
 
   catColor(cat: EditorCat | string): string { return CAT_COLOR[cat as EditorCat] ?? '#bbb'; }
   catLabel(cat: EditorCat | string): string { return CAT_LABEL[cat as EditorCat] ?? cat; }
@@ -485,5 +540,28 @@ export class TemplatesComponent {
     } catch {
       this.feedback.error('Error en eliminar', 3000);
     }
+  }
+
+  /** Copies a suggested built-in into the user's own templates, matching
+   *  exercises by name (any without a match in the user's library are
+   *  dropped, same best-effort resolution used when starting a workout
+   *  straight from a suggestion). */
+  async addSuggested(t: BuiltInTemplate): Promise<void> {
+    try {
+      const exercises = this.exerciseService.exercises();
+      const entries: TemplateEntry[] = t.exerciseNames
+        .map(name => exercises.find(e => e.name === name))
+        .filter((e): e is Exercise => e !== undefined)
+        .map(e => ({ exerciseId: e.id, exerciseName: e.name }));
+      await this.templateService.create(t.name, t.category, entries);
+      this.feedback.success('Plantilla afegida', 2000);
+    } catch {
+      this.feedback.error('Error en afegir la plantilla', 3000);
+    }
+  }
+
+  async dismissSuggested(id: string): Promise<void> {
+    const next = [...this.settingsService.dismissedBuiltInTemplateIds(), id];
+    await this.settingsService.update({ dismissedBuiltInTemplateIds: next });
   }
 }

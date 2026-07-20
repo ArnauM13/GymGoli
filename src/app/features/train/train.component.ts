@@ -14,9 +14,8 @@ import {
   Exercise, ExerciseCategory,
 } from '../../core/models/exercise.model';
 import { Sport, SportMetricDef } from '../../core/models/sport.model';
-import { BUILT_IN_TEMPLATES, BuiltInTemplate, WorkoutTemplate } from '../../core/models/template.model';
+import { WorkoutTemplate } from '../../core/models/template.model';
 import { FeelingLevel, Workout, WorkoutEntry, setMaxWeight } from '../../core/models/workout.model';
-import { ExerciseService } from '../../core/services/exercise.service';
 import { TemplateService } from '../../core/services/template.service';
 import { SharedWorkoutService } from '../../core/services/shared-workout.service';
 import { SportService } from '../../core/services/sport.service';
@@ -366,23 +365,12 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           }
         }
 
-        @if (pickerBuiltIns().length) {
-          <div class="tp-section">Suggeriments</div>
-          @for (t of pickerBuiltIns(); track t.id) {
-            <button class="tp-option" (click)="pickerStartFromBuiltIn(t)">
-              <span class="material-symbols-outlined tp-opt-icon">auto_awesome</span>
-              <div class="tp-opt-info">
-                <span class="tp-opt-name">{{ t.name }}</span>
-                <span class="tp-opt-sub">{{ t.exerciseNames.length }} exercicis</span>
-              </div>
-            </button>
-          }
+        @if (pickerUserTemplates().length) {
+          <button class="tp-manage" (click)="goToTemplates()">
+            <span>Gestionar plantilles</span>
+            <span class="material-symbols-outlined">chevron_right</span>
+          </button>
         }
-
-        <button class="tp-manage" (click)="goToTemplates()">
-          <span>Gestionar plantilles</span>
-          <span class="material-symbols-outlined">chevron_right</span>
-        </button>
       </div>
     }
 
@@ -1102,7 +1090,6 @@ export class TrainComponent {
   readonly offlineService  = inject(OfflineService);
   readonly trainerService  = inject(TrainerService);
   readonly settingsService = inject(UserSettingsService);
-  private exerciseService  = inject(ExerciseService);
   private templateService  = inject(TemplateService);
   private sharedWorkoutService = inject(SharedWorkoutService);
   private profileService   = inject(WorkoutProfileService);
@@ -1300,12 +1287,6 @@ export class TrainComponent {
   readonly pickerUserTemplates = computed(() => {
     const cat = this.pickerCat();
     return cat ? this.templateService.forCategory(cat) : [];
-  });
-
-  readonly pickerBuiltIns = computed(() => {
-    const cat = this.pickerCat();
-    if (!cat) return [];
-    return BUILT_IN_TEMPLATES.filter(t => t.category === cat);
   });
 
   constructor() {
@@ -1609,24 +1590,6 @@ export class TrainComponent {
           : [],
       }));
       const id = await this._createForSelectedDate(useCat, entries);
-      this.openWorkout(id);
-    } catch {
-      this.feedback.error('Error en crear l\'entrenament', 3000);
-    } finally { this.creating.set(false); }
-  }
-
-  async pickerStartFromBuiltIn(t: BuiltInTemplate): Promise<void> {
-    const cat = this.pickerCat();
-    if (!cat) return;
-    this.closePicker();
-    this.creating.set(true);
-    try {
-      const exercises = this.exerciseService.exercises();
-      const entries: WorkoutEntry[] = t.exerciseNames
-        .map(name => exercises.find(e => e.name === name))
-        .filter((e): e is Exercise => e !== undefined)
-        .map(e => ({ exerciseId: e.id, exerciseName: e.name, sets: [] }));
-      const id = await this._createForSelectedDate(cat, entries);
       this.openWorkout(id);
     } catch {
       this.feedback.error('Error en crear l\'entrenament', 3000);
