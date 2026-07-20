@@ -40,7 +40,6 @@ describe('TrainComponent', () => {
   let weeklyPlanSignal: ReturnType<typeof signal<WeeklyPlan>>;
   let settingsSignal: ReturnType<typeof signal<UserSettings>>;
   let updateSettings: jasmine.Spy;
-  let goBackSpy: jasmine.Spy;
 
   beforeEach(async () => {
     forceOffline = signal(false);
@@ -103,7 +102,7 @@ describe('TrainComponent', () => {
         { provide: MatDialog,              useValue: { open: jasmine.createSpy() } },
         { provide: FeedbackService,        useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
         { provide: ConfirmDialogService,   useValue: { confirm: jasmine.createSpy('confirm').and.resolveTo(false) } },
-        { provide: NavigationHistoryService, useValue: { goBack: goBackSpy = jasmine.createSpy('goBack') } },
+        { provide: NavigationHistoryService, useValue: { goBack: jasmine.createSpy('goBack') } },
       ],
     })
       .overrideComponent(TrainComponent, {
@@ -191,56 +190,28 @@ describe('TrainComponent', () => {
       expect(component.activeWorkoutId()).toBeNull();
     });
 
-    it('does not navigate on closeWorkout by default', () => {
+    it('navigates home on closeWorkout (workouts are only opened from home)', () => {
       component.openWorkout('abc');
       component.closeWorkout();
-      expect(navigateSpy).not.toHaveBeenCalled();
+      expect(navigateSpy).toHaveBeenCalledWith(['/home']);
     });
-
-    it('goes back through navigation history on closeWorkout when opened via deep link', () => {
-      component.openWorkout('abc');
-      component.cameFromDeepLink.set(true);
-      component.closeWorkout();
-      expect(goBackSpy).toHaveBeenCalledWith('/train');
-    });
-
-    it('openWorkout resets cameFromDeepLink', () => {
-      component.cameFromDeepLink.set(true);
-      component.openWorkout('abc');
-      expect(component.cameFromDeepLink()).toBeFalse();
-    });
-
   });
 
   // ── deleteActiveWorkout() ────────────────────────────────────────────────
 
   describe('deleteActiveWorkout()', () => {
-    it('deletes the workout and goes back through navigation history when opened via deep link', async () => {
+    it('deletes the workout and navigates home', async () => {
       const w = makeWorkout({ id: 'abc' });
       const workoutService = TestBed.inject(WorkoutService) as unknown as { workouts: ReturnType<typeof signal<Workout[]>>; deleteWorkout: jasmine.Spy };
       workoutService.workouts.set([w]);
       (TestBed.inject(ConfirmDialogService).confirm as jasmine.Spy).and.resolveTo(true);
 
       component.openWorkout('abc');
-      component.cameFromDeepLink.set(true);
       await component.deleteActiveWorkout();
 
       expect(workoutService.deleteWorkout).toHaveBeenCalledWith('abc');
       expect(component.activeWorkoutId()).toBeNull();
-      expect(goBackSpy).toHaveBeenCalledWith('/train');
-    });
-
-    it('does not navigate when the deleted workout was not opened from home', async () => {
-      const w = makeWorkout({ id: 'abc' });
-      const workoutService = TestBed.inject(WorkoutService) as unknown as { workouts: ReturnType<typeof signal<Workout[]>>; deleteWorkout: jasmine.Spy };
-      workoutService.workouts.set([w]);
-      (TestBed.inject(ConfirmDialogService).confirm as jasmine.Spy).and.resolveTo(true);
-
-      component.openWorkout('abc');
-      await component.deleteActiveWorkout();
-
-      expect(workoutService.deleteWorkout).toHaveBeenCalledWith('abc');
-      expect(navigateSpy).not.toHaveBeenCalled();
+      expect(navigateSpy).toHaveBeenCalledWith(['/home']);
     });
   });
 

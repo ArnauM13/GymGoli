@@ -25,7 +25,6 @@ import { WorkoutService } from '../../core/services/workout.service';
 import { OfflineService } from '../../core/services/offline.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
-import { NavigationHistoryService } from '../../core/services/navigation-history.service';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import {
@@ -1109,7 +1108,6 @@ export class TrainComponent {
   private sharedWorkoutService = inject(SharedWorkoutService);
   private profileService   = inject(WorkoutProfileService);
   readonly router          = inject(Router);
-  private readonly navigationHistory = inject(NavigationHistoryService);
   private route            = inject(ActivatedRoute);
   private dialog           = inject(MatDialog);
   private feedback         = inject(FeedbackService);
@@ -1134,11 +1132,6 @@ export class TrainComponent {
    *  via ?workout=<id> renders straight into the editor on first paint,
    *  without a flash of the dashboard first. */
   readonly activeWorkoutId = signal<string | null>(this.route.snapshot.queryParamMap.get('workout'));
-  /** True when the open workout was reached via a deep link (?workout=<id>,
-   *  e.g. from home) rather than by tapping something inside the train
-   *  dashboard — closing it should navigate back through the app's
-   *  navigation history instead of just staying on the train dashboard. */
-  readonly cameFromDeepLink = signal(false);
   readonly loggerSport     = signal<Sport | null>(null);
   readonly loggerSessionId = signal<string | null>(null);
   readonly loggerDuration  = signal<number>(60);
@@ -1317,7 +1310,6 @@ export class TrainComponent {
       const id = queryWorkoutId();
       if (id) untracked(() => {
         this.openWorkout(id);
-        this.cameFromDeepLink.set(true);
         // The train route is kept alive (AppReuseStrategy), so its query-param
         // observable only re-emits when the value actually changes. Strip the
         // consumed ?workout= from the URL right away — otherwise re-tapping the
@@ -1422,15 +1414,14 @@ export class TrainComponent {
   openWorkout(id: string): void {
     this.activeWorkoutId.set(id);
     this.pickerCat.set(null);
-    this.cameFromDeepLink.set(false);
   }
 
   closeWorkout(): void {
-    const external = this.cameFromDeepLink();
     this.activeWorkoutId.set(null);
     this.editor?.reset();
-    this.cameFromDeepLink.set(false);
-    if (external) this.navigationHistory.goBack('/train');
+    // Workouts are only ever opened from home, so closing one always returns
+    // there — never leaves the user on the bare train dashboard.
+    this.router.navigate(['/home']);
   }
 
   async startPlan(w: Workout): Promise<void> {
