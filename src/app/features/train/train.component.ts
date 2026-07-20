@@ -363,12 +363,18 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               </div>
             </button>
           }
-        }
 
-        @if (pickerUserTemplates().length) {
           <button class="tp-manage" (click)="goToTemplates()">
             <span>Gestionar plantilles</span>
             <span class="material-symbols-outlined">chevron_right</span>
+          </button>
+        } @else {
+          <button class="tp-option tp-option--create" (click)="goToTemplates()">
+            <span class="material-symbols-outlined tp-opt-icon">bookmark_add</span>
+            <div class="tp-opt-info">
+              <span class="tp-opt-name">Crea la teva primera plantilla</span>
+              <span class="tp-opt-sub">Desa una rutina per reutilitzar-la ràpidament</span>
+            </div>
           </button>
         }
       </div>
@@ -887,6 +893,15 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       background: rgba(var(--c-brand-rgb), 0.04);
       .tp-opt-icon { color: var(--c-brand); }
       &:hover { background: rgba(var(--c-brand-rgb), 0.1); border-color: var(--c-brand); }
+    }
+    .tp-option--create {
+      border-style: dashed;
+      border-color: rgba(var(--c-brand-rgb), 0.4);
+      background: rgba(var(--c-brand-rgb), 0.03);
+      margin-top: 6px;
+      .tp-opt-icon { color: var(--c-brand); }
+      .tp-opt-name { color: var(--c-brand); }
+      &:hover { background: rgba(var(--c-brand-rgb), 0.09); border-color: var(--c-brand); border-style: solid; }
     }
     .tp-opt-icon { font-size: 22px; color: var(--c-text-3); flex-shrink: 0; }
     .tp-opt-info { display: flex; flex-direction: column; gap: 2px; flex: 1; }
