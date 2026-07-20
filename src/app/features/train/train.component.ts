@@ -35,8 +35,8 @@ import {
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
 
-type GymSuggestion   = { type: 'gym';   category: ExerciseCategory; label: string; color: string; icon: string; reason?: string };
-type SportSuggestion = { type: 'sport'; sport: Sport;               label: string; color: string; icon: string; reason?: string };
+type GymSuggestion   = { type: 'gym';   category: ExerciseCategory; label: string; color: string; icon: string; reason: string };
+type SportSuggestion = { type: 'sport'; sport: Sport;               label: string; color: string; icon: string; reason: string };
 type TodaySuggestion = GymSuggestion | SportSuggestion;
 
 const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; color: string }[] = [
@@ -300,7 +300,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     </div>
 
-    <!-- ── Suggeriment flotant (abaix a la dreta) ── -->
+    <!-- ── Suggeriment (ample complet, sobre la barra de navegació) ── -->
     @if (!activeWorkout() && todaySuggestion(); as s) {
       <div class="suggestion-float-row">
         <button class="suggestion-float" [style.--sc]="s.color" (click)="handleSuggestionClick(s)">
@@ -311,9 +311,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           <div class="sf-info">
             <span class="sf-eyebrow">Suggerit</span>
             <span class="sf-label">{{ s.label }}</span>
-            @if (s.reason) {
-              <span class="sf-reason">{{ s.reason }}</span>
-            }
+            <span class="sf-reason">{{ s.reason }}</span>
           </div>
           <span class="material-symbols-outlined sf-chevron">chevron_right</span>
         </button>
@@ -741,14 +739,14 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       .material-symbols-outlined { font-size: 32px; color: var(--c-border); }
     }
 
-    /* ── Suggestion card: floats bottom-right, above the nav bar ── */
+    /* ── Suggestion card: full-width bar, pinned above the nav bar ── */
     .suggestion-float-row {
-      position: fixed; right: 16px; bottom: calc(var(--nav-height) + 16px); z-index: 90;
+      position: fixed; left: 16px; right: 16px; bottom: calc(var(--nav-height) + 16px); z-index: 90;
       display: flex;
     }
     .suggestion-float {
-      display: flex; align-items: center; gap: 0;
-      height: 56px; max-width: 260px; border-radius: 14px; padding: 0;
+      display: flex; align-items: center; gap: 0; width: 100%;
+      height: 60px; border-radius: 14px; padding: 0;
       border: 1.5px solid color-mix(in srgb, var(--sc) 35%, var(--c-border-2));
       background: color-mix(in srgb, var(--sc) 8%, var(--c-card));
       box-shadow: 0 4px 16px var(--c-shadow-md);
@@ -762,23 +760,24 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       &:active { transform: scale(0.98); }
     }
     .sf-bar { width: 5px; align-self: stretch; flex-shrink: 0; background: var(--sc); }
-    .sf-icon-wrap { width: 46px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-    .sf-icon { font-size: 22px; color: var(--sc); font-variation-settings: 'FILL' 1; }
+    .sf-icon-wrap { width: 48px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .sf-icon { font-size: 23px; color: var(--sc); font-variation-settings: 'FILL' 1; }
     .sf-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
     .sf-eyebrow {
-      font-size: 9px; font-weight: 700; line-height: 1;
+      font-size: 9.5px; font-weight: 700; line-height: 1;
       color: color-mix(in srgb, var(--sc) 70%, var(--c-text-3));
       text-transform: uppercase; letter-spacing: 0.6px;
     }
     .sf-label {
-      font-size: 13px; font-weight: 700; color: var(--c-text); line-height: 1.2;
+      font-size: 14px; font-weight: 700; color: var(--c-text); line-height: 1.2;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .sf-reason {
-      font-size: 10px; font-weight: 600; letter-spacing: 0.1px;
+      font-size: 11.5px; font-weight: 600; letter-spacing: 0.1px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       color: color-mix(in srgb, var(--sc) 65%, var(--c-text-3));
     }
-    .sf-chevron { font-size: 18px; color: var(--c-text-3); margin-right: 10px; flex-shrink: 0; }
+    .sf-chevron { font-size: 20px; color: var(--c-text-3); margin-right: 12px; flex-shrink: 0; }
 
     /* ── "Nou entrenament" section card ── */
     .card-section {
@@ -1198,9 +1197,10 @@ export class TrainComponent {
 
     const mkGym = (cat: ExerciseCategory): GymSuggestion => {
       const p = profile.gym[cat];
-      const reason = p.daysSinceLast < 99
-        ? p.daysSinceLast === 1 ? 'Fa 1 dia' : `Fa ${p.daysSinceLast} dies`
-        : undefined;
+      const daysStr = p.daysSinceLast === 1 ? 'Fa 1 dia' : `Fa ${p.daysSinceLast} dies`;
+      const reason  = p.daysSinceLast >= 99
+        ? 'Encara no l\'has entrenat'
+        : p.overdueScore >= 1.3 ? `${daysStr} · ja toca` : daysStr;
       return {
         type: 'gym', category: cat,
         label: CATEGORY_LABELS[cat], color: CATEGORY_COLORS[cat], icon: CATEGORY_ICONS[cat],
@@ -1209,6 +1209,7 @@ export class TrainComponent {
     };
     const mkSport = (s: Sport): SportSuggestion => ({
       type: 'sport', sport: s, label: s.name, color: s.color, icon: s.icon,
+      reason: profile.recentSport?.id === s.id ? 'El que vas fer l\'últim cop' : 'El teu esport habitual',
     });
 
     switch (goal) {
