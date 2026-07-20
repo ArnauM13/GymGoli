@@ -1303,6 +1303,17 @@ export class TrainComponent {
       if (id) untracked(() => {
         this.openWorkout(id);
         this.cameFromDeepLink.set(true);
+        // The train route is kept alive (AppReuseStrategy), so its query-param
+        // observable only re-emits when the value actually changes. Strip the
+        // consumed ?workout= from the URL right away — otherwise re-tapping the
+        // same workout later navigates to an identical URL that never re-fires
+        // this effect, leaving the dashboard visible instead of the detail.
+        queueMicrotask(() => this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: { workout: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        }));
       });
     });
 
