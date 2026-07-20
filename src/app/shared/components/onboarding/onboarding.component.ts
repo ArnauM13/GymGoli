@@ -41,6 +41,11 @@ const SLIDES: OnboardingSlide[] = [
     body: 'Entrena sense internet. Els canvis es guarden al dispositiu i es sincronitzen automàticament quan recuperis connexió.',
   },
   {
+    emoji: '⚙️',
+    title: 'Fes-la teva des de Perfil',
+    body: 'A Perfil pots configurar esports i exercicis, unitats de pes, temporitzador de descans, tema i opcions avançades. Explora-ho quan vulguis.',
+  },
+  {
     emoji: '🎯',
     title: 'Personalitzat per a tu',
     body: 'Diga\'ns quin és el teu objectiu i l\'app t\'acompanyarà al teu ritme, sense alarmes ni pressions.',

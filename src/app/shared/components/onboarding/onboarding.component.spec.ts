@@ -38,8 +38,8 @@ describe('OnboardingComponent', () => {
     expect(component.step()).toBe(0);
   });
 
-  it('has 6 slides', () => {
-    expect(component.slides.length).toBe(6);
+  it('has 7 slides', () => {
+    expect(component.slides.length).toBe(7);
   });
 
   // ── next() ───────────────────────────────────────────────────────────────
