@@ -47,9 +47,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
         } @else {
           <div class="today-empty">
             <span class="material-symbols-outlined today-empty-icon">bedtime</span>
-            <span class="today-empty-text">
-              {{ isToday() ? 'Encara no has registrat res avui.' : 'No hi ha res aquest dia.' }}
-            </span>
+            <span class="today-empty-text">Sense activitat</span>
           </div>
         }
       </div>
@@ -155,7 +153,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
 
     .today-empty {
       display: flex; flex-direction: column; align-items: center; gap: 8px;
-      padding: 16px 12px 8px; text-align: center;
+      padding: 14px 12px; text-align: center;
     }
     .today-empty-icon { font-size: 32px; color: color-mix(in srgb, var(--c-brand) 35%, var(--c-border)); }
     .today-empty-text { font-size: 13px; color: var(--c-text-3); line-height: 1.4; }
