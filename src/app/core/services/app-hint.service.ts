@@ -51,7 +51,7 @@ const DISCOVERY_HINTS: AppHint[] = [
     id: 'discover-goal',
     icon: 'flag',
     title: 'Marca\'t un objectiu setmanal',
-    body: 'Defineix quantes activitats vols fer cada setmana i segueix el teu progrés — pots separar gym i esport.',
+    body: 'Defineix quantes activitats vols fer cada setmana i segueix el teu progrés a Inici i al calendari.',
     route: '/settings',
     cta: 'Definir objectiu',
   },

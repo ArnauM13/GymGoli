@@ -13,6 +13,7 @@ import { DayFeedCardsComponent, DayFeedEntry } from '../../shared/components/day
 import { FitnessInsightsComponent } from '../../shared/components/fitness-insights/fitness-insights.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { DiscoveryHintComponent } from '../../shared/components/discovery-hint/discovery-hint.component';
+import { AppHintService } from '../../core/services/app-hint.service';
 import { feedDayLabel } from '../../shared/utils/workout-card.utils';
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
@@ -76,6 +77,25 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
             <button class="routine-hint-btn" (click)="goToPlanner()">
               <span class="material-symbols-outlined">event_repeat</span>
               Planificar rutines
+            </button>
+          </div>
+        </div>
+      } @else if (showSeparateGoalsNudge()) {
+        <div class="routine-hint-card">
+          <button class="routine-hint-dismiss" (click)="hintService.dismiss('nudge-separate-goals')" aria-label="No tornar a mostrar">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+          <div class="routine-hint-top">
+            <span class="material-symbols-outlined routine-hint-icon">flag</span>
+            <div class="routine-hint-text">
+              <span class="routine-hint-title">Fas gym i esport</span>
+              <span class="routine-hint-sub">Marca objectius setmanals separats per a cada tipus i segueix-los per separat.</span>
+            </div>
+          </div>
+          <div class="routine-hint-actions">
+            <button class="routine-hint-btn" (click)="goToSettings()">
+              <span class="material-symbols-outlined">flag</span>
+              Objectius separats
             </button>
           </div>
         </div>
@@ -279,10 +299,22 @@ export class HomeComponent implements OnDestroy {
   readonly sportService    = inject(SportService);
   readonly offlineService  = inject(OfflineService);
   readonly settingsService = inject(UserSettingsService);
+  readonly hintService     = inject(AppHintService);
   private router           = inject(Router);
   private confirmDialog    = inject(ConfirmDialogService);
 
   readonly selectedDate = signal<string | null>(null);
+
+  /** Contextual nudge: the user trains both gym and sport but tracks a single
+   *  combined weekly goal — suggest splitting it into separate goals. */
+  readonly showSeparateGoalsNudge = computed(() => {
+    if (this.hintService.isDismissed('nudge-separate-goals')) return false;
+    const s = this.settingsService.settings();
+    if ((s.goalMode ?? 'combined') !== 'combined') return false;
+    if (!s.weeklyActivityGoal) return false;
+    return this.workoutService.doneWorkouts().length > 0
+        && this.sportService.sessions().length > 0;
+  });
 
   readonly effectiveDate = computed(() => this.selectedDate() ?? TODAY());
 
@@ -327,6 +359,10 @@ export class HomeComponent implements OnDestroy {
 
   goToPlanner(): void {
     this.router.navigate(['/train/planner']);
+  }
+
+  goToSettings(): void {
+    this.router.navigate(['/settings']);
   }
 
   async dismissRoutineHint(): Promise<void> {

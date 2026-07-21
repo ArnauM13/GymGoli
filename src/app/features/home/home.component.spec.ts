@@ -26,10 +26,18 @@ describe('HomeComponent', () => {
   let settingsSignal: ReturnType<typeof signal<UserSettings>>;
   let updateSettings: jasmine.Spy;
   let confirmSpy: jasmine.Spy;
+  let doneWorkoutsSignal: ReturnType<typeof signal<Workout[]>>;
+  let sessionsSignal: ReturnType<typeof signal<unknown[]>>;
+  let dismissedHintsSignal: ReturnType<typeof signal<string[]>>;
 
   beforeEach(async () => {
+    doneWorkoutsSignal   = signal<Workout[]>([]);
+    sessionsSignal       = signal<unknown[]>([]);
+    dismissedHintsSignal = signal<string[]>([]);
+
     const mockWorkoutService = {
       isLoading:              signal(false),
+      doneWorkouts:           doneWorkoutsSignal,
       getDoneWorkoutsForDate: jasmine.createSpy().and.returnValue([]),
       getPlannedForDate:      jasmine.createSpy().and.returnValue([]),
       ensureMonthLoaded:      jasmine.createSpy(),
@@ -37,6 +45,7 @@ describe('HomeComponent', () => {
 
     const mockSportService = {
       sportsLoaded:                  signal(true),
+      sessions:                      sessionsSignal,
       getSportSessionsForDate:       jasmine.createSpy().and.returnValue([]),
       getPlannedSportSessionsForDate: jasmine.createSpy().and.returnValue([]),
       ensureMonthLoaded:              jasmine.createSpy(),
@@ -50,9 +59,10 @@ describe('HomeComponent', () => {
     });
     const weeklyPlanComputed = () => settingsSignal().weeklyPlan ?? EMPTY_WEEKLY_PLAN;
     const mockSettingsService = {
-      settings:   settingsSignal,
-      weeklyPlan: weeklyPlanComputed,
-      update:     updateSettings,
+      settings:       settingsSignal,
+      weeklyPlan:     weeklyPlanComputed,
+      dismissedHints: dismissedHintsSignal,
+      update:         updateSettings,
     };
 
     confirmSpy = jasmine.createSpy('confirm').and.resolveTo(true);
@@ -200,6 +210,46 @@ describe('HomeComponent', () => {
       await component.dismissRoutineHint();
       expect(updateSettings).not.toHaveBeenCalled();
       expect(component.showRoutineHint()).toBeTrue();
+    });
+  });
+
+  // ── showSeparateGoalsNudge() ─────────────────────────────────────────────
+
+  describe('showSeparateGoalsNudge()', () => {
+    function withBothActivities(): void {
+      doneWorkoutsSignal.set([makeWorkout()]);
+      sessionsSignal.set([{ id: 's1', date: TODAY }]);
+    }
+
+    it('shows when the user does both gym and sport with a combined weekly goal', () => {
+      settingsSignal.set({ ...DEFAULT_USER_SETTINGS, goalMode: 'combined', weeklyActivityGoal: 3 });
+      withBothActivities();
+      expect(component.showSeparateGoalsNudge()).toBeTrue();
+    });
+
+    it('is false without any weekly goal set', () => {
+      settingsSignal.set({ ...DEFAULT_USER_SETTINGS, goalMode: 'combined', weeklyActivityGoal: null });
+      withBothActivities();
+      expect(component.showSeparateGoalsNudge()).toBeFalse();
+    });
+
+    it('is false when already in separate-goal mode', () => {
+      settingsSignal.set({ ...DEFAULT_USER_SETTINGS, goalMode: 'separate', weeklyActivityGoal: 3 });
+      withBothActivities();
+      expect(component.showSeparateGoalsNudge()).toBeFalse();
+    });
+
+    it('is false when the user only does one activity type', () => {
+      settingsSignal.set({ ...DEFAULT_USER_SETTINGS, goalMode: 'combined', weeklyActivityGoal: 3 });
+      doneWorkoutsSignal.set([makeWorkout()]); // gym only, no sport
+      expect(component.showSeparateGoalsNudge()).toBeFalse();
+    });
+
+    it('is false once the nudge has been dismissed', () => {
+      settingsSignal.set({ ...DEFAULT_USER_SETTINGS, goalMode: 'combined', weeklyActivityGoal: 3 });
+      withBothActivities();
+      dismissedHintsSignal.set(['nudge-separate-goals']);
+      expect(component.showSeparateGoalsNudge()).toBeFalse();
     });
   });
 });
