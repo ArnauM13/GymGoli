@@ -150,6 +150,44 @@ describe('UserSettingsService', () => {
     }));
   });
 
+  describe('failed upserts are retried (no silent per-device drift)', () => {
+    const DIRTY_KEY = 'gymgoli_settings_dirty_user-1';
+
+    it('flags the settings dirty when the upsert fails and clears it on retry', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+
+      upsertSpy.and.resolveTo({ error: new Error('boom') });
+      service.update({ weightUnit: 'lb' });
+      tick();
+      expect(localStorage.getItem(DIRTY_KEY)).toBe('true');
+
+      upsertSpy.and.resolveTo({ error: null });
+      upsertSpy.calls.reset();
+      window.dispatchEvent(new Event('online'));
+      tick();
+
+      expect(upsertSpy).toHaveBeenCalled();
+      expect(localStorage.getItem(DIRTY_KEY)).toBeNull();
+    }));
+
+    it('unsent local changes win over the server copy on load', fakeAsync(() => {
+      localStorage.setItem(LS_KEY('user-1'),
+        JSON.stringify({ ...DEFAULT_USER_SETTINGS, weightUnit: 'lb' }));
+      localStorage.setItem(DIRTY_KEY, 'true');
+      selectResult = { data: { settings: { weightUnit: 'kg' } }, error: null };
+
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+
+      expect(service.weightUnit()).toBe('lb'); // server did not overwrite
+      expect(upsertSpy).toHaveBeenCalled();    // local copy pushed instead
+      expect(localStorage.getItem(DIRTY_KEY)).toBeNull();
+    }));
+  });
+
   describe('updateWeeklyPlan()', () => {
     it('persists the plan and exposes it via weeklyPlan()', fakeAsync(() => {
       uid.set('user-1');

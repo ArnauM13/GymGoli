@@ -28,7 +28,7 @@ RLS a totes les taules per-usuari.
 | 9 | `SyncService` sense tests | 🟠 P1 | `[x]` |
 | 10 | Exportació de dades (JSON/CSV) | 🟠 P1 | `[ ]` |
 | 11 | Resum de fi d'entrenament | 🟠 P1 | `[ ]` |
-| 12 | Settings encuats com els workouts | 🟠 P1 | `[ ]` |
+| 12 | Settings encuats com els workouts | 🟠 P1 | `[x]` |
 | 13 | `shared_workouts`: TTL + límit de mida | 🟡 P2 | `[ ]` |
 | 14 | Headers de seguretat a Vercel | 🟡 P2 | `[ ]` |
 | 15 | Consulta per exercici no indexable | 🟡 P2 | `[ ]` |
@@ -376,7 +376,14 @@ desa el feeling triat.
 
 ---
 
-### 12. `[ ]` Escriptures de settings amb reintents
+### 12. `[x]` Escriptures de settings amb reintents — **fet 2026-07-20** (branca `claude/app-state-analysis-x73qzl`)
+
+> **Com s'ha resolt:** l'opció mínima del pla. `update()` ara comprova
+> l'`error` de l'upsert (abans s'ignorava — supabase-js no llença) i deixa
+> un flag `gymgoli_settings_dirty_<uid>` si falla; es reintenta amb
+> `online`, en tornar a primer pla i en el següent `_load()`. Al merge de
+> càrrega, si hi ha canvis locals pendents, el local guanya sobre el
+> servidor i es puja en lloc de ser trepitjat. 2 tests nous al spec.
 
 **Context.** `UserSettingsService.update()` (`user-settings.service.ts:105`)
 fa l'upsert dins `try/catch` buit: si falla, el canvi només viu al

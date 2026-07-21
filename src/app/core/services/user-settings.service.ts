@@ -44,6 +44,13 @@ export class UserSettingsService {
     if (typeof window !== 'undefined') {
       window.matchMedia('(prefers-color-scheme: dark)')
         .addEventListener('change', e => this._systemDark.set(e.matches));
+
+      // Settings are a single last-write-wins document, so a failed upsert
+      // just leaves a dirty flag behind and gets retried here.
+      window.addEventListener('online', () => this._pushPendingIfAny());
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) this._pushPendingIfAny();
+      });
     }
 
     effect(() => {
@@ -56,6 +63,21 @@ export class UserSettingsService {
 
   private _lsKey(uid: string): string {
     return `gymgoli_settings_${uid}`;
+  }
+
+  private _dirtyKey(uid: string): string {
+    return `gymgoli_settings_dirty_${uid}`;
+  }
+
+  private _isDirty(uid: string): boolean {
+    try { return localStorage.getItem(this._dirtyKey(uid)) === 'true'; } catch { return false; }
+  }
+
+  private _setDirty(uid: string, dirty: boolean): void {
+    try {
+      if (dirty) localStorage.setItem(this._dirtyKey(uid), 'true');
+      else       localStorage.removeItem(this._dirtyKey(uid));
+    } catch { }
   }
 
   private _readLocalStorage(uid: string): Partial<UserSettings> | null {
@@ -85,9 +107,15 @@ export class UserSettingsService {
         .maybeSingle();
 
       if (!error && data?.settings) {
-        const merged = { ...DEFAULT_USER_SETTINGS, ...(data.settings as Partial<UserSettings>) };
-        this._settings.set(merged);
-        this._writeLocalStorage(uid, merged);
+        if (this._isDirty(uid)) {
+          // Unsent local changes win over the server copy — push them
+          // instead of silently overwriting them with older data.
+          await this._push(uid);
+        } else {
+          const merged = { ...DEFAULT_USER_SETTINGS, ...(data.settings as Partial<UserSettings>) };
+          this._settings.set(merged);
+          this._writeLocalStorage(uid, merged);
+        }
       }
     } catch { /* best-effort */ }
 
@@ -101,12 +129,29 @@ export class UserSettingsService {
     const next = { ...this._settings(), ...patch };
     this._settings.set(next);
     this._writeLocalStorage(uid, next);
+    await this._push(uid);
+  }
 
+  /** Upserts the current settings; on failure leaves a dirty flag that is
+   *  retried when the app comes back online / to the foreground. */
+  private async _push(uid: string): Promise<void> {
     try {
-      await this.supabase
+      const { error } = await this.supabase
         .from('user_settings')
-        .upsert({ user_id: uid, settings: next, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
-    } catch { /* best-effort */ }
+        .upsert(
+          { user_id: uid, settings: this._settings(), updated_at: new Date().toISOString() },
+          { onConflict: 'user_id' },
+        );
+      if (error) throw error;
+      this._setDirty(uid, false);
+    } catch {
+      this._setDirty(uid, true);
+    }
+  }
+
+  private _pushPendingIfAny(): void {
+    const uid = this.auth.uid();
+    if (uid && this._isDirty(uid)) this._push(uid);
   }
 
   async updateWeeklyPlan(plan: WeeklyPlan): Promise<void> {
