@@ -91,7 +91,7 @@ describe('TrainComponent', () => {
           useValue: {
             weightUnit: signal<'kg' | 'lb'>('kg'), fitnessGoal: signal(null), loaded: signal(true),
             weeklyPlan: weeklyPlanSignal, settings: settingsSignal, update: updateSettings,
-            supersetsEnabled: signal(false), dropsetsEnabled: signal(false),
+            supersetsEnabled: signal(false), dropsetsEnabled: signal(false), dismissedHints: signal<string[]>([]),
           },
         },
         { provide: OfflineService,      useValue: { isOffline: signal(false), forceOffline, toggleForceOffline: jasmine.createSpy() } },
@@ -212,6 +212,16 @@ describe('TrainComponent', () => {
       expect(workoutService.deleteWorkout).toHaveBeenCalledWith('abc');
       expect(component.activeWorkoutId()).toBeNull();
       expect(navigateSpy).toHaveBeenCalledWith(['/home']);
+    });
+  });
+
+  // ── saveTemplateFromNudge() ──────────────────────────────────────────────
+
+  describe('saveTemplateFromNudge()', () => {
+    it('dismisses the nudge and opens the save-as-template sheet', () => {
+      component.saveTemplateFromNudge(makeWorkout({ id: 'w1', categories: ['push'] }));
+      expect(component.saveTemplateOpen()).toBeTrue();
+      expect(updateSettings).toHaveBeenCalledWith({ dismissedHints: ['nudge-save-template'] });
     });
   });
 

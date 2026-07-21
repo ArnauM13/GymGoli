@@ -25,6 +25,7 @@ import { WorkoutService } from '../../core/services/workout.service';
 import { OfflineService } from '../../core/services/offline.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
+import { AppHintService } from '../../core/services/app-hint.service';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import {
@@ -132,6 +133,23 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           [groupingMode]="groupingMode()"
           (requestAddExercise)="openPicker()"
         />
+
+        <!-- ── Nudge contextual: desa'l com a plantilla ── -->
+        @if (w.entries.length >= 2 && !offlineService.isOffline()
+             && !reorderMode() && !groupingMode()
+             && !hintService.isDismissed('nudge-save-template')) {
+          <div class="aw-nudge">
+            <span class="material-symbols-outlined aw-nudge-icon">bookmark_add</span>
+            <div class="aw-nudge-text">
+              <span class="aw-nudge-title">Repeteixes aquest entrenament?</span>
+              <span class="aw-nudge-sub">Desa'l com a plantilla i comença'l en un tap la propera vegada.</span>
+            </div>
+            <button class="aw-nudge-cta" (click)="saveTemplateFromNudge(w)">Desar</button>
+            <button class="aw-nudge-x" (click)="hintService.dismiss('nudge-save-template')" aria-label="No tornar a mostrar">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+        }
 
         <!-- ── Three-dots action menu ── -->
         @if (workoutMenuOpen()) {
@@ -607,6 +625,35 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       &.aw-menu-fab--open { background: var(--c-subtle); border-color: var(--c-brand); color: var(--c-brand); }
     }
     .aw-menu-backdrop { position: fixed; inset: 0; z-index: 88; }
+    /* ── Contextual "save as template" nudge ── */
+    .aw-nudge {
+      position: relative;
+      display: flex; align-items: center; gap: 10px;
+      margin: 12px 16px 0; padding: 12px 32px 12px 12px;
+      background: color-mix(in srgb, var(--c-brand) 5%, var(--c-card));
+      border: 1.5px solid color-mix(in srgb, var(--c-brand) 22%, var(--c-border-2));
+      border-radius: 14px;
+    }
+    .aw-nudge-icon { font-size: 22px; color: var(--c-brand); flex-shrink: 0; font-variation-settings: 'FILL' 0, 'wght' 400; }
+    .aw-nudge-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .aw-nudge-title { font-size: 13px; font-weight: 800; color: var(--c-text); }
+    .aw-nudge-sub { font-size: 11.5px; color: var(--c-text-3); line-height: 1.35; }
+    .aw-nudge-cta {
+      flex-shrink: 0; height: 34px; padding: 0 16px; border: none; border-radius: 10px;
+      background: var(--c-brand); color: white; font-size: 13px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
+      &:hover { background: var(--c-brand-dk); }
+    }
+    .aw-nudge-x {
+      position: absolute; top: 6px; right: 6px;
+      width: 24px; height: 24px; border-radius: 50%; border: none;
+      background: transparent; color: var(--c-text-3);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s, color 0.15s;
+      .material-symbols-outlined { font-size: 15px; }
+      &:hover { background: var(--c-subtle); color: var(--c-text-2); }
+    }
+
     .aw-menu-dropdown {
       position: fixed; right: 16px;
       bottom: calc(var(--nav-height) + 16px + 56px + 10px);
@@ -1107,6 +1154,7 @@ export class TrainComponent {
   private templateService  = inject(TemplateService);
   private sharedWorkoutService = inject(SharedWorkoutService);
   private profileService   = inject(WorkoutProfileService);
+  readonly hintService     = inject(AppHintService);
   readonly router          = inject(Router);
   private route            = inject(ActivatedRoute);
   private dialog           = inject(MatDialog);
@@ -1482,6 +1530,13 @@ export class TrainComponent {
     const cat = cats.length === 1 ? cats[0] as ExerciseCategory : null;
     this.saveTemplateName = cat ? (CATEGORY_LABELS[cat] ?? '') : '';
     this.saveTemplateOpen.set(true);
+  }
+
+  /** From the contextual nudge: opening the sheet means the user found the
+   *  feature, so dismiss the nudge too. */
+  saveTemplateFromNudge(w: Workout): void {
+    this.hintService.dismiss('nudge-save-template');
+    this.openSaveAsTemplate(w);
   }
 
   async confirmSaveAsTemplate(): Promise<void> {
