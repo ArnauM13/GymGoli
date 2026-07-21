@@ -30,6 +30,7 @@ describe('HomeComponent', () => {
   beforeEach(async () => {
     const mockWorkoutService = {
       isLoading:              signal(false),
+      loadError:              signal(false),
       getDoneWorkoutsForDate: jasmine.createSpy().and.returnValue([]),
       getPlannedForDate:      jasmine.createSpy().and.returnValue([]),
       ensureMonthLoaded:      jasmine.createSpy(),
@@ -37,6 +38,7 @@ describe('HomeComponent', () => {
 
     const mockSportService = {
       sportsLoaded:                  signal(true),
+      loadError:                     signal(false),
       getSportSessionsForDate:       jasmine.createSpy().and.returnValue([]),
       getPlannedSportSessionsForDate: jasmine.createSpy().and.returnValue([]),
       ensureMonthLoaded:              jasmine.createSpy(),

@@ -36,6 +36,7 @@ describe('WorkoutService', () => {
   let service: WorkoutService;
 
   function setup(): void {
+    localStorage.clear(); // month caches persist across tests otherwise
     uid = signal<string | null>('user-1');
     clockToday = signal('2026-07-20');
     dirtyIds = new Set<string>();
@@ -125,6 +126,42 @@ describe('WorkoutService', () => {
       fromSpy.and.callFake((table: string) => table === 'workouts' ? workoutsChain : makeQueryChain({ data: [], count: 0, error: null }));
 
       await expectAsync(service.loadWorkoutPage({ page: 0, pageSize: 20 })).toBeRejected();
+    });
+  });
+
+  describe('load errors (an error must never read as "no data")', () => {
+    function useChain(result: { data?: unknown; count?: number; error?: unknown }): void {
+      workoutsChain = makeQueryChain(result);
+      fromSpy.and.callFake((table: string) =>
+        table === 'workouts' ? workoutsChain : makeQueryChain({ data: [], count: 0, error: null }));
+    }
+
+    const row = {
+      id: 'w9', date: '2024-03-05', entries: [], categories: [],
+      created_at: '2024-03-05T10:00:00Z', status: 'done',
+    };
+
+    it('marks loadError when a month fetch fails and clears it on a successful retry', async () => {
+      useChain({ data: null, error: new Error('boom') });
+      await service.ensureMonthLoaded(2024, 2);
+      expect(service.loadError()).toBeTrue();
+      expect(service.getWorkoutsForDate('2024-03-05').length).toBe(0);
+
+      useChain({ data: [row], error: null });
+      await service.ensureMonthLoaded(2024, 2); // failed months are retryable
+      expect(service.loadError()).toBeFalse();
+      expect(service.getWorkoutsForDate('2024-03-05').length).toBe(1);
+    });
+
+    it('does not freeze an empty history when loadAllWorkouts() fails', async () => {
+      useChain({ data: null, error: new Error('boom') });
+      await service.loadAllWorkouts();
+      expect(service.loadError()).toBeTrue();
+
+      useChain({ data: [row], error: null });
+      await service.loadAllWorkouts(); // must actually refetch
+      expect(service.loadError()).toBeFalse();
+      expect(service.getWorkoutsForDate('2024-03-05').length).toBe(1);
     });
   });
 

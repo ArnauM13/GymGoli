@@ -56,11 +56,19 @@ export class WorkoutService {
   private _allLoaded = false;
   private _realtimeChannel: RealtimeChannel | null = null;
 
+  // Months whose server fetch failed — kept out of the "already loaded"
+  // check so calling ensureMonthLoaded() again actually retries them.
+  private readonly _failedMonths = new Set<string>();
+
   // Per-exercise load tracking (for progress/charts lazy loading)
   private readonly _exLoadedIds      = new Set<string>();
   private readonly _exLoadPromises   = new Map<string, Promise<void>>();
 
   readonly isLoading = signal(false);
+
+  /** True when the last server read failed — lets pages show an error
+   *  state with retry instead of a misleading "no tens dades" empty state. */
+  readonly loadError = signal(false);
 
   // ── Public signals ───────────────────────────────────────────────────────
 
@@ -151,11 +159,15 @@ export class WorkoutService {
 
   private async _fetchToday(uid: string): Promise<void> {
     const today = untracked(() => this.clock.today());
-    const { data } = await this.supabase
+    const { data, error } = await this.supabase
       .from('workouts')
       .select('*')
       .eq('user_id', uid)
       .eq('date', today);
+
+    // A failed refetch must never wipe today's cached workouts with "empty"
+    if (error) { this.loadError.set(true); return; }
+    this.loadError.set(false);
 
     const fresh    = (data ?? []).map(r => toWorkout(r as Record<string, unknown>));
     const key      = today.substring(0, 7);
@@ -177,7 +189,7 @@ export class WorkoutService {
 
   async ensureMonthLoaded(year: number, month: number): Promise<void> {
     const key = this._monthKey(year, month);
-    if (this._monthCache.has(key) || this._allLoaded) return;
+    if ((this._monthCache.has(key) && !this._failedMonths.has(key)) || this._allLoaded) return;
 
     const uid = this._uid();
 
@@ -206,13 +218,14 @@ export class WorkoutService {
       const lastDay = new Date(year, month + 1, 0).getDate();
       const end     = `${key}-${String(lastDay).padStart(2, '0')}`;
 
-      const { data } = await this.supabase
+      const { data, error } = await this.supabase
         .from('workouts')
         .select('*')
         .eq('user_id', uid)
         .gte('date', start)
         .lte('date', end)
         .order('date', { ascending: false });
+      if (error) throw error;
 
       const fetched  = (data ?? []).map(r => toWorkout(r as Record<string, unknown>));
       const inFlight = this._monthCache.get(key) ?? [];
@@ -224,8 +237,13 @@ export class WorkoutService {
       this._monthCache.set(key, final);
       this._rebuildHistorical();
       this._writeMonthToStorage(uid, key, fetched); // persist clean server data
+      this._failedMonths.delete(key);
+      this.loadError.set(false);
     } catch {
-      // Network failure — keep whatever we have from localStorage/local state
+      // Failure — keep whatever we have from localStorage/local state, but
+      // remember it so pages can show an error state and a retry refetches.
+      this._failedMonths.add(key);
+      this.loadError.set(true);
     } finally {
       this.isLoading.set(false);
     }
@@ -283,11 +301,16 @@ export class WorkoutService {
     if (this._allLoaded) return;
     this.isLoading.set(true);
     try {
-      const { data } = await this.supabase
+      const { data, error } = await this.supabase
         .from('workouts')
         .select('*')
         .eq('user_id', this._uid())
         .order('date', { ascending: false });
+
+      // Never mark "all loaded" off a failed read — that would freeze an
+      // empty history in place until the next full reload.
+      if (error) { this.loadError.set(true); return; }
+      this.loadError.set(false);
 
       for (const row of data ?? []) {
         const w   = toWorkout(row as Record<string, unknown>);

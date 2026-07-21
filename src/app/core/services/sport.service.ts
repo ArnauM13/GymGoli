@@ -70,6 +70,14 @@ export class SportService {
   private readonly _sessions   = signal<SportSession[]>([]);
   readonly isLoading = signal(false);
 
+  // Months whose server fetch failed — kept out of the "already loaded"
+  // check so calling ensureMonthLoaded() again actually retries them.
+  private readonly _failedMonths = new Set<string>();
+
+  /** True when the last server read failed — lets pages show an error
+   *  state with retry instead of a misleading "no tens dades" empty state. */
+  readonly loadError = signal(false);
+
   private readonly _sportsLoaded = signal(false);
   /** True once the user's sport definitions have been fetched at least once. */
   readonly sportsLoaded = this._sportsLoaded.asReadonly();
@@ -135,19 +143,25 @@ export class SportService {
   private async _initLoad(): Promise<void> {
     const uid = this.auth.uid();
     if (!uid) return;
-    await this._loadSports(uid);
-    this.isLoaded.set(true);
+    const ok = await this._loadSports(uid);
+    // Only mark loaded on success, so ensureLoaded() can retry after errors
+    if (ok) this.isLoaded.set(true);
   }
 
   // ── Sport CRUD ────────────────────────────────────────────────────────────
 
-  private async _loadSports(uid: string): Promise<void> {
+  private async _loadSports(uid: string): Promise<boolean> {
     try {
-      const { data } = await this.supabase
+      const { data, error } = await this.supabase
         .from('sports')
         .select('*')
         .eq('user_id', uid)
         .order('created_at');
+
+      // On error, data is null — without this check a transient failure
+      // would look like "no sports yet" and re-seed the defaults.
+      if (error) { this.loadError.set(true); return false; }
+      this.loadError.set(false);
 
       const sports = (data ?? []).map(r => toSport(r as Record<string, unknown>));
       if (sports.length === 0) {
@@ -156,6 +170,7 @@ export class SportService {
         this._sports.set(sports);
         this._writeSportsToStorage(uid, sports);
       }
+      return true;
     } finally {
       this._sportsLoaded.set(true);
     }
@@ -228,7 +243,7 @@ export class SportService {
 
   async ensureMonthLoaded(year: number, month: number): Promise<void> {
     const key = `${year}-${String(month + 1).padStart(2, '0')}`;
-    if (this._monthCache.has(key)) return;
+    if (this._monthCache.has(key) && !this._failedMonths.has(key)) return;
 
     const uid = this._uid();
 
@@ -248,20 +263,27 @@ export class SportService {
       const lastDay = new Date(year, month + 1, 0).getDate();
       const end     = `${key}-${String(lastDay).padStart(2, '0')}`;
 
-      const { data } = await this.supabase
+      const { data, error } = await this.supabase
         .from('sport_sessions')
         .select('*')
         .eq('user_id', uid)
         .gte('date', start)
         .lte('date', end)
         .order('date', { ascending: false });
+      // A failed fetch must never wipe the month's cache with "empty"
+      if (error) throw error;
 
       const fetched = (data ?? []).map(r => toSportSession(r as Record<string, unknown>));
       this._monthCache.set(key, fetched);
       this._rebuild();
       this._writeSessionsToStorage(uid, key, fetched);
+      this._failedMonths.delete(key);
+      this.loadError.set(false);
     } catch {
-      // Network failure — keep whatever we have from localStorage/local state
+      // Failure — keep whatever we have from localStorage/local state, but
+      // remember it so pages can show an error state and a retry refetches.
+      this._failedMonths.add(key);
+      this.loadError.set(true);
     } finally {
       this.isLoading.set(false);
     }

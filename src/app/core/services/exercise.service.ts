@@ -56,6 +56,11 @@ export class ExerciseService {
 
   // Exposed so components can show a loading state while exercises are fetching
   readonly isLoaded = signal(false);
+
+  /** True when the last server read failed — lets pages show an error
+   *  state with retry instead of a misleading "cap exercici" empty state. */
+  readonly loadError = signal(false);
+
   private _loadPromise: Promise<void> | null = null;
 
   constructor() {
@@ -89,7 +94,8 @@ export class ExerciseService {
     if (!uid) return;
     await this._seedIfNeeded(uid);
     await this._fetch(uid);
-    this.isLoaded.set(true);
+    // Only mark loaded on success, so ensureLoaded() can retry after errors
+    if (!this.loadError()) this.isLoaded.set(true);
   }
 
   private async _fetch(uid: string): Promise<void> {
@@ -99,7 +105,8 @@ export class ExerciseService {
       .eq('user_id', uid)
       .order('name');
 
-    if (error) return;
+    if (error) { this.loadError.set(true); return; }
+    this.loadError.set(false);
     const exercises = (data ?? []).map(r => toExercise(r as Record<string, unknown>));
     this._exercises.set(exercises);
     this._writeExercisesToStorage(uid, exercises);

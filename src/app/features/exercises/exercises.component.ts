@@ -17,11 +17,12 @@ import {
 import { ExerciseService } from '../../core/services/exercise.service';
 import { ExerciseFormDialogComponent } from '../library/components/exercise-form-dialog.component';
 import { FilterBarComponent } from '../../shared/components/filter-bar/filter-bar.component';
+import { LoadErrorComponent } from '../../shared/components/load-error/load-error.component';
 
 @Component({
   selector: 'app-exercises',
   standalone: true,
-  imports: [FilterBarComponent],
+  imports: [FilterBarComponent, LoadErrorComponent],
   template: `
     <div class="page">
 
@@ -38,7 +39,11 @@ import { FilterBarComponent } from '../../shared/components/filter-bar/filter-ba
         [(searchQuery)]="searchQuery"
         [(category)]="activeFilter" />
 
-      @if (exercises().length === 0) {
+      @if (exercises().length === 0 && exerciseService.loadError()) {
+        <div class="card-section">
+          <app-load-error message="No s'han pogut carregar els exercicis" (retry)="retryLoad()" />
+        </div>
+      } @else if (exercises().length === 0) {
         <div class="card-section">
           <div class="empty-state">
             <span class="material-symbols-outlined empty-icon">fitness_center</span>
@@ -214,13 +219,15 @@ import { FilterBarComponent } from '../../shared/components/filter-bar/filter-ba
   `],
 })
 export class ExercisesComponent {
-  private exerciseService = inject(ExerciseService);
+  readonly exerciseService = inject(ExerciseService);
   private dialog          = inject(MatDialog);
   private feedback        = inject(FeedbackService);
   private confirmDialog   = inject(ConfirmDialogService);
   private router          = inject(Router);
 
   constructor() { this.exerciseService.ensureLoaded(); }
+
+  retryLoad(): void { this.exerciseService.ensureLoaded(); }
 
   readonly searchQuery  = signal('');
   readonly activeFilter = signal<ExerciseCategory | null>(null);

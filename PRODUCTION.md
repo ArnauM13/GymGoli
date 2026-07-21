@@ -20,7 +20,7 @@ RLS a totes les taules per-usuari.
 | 1 | Migració `delete_my_account` inexistent | 🔴 P0 | `[~]` |
 | 2 | "Avui" congelat a mitjanit | 🔴 P0 | `[x]` |
 | 3 | Cap gestió de `SwUpdate` + chunk errors silenciats | 🔴 P0 | `[~]` |
-| 4 | Errors de xarxa silenciats (buit ≠ error) | 🔴 P0 | `[ ]` |
+| 4 | Errors de xarxa silenciats (buit ≠ error) | 🔴 P0 | `[x]` |
 | 5 | Zero observabilitat en producció | 🔴 P0 | `[ ]` |
 | 6 | Pla de còpies de seguretat | 🔴 P0 | `[ ]` |
 | 7 | La rutina setmanal caduca en silenci (13 setmanes) | 🟠 P1 | `[ ]` |
@@ -158,7 +158,20 @@ una única recàrrega neta.
 
 ---
 
-### 4. `[ ]` Errors de xarxa silenciats — distingir buit d'error
+### 4. `[x]` Errors de xarxa silenciats — distingir buit d'error — **fet 2026-07-20** (branca `claude/app-state-analysis-x73qzl`)
+
+> **Com s'ha resolt:** `loadError` signal a `WorkoutService`, `SportService`
+> i `ExerciseService`; els mesos fallits es recorden (`_failedMonths`) perquè
+> `ensureMonthLoaded()` els reintenti de veritat. Corregits tres bugs reals
+> que l'inventari va destapar: un refetch fallit d'avui o d'un mes
+> **esborrava el cache amb "buit"** (workouts i sport_sessions), un error a
+> `loadAllWorkouts()` congelava un historial buit com a "tot carregat", i un
+> error carregant esports **re-seedejava els esports per defecte**. Nou
+> component compartit `app-load-error` (icona + "Torna-ho a provar") mostrat
+> a l'historial de home, a la llista del calendari i a la pàgina d'exercicis
+> quan hi ha error i cap dada — mai més un error llegit com a "no tens
+> dades". El local-first es manté: si hi ha cache, es serveix igualment.
+> Cobert amb 2 tests nous d'error/retry a `workout.service.spec.ts`.
 
 **Context.** Patró repetit: `const { data } = await this.supabase...` sense
 mirar `error` (`_fetchToday`, `ensureMonthLoaded`, `loadAllWorkouts`,

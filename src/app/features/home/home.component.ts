@@ -12,6 +12,7 @@ import { ConfirmDialogService } from '../../shared/services/confirm-dialog.servi
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
 import { DayFeedCardsComponent, DayFeedEntry } from '../../shared/components/day-feed-cards/day-feed-cards.component';
 import { FitnessInsightsComponent } from '../../shared/components/fitness-insights/fitness-insights.component';
+import { LoadErrorComponent } from '../../shared/components/load-error/load-error.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { feedDayLabel } from '../../shared/utils/workout-card.utils';
 
@@ -20,7 +21,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CalendarComponent, DayFeedCardsComponent, FitnessInsightsComponent, PageHeaderComponent],
+  imports: [CalendarComponent, DayFeedCardsComponent, FitnessInsightsComponent, LoadErrorComponent, PageHeaderComponent],
   template: `
     <div class="page">
 
@@ -100,6 +101,8 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
               </div>
             }
           </div>
+        } @else if (historyFeedDays().length === 0 && (workoutService.loadError() || sportService.loadError())) {
+          <app-load-error message="No s'ha pogut carregar l'historial" (retry)="retryFeed()" />
         } @else if (historyFeedDays().length === 0) {
           <div class="empty-state">
             <span class="material-symbols-outlined empty-icon">fitness_center</span>
@@ -372,6 +375,13 @@ export class HomeComponent implements OnDestroy {
   readonly historyFeedDays = computed(() =>
     this.feedDays().filter(d => d.date !== this.effectiveDate())
   );
+
+  retryFeed(): void {
+    const [year, month] = this.effectiveDate().split('-').map(Number);
+    this.workoutService.ensureMonthLoaded(year, month - 1);
+    this.sportService.ensureMonthLoaded(year, month - 1);
+    this.sportService.ensureLoaded();
+  }
 
   async loadMoreFeedMonths(): Promise<void> {
     if (this.feedLoadingMore()) return;

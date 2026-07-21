@@ -18,6 +18,7 @@ import { kgToDisplay } from '../../shared/utils/weight.utils';
 import { addDays, mondayOf } from '../../shared/utils/calendar-utils';
 import { formatFeeling } from '../../shared/utils/workout-card.utils';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
+import { LoadErrorComponent } from '../../shared/components/load-error/load-error.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { FilterBarComponent } from '../../shared/components/filter-bar/filter-bar.component';
 import { WeeklySummaryComponent } from '../train/components/weekly-summary.component';
@@ -29,7 +30,7 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
 @Component({
   selector: 'app-calendar-page',
   standalone: true,
-  imports: [RouterLink, CalendarComponent, PageHeaderComponent, FilterBarComponent, WeeklySummaryComponent],
+  imports: [RouterLink, CalendarComponent, LoadErrorComponent, PageHeaderComponent, FilterBarComponent, WeeklySummaryComponent],
   template: `
     <div class="page">
 
@@ -294,7 +295,9 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
           }
 
         } @else if (!isLoadingMore()) {
-          @if (hasActiveFilter()) {
+          @if (listError()) {
+            <app-load-error message="No s'ha pogut carregar la llista" (retry)="retryList()" />
+          } @else if (hasActiveFilter()) {
             <div class="filter-empty">
               <span class="material-symbols-outlined">filter_list_off</span>
               <p>Cap entrenament amb aquest filtre</p>
@@ -935,6 +938,12 @@ export class CalendarPageComponent implements OnDestroy {
     this._fetchPage(next).finally(() => this.isLoadingMore.set(false));
   }
 
+  readonly listError = signal(false);
+
+  retryList(): void {
+    this._resetAndLoad();
+  }
+
   private async _fetchPage(page: number): Promise<void> {
     try {
       const { workouts, total } = await this.workoutService.loadWorkoutPage({
@@ -947,8 +956,11 @@ export class CalendarPageComponent implements OnDestroy {
       });
       this._total.set(total);
       this._items.update(prev => page === 0 ? workouts : [...prev, ...workouts]);
+      this.listError.set(false);
     } catch {
-      // Network failure — keep current state
+      // Keep whatever is already shown, but surface the failure so an
+      // empty list reads as an error with retry, not "cap entrenament".
+      this.listError.set(true);
     }
   }
 
