@@ -66,6 +66,12 @@ export class WorkoutProfileService {
       this.workoutService.workouts();
       this.workoutService.loadAllWorkouts();
     });
+    // Same reasoning for the "recent sport" recency: without the full history
+    // the last sport session may live in an unloaded month.
+    effect(() => {
+      this.sportService.sessions();
+      this.sportService.loadAllSessions();
+    });
   }
 
   readonly profile = computed((): WorkoutProfile => {

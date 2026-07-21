@@ -68,6 +68,7 @@ export class SportService {
   // ── Sessions cache ────────────────────────────────────────────────────────
   private readonly _monthCache = new Map<string, SportSession[]>();
   private readonly _sessions   = signal<SportSession[]>([]);
+  private _allLoaded = false;
   readonly isLoading = signal(false);
 
   private readonly _sportsLoaded = signal(false);
@@ -94,6 +95,7 @@ export class SportService {
       this._sportsLoaded.set(false);
       this._monthCache.clear();
       this._sessions.set([]);
+      this._allLoaded = false;
       this.isLoaded.set(false);
       this._loadPromise = null;
       if (uid) {
@@ -217,7 +219,7 @@ export class SportService {
 
   async ensureMonthLoaded(year: number, month: number): Promise<void> {
     const key = `${year}-${String(month + 1).padStart(2, '0')}`;
-    if (this._monthCache.has(key)) return;
+    if (this._monthCache.has(key) || this._allLoaded) return;
 
     const uid = this._uid();
 
@@ -251,6 +253,38 @@ export class SportService {
       this._writeSessionsToStorage(uid, key, fetched);
     } catch {
       // Network failure — keep whatever we have from localStorage/local state
+    } finally {
+      this.isLoading.set(false);
+    }
+  }
+
+  /** Loads the user's entire sport-session history into the cache in a single
+   *  query. Needed by features that reason over all-time recency (e.g. the
+   *  workout suggestion), which the lazy per-month loading can't guarantee.
+   *  Cached after the first successful run. */
+  async loadAllSessions(): Promise<void> {
+    if (this._allLoaded) return;
+    const uid = this.auth.uid();
+    if (!uid) return;
+    this.isLoading.set(true);
+    try {
+      const { data } = await this.supabase
+        .from('sport_sessions')
+        .select('*')
+        .eq('user_id', uid)
+        .order('date', { ascending: false });
+
+      for (const row of data ?? []) {
+        const s   = toSportSession(row as Record<string, unknown>);
+        const key = s.date.substring(0, 7);
+        const bucket = this._monthCache.get(key) ?? [];
+        if (!bucket.find(x => x.id === s.id)) bucket.push(s);
+        this._monthCache.set(key, bucket);
+      }
+      this._rebuild();
+      this._allLoaded = true;
+    } catch {
+      // best-effort; keep whatever we already have
     } finally {
       this.isLoading.set(false);
     }
