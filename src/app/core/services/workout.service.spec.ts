@@ -31,6 +31,7 @@ describe('WorkoutService', () => {
   let uid: ReturnType<typeof signal<string | null>>;
   let clockToday: ReturnType<typeof signal<string>>;
   let dirtyIds: Set<string>;
+  let deletedIds: Set<string>;
   let fromSpy: jasmine.Spy;
   let workoutsChain: ReturnType<typeof makeQueryChain>;
   let service: WorkoutService;
@@ -40,6 +41,7 @@ describe('WorkoutService', () => {
     uid = signal<string | null>('user-1');
     clockToday = signal('2026-07-20');
     dirtyIds = new Set<string>();
+    deletedIds = new Set<string>();
     workoutsChain = makeQueryChain({ data: [], count: 0, error: null });
 
     fromSpy = jasmine.createSpy('from').and.callFake((table: string) =>
@@ -65,6 +67,8 @@ describe('WorkoutService', () => {
           getSnapshot: () => null,
           cancelDirty: jasmine.createSpy('cancelDirty').and.callFake((id: string) => dirtyIds.delete(id)),
           isInsert:    () => false,
+          markDeleted:      jasmine.createSpy('markDeleted').and.callFake((id: string) => deletedIds.add(id)),
+          pendingDeleteIds: () => [...deletedIds],
         } },
       ],
     });

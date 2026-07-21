@@ -26,7 +26,7 @@ export class SyncService {
       const uid = this.auth.uid();
       if (uid) {
         this._hydrate(uid);
-        if (navigator.onLine && this._loadDirtyIds(uid).length > 0) this._triggerFlush();
+        if (navigator.onLine && this.pendingCount() > 0) this._triggerFlush();
       } else {
         this.status.set('synced');
         this.pendingCount.set(0);
@@ -79,8 +79,37 @@ export class SyncService {
     this._writeInsertIds(uid, inserts);
     this._backoff.delete(workoutId);
 
-    this.pendingCount.set(ids.length);
-    if (ids.length === 0 && !this._isFlushRunning) this.status.set('synced');
+    this._refreshPending(uid);
+  }
+
+  /** Queues a server-side delete so removing a workout works offline like
+   *  every other mutation. Any pending edit for the same id is dropped —
+   *  the delete supersedes it. */
+  markDeleted(workoutId: string): void {
+    const uid = this.auth.uid();
+    if (!uid) return;
+
+    this.markClean(workoutId);
+    const deletes = this._loadDeleteIds(uid);
+    if (!deletes.includes(workoutId)) {
+      deletes.push(workoutId);
+      this._writeDeleteIds(uid, deletes);
+    }
+    this._refreshPending(uid);
+    if (this.status() === 'synced') this.status.set('pending');
+
+    if (navigator.onLine) {
+      if (this._debounceTimer) clearTimeout(this._debounceTimer);
+      this._debounceTimer = setTimeout(() => { this._debounceTimer = null; this.flush(); }, 1000);
+    }
+  }
+
+  /** Ids with a delete queued but not yet confirmed by the server — reads
+   *  must filter these out so a refetch can't resurrect them in the UI. */
+  pendingDeleteIds(): string[] {
+    const uid = this.auth.uid();
+    if (!uid) return [];
+    return this._loadDeleteIds(uid);
   }
 
   cancelDirty(workoutId: string): void {
@@ -114,8 +143,9 @@ export class SyncService {
     if (this._isFlushRunning || !navigator.onLine) return;
     const uid = this.auth.uid();
     if (!uid) return;
-    const ids = this.pendingIds();
-    if (ids.length === 0) return;
+    const ids     = this.pendingIds();
+    const deletes = this.pendingDeleteIds();
+    if (ids.length === 0 && deletes.length === 0) return;
 
     this._isFlushRunning = true;
     this.status.set('syncing');
@@ -133,16 +163,39 @@ export class SyncService {
         this.markClean(workoutId);
       } catch {
         anyError = true;
-        const count = (this._backoff.get(workoutId)?.retryCount ?? 0) + 1;
-        const delay = [5_000, 10_000, 30_000, 60_000][Math.min(count - 1, 3)];
-        this._backoff.set(workoutId, { retryCount: count, nextRetryAt: Date.now() + delay });
+        this._bumpBackoff(workoutId);
+      }
+    }
+
+    for (const workoutId of deletes) {
+      const backoff = this._backoff.get(workoutId);
+      if (backoff && Date.now() < backoff.nextRetryAt) continue;
+
+      try {
+        const { error } = await this.supabase
+          .from('workouts')
+          .delete()
+          .eq('id', workoutId)
+          .eq('user_id', uid);
+        if (error) throw error;
+        this._writeDeleteIds(uid, this._loadDeleteIds(uid).filter(id => id !== workoutId));
+        this._backoff.delete(workoutId);
+      } catch {
+        anyError = true;
+        this._bumpBackoff(workoutId);
       }
     }
 
     this._isFlushRunning = false;
-    const remaining = this.pendingIds().length;
+    const remaining = this.pendingIds().length + this.pendingDeleteIds().length;
     this.pendingCount.set(remaining);
     this.status.set(remaining === 0 ? 'synced' : anyError ? 'error' : 'pending');
+  }
+
+  private _bumpBackoff(workoutId: string): void {
+    const count = (this._backoff.get(workoutId)?.retryCount ?? 0) + 1;
+    const delay = [5_000, 10_000, 30_000, 60_000][Math.min(count - 1, 3)];
+    this._backoff.set(workoutId, { retryCount: count, nextRetryAt: Date.now() + delay });
   }
 
   // ── Private: Supabase ──────────────────────────────────────────────────────
@@ -181,6 +234,7 @@ export class SyncService {
 
   private _dirtyKey(uid: string)                     { return `gymgoli_sync_dirty_${uid}`; }
   private _insertKey(uid: string)                    { return `gymgoli_sync_inserts_${uid}`; }
+  private _deleteKey(uid: string)                    { return `gymgoli_sync_deletes_${uid}`; }
   private _snapKey(uid: string, wid: string)         { return `gymgoli_sync_snap_${uid}_${wid}`; }
 
   private _loadDirtyIds(uid: string): string[] {
@@ -195,6 +249,17 @@ export class SyncService {
   private _writeInsertIds(uid: string, ids: string[]): void {
     try { localStorage.setItem(this._insertKey(uid), JSON.stringify(ids)); } catch { }
   }
+  private _loadDeleteIds(uid: string): string[] {
+    try { return JSON.parse(localStorage.getItem(this._deleteKey(uid)) ?? '[]'); } catch { return []; }
+  }
+  private _writeDeleteIds(uid: string, ids: string[]): void {
+    try { localStorage.setItem(this._deleteKey(uid), JSON.stringify(ids)); } catch { }
+  }
+  private _refreshPending(uid: string): void {
+    const count = this._loadDirtyIds(uid).length + this._loadDeleteIds(uid).length;
+    this.pendingCount.set(count);
+    if (count === 0 && !this._isFlushRunning) this.status.set('synced');
+  }
   private _writeSnap(uid: string, wid: string, snap: Workout): void {
     try { localStorage.setItem(this._snapKey(uid, wid), JSON.stringify(snap)); } catch { }
   }
@@ -203,7 +268,7 @@ export class SyncService {
   }
 
   private _hydrate(uid: string): void {
-    const count = this._loadDirtyIds(uid).length;
+    const count = this._loadDirtyIds(uid).length + this._loadDeleteIds(uid).length;
     this.pendingCount.set(count);
     this.status.set(count > 0 ? 'pending' : 'synced');
   }

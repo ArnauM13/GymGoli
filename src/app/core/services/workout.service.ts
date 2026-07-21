@@ -169,7 +169,10 @@ export class WorkoutService {
     if (error) { this.loadError.set(true); return; }
     this.loadError.set(false);
 
-    const fresh    = (data ?? []).map(r => toWorkout(r as Record<string, unknown>));
+    const deleted  = new Set(this.syncService.pendingDeleteIds());
+    const fresh    = (data ?? [])
+      .map(r => toWorkout(r as Record<string, unknown>))
+      .filter(w => !deleted.has(w.id)); // a queued delete must not resurrect
     const key      = today.substring(0, 7);
     const existing = (this._monthCache.get(key) ?? []).filter(w => w.date !== today);
     // Keep local dirty versions — don't overwrite unsent changes with stale server data
@@ -227,7 +230,10 @@ export class WorkoutService {
         .order('date', { ascending: false });
       if (error) throw error;
 
-      const fetched  = (data ?? []).map(r => toWorkout(r as Record<string, unknown>));
+      const deleted  = new Set(this.syncService.pendingDeleteIds());
+      const fetched  = (data ?? [])
+        .map(r => toWorkout(r as Record<string, unknown>))
+        .filter(w => !deleted.has(w.id)); // a queued delete must not resurrect
       const inFlight = this._monthCache.get(key) ?? [];
       const freshDirtyIds = new Set(this.syncService.pendingIds());
       const dirtyLocal    = inFlight.filter(w => freshDirtyIds.has(w.id));
@@ -278,9 +284,10 @@ export class WorkoutService {
         return;
       }
 
+      const deleted = new Set(this.syncService.pendingDeleteIds());
       const fetched = (data ?? [])
         .map(r => toWorkout(r as Record<string, unknown>))
-        .filter(w => w.entries.some(e => e.exerciseId === exerciseId));
+        .filter(w => w.entries.some(e => e.exerciseId === exerciseId) && !deleted.has(w.id));
 
       for (const w of fetched) {
         const key    = w.date.substring(0, 7);
@@ -312,8 +319,10 @@ export class WorkoutService {
       if (error) { this.loadError.set(true); return; }
       this.loadError.set(false);
 
+      const deleted = new Set(this.syncService.pendingDeleteIds());
       for (const row of data ?? []) {
         const w   = toWorkout(row as Record<string, unknown>);
+        if (deleted.has(w.id)) continue; // a queued delete must not resurrect
         const key = w.date.substring(0, 7);
         if (!this._monthCache.has(key)) this._monthCache.set(key, []);
         const bucket = this._monthCache.get(key)!;
@@ -356,8 +365,11 @@ export class WorkoutService {
     const { data, count, error } = await q.range(from, to);
     if (error) throw error;
 
+    const deleted = new Set(this.syncService.pendingDeleteIds());
     return {
-      workouts: (data ?? []).map(r => toWorkout(r as Record<string, unknown>)),
+      workouts: (data ?? [])
+        .map(r => toWorkout(r as Record<string, unknown>))
+        .filter(w => !deleted.has(w.id)), // a queued delete must not resurrect
       total: count ?? 0,
     };
   }
@@ -661,12 +673,8 @@ export class WorkoutService {
     this.syncService.cancelDirty(id);
     this._removeFromCache(id);
     if (wasPendingInsert) return; // never reached Supabase, nothing to delete
-    const { error } = await this.supabase
-      .from('workouts')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', this._uid());
-    if (error) throw error;
+    // Queued like every other mutation, so deleting works offline too
+    this.syncService.markDeleted(id);
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────

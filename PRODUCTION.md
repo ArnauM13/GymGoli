@@ -24,8 +24,8 @@ RLS a totes les taules per-usuari.
 | 5 | Zero observabilitat en producció | 🔴 P0 | `[ ]` |
 | 6 | Pla de còpies de seguretat | 🔴 P0 | `[ ]` |
 | 7 | La rutina setmanal caduca en silenci (13 setmanes) | 🟠 P1 | `[x]` |
-| 8 | Delete de workout no encuat offline | 🟠 P1 | `[ ]` |
-| 9 | `SyncService` sense tests | 🟠 P1 | `[ ]` |
+| 8 | Delete de workout no encuat offline | 🟠 P1 | `[x]` |
+| 9 | `SyncService` sense tests | 🟠 P1 | `[x]` |
 | 10 | Exportació de dades (JSON/CSV) | 🟠 P1 | `[ ]` |
 | 11 | Resum de fi d'entrenament | 🟠 P1 | `[ ]` |
 | 12 | Settings encuats com els workouts | 🟠 P1 | `[ ]` |
@@ -274,7 +274,16 @@ obrir l'app repobla les setmanes següents sense passar pel planner.
 
 ---
 
-### 8. `[ ]` Delete de workout encuat offline
+### 8. `[x]` Delete de workout encuat offline — **fet 2026-07-20** (branca `claude/app-state-analysis-x73qzl`)
+
+> **Com s'ha resolt:** cua de deletes al `SyncService`
+> (`gymgoli_sync_deletes_<uid>`): `markDeleted()` descarta qualsevol edició
+> pendent del mateix id (el delete la supera) i encua l'esborrat; `flush()`
+> l'executa amb el mateix backoff que les edicions. `deleteWorkout()` ja no
+> crida Supabase directament. Tots els merges de lectura (`_fetchToday`,
+> `ensureMonthLoaded`, `loadAllWorkouts`, `_fetchForExercise`,
+> `loadWorkoutPage`) filtren els ids pendents d'esborrar perquè un refetch
+> no els ressusciti a la UI abans que el flush confirmi.
 
 **Context.** `deleteWorkout()` (`workout.service.ts:621`) és l'única mutació
 de workout que va directa a Supabase: offline llença error i trenca la
@@ -296,7 +305,15 @@ connexió → l'entrenament desapareix també del servidor i no reapareix mai a 
 
 ---
 
-### 9. `[ ]` Tests del `SyncService`
+### 9. `[x]` Tests del `SyncService` — **fet 2026-07-20** (branca `claude/app-state-analysis-x73qzl`)
+
+> **Com s'ha resolt:** nou `sync.service.spec.ts` amb 10 tests: markDirty
+> (snapshot + pending + no-op sense sessió), flush feliç (upsert per inserts,
+> update per edicions, markClean), flush amb error (estat `error` + backoff
+> que evita re-intents dins la finestra), snapshots orfes descartats,
+> cua de deletes (supera edicions pendents, flush amb èxit i amb error),
+> hydration en login des de localStorage i aïllament per usuari amb reset
+> en logout.
 
 **Context.** És el codi amb més risc de pèrdua de dades de l'app (backoff,
 inserts vs updates, snapshots, hydration) i l'únic servei nucli **sense spec**.
