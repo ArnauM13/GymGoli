@@ -88,6 +88,21 @@ export class SportService {
     this.sessions().filter(s => s.date === this._todayStr)
   );
 
+  /** Sport definitions indexed by id, and all sessions indexed by date —
+   *  rebuilt once per change so the per-date helpers (called in calendar and
+   *  home day-loops) don't rebuild a lookup map and scan every session on
+   *  each call. */
+  private readonly _sportsById = computed(() => new Map(this._sports().map(s => [s.id, s])));
+  private readonly _sessionsByDate = computed(() => {
+    const map = new Map<string, SportSession[]>();
+    for (const s of this._sessions()) {
+      const bucket = map.get(s.date) ?? [];
+      bucket.push(s);
+      map.set(s.date, bucket);
+    }
+    return map;
+  });
+
   constructor() {
     effect(() => {
       const uid = this.auth.uid();
@@ -296,9 +311,9 @@ export class SportService {
 
   /** Returns full Sport objects (DONE sessions) for a given date. */
   getSportsForDate(date: string): Sport[] {
-    const sessions  = this._sessions().filter(s => s.date === date && (s.status ?? 'done') !== 'planned');
-    const sportsMap = new Map(this._sports().map(s => [s.id, s]));
-    return sessions
+    const sportsMap = this._sportsById();
+    return (this._sessionsByDate().get(date) ?? [])
+      .filter(s => (s.status ?? 'done') !== 'planned')
       .map(s => sportsMap.get(s.sportId))
       .filter((s): s is Sport => !!s);
   }
@@ -316,10 +331,10 @@ export class SportService {
   private _pairsForDate(
     date: string, predicate: (s: SportSession) => boolean,
   ): Array<{ sport: Sport; session: SportSession }> {
-    const sessions  = this._sessions().filter(s => s.date === date && predicate(s));
-    const sportsMap = new Map(this._sports().map(s => [s.id, s]));
+    const sportsMap = this._sportsById();
     const result: Array<{ sport: Sport; session: SportSession }> = [];
-    for (const s of sessions) {
+    for (const s of this._sessionsByDate().get(date) ?? []) {
+      if (!predicate(s)) continue;
       const sport = sportsMap.get(s.sportId);
       if (sport) result.push({ sport, session: s });
     }
@@ -328,16 +343,16 @@ export class SportService {
 
   /** Returns the session for a specific sport on a specific date (any status). */
   getSessionForDate(date: string, sportId: string): SportSession | undefined {
-    return this._sessions().find(s => s.date === date && s.sportId === sportId);
+    return (this._sessionsByDate().get(date) ?? []).find(s => s.sportId === sportId);
   }
 
   hasSportOnDate(date: string, sportId: string): boolean {
-    return this._sessions().some(s =>
-      s.date === date && s.sportId === sportId && (s.status ?? 'done') !== 'planned');
+    return (this._sessionsByDate().get(date) ?? []).some(s =>
+      s.sportId === sportId && (s.status ?? 'done') !== 'planned');
   }
 
   hasAnySportOnDate(date: string): boolean {
-    return this._sessions().some(s => s.date === date && (s.status ?? 'done') !== 'planned');
+    return (this._sessionsByDate().get(date) ?? []).some(s => (s.status ?? 'done') !== 'planned');
   }
 
   // ── Session log / toggle ────────────────────────────────────────────────

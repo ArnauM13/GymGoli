@@ -94,6 +94,19 @@ export class WorkoutService {
     return map;
   });
 
+  /** All workouts indexed by date, rebuilt once per change — so per-date
+   *  lookups in day-loops (home feed, calendar) are O(1) instead of scanning
+   *  the whole (now full-history) list on every call. */
+  readonly byDate = computed(() => {
+    const map = new Map<string, Workout[]>();
+    for (const w of this.workouts()) {
+      const bucket = map.get(w.date) ?? [];
+      bucket.push(w);
+      map.set(w.date, bucket);
+    }
+    return map;
+  });
+
   readonly exercisesWithData = computed((): Set<string> =>
     new Set(
       this.doneWorkouts()
@@ -328,15 +341,15 @@ export class WorkoutService {
   todayDateString(): string { return this._todayStr; }
 
   getWorkoutForDate(date: string): Workout | null {
-    return this.workouts().find(w => w.date === date) ?? null;
+    return this.byDate().get(date)?.[0] ?? null;
   }
 
   getWorkoutsForDate(date: string): Workout[] {
-    return this.workouts().filter(w => w.date === date);
+    return this.byDate().get(date) ?? [];
   }
 
   getPlannedForDate(date: string): Workout[] {
-    return this.plannedWorkouts().filter(w => w.date === date);
+    return this.plannedByDate().get(date) ?? [];
   }
 
   getDoneWorkoutsForDate(date: string): Workout[] {
