@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { WorkoutService } from './workout.service';
 import { SportService } from './sport.service';
 import { TemplateService } from './template.service';
+import { UserSettingsService } from './user-settings.service';
 import { addDays, mondayOf, workoutCategories } from '../../shared/utils/calendar-utils';
 import { WeeklyPlan } from '../models/weekly-plan.model';
 import { WorkoutEntry } from '../models/workout.model';
@@ -10,9 +11,13 @@ import { ExerciseCategory } from '../models/exercise.model';
 import { TemplateEntry } from '../models/template.model';
 
 export const WEEKS_SINGLE    = 1;
-/** ~3 months — the routine is materialized this far ahead once, when saved
- *  (see Configuració > Estableix rutines), not re-applied on every visit. */
+/** ~3 months — how far ahead the recurring routine is materialized, both
+ *  when saved (see Configuració > Estableix rutines) and when the horizon
+ *  is topped up on app start via ensureRoutineHorizon(). */
 export const WEEKS_RECURRING = 13;
+/** ensureRoutineHorizon() re-applies the routine when fewer than this many
+ *  days of planned workouts remain materialized. */
+export const HORIZON_MIN_DAYS = 28;
 
 /**
  * 'routine' = the persistent recurring routine (Configuració > Estableix
@@ -36,6 +41,7 @@ export class WeeklyPlanService {
   private workoutService  = inject(WorkoutService);
   private sportService    = inject(SportService);
   private templateService = inject(TemplateService);
+  private settingsService = inject(UserSettingsService);
 
   /** `startMonday` lets a caller target a specific week (e.g. "plan the week
    *  I'm viewing right now") instead of always anchoring to the current one.
@@ -87,6 +93,46 @@ export class WeeklyPlanService {
           }
         }
       }
+    }
+
+    // Record how far the routine now reaches so ensureRoutineHorizon() can
+    // top it up before it runs out. Extend-only: re-applying a shorter
+    // window (e.g. a retry) must never shrink the recorded horizon.
+    if (source === 'routine') {
+      const until   = addDays(monday, weeks * 7 - 1);
+      const current = this.settingsService.settings().routineMaterializedUntil;
+      if (!current || until > current) {
+        await this.settingsService.update({ routineMaterializedUntil: until });
+      }
+    }
+  }
+
+  /**
+   * Re-materializes the recurring routine when its horizon runs low.
+   * The routine is applied WEEKS_RECURRING ahead when saved in the planner;
+   * without this, planned workouts silently stop appearing ~3 months later
+   * and the routine looks broken. apply() is idempotent (it skips dates
+   * that already have the item), so calling this on every app start is safe.
+   */
+  async ensureRoutineHorizon(): Promise<void> {
+    const plan = this.settingsService.weeklyPlan();
+    if (!plan.recurring || !plan.days.some(items => items.length > 0)) return;
+
+    const until = this.settingsService.settings().routineMaterializedUntil;
+    if (until && until >= addDays(TODAY(), HORIZON_MIN_DAYS)) return;
+
+    // Items that reference a template need the template list to be loaded
+    // before entries can be resolved.
+    const needsTemplates = plan.days.some(items =>
+      items.some(i => i.type === 'gym' && !!i.templateId));
+    if (needsTemplates) await this._waitForTemplates();
+
+    await this.apply(plan, WEEKS_RECURRING, undefined, 'routine');
+  }
+
+  private async _waitForTemplates(): Promise<void> {
+    for (let i = 0; i < 50 && !this.templateService.isLoaded(); i++) {
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
   }
 

@@ -41,6 +41,10 @@ export interface UserSettings {
   onboardingDone: boolean;
   fitnessGoal: FitnessGoal | null;
   weeklyPlan: WeeklyPlan | null;
+  /** Last date (inclusive) the recurring routine was materialized to as
+   *  planned workouts/sessions — lets the app re-apply the routine before
+   *  the horizon runs out instead of silently stopping after ~3 months. */
+  routineMaterializedUntil?: string;
   /** User asked to stop seeing the "set up a routine" reminder on Train. */
   routineHintDismissed: boolean;
   /** Built-in template suggestions (Plantilles page) the user dismissed. */

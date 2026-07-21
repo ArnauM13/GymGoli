@@ -1,10 +1,13 @@
 import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 
-import { WeeklyPlanService } from './weekly-plan.service';
+import { WEEKS_RECURRING, WeeklyPlanService } from './weekly-plan.service';
 import { WorkoutService } from './workout.service';
 import { SportService } from './sport.service';
 import { TemplateService } from './template.service';
-import { WeeklyPlan } from '../models/weekly-plan.model';
+import { UserSettingsService } from './user-settings.service';
+import { DEFAULT_USER_SETTINGS, UserSettings } from '../models/user-settings.model';
+import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../models/weekly-plan.model';
 import { Workout } from '../models/workout.model';
 import { SportSession } from '../models/sport.model';
 import { WorkoutTemplate } from '../models/template.model';
@@ -40,6 +43,8 @@ describe('WeeklyPlanService', () => {
   let logSession: jasmine.Spy;
   let deleteSession: jasmine.Spy;
   let templates: WorkoutTemplate[];
+  let settingsState: ReturnType<typeof signal<UserSettings>>;
+  let settingsUpdate: jasmine.Spy;
   let service: WeeklyPlanService;
 
   beforeEach(() => {
@@ -58,6 +63,9 @@ describe('WeeklyPlanService', () => {
     logSession                = jasmine.createSpy().and.resolveTo(undefined);
     deleteSession             = jasmine.createSpy().and.resolveTo(undefined);
     templates                 = [];
+    settingsState             = signal<UserSettings>({ ...DEFAULT_USER_SETTINGS });
+    settingsUpdate            = jasmine.createSpy('update').and.callFake(
+      async (patch: Partial<UserSettings>) => settingsState.update(s => ({ ...s, ...patch })));
 
     TestBed.configureTestingModule({
       providers: [
@@ -83,7 +91,15 @@ describe('WeeklyPlanService', () => {
         },
         {
           provide: TemplateService,
-          useValue: { templates: () => templates },
+          useValue: { templates: () => templates, isLoaded: () => true },
+        },
+        {
+          provide: UserSettingsService,
+          useValue: {
+            settings:   () => settingsState(),
+            weeklyPlan: () => settingsState().weeklyPlan ?? EMPTY_WEEKLY_PLAN,
+            update:     settingsUpdate,
+          },
         },
       ],
     });
@@ -339,6 +355,48 @@ describe('WeeklyPlanService', () => {
       ]);
       deleteWorkout.and.rejectWith(new Error('network error'));
       await expectAsync(service.retractRemoved(emptyPlan(), 1)).toBeResolved();
+    });
+  });
+
+  // Mocked "today" is Wednesday 2024-03-06 → monday 2024-03-04, so applying
+  // WEEKS_RECURRING (13) weeks reaches sunday 2024-06-02.
+  describe('routine horizon (re-materialization)', () => {
+    it('apply() with source routine records how far the routine reaches', async () => {
+      await service.apply(planWithGymOn(4, 'push', true), WEEKS_RECURRING, undefined, 'routine');
+      expect(settingsUpdate).toHaveBeenCalledWith({ routineMaterializedUntil: '2024-06-02' });
+    });
+
+    it('apply() never shrinks the recorded horizon', async () => {
+      settingsState.update(s => ({ ...s, routineMaterializedUntil: '2024-12-31' }));
+      await service.apply(planWithGymOn(4, 'push', true), WEEKS_RECURRING, undefined, 'routine');
+      expect(settingsUpdate).not.toHaveBeenCalled();
+    });
+
+    it('ensureRoutineHorizon() re-applies a recurring routine whose horizon ran low', async () => {
+      settingsState.update(s => ({
+        ...s,
+        weeklyPlan: planWithGymOn(4, 'push', true),
+        routineMaterializedUntil: '2024-03-10', // fewer than HORIZON_MIN_DAYS away
+      }));
+      await service.ensureRoutineHorizon();
+      expect(createPlannedWorkout).toHaveBeenCalled();
+      expect(settingsUpdate).toHaveBeenCalledWith({ routineMaterializedUntil: '2024-06-02' });
+    });
+
+    it('ensureRoutineHorizon() does nothing while the horizon is still far away', async () => {
+      settingsState.update(s => ({
+        ...s,
+        weeklyPlan: planWithGymOn(4, 'push', true),
+        routineMaterializedUntil: '2024-06-02',
+      }));
+      await service.ensureRoutineHorizon();
+      expect(createPlannedWorkout).not.toHaveBeenCalled();
+    });
+
+    it('ensureRoutineHorizon() ignores non-recurring plans', async () => {
+      settingsState.update(s => ({ ...s, weeklyPlan: planWithGymOn(4, 'push', false) }));
+      await service.ensureRoutineHorizon();
+      expect(createPlannedWorkout).not.toHaveBeenCalled();
     });
   });
 });

@@ -23,7 +23,7 @@ RLS a totes les taules per-usuari.
 | 4 | Errors de xarxa silenciats (buit ≠ error) | 🔴 P0 | `[x]` |
 | 5 | Zero observabilitat en producció | 🔴 P0 | `[ ]` |
 | 6 | Pla de còpies de seguretat | 🔴 P0 | `[ ]` |
-| 7 | La rutina setmanal caduca en silenci (13 setmanes) | 🟠 P1 | `[ ]` |
+| 7 | La rutina setmanal caduca en silenci (13 setmanes) | 🟠 P1 | `[x]` |
 | 8 | Delete de workout no encuat offline | 🟠 P1 | `[ ]` |
 | 9 | `SyncService` sense tests | 🟠 P1 | `[ ]` |
 | 10 | Exportació de dades (JSON/CSV) | 🟠 P1 | `[ ]` |
@@ -238,7 +238,17 @@ restaurant-lo en un projecte de prova.
 
 ## 🟠 P1 — Fluxos i robustesa
 
-### 7. `[ ]` Re-materialització automàtica de la rutina setmanal
+### 7. `[x]` Re-materialització automàtica de la rutina setmanal — **fet 2026-07-20** (branca `claude/app-state-analysis-x73qzl`)
+
+> **Com s'ha resolt:** nou camp `routineMaterializedUntil` a `user_settings`;
+> `apply()` amb source `routine` el registra (només estenent, mai encongint).
+> Nou `WeeklyPlanService.ensureRoutineHorizon()`: si la rutina és recurrent i
+> queden menys de `HORIZON_MIN_DAYS` (28) dies materialitzats, re-aplica la
+> rutina `WEEKS_RECURRING` setmanes més (idempotent — `apply()` ja salta els
+> dies existents). Es dispara un cop per arrencada des d'`AppComponent`,
+> diferit 3 s per no competir amb el primer render, i espera la càrrega de
+> plantilles si la rutina en referencia. Cobert amb 5 tests nous a
+> `weekly-plan.service.spec.ts`.
 
 **Context.** `WEEKS_RECURRING = 13` (`weekly-plan.service.ts:15`): la rutina
 es materialitza ~3 mesos **només quan es desa al planner**. Després s'acaba

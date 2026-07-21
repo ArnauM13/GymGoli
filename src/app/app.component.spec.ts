@@ -8,6 +8,7 @@ import { AppComponent } from './app.component';
 import { AuthService } from './core/services/auth.service';
 import { OfflineService } from './core/services/offline.service';
 import { UserSettingsService } from './core/services/user-settings.service';
+import { WeeklyPlanService } from './core/services/weekly-plan.service';
 import { DEFAULT_USER_SETTINGS } from './core/models/user-settings.model';
 
 @Component({ selector: 'app-stub', template: '', standalone: true })
@@ -55,6 +56,10 @@ describe('AppComponent', () => {
         {
           provide: MatSnackBar,
           useValue: { open: jasmine.createSpy('open') },
+        },
+        {
+          provide: WeeklyPlanService,
+          useValue: { ensureRoutineHorizon: jasmine.createSpy('ensureRoutineHorizon').and.resolveTo(undefined) },
         },
       ],
     })
