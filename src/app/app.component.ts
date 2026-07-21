@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, EnvironmentInjector, computed, effect, inject, signal } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -9,7 +9,6 @@ import { UserSettingsService } from './core/services/user-settings.service';
 import { OfflineService } from './core/services/offline.service';
 import { NavigationHistoryService } from './core/services/navigation-history.service';
 import { UpdateService } from './core/services/update.service';
-import { WeeklyPlanService } from './core/services/weekly-plan.service';
 import { NavBarComponent } from './shared/components/nav-bar/nav-bar.component';
 import { OnboardingComponent } from './shared/components/onboarding/onboarding.component';
 
@@ -102,7 +101,7 @@ export class AppComponent {
   private doc             = inject(DOCUMENT);
   private snackBar        = inject(MatSnackBar);
   private updateService   = inject(UpdateService);
-  private weeklyPlanService = inject(WeeklyPlanService);
+  private injector        = inject(EnvironmentInjector);
   // Injected here (unused directly) to start tracking navigation from the
   // very first route change, before any page needs goBack().
   private navigationHistory = inject(NavigationHistoryService);
@@ -136,11 +135,16 @@ export class AppComponent {
 
     // Top up the recurring routine's horizon once per app start, deferred
     // so it never competes with the first render / initial data loads.
+    // Dynamic import: WeeklyPlanService pulls the workout/sport services,
+    // which must stay out of the initial bundle.
     let horizonChecked = false;
     effect(() => {
       if (horizonChecked || !this.auth.user() || !this.settingsService.loaded()) return;
       horizonChecked = true;
-      setTimeout(() => this.weeklyPlanService.ensureRoutineHorizon(), 3000);
+      setTimeout(async () => {
+        const { WeeklyPlanService } = await import('./core/services/weekly-plan.service');
+        this.injector.get(WeeklyPlanService).ensureRoutineHorizon();
+      }, 3000);
     });
 
     effect(() => {
