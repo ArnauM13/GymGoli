@@ -14,7 +14,7 @@ import { ConfirmDialogService } from '../../shared/services/confirm-dialog.servi
 import { FeedbackService } from '../../shared/services/feedback.service';
 import {
   FitnessGoal, GoalMode, ThemeMode, WeightUnit,
-  FITNESS_GOAL_EMOJIS, FITNESS_GOAL_LABELS, FITNESS_GOAL_WEEKLY_DEFAULTS,
+  FITNESS_GOAL_EMOJIS, FITNESS_GOAL_LABELS,
 } from '../../core/models/user-settings.model';
 
 @Component({

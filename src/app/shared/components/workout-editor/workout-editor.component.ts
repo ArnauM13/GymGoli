@@ -1691,7 +1691,6 @@ export class WorkoutEditorComponent implements OnDestroy {
     this.rirValue.set(null);
     const w    = this.workout();
     const u    = this.unit();
-    const goal = this.settingsService.fitnessGoal();
     if (entry.sets.length === 0 && w) {
       const info = this.workoutService.getLastSessionInfo(entry.exerciseId, w.id);
       const goal = this.settingsService.fitnessGoal();

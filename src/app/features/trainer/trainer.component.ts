@@ -17,7 +17,6 @@ import {
 import { FeelingLevel, Workout, WorkoutEntry } from '../../core/models/workout.model';
 import { formatFeeling } from '../../shared/utils/workout-card.utils';
 
-type DashboardView = 'clients' | 'detail';
 
 @Component({
   selector: 'app-trainer',
