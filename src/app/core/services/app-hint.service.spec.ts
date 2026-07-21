@@ -37,11 +37,14 @@ describe('AppHintService', () => {
   it('dismiss() persists the id and advances to the next hint', () => {
     service.dismiss('discover-sports');
     expect(update).toHaveBeenCalledWith({ dismissedHints: ['discover-sports'] });
-    expect(service.nextDiscoveryHint()?.id).toBe('discover-templates');
+    expect(service.nextDiscoveryHint()?.id).toBe('discover-exercises');
   });
 
   it('returns null once every hint is dismissed', () => {
-    const all = ['discover-sports', 'discover-templates', 'discover-preferences', 'discover-advanced'];
+    const all = [
+      'discover-sports', 'discover-exercises', 'discover-templates', 'discover-goal',
+      'discover-progress', 'discover-preferences', 'discover-advanced',
+    ];
     dismissed.set(all);
     expect(service.nextDiscoveryHint()).toBeNull();
   });
