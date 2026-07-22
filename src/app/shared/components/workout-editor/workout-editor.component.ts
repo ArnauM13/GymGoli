@@ -661,9 +661,9 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       background: rgba(0,0,0,0.35);
     }
     .we-fatiga-popup {
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 201;
+      position: fixed; bottom: var(--nav-height); left: 0; right: 0; z-index: 201;
       background: var(--c-card); border-radius: 20px 20px 0 0;
-      padding: 20px 20px 32px;
+      padding: 20px 20px 24px;
       box-shadow: 0 -4px 24px var(--c-shadow-md);
     }
     .we-fatiga-popup-header {
@@ -788,9 +788,9 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
     /* ── Notes popup ── */
     .we-notes-popup {
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 201;
+      position: fixed; bottom: var(--nav-height); left: 0; right: 0; z-index: 201;
       background: var(--c-card); border-radius: 20px 20px 0 0;
-      padding: 20px 20px 32px;
+      padding: 20px 20px 24px;
       box-shadow: 0 -4px 24px var(--c-shadow-md);
       display: flex; flex-direction: column; gap: 14px;
     }
