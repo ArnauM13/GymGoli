@@ -5,6 +5,7 @@ import { DayFeedCardsComponent } from './day-feed-cards.component';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { SportService } from '../../../core/services/sport.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
+import { ExerciseService } from '../../../core/services/exercise.service';
 import { FeedbackService } from '../../services/feedback.service';
 import { Workout } from '../../../core/models/workout.model';
 
@@ -29,7 +30,8 @@ describe('DayFeedCardsComponent', () => {
       providers: [
         { provide: WorkoutService, useValue: { startPlannedWorkout } },
         { provide: SportService, useValue: { updateSession, deleteSession } },
-        { provide: UserSettingsService, useValue: { difficultyScale: signal('emoji') } },
+        { provide: UserSettingsService, useValue: { difficultyScale: signal('emoji'), bodyweightKg: signal(null) } },
+        { provide: ExerciseService, useValue: { loadTypeOf: () => undefined, getById: () => undefined } },
         { provide: FeedbackService, useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
       ],
     })

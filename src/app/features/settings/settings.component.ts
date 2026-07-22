@@ -12,6 +12,7 @@ import { WorkoutService } from '../../core/services/workout.service';
 import { TrainerService } from '../../core/services/trainer.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
+import { kgToDisplay, displayToKg } from '../../shared/utils/weight.utils';
 import {
   FitnessGoal, GoalMode, ThemeMode, WeightUnit,
   FITNESS_GOAL_EMOJIS, FITNESS_GOAL_LABELS,
@@ -263,6 +264,26 @@ import {
           <div class="unit-toggle">
             <button class="unit-btn" [class.unit-btn--active]="settingsService.weightUnit() === 'kg'" (click)="setWeightUnit('kg')">kg</button>
             <button class="unit-btn" [class.unit-btn--active]="settingsService.weightUnit() === 'lb'" (click)="setWeightUnit('lb')">lb</button>
+          </div>
+        </div>
+
+        <div class="setting-row setting-row--top">
+          <div class="setting-info">
+            <span class="setting-label">Pes corporal</span>
+            <span class="setting-desc">Per comptar els exercicis de propi pes (dominades, fons…) al volum.</span>
+          </div>
+          <div class="rest-input-wrap">
+            <input
+              class="rest-input"
+              type="number"
+              min="1"
+              max="500"
+              inputmode="decimal"
+              placeholder="—"
+              [value]="bodyweightDisplay() ?? ''"
+              (change)="setBodyweightFromInput($event)"
+            />
+            <span class="rest-input-unit">{{ settingsService.weightUnit() }}</span>
           </div>
         </div>
 
@@ -833,6 +854,20 @@ export class SettingsComponent {
   readonly fitnessGoalOptions = (Object.keys(FITNESS_GOAL_LABELS) as FitnessGoal[]).map(v => ({
     value: v, emoji: FITNESS_GOAL_EMOJIS[v], label: FITNESS_GOAL_LABELS[v],
   }));
+
+  /** Bodyweight shown in the user's unit (stored in kg), or null if unset. */
+  readonly bodyweightDisplay = computed(() => {
+    const kg = this.settingsService.bodyweightKg();
+    return kg != null ? kgToDisplay(kg, this.settingsService.weightUnit()) : null;
+  });
+
+  setBodyweightFromInput(ev: Event): void {
+    const raw = (ev.target as HTMLInputElement).value.trim().replace(',', '.');
+    if (raw === '') { this.settingsService.update({ bodyweightKg: null }); return; }
+    const val = Number(raw);
+    if (!Number.isFinite(val) || val <= 0) return;
+    this.settingsService.update({ bodyweightKg: displayToKg(val, this.settingsService.weightUnit()) });
+  }
 
   setFitnessGoal(goal: FitnessGoal): void {
     if (this.settingsService.fitnessGoal() === goal) {

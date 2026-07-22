@@ -1058,9 +1058,11 @@ export class CalendarPageComponent implements OnDestroy {
     return workout.entries.reduce((s, e) => s + e.sets.filter(set => !set.warmup).length, 0);
   }
   totalVolume(workout: Workout): number {
-    return Math.round(workout.entries.reduce((t, e) =>
-      t + e.sets.reduce((s, set) => set.warmup ? s : s + setVolume(set), 0), 0
-    ));
+    const bodyweightKg = this.settingsService.bodyweightKg();
+    return Math.round(workout.entries.reduce((t, e) => {
+      const ctx = { bodyweightKg, loadType: this.exerciseService.loadTypeOf(e.exerciseId) };
+      return t + e.sets.reduce((s, set) => set.warmup ? s : s + setVolume(set, ctx), 0);
+    }, 0));
   }
   volumeFmt(workout: Workout): string {
     const vol = this.dispW(this.totalVolume(workout));

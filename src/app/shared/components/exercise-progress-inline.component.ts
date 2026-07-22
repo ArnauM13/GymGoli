@@ -25,6 +25,7 @@ import {
 import { Workout, setMaxWeight, setVolume } from '../../core/models/workout.model';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
+import { ExerciseService } from '../../core/services/exercise.service';
 
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, Title, Tooltip, Legend);
 
@@ -154,6 +155,7 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
 
   private workoutService  = inject(WorkoutService);
   private settingsService = inject(UserSettingsService);
+  private exerciseService = inject(ExerciseService);
 
   readonly exerciseId   = input<string | null>(null);
   readonly exerciseName = input<string | null>(null);
@@ -221,7 +223,10 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
     const workingSets = entry.sets.filter(s => !s.warmup);
     if (!workingSets.length) return 0;
     if (metric === 'weight') return Math.max(...workingSets.map(s => setMaxWeight(s)));
-    return workingSets.reduce((sum, s) => sum + setVolume(s), 0);
+    // Volume folds in bodyweight so dominades & co. count their real load, not
+    // just the added weight (0 for pure bodyweight). "Pes màx" stays as logged.
+    const ctx = { bodyweightKg: this.settingsService.bodyweightKg(), loadType: this.exerciseService.loadTypeOf(exId) };
+    return workingSets.reduce((sum, s) => sum + setVolume(s, ctx), 0);
   }
 
   private _label(metric: Metric): string {

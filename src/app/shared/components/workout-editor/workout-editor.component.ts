@@ -177,7 +177,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                       <form [formGroup]="editSetForm" (ngSubmit)="saveEditSet()" class="we-inline-edit">
                         <div class="we-inline-inputs">
                           <div class="we-inline-group">
-                            <label for="edit-weight">{{ isUnilateral(entry) ? 'Esquerra' : 'Pes' }}</label>
+                            <label for="edit-weight">{{ weightLabel(entry, false) }}</label>
                             <div class="we-number-input compact">
                               <button type="button" (click)="adjustEditWeight(-1)" aria-label="Menys pes">−</button>
                               <input id="edit-weight" type="number" formControlName="weight" min="0" step="2.5"
@@ -343,7 +343,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                 <form [formGroup]="setForm" class="we-set-form">
                   <div class="we-set-inputs">
                     <div class="we-input-group">
-                      <label for="add-weight">{{ isUnilateral(entry) ? 'Esquerra (' + unit() + ')' : 'Pes (' + unit() + ')' }}</label>
+                      <label for="add-weight">{{ weightLabel(entry, true) }}</label>
                       <div class="we-number-input">
                         <button type="button" (click)="adjustWeight(-1)" aria-label="Menys pes">−</button>
                         <input id="add-weight" type="number" formControlName="weight" min="0" step="2.5"
@@ -1627,6 +1627,18 @@ export class WorkoutEditorComponent implements OnDestroy {
 
   isUnilateral(entry: WorkoutEntry): boolean {
     return !!this.exerciseService.getById(entry.exerciseId)?.unilateral;
+  }
+
+  /** Label for the weight input, reflecting how the exercise is loaded: for
+   *  bodyweight exercises you log the *added* weight, for assisted ones the
+   *  assistance removed. `withUnit` appends the unit for the add-set form. */
+  weightLabel(entry: WorkoutEntry, withUnit: boolean): string {
+    const loadType = this.exerciseService.getById(entry.exerciseId)?.loadType;
+    const base = this.isUnilateral(entry) ? 'Esquerra'
+      : loadType === 'bodyweight' ? 'Pes afegit'
+      : loadType === 'assisted'   ? 'Assistència'
+      : 'Pes';
+    return withUnit ? `${base} (${this.unit()})` : base;
   }
 
   /** Main stage + every drop stage, in order, so the template can render

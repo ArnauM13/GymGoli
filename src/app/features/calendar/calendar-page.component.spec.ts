@@ -35,6 +35,7 @@ describe('CalendarPageComponent', () => {
       exercises:    signal<any[]>([]),
       isLoaded:     signal(true),
       getById:      jasmine.createSpy().and.returnValue(null),
+      loadTypeOf:   () => undefined,
       ensureLoaded: jasmine.createSpy().and.resolveTo(undefined),
     };
 
@@ -55,7 +56,7 @@ describe('CalendarPageComponent', () => {
         { provide: ExerciseService,     useValue: mockExerciseService },
         { provide: SportService,        useValue: mockSportService },
         { provide: AuthService,         useValue: { uid: signal('user-1') } },
-        { provide: UserSettingsService, useValue: { weightUnit: signal<'kg' | 'lb'>('kg'), difficultyScale: signal('emoji') } },
+        { provide: UserSettingsService, useValue: { weightUnit: signal<'kg' | 'lb'>('kg'), difficultyScale: signal('emoji'), bodyweightKg: signal(null) } },
         { provide: FeedbackService,     useValue: { success: jasmine.createSpy(), error: jasmine.createSpy() } },
       ],
     })

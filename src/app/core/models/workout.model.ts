@@ -56,19 +56,42 @@ export interface WorkoutEntry {
   supersetGroupId?: string;
 }
 
-/** Heaviest weight lifted in this set, including per-side and drop stages. */
-export function setMaxWeight(set: WorkoutSet): number {
-  const base = Math.max(set.weight, set.weightLeft ?? 0, set.weightRight ?? 0);
-  return (set.drops ?? []).reduce((m, d) => Math.max(m, d.weight), base);
+/** Context that turns a logged weight into the real load moved, for bodyweight
+ *  and assisted exercises. Omitted (or without a bodyweight) → logged weight is
+ *  used as-is, so plain weighted exercises and unknown bodyweight behave as before. */
+export interface SetLoadContext {
+  /** How the exercise is loaded: 'weighted' (default), 'bodyweight' or 'assisted'. */
+  loadType?: 'weighted' | 'bodyweight' | 'assisted';
+  /** The user's bodyweight in kg. Falsy → bodyweight/assisted fall back to the
+   *  logged weight, so nothing changes until a bodyweight is set. */
+  bodyweightKg?: number | null;
 }
 
-/** Total volume (weight × reps) of this set, including any drop stages.
+/** Real load (kg) moved for one rep given how the exercise is loaded:
+ *  'bodyweight' adds the user's bodyweight to the logged (extra) weight,
+ *  'assisted' subtracts the logged assistance from it, else the logged weight. */
+export function effectiveRepWeight(logged: number, ctx?: SetLoadContext): number {
+  const bw = ctx?.bodyweightKg ?? 0;
+  if (bw > 0 && ctx?.loadType === 'bodyweight') return Math.max(0, bw + logged);
+  if (bw > 0 && ctx?.loadType === 'assisted')   return Math.max(0, bw - logged);
+  return logged;
+}
+
+/** Heaviest weight lifted in this set, including per-side and drop stages. */
+export function setMaxWeight(set: WorkoutSet, ctx?: SetLoadContext): number {
+  const w = (x: number) => effectiveRepWeight(x, ctx);
+  const base = Math.max(w(set.weight), w(set.weightLeft ?? 0), w(set.weightRight ?? 0));
+  return (set.drops ?? []).reduce((m, d) => Math.max(m, w(d.weight)), base);
+}
+
+/** Total volume (load × reps) of this set, including any drop stages.
  *  Unilateral sets count both sides' weight for that same rep count. */
-export function setVolume(set: WorkoutSet): number {
+export function setVolume(set: WorkoutSet, ctx?: SetLoadContext): number {
+  const w = (x: number) => effectiveRepWeight(x, ctx);
   const base = set.weightLeft != null && set.weightRight != null
-    ? (set.weightLeft + set.weightRight) * set.reps
-    : set.weight * set.reps;
-  return base + (set.drops ?? []).reduce((sum, d) => sum + d.weight * d.reps, 0);
+    ? (w(set.weightLeft) + w(set.weightRight)) * set.reps
+    : w(set.weight) * set.reps;
+  return base + (set.drops ?? []).reduce((sum, d) => sum + w(d.weight) * d.reps, 0);
 }
 
 export interface Workout {

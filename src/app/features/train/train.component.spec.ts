@@ -92,6 +92,7 @@ describe('TrainComponent', () => {
             weightUnit: signal<'kg' | 'lb'>('kg'), fitnessGoal: signal(null), loaded: signal(true),
             weeklyPlan: weeklyPlanSignal, settings: settingsSignal, update: updateSettings,
             supersetsEnabled: signal(false), dropsetsEnabled: signal(false), dismissedHints: signal<string[]>([]),
+            bodyweightKg: signal(null),
           },
         },
         { provide: OfflineService,      useValue: { isOffline: signal(false), forceOffline, toggleForceOffline: jasmine.createSpy() } },

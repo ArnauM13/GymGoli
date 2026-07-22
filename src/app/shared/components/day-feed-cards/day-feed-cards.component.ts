@@ -5,10 +5,12 @@ import { FeelingLevel, Workout } from '../../../core/models/workout.model';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { SportService } from '../../../core/services/sport.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
+import { ExerciseService } from '../../../core/services/exercise.service';
 import { FeedbackService } from '../../services/feedback.service';
 import {
   formatFeeling, getCatLabel, getExerciseNames, isWorkoutPlanned, sportSessionSummary,
-  workoutCardColor, workoutCategoryList, workoutPrimaryColor, workoutSetsCount, workoutVolumeFmt,
+  workoutCardColor, workoutCategoryList, workoutPrimaryColor, workoutSetsCount,
+  workoutVolumeFmt as workoutVolumeFmtUtil,
 } from '../../utils/workout-card.utils';
 
 export interface DayFeedEntry {
@@ -369,6 +371,7 @@ export class DayFeedCardsComponent {
   private workoutService = inject(WorkoutService);
   private sportService    = inject(SportService);
   private settingsService = inject(UserSettingsService);
+  private exerciseService = inject(ExerciseService);
   private feedback       = inject(FeedbackService);
 
   readonly day  = input<DayFeedEntry | null>(null);
@@ -392,7 +395,14 @@ export class DayFeedCardsComponent {
   readonly getCatLabel         = getCatLabel;
   readonly getExerciseNames    = getExerciseNames;
   readonly workoutSetsCount    = workoutSetsCount;
-  readonly workoutVolumeFmt    = workoutVolumeFmt;
+  /** Bodyweight-aware total volume label (folds in the user's bodyweight for
+   *  bodyweight/assisted exercises). */
+  workoutVolumeFmt(w: Workout): string {
+    return workoutVolumeFmtUtil(w, {
+      bodyweightKg: this.settingsService.bodyweightKg(),
+      loadTypeOf: this.exerciseService.loadTypeOf,
+    });
+  }
 
   emojiOf(level: FeelingLevel): string {
     return formatFeeling(level, this.settingsService.difficultyScale());

@@ -1,5 +1,16 @@
 export type ExerciseCategory = 'push' | 'pull' | 'legs';
 
+/**
+ * How an exercise is loaded, which decides how the logged weight becomes the
+ * real load moved (used for volume):
+ *  · 'weighted'   — external load only; the logged weight IS the load (default).
+ *  · 'bodyweight' — moves your own weight; the logged weight is EXTRA weight
+ *                   added on top (belt/dip-belt), 0 for pure bodyweight.
+ *  · 'assisted'   — bodyweight minus machine/band assistance; the logged weight
+ *                   is the assistance REMOVED from your bodyweight.
+ */
+export type LoadType = 'weighted' | 'bodyweight' | 'assisted';
+
 export type ExerciseSubcategory =
   | 'chest' | 'shoulders' | 'triceps'       // push
   | 'back' | 'biceps' | 'forearms'          // pull
@@ -91,6 +102,9 @@ export interface Exercise {
   repsRange?: [number, number];
   /** Worked one side at a time — lets the workout editor log weight per side. */
   unilateral?: boolean;
+  /** How the exercise is loaded (see {@link LoadType}). Undefined = 'weighted'.
+   *  For 'bodyweight'/'assisted' the volume calc folds in the user's bodyweight. */
+  loadType?: LoadType;
   createdAt: Date;
 }
 
@@ -133,7 +147,7 @@ export const DEFAULT_EXERCISES: Omit<Exercise, 'id' | 'createdAt'>[] = [
   },
   {
     name: 'Dominades', category: 'pull', subcategory: 'back',
-    muscles: ['esquena', 'biceps'],
+    muscles: ['esquena', 'biceps'], loadType: 'bodyweight',
     description: "Penja d'una barra amb agafada prona. Puja activant l'esquena fins que el mentó superi la barra. Baixa lentament i de forma controlada.",
     setsRange: [3, 5], repsRange: [5, 10],
   },

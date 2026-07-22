@@ -55,6 +55,10 @@ export interface UserSettings {
   /** Off by default — logging Reps In Reserve per set. */
   rirEnabled: boolean;
   difficultyScale: DifficultyScale;
+  /** User's bodyweight in kg, used to count bodyweight/assisted exercises
+   *  (dominades, fons…) towards volume. Null = not set → those exercises fall
+   *  back to their logged (added) weight only. */
+  bodyweightKg: number | null;
 }
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
@@ -76,4 +80,5 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   dropsetsEnabled: false,
   rirEnabled: false,
   difficultyScale: 'emoji',
+  bodyweightKg: null,
 };

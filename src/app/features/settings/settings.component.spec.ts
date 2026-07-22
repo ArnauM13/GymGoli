@@ -68,6 +68,7 @@ describe('SettingsComponent', () => {
             dropsetsEnabled:    signal(false),
             rirEnabled:         signal(false),
             difficultyScale:    signal('emoji'),
+            bodyweightKg:       signal(null),
             loaded:             signal(true),
             settings:           signal({
               metricsEnabled: false,

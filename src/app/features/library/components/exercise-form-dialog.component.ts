@@ -9,6 +9,7 @@ import {
   CATEGORY_LABELS,
   Exercise,
   ExerciseCategory,
+  LoadType,
   MUSCLE_OPTIONS,
   SUBCATEGORY_OPTIONS,
 } from '../../../core/models/exercise.model';
@@ -118,6 +119,21 @@ const MUSCLE_GROUPS: { label: string; values: string[] }[] = [
                 color="primary"
               />
             </div>
+          </div>
+
+          <!-- Càrrega -->
+          <div class="field">
+            <span class="field-label">Càrrega</span>
+            <div class="chips-row">
+              @for (opt of loadTypeOptions; track opt.value) {
+                <button type="button" class="chip"
+                        [class.selected]="loadType() === opt.value"
+                        (click)="loadType.set(opt.value)">
+                  {{ opt.label }}
+                </button>
+              }
+            </div>
+            <span class="unilateral-desc">{{ loadTypeDesc() }}</span>
           </div>
 
           <!-- Guia sèries i reps -->
@@ -380,6 +396,18 @@ export class ExerciseFormDialogComponent {
 
   readonly unilateral = signal(!!this.data.exercise?.unilateral);
 
+  readonly loadType = signal<LoadType>(this.data.exercise?.loadType ?? 'weighted');
+  readonly loadTypeOptions: { value: LoadType; label: string }[] = [
+    { value: 'weighted',   label: 'Amb pes' },
+    { value: 'bodyweight', label: 'Propi pes' },
+    { value: 'assisted',   label: 'Assistit' },
+  ];
+  readonly loadTypeDesc = computed(() => ({
+    weighted:   'Càrrega externa: el pes que registres és la càrrega (barra, mancuernes, màquina).',
+    bodyweight: 'Mous el teu propi pes; registres el pes AFEGIT (cinturó llastrat), 0 si és només el cos. Es compta amb el teu pes corporal per al volum.',
+    assisted:   "Propi pes menys assistència; registres l'assistència que et treu la màquina o goma.",
+  }[this.loadType()]));
+
   readonly categories = (Object.keys(CATEGORY_LABELS) as ExerciseCategory[]).map(value => ({
     value,
     label: CATEGORY_LABELS[value],
@@ -443,6 +471,7 @@ export class ExerciseFormDialogComponent {
       setsRange,
       repsRange,
       unilateral: this.unilateral() || undefined,
+      loadType: this.loadType() !== 'weighted' ? this.loadType() : undefined,
     });
   }
 

@@ -28,11 +28,13 @@ import { WorkoutEditorComponent } from '../../shared/components/workout-editor/w
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
 import { AppHintService } from '../../core/services/app-hint.service';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
+import { ExerciseService } from '../../core/services/exercise.service';
 import { ExerciseSuggestionService } from '../../core/services/exercise-suggestion.service';
 import { ExerciseSuggestion } from '../../shared/utils/exercise-suggestion.util';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import {
-  formatFeeling, workoutCardColor, workoutPrimaryColor, workoutVolumeFmt,
+  formatFeeling, workoutCardColor, workoutPrimaryColor,
+  workoutVolumeFmt as workoutVolumeFmtUtil,
 } from '../../shared/utils/workout-card.utils';
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
@@ -1176,6 +1178,7 @@ export class TrainComponent {
   readonly settingsService = inject(UserSettingsService);
   private templateService  = inject(TemplateService);
   private suggestionService = inject(ExerciseSuggestionService);
+  private exerciseService  = inject(ExerciseService);
   private sharedWorkoutService = inject(SharedWorkoutService);
   private profileService   = inject(WorkoutProfileService);
   readonly hintService     = inject(AppHintService);
@@ -1551,7 +1554,14 @@ export class TrainComponent {
 
   readonly workoutCardColor    = workoutCardColor;
   readonly workoutPrimaryColor = workoutPrimaryColor;
-  readonly workoutVolumeFmt    = workoutVolumeFmt;
+  /** Bodyweight-aware total volume label — folds in the user's bodyweight for
+   *  bodyweight/assisted exercises (dominades, fons…). */
+  workoutVolumeFmt(w: Workout): string {
+    return workoutVolumeFmtUtil(w, {
+      bodyweightKg: this.settingsService.bodyweightKg(),
+      loadTypeOf: this.exerciseService.loadTypeOf,
+    });
+  }
 
   emojiOf(level: FeelingLevel): string {
     return formatFeeling(level, this.settingsService.difficultyScale());

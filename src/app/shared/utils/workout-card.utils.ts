@@ -1,4 +1,4 @@
-import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
+import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory, LoadType } from '../../core/models/exercise.model';
 import { FEELING_EMOJI, FeelingLevel, Workout, setVolume } from '../../core/models/workout.model';
 import { DifficultyScale } from '../../core/models/user-settings.model';
 import { Sport } from '../../core/models/sport.model';
@@ -47,13 +47,23 @@ export function workoutSetsCount(w: Workout): number {
   return w.entries.reduce((sum, e) => sum + e.sets.filter(s => !s.warmup).length, 0);
 }
 
-export function workoutVolume(w: Workout): number {
-  return w.entries.reduce((sum, e) =>
-    sum + e.sets.reduce((s2, set) => set.warmup ? s2 : s2 + setVolume(set), 0), 0);
+/** Optional bodyweight context so bodyweight/assisted exercises count their
+ *  real load. Omitted → every exercise is treated as plain weighted (as before). */
+export interface WorkoutVolumeContext {
+  bodyweightKg?: number | null;
+  /** Load type of an exercise by id; undefined → 'weighted'. */
+  loadTypeOf?: (exerciseId: string) => LoadType | undefined;
 }
 
-export function workoutVolumeFmt(w: Workout): string {
-  const vol = workoutVolume(w);
+export function workoutVolume(w: Workout, ctx?: WorkoutVolumeContext): number {
+  return w.entries.reduce((sum, e) => {
+    const setCtx = { bodyweightKg: ctx?.bodyweightKg, loadType: ctx?.loadTypeOf?.(e.exerciseId) };
+    return sum + e.sets.reduce((s2, set) => set.warmup ? s2 : s2 + setVolume(set, setCtx), 0);
+  }, 0);
+}
+
+export function workoutVolumeFmt(w: Workout, ctx?: WorkoutVolumeContext): string {
+  const vol = workoutVolume(w, ctx);
   if (vol <= 0) return '';
   if (vol >= 1000) return `${(vol / 1000).toFixed(1)}t`;
   return `${Math.round(vol)}kg`;
