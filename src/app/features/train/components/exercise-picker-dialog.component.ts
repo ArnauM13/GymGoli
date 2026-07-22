@@ -18,6 +18,11 @@ export interface ExercisePickerData {
    * but the user can freely switch to any other category.
    */
   defaultCategory?: ExerciseCategory;
+  /**
+   * Learned next-exercise guesses (ordered), surfaced as a "Suggerits per tu"
+   * group at the top of the list while browsing the default category.
+   */
+  suggestions?: { exerciseId: string; reason: string }[];
 }
 
 @Component({
@@ -45,6 +50,21 @@ export interface ExercisePickerData {
           </div>
         }
       } @else {
+        @if (suggestedGroup().length) {
+          <div class="muscle-group-header muscle-group-header--sugg">
+            <span class="material-symbols-outlined">auto_awesome</span> Suggerits per tu
+          </div>
+          @for (s of suggestedGroup(); track s.ex.id) {
+            <button class="exercise-item exercise-item--sugg" (click)="select(s.ex)">
+              <span class="category-dot" [style.background]="getCategoryColor(s.ex.category)"></span>
+              <div class="info">
+                <span class="name">{{ s.ex.name }}</span>
+                <span class="sub sub--sugg">{{ s.reason }}</span>
+              </div>
+              <span class="material-symbols-outlined arrow">chevron_right</span>
+            </button>
+          }
+        }
         @if (groupedFiltered().length === 0) {
           <div class="empty">
             <p class="empty-msg">Cap exercici trobat</p>
@@ -113,6 +133,14 @@ export interface ExercisePickerData {
       text-transform: uppercase; letter-spacing: 0.4px;
       &:not(:first-child) { margin-top: 4px; border-top: 1px solid var(--c-border-2); padding-top: 12px; }
     }
+
+    .muscle-group-header--sugg {
+      display: flex; align-items: center; gap: 5px;
+      color: var(--c-brand); border-top: none !important; margin-top: 0 !important;
+      .material-symbols-outlined { font-size: 14px; }
+    }
+    .exercise-item--sugg { background: rgba(var(--c-brand-rgb), 0.045); }
+    .sub--sugg { color: var(--c-brand); font-weight: 600; }
 
     .category-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
     .info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
@@ -210,6 +238,22 @@ export class ExercisePickerDialogComponent {
       .filter(e => !excluded.includes(e.id))
       .filter(e => !cat || e.category === cat)
       .filter(e => !term || e.name.toLowerCase().includes(term));
+  });
+
+  /** "Suggerits per tu": the learned next-exercise guesses resolved to real
+   *  catalog exercises. Only shown while browsing (no active search) and on
+   *  the default category, so it never fights the user's own filtering. */
+  readonly suggestedGroup = computed(() => {
+    if (this.searchTerm().trim()) return [];
+    const cat = this.catFilter();
+    if (cat !== null && cat !== this.data.defaultCategory) return [];
+
+    const excluded = this.data.excludeIds ?? [];
+    const byId = new Map(this.exerciseService.exercises().map(e => [e.id, e]));
+    return (this.data.suggestions ?? [])
+      .filter(s => !excluded.includes(s.exerciseId))
+      .map(s => ({ ex: byId.get(s.exerciseId), reason: s.reason }))
+      .filter((s): s is { ex: Exercise; reason: string } => !!s.ex);
   });
 
   /** Subdivides filtered() by main muscle group (subcategory), in a fixed
