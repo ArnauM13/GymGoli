@@ -1,7 +1,8 @@
-import { Component, ViewChild, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, HostListener, ViewChild, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs/operators';
 import { FormsModule } from '@angular/forms';
+import { A11yModule } from '@angular/cdk/a11y';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { workoutCategories } from '../../shared/utils/calendar-utils';
@@ -49,7 +50,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 @Component({
   selector: 'app-train',
   standalone: true,
-  imports: [FormsModule, WorkoutEditorComponent, PageHeaderComponent],
+  imports: [FormsModule, A11yModule, WorkoutEditorComponent, PageHeaderComponent],
   template: `
     <div class="page" [style.padding-bottom]="pagePaddingBottom()">
 
@@ -215,11 +216,13 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
         <!-- ── Save as template bottom sheet ── -->
         @if (saveTemplateOpen()) {
-          <div class="aw-tpl-backdrop" (click)="saveTemplateOpen.set(false)"></div>
-          <div class="aw-tpl-sheet">
+          <div class="aw-tpl-backdrop sheet-backdrop" (click)="saveTemplateOpen.set(false)" aria-hidden="true"></div>
+          <div class="aw-tpl-sheet sheet-float" role="dialog" aria-modal="true"
+               aria-labelledby="aw-tpl-title" cdkTrapFocus cdkTrapFocusAutoCapture>
+            <span class="sheet-handle" aria-hidden="true"></span>
             <div class="aw-tpl-header">
-              <span class="aw-tpl-title">Guardar com a plantilla</span>
-              <button class="aw-tpl-close" (click)="saveTemplateOpen.set(false)">
+              <span class="aw-tpl-title" id="aw-tpl-title">Guardar com a plantilla</span>
+              <button class="aw-tpl-close" (click)="saveTemplateOpen.set(false)" aria-label="Tancar">
                 <span class="material-symbols-outlined">close</span>
               </button>
             </div>
@@ -362,13 +365,15 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     <!-- ── Template picker bottom sheet ── -->
     @if (pickerCat()) {
-      <div class="tp-backdrop" (click)="closePicker()"></div>
-      <div class="tp-sheet">
+      <div class="tp-backdrop sheet-backdrop" (click)="closePicker()" aria-hidden="true"></div>
+      <div class="tp-sheet sheet-float" role="dialog" aria-modal="true"
+           aria-labelledby="tp-title" cdkTrapFocus cdkTrapFocusAutoCapture>
+        <span class="sheet-handle" aria-hidden="true"></span>
         <div class="tp-header">
           <div class="tp-header-left">
             <div class="tp-dot" [style.background]="pickerColor()"></div>
             <div class="tp-header-info">
-              <span class="tp-title">{{ pickerLabel() }}</span>
+              <span class="tp-title" id="tp-title">{{ pickerLabel() }}</span>
               <span class="tp-muscles">{{ pickerMuscles() }}</span>
             </div>
           </div>
@@ -425,14 +430,16 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
 
     <!-- ── Session logger bottom sheet ── -->
     @if (loggerSport(); as sport) {
-      <div class="sl-backdrop" (click)="closeSessionLogger()"></div>
-      <div class="sl-sheet">
+      <div class="sl-backdrop sheet-backdrop" (click)="closeSessionLogger()" aria-hidden="true"></div>
+      <div class="sl-sheet sheet-float" role="dialog" aria-modal="true"
+           aria-labelledby="sl-title" cdkTrapFocus cdkTrapFocusAutoCapture>
+        <span class="sheet-handle" aria-hidden="true"></span>
         <div class="sl-header">
           <div class="sl-header-left">
-            <span class="material-symbols-outlined sl-sport-icon" [style.color]="sport.color">
+            <span class="material-symbols-outlined sl-sport-icon" [style.color]="sport.color" aria-hidden="true">
               {{ sport.icon }}
             </span>
-            <span class="sl-sport-name">{{ sport.name }}</span>
+            <span class="sl-sport-name" id="sl-title">{{ sport.name }}</span>
           </div>
           <button class="sl-close" (click)="closeSessionLogger()" aria-label="Tancar">
             <span class="material-symbols-outlined">close</span>
@@ -740,19 +747,40 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       &.aw-menu-item--danger:hover { background: rgba(239,83,80,0.07); }
     }
 
+    /* ── Floating bottom sheets ──────────────────────────────────────────────
+     * Shared shell for the picker / logger / save-template sheets. With the
+     * new capsule nav they no longer sit flat on the bottom edge: they float
+     * above the nav pill (inset margins, all corners rounded) and slide up
+     * from below. Per-sheet rules keep only their own padding + content. */
+    .sheet-backdrop { animation: sheet-fade-in 0.28s ease both; }
+    .sheet-float {
+      position: fixed; z-index: 201;
+      left: 12px; right: 12px; bottom: calc(var(--nav-height) + 8px);
+      margin: 0 auto; max-width: 460px;
+      max-height: calc(100dvh - var(--nav-height) - 28px); overflow-y: auto;
+      background: var(--c-card); border-radius: 24px;
+      border: 1px solid color-mix(in srgb, var(--c-border) 55%, transparent);
+      box-shadow: 0 16px 44px rgba(0,0,0,0.24), 0 4px 14px rgba(0,0,0,0.10);
+      animation: sheet-float-in 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    .sheet-handle {
+      display: block; width: 40px; height: 4px; margin: 2px auto 12px;
+      border-radius: 999px; background: var(--c-border); flex-shrink: 0;
+    }
+    @keyframes sheet-float-in {
+      from { opacity: 0; transform: translateY(115%); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes sheet-fade-in { from { opacity: 0; } to { opacity: 1; } }
+    /* Honour reduced-motion: fade in place instead of sliding. */
+    @media (prefers-reduced-motion: reduce) {
+      .sheet-float { animation: sheet-fade-in 0.2s ease both; }
+      .sheet-backdrop { animation-duration: 0.2s; }
+    }
+
     /* ── Save as template sheet ── */
-    .aw-tpl-backdrop { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.4); }
-    .aw-tpl-sheet {
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 201;
-      background: var(--c-card); border-radius: 20px 20px 0 0;
-      padding: 20px 20px 36px;
-      box-shadow: 0 -4px 24px var(--c-shadow-md);
-      animation: sheet-in 0.25s cubic-bezier(0.32, 1.2, 0.64, 1) both;
-    }
-    @keyframes sheet-in {
-      from { transform: translateY(100%); }
-      to   { transform: translateY(0); }
-    }
+    .aw-tpl-backdrop { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.42); }
+    .aw-tpl-sheet { padding: 8px 20px 22px; }
     .aw-tpl-header {
       display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;
     }
@@ -947,20 +975,9 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     /* ── Template picker bottom sheet ── */
     .tp-backdrop {
       position: fixed; inset: 0; z-index: 200;
-      background: rgba(0,0,0,0.4);
+      background: rgba(0,0,0,0.42);
     }
-    .tp-sheet {
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 201;
-      background: var(--c-card); border-radius: 20px 20px 0 0;
-      padding: 20px 16px 40px;
-      box-shadow: 0 -4px 24px var(--c-shadow-md);
-      max-height: 80vh; overflow-y: auto;
-      animation: tp-in 0.25s cubic-bezier(0.32, 1.2, 0.64, 1) both;
-    }
-    @keyframes tp-in {
-      from { transform: translateY(100%); }
-      to   { transform: translateY(0); }
-    }
+    .tp-sheet { padding: 8px 16px 20px; }
     .tp-header {
       display: flex; align-items: center; justify-content: space-between;
       margin-bottom: 16px;
@@ -1084,24 +1101,12 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     /* ── Session logger bottom sheet ── */
     .sl-backdrop {
       position: fixed; inset: 0; z-index: 200;
-      background: rgba(0,0,0,0.4);
-      animation: fade-in 0.18s ease;
+      background: rgba(0,0,0,0.42);
     }
-    @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-
-    .sl-sheet {
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 201;
-      background: var(--c-card); border-radius: 24px 24px 0 0;
-      padding: 0 16px calc(env(safe-area-inset-bottom) + 16px);
-      max-height: 85vh; overflow-y: auto;
-      box-shadow: 0 -4px 24px rgba(0,0,0,0.14);
-      animation: sheet-up 0.22s cubic-bezier(0.34, 1.2, 0.64, 1);
-    }
-    @keyframes sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
-
+    .sl-sheet { padding: 8px 16px 16px; }
     .sl-header {
       display: flex; align-items: center;
-      padding: 16px 0 12px; border-bottom: 1px solid var(--c-border-2); margin-bottom: 12px;
+      padding: 4px 0 12px; border-bottom: 1px solid var(--c-border-2); margin-bottom: 12px;
     }
     .sl-header-left { flex: 1; display: flex; align-items: center; gap: 10px; }
     .sl-sport-icon {
@@ -1679,6 +1684,16 @@ export class TrainComponent {
   }
 
   closePicker(): void { this.pickerCat.set(null); }
+
+  /** Dismiss the top-most open overlay with Escape (picker · logger · save
+   *  sheet · action menu), for keyboard and accessibility. */
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    if (this.saveTemplateOpen()) { this.saveTemplateOpen.set(false); return; }
+    if (this.loggerSport())      { this.closeSessionLogger(); return; }
+    if (this.pickerCat())        { this.closePicker(); return; }
+    if (this.workoutMenuOpen())  { this.workoutMenuOpen.set(false); }
+  }
 
   /** Create a planned workout (future date) or a live one (today/past), then open it. */
   private async _createForSelectedDate(cat: ExerciseCategory, entries: WorkoutEntry[]): Promise<string> {
