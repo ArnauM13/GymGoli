@@ -1334,6 +1334,11 @@ export class TrainComponent {
     const w = this.activeWorkout();
     if (!w || (w.status ?? 'done') === 'planned') return [];
     if (this.reorderMode() || this.groupingMode()) return [];
+    // "Sèrie activa" is your *next* move while training, so it stays quiet
+    // until you've actually started — at least one logged set in the session.
+    // Before that (empty card, or an exercise added but no set done) a "next
+    // exercise" hint is premature noise.
+    if (!w.entries.some(e => e.sets.length > 0)) return [];
     const category = (w.category ?? workoutCategories(w)[0]) as ExerciseCategory | undefined;
     if (!category) return [];
     const currentIds = w.entries.map(e => e.exerciseId);

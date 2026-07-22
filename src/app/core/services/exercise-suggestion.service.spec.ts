@@ -75,6 +75,17 @@ describe('ExerciseSuggestionService', () => {
     expect(out[0].exerciseId).toBe('bi1');
   });
 
+  it('stops suggesting once the session reaches the typical size', () => {
+    doneWorkouts.set([
+      workout('2024-01-01', 'pull', ['back1', 'bi1']),
+      workout('2024-01-05', 'pull', ['back1', 'bi1']),
+    ]);
+    // Typical pull day = 2 exercises. With 2 already added, stay quiet…
+    expect(service.suggest('pull', ['back1', 'bi1'])).toEqual([]);
+    // …but with just 1, it still helps fill out the day.
+    expect(service.suggest('pull', ['back1']).length).toBeGreaterThan(0);
+  });
+
   it('ignores workouts of other categories', () => {
     doneWorkouts.set([
       workout('2024-01-01', 'push', ['back1', 'bi1']),

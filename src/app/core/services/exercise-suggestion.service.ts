@@ -47,9 +47,25 @@ export class ExerciseSuggestionService {
     const sources = this.buildSources(category);
     if (sources.length < MIN_SOURCES) return [];
 
+    // Stay quiet once the day already matches the user's typical size for this
+    // kind of session: past that point we'd be nudging extra volume, not
+    // helping fill out a normal workout.
+    if (currentEntryIds.length >= this.typicalSessionSize(sources)) return [];
+
     return suggestNextExercises({
       category, currentEntryIds, sources, exerciseById, limit,
     });
+  }
+
+  /** Weighted-average number of exercises per day across the learnable sources
+   *  — the user's "normal" session size for this category (at least 1). */
+  private typicalSessionSize(sources: SuggestionSource[]): number {
+    let lenSum = 0, weightSum = 0;
+    for (const s of sources) {
+      lenSum += s.exerciseIds.length * s.weight;
+      weightSum += s.weight;
+    }
+    return weightSum > 0 ? Math.max(1, Math.round(lenSum / weightSum)) : 1;
   }
 
   /** Ordered training days the engine learns from: past workouts of this
