@@ -123,10 +123,13 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
               </div>
             }
 
-            <!-- ── Last session info banner (read-only — adding sets only ever
-                 happens via the "Afegir" button below) ── -->
+            <!-- ── Last session info banner — tap to copy every set from the
+                 previous session into this exercise ── -->
             @if (lastSessionData()?.exerciseId === entry.exerciseId && entry.sets.length === 0 && addingFor() === entry.exerciseId && !recData()) {
-              <div class="we-last-session-banner">
+              <div class="we-last-session-banner" role="button" tabindex="0"
+                (click)="applyLastSession(entry.exerciseId)"
+                (keydown.enter)="applyLastSession(entry.exerciseId)"
+                (keydown.space)="applyLastSession(entry.exerciseId)">
                 <span class="material-symbols-outlined we-lsb-icon">history</span>
                 <div class="we-lsb-info">
                   <span class="we-lsb-label">Última sessió</span>
@@ -729,7 +732,8 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       display: flex; align-items: center; gap: 10px;
       margin: 10px 14px; padding: 10px 14px;
       background: rgba(var(--c-brand-rgb), 0.07); border: 1px solid rgba(var(--c-brand-rgb), 0.15);
-      border-radius: 10px;
+      border-radius: 10px; cursor: pointer; transition: background 0.15s;
+      &:hover { background: rgba(var(--c-brand-rgb), 0.13); }
     }
     .we-lsb-icon { font-size: 20px; color: var(--c-brand); flex-shrink: 0; }
     .we-lsb-info { display: flex; flex-direction: column; gap: 1px; flex: 1; }
@@ -1859,6 +1863,18 @@ export class WorkoutEditorComponent implements OnDestroy {
     }
   }
 
+  async applyLastSession(exerciseId: string): Promise<void> {
+    const data = this.lastSessionData();
+    const w    = this.workout();
+    if (!data || !w || data.sets.length === 0) return;
+    try {
+      await this.workoutService.addSetsToEntry(w.id, exerciseId, data.sets);
+      this.lastSessionData.set(null);
+      this.cancelSet();
+    } catch {
+      this.feedback.error('Error en aplicar l\'última sessió', 3000);
+    }
+  }
 
   async removeSet(exerciseId: string, index: number): Promise<void> {
     const w = this.workout();
