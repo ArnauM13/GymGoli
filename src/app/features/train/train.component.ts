@@ -27,6 +27,8 @@ import { WorkoutEditorComponent } from '../../shared/components/workout-editor/w
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
 import { AppHintService } from '../../core/services/app-hint.service';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
+import { ExerciseSuggestionService } from '../../core/services/exercise-suggestion.service';
+import { ExerciseSuggestion } from '../../shared/utils/exercise-suggestion.util';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import {
   formatFeeling, workoutCardColor, workoutPrimaryColor, workoutVolumeFmt,
@@ -133,6 +135,30 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           [groupingMode]="groupingMode()"
           (requestAddExercise)="openPicker()"
         />
+
+        <!-- ── Sèrie activa: proper exercici suggerit (aprèn de l'usuari) ── -->
+        @if (exerciseSuggestions(); as sugg) {
+          @if (sugg.length && !reorderMode() && !groupingMode()) {
+            <div class="aw-suggest">
+              <div class="aw-suggest-head">
+                <span class="material-symbols-outlined aw-suggest-icon">auto_awesome</span>
+                <span class="aw-suggest-title">Sèrie activa</span>
+                <span class="aw-suggest-sub">El teu proper exercici</span>
+              </div>
+              <div class="aw-suggest-list">
+                @for (s of sugg; track s.exerciseId) {
+                  <button class="aw-suggest-chip" (click)="addSuggestion(s)">
+                    <span class="aw-suggest-chip-top">
+                      <span class="material-symbols-outlined aw-suggest-add">add</span>
+                      <span class="aw-suggest-name">{{ s.exerciseName }}</span>
+                    </span>
+                    <span class="aw-suggest-reason">{{ s.reason }}</span>
+                  </button>
+                }
+              </div>
+            </div>
+          }
+        }
 
         <!-- ── Nudge contextual: desa'l com a plantilla ── -->
         @if (w.entries.length >= 2 && !offlineService.isOffline()
@@ -654,6 +680,38 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
       &:hover { background: var(--c-subtle); color: var(--c-text-2); }
     }
 
+    /* ── Sèrie activa (proper exercici suggerit) ── */
+    .aw-suggest {
+      margin: 12px 16px 0; padding: 12px;
+      background: color-mix(in srgb, var(--c-brand) 5%, var(--c-card));
+      border: 1.5px solid color-mix(in srgb, var(--c-brand) 20%, var(--c-border-2));
+      border-radius: 14px;
+      animation: aw-suggest-in 0.25s ease;
+    }
+    @keyframes aw-suggest-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    .aw-suggest-head { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+    .aw-suggest-icon { font-size: 18px; color: var(--c-brand); flex-shrink: 0; }
+    .aw-suggest-title { font-size: 12.5px; font-weight: 800; color: var(--c-text); }
+    .aw-suggest-sub {
+      font-size: 10.5px; font-weight: 600; color: var(--c-text-3);
+      text-transform: uppercase; letter-spacing: 0.3px; margin-left: auto;
+    }
+    .aw-suggest-list { display: flex; flex-direction: column; gap: 6px; }
+    .aw-suggest-chip {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+      width: 100%; padding: 9px 12px; text-align: left;
+      background: var(--c-card); border: 1.5px solid var(--c-border-2); border-radius: 11px;
+      cursor: pointer; touch-action: manipulation; transition: border-color 0.15s, background 0.15s;
+      &:hover { border-color: var(--c-brand); background: color-mix(in srgb, var(--c-brand) 6%, var(--c-card)); }
+    }
+    .aw-suggest-chip-top { display: flex; align-items: center; gap: 7px; }
+    .aw-suggest-add {
+      font-size: 18px; color: var(--c-brand);
+      background: rgba(var(--c-brand-rgb), 0.12); border-radius: 7px; padding: 2px;
+    }
+    .aw-suggest-name { font-size: 14px; font-weight: 700; color: var(--c-text); }
+    .aw-suggest-reason { font-size: 11px; color: var(--c-text-3); padding-left: 29px; line-height: 1.3; }
+
     .aw-menu-dropdown {
       position: fixed; right: 16px;
       bottom: calc(var(--nav-height) + 16px + 56px + 10px);
@@ -1152,6 +1210,7 @@ export class TrainComponent {
   readonly trainerService  = inject(TrainerService);
   readonly settingsService = inject(UserSettingsService);
   private templateService  = inject(TemplateService);
+  private suggestionService = inject(ExerciseSuggestionService);
   private sharedWorkoutService = inject(SharedWorkoutService);
   private profileService   = inject(WorkoutProfileService);
   readonly hintService     = inject(AppHintService);
@@ -1302,6 +1361,19 @@ export class TrainComponent {
       .map(c => WORKOUT_TYPES.find(t => t.value === c))
       .filter((t): t is typeof WORKOUT_TYPES[0] => !!t)
   );
+
+  /** "Sèrie activa": learned next-exercise guesses for the live workout,
+   *  derived from the user's own history + templates. Hidden while
+   *  reordering/grouping and for planned days (this is a live-training aid). */
+  readonly exerciseSuggestions = computed((): ExerciseSuggestion[] => {
+    const w = this.activeWorkout();
+    if (!w || (w.status ?? 'done') === 'planned') return [];
+    if (this.reorderMode() || this.groupingMode()) return [];
+    const category = (w.category ?? workoutCategories(w)[0]) as ExerciseCategory | undefined;
+    if (!category) return [];
+    const currentIds = w.entries.map(e => e.exerciseId);
+    return this.suggestionService.suggest(category, currentIds, 3);
+  });
 
 
   readonly pickerCat = signal<ExerciseCategory | null>(null);
@@ -1681,31 +1753,52 @@ export class TrainComponent {
     const w               = this.activeWorkout();
     const excludeIds      = w?.entries.map(e => e.exerciseId) ?? [];
     const defaultCategory = (newCategory ?? w?.category) as ExerciseCategory | undefined;
+    const suggestions     = defaultCategory
+      ? this.suggestionService.suggest(defaultCategory, excludeIds, 5)
+          .map(s => ({ exerciseId: s.exerciseId, reason: s.reason }))
+      : [];
 
     const ref = this.dialog.open(ExercisePickerDialogComponent, {
-      data: { excludeIds, defaultCategory }, width: '420px', maxHeight: '80vh',
+      data: { excludeIds, defaultCategory, suggestions }, width: '420px', maxHeight: '80vh',
     });
 
-    ref.afterClosed().subscribe(async (exercise: Exercise | undefined) => {
+    ref.afterClosed().subscribe((exercise: Exercise | undefined) => {
       if (!exercise) return;
-      try {
-        let workoutId = w?.id;
-        if (!workoutId) {
-          workoutId = await this.workoutService.createWorkoutForDate(this.selectedDate(), defaultCategory);
-          this.activeWorkoutId.set(workoutId);
-        }
-
-        await this.workoutService.addExerciseToWorkout(workoutId, {
-          exerciseId: exercise.id, exerciseName: exercise.name, sets: [],
-        });
-
-        setTimeout(() => {
-          this.editor?.startAddSet({ exerciseId: exercise.id, exerciseName: exercise.name, sets: [] });
-        }, 0);
-      } catch {
-        this.feedback.error('Error en afegir l\'exercici', 3000);
-      }
+      this.addExerciseToActive(exercise.id, exercise.name, defaultCategory);
     });
+  }
+
+  /** Adds a suggestion from the "Sèrie activa" strip straight into the live
+   *  workout, then opens its set editor — same flow as picking from the dialog. */
+  addSuggestion(s: ExerciseSuggestion): void {
+    const w = this.activeWorkout();
+    if (!w || w.entries.some(e => e.exerciseId === s.exerciseId)) return;
+    const defaultCategory = (w.category ?? workoutCategories(w)[0]) as ExerciseCategory | undefined;
+    this.addExerciseToActive(s.exerciseId, s.exerciseName, defaultCategory);
+  }
+
+  /** Shared add flow: ensures a workout exists for the selected date, appends
+   *  the exercise, then jumps into its set editor. */
+  private async addExerciseToActive(
+    exerciseId: string, exerciseName: string, defaultCategory?: ExerciseCategory,
+  ): Promise<void> {
+    try {
+      let workoutId = this.activeWorkout()?.id;
+      if (!workoutId) {
+        workoutId = await this.workoutService.createWorkoutForDate(this.selectedDate(), defaultCategory);
+        this.activeWorkoutId.set(workoutId);
+      }
+
+      await this.workoutService.addExerciseToWorkout(workoutId, {
+        exerciseId, exerciseName, sets: [],
+      });
+
+      setTimeout(() => {
+        this.editor?.startAddSet({ exerciseId, exerciseName, sets: [] });
+      }, 0);
+    } catch {
+      this.feedback.error('Error en afegir l\'exercici', 3000);
+    }
   }
 
   // ── Sport helpers ─────────────────────────────────────────────────────────
