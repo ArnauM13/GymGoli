@@ -539,10 +539,10 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
       <!-- ── Fatiga popup ── -->
       @if (feelingPickerFor()) {
-        <div class="we-sheet-backdrop" (click)="closeFatigaPicker()" aria-hidden="true"></div>
-        <div class="we-sheet we-fatiga-popup" role="dialog" aria-modal="true"
+        <div class="bottom-sheet-backdrop" (click)="closeFatigaPicker()" aria-hidden="true"></div>
+        <div class="bottom-sheet we-fatiga-popup" role="dialog" aria-modal="true"
              aria-labelledby="we-fatiga-title" cdkTrapFocus cdkTrapFocusAutoCapture>
-          <span class="we-sheet-handle" aria-hidden="true"></span>
+          <span class="bottom-sheet-handle" aria-hidden="true"></span>
           <div class="we-fatiga-popup-header">
             <span class="we-fatiga-popup-title" id="we-fatiga-title">Fatiga</span>
             @if (fatigaEntry()?.feeling) {
@@ -568,10 +568,10 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
       <!-- ── Notes popup ── -->
       @if (notesPopupFor()) {
-        <div class="we-sheet-backdrop" (click)="closeNotesPopup()" aria-hidden="true"></div>
-        <div class="we-sheet we-notes-popup" role="dialog" aria-modal="true"
+        <div class="bottom-sheet-backdrop" (click)="closeNotesPopup()" aria-hidden="true"></div>
+        <div class="bottom-sheet we-notes-popup" role="dialog" aria-modal="true"
              aria-labelledby="we-notes-title" cdkTrapFocus cdkTrapFocusAutoCapture>
-          <span class="we-sheet-handle" aria-hidden="true"></span>
+          <span class="bottom-sheet-handle" aria-hidden="true"></span>
           <div class="we-notes-popup-header">
             <span class="material-symbols-outlined we-notes-popup-icon" aria-hidden="true">sticky_note_2</span>
             <span class="we-notes-popup-title" id="we-notes-title">Nota de l'exercici</span>
@@ -663,44 +663,8 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
 
 
-    /* ── Bottom sheets (fatiga · notes) ──
-     * Float above the new capsule nav instead of sitting flat on it: inset
-     * side margins align with the nav pill, all four corners are rounded and
-     * the sheet slides up from below. */
-    .we-sheet-backdrop {
-      position: fixed; inset: 0; z-index: 200;
-      background: rgba(0,0,0,0.42);
-      animation: we-backdrop-in 0.28s ease both;
-    }
-    .we-sheet {
-      position: fixed; z-index: 201;
-      left: 12px; right: 12px; bottom: calc(var(--nav-height) + 8px);
-      margin: 0 auto; max-width: 460px;
-      background: var(--c-card); border-radius: 24px;
-      padding: 16px 20px 22px;
-      border: 1px solid color-mix(in srgb, var(--c-border) 55%, transparent);
-      box-shadow: 0 16px 44px rgba(0,0,0,0.24), 0 4px 14px rgba(0,0,0,0.10);
-      animation: we-sheet-in 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
-    }
-    .we-sheet-handle {
-      display: block; width: 40px; height: 4px; margin: 0 auto 14px;
-      border-radius: 999px; background: var(--c-border);
-    }
-    @keyframes we-sheet-in {
-      from { opacity: 0; transform: translateY(115%); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes we-backdrop-in {
-      from { opacity: 0; }
-      to   { opacity: 1; }
-    }
-    /* Respect users who ask for less motion: fade in place, no slide. */
-    @media (prefers-reduced-motion: reduce) {
-      .we-sheet { animation: we-backdrop-in 0.2s ease both; }
-      .we-sheet-backdrop { animation-duration: 0.2s; }
-    }
-
-    /* ── Fatiga popup ── */
+    /* ── Fatiga popup (floating bottom sheet — see global .bottom-sheet) ── */
+    .we-fatiga-popup { padding: 12px 20px 22px; }
     .we-fatiga-popup-header {
       display: flex; align-items: center; justify-content: space-between;
       margin-bottom: 20px;
@@ -821,8 +785,8 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       &:hover { background: var(--c-hover); }
     }
 
-    /* ── Notes popup ── */
-    .we-notes-popup { display: flex; flex-direction: column; gap: 14px; }
+    /* ── Notes popup (floating bottom sheet — see global .bottom-sheet) ── */
+    .we-notes-popup { display: flex; flex-direction: column; gap: 14px; padding: 12px 20px 22px; }
     .we-notes-popup-header {
       display: flex; align-items: center; gap: 8px;
     }
@@ -1544,9 +1508,11 @@ export class WorkoutEditorComponent implements OnDestroy {
   }
   getFeelingLabel(level: FeelingLevel): string { return FEELING_LABEL[level]; }
 
-  /** Dismiss the open bottom sheet with Escape (fatiga · notes). */
+  /** Dismiss the open bottom sheet with Escape (fatiga · notes). Skips while a
+   *  Material dialog is open so its own Escape handling wins. */
   @HostListener('document:keydown.escape')
   onEscape(): void {
+    if (this.dialog.openDialogs.length) return;
     if (this.notesPopupFor()) { this.closeNotesPopup(); return; }
     if (this.feelingPickerFor()) { this.closeFatigaPicker(); }
   }

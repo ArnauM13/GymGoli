@@ -163,3 +163,45 @@ html.dark {
     }
   }
 }
+
+// ── Floating bottom sheet ───────────────────────────────────────────────────
+// Shared shell for every bottom-anchored dropdown/picker/logger/editor in the
+// app (fatiga, notes, workout picker, sport logger, save-as-template, template
+// editor, …). Since the nav became a floating capsule, sheets no longer sit
+// flat on the bottom edge: they float *above* the nav pill (inset side margins,
+// all four corners rounded) and slide up from below. A component just adds
+// `.bottom-sheet-backdrop` to its backdrop and `.bottom-sheet` to its panel,
+// with a `.bottom-sheet-handle` grabber on top, and keeps only its own padding
+// and inner content styles. Defined globally so any new sheet inherits it.
+.bottom-sheet-backdrop {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0, 0, 0, 0.42);
+  animation: bottom-sheet-fade 0.28s ease both;
+}
+.bottom-sheet {
+  position: fixed; z-index: 201;
+  left: 12px; right: 12px; bottom: calc(var(--nav-height) + 8px);
+  margin: 0 auto; max-width: 460px;
+  max-height: calc(100dvh - var(--nav-height) - 28px); overflow-y: auto;
+  background: var(--c-card); border-radius: 24px;
+  border: 1px solid color-mix(in srgb, var(--c-border) 55%, transparent);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.24), 0 4px 14px rgba(0, 0, 0, 0.10);
+  animation: bottom-sheet-in 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.bottom-sheet-handle {
+  display: block; width: 40px; height: 4px; margin: 2px auto 12px;
+  border-radius: 999px; background: var(--c-border); flex-shrink: 0;
+}
+@keyframes bottom-sheet-in {
+  from { opacity: 0; transform: translateY(115%); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes bottom-sheet-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+// Honour users who prefer less motion: fade in place, no slide.
+@media (prefers-reduced-motion: reduce) {
+  .bottom-sheet { animation: bottom-sheet-fade 0.2s ease both; }
+  .bottom-sheet-backdrop { animation-duration: 0.2s; }
+}

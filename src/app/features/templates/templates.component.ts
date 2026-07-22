@@ -1,7 +1,8 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, HostListener, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
+import { A11yModule } from '@angular/cdk/a11y';
 
 import { CATEGORY_COLORS, CATEGORY_LABELS, Exercise, ExerciseCategory } from '../../core/models/exercise.model';
 import { BUILT_IN_TEMPLATES, BuiltInTemplate, TemplateEntry, WorkoutTemplate } from '../../core/models/template.model';
@@ -38,7 +39,7 @@ const CAT_LABEL: Record<EditorCat, string> = {
 @Component({
   selector: 'app-templates',
   standalone: true,
-  imports: [FormsModule, DragDropModule, PageHeaderComponent],
+  imports: [FormsModule, DragDropModule, A11yModule, PageHeaderComponent],
   template: `
     <div class="page">
 
@@ -149,12 +150,14 @@ const CAT_LABEL: Record<EditorCat, string> = {
 
     <!-- ── Editor bottom sheet ── -->
     @if (editorOpen()) {
-      <div class="editor-backdrop" (click)="closeEditor()"></div>
-      <div class="editor-sheet">
+      <div class="editor-backdrop bottom-sheet-backdrop" (click)="closeEditor()" aria-hidden="true"></div>
+      <div class="editor-sheet bottom-sheet" role="dialog" aria-modal="true"
+           aria-labelledby="editor-title" cdkTrapFocus cdkTrapFocusAutoCapture>
+        <span class="bottom-sheet-handle" aria-hidden="true"></span>
 
         <div class="editor-header">
-          <span class="editor-title">{{ editingId() ? 'Editar plantilla' : 'Nova plantilla' }}</span>
-          <button class="editor-close" (click)="closeEditor()">
+          <span class="editor-title" id="editor-title">{{ editingId() ? 'Editar plantilla' : 'Nova plantilla' }}</span>
+          <button class="editor-close" (click)="closeEditor()" aria-label="Tancar">
             <span class="material-symbols-outlined">close</span>
           </button>
         </div>
@@ -328,23 +331,8 @@ const CAT_LABEL: Record<EditorCat, string> = {
       &:hover { border-color: var(--c-brand); border-style: solid; background: rgba(var(--c-brand-rgb), 0.1); }
     }
 
-    /* ── Editor sheet ── */
-    .editor-backdrop {
-      position: fixed; inset: 0; z-index: 200;
-      background: rgba(0,0,0,0.4);
-    }
-    .editor-sheet {
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 201;
-      background: var(--c-card); border-radius: 20px 20px 0 0;
-      padding: 20px 20px 36px;
-      box-shadow: 0 -4px 24px var(--c-shadow-md);
-      max-height: 85vh; overflow-y: auto;
-      animation: sheet-in 0.25s cubic-bezier(0.32, 1.2, 0.64, 1) both;
-    }
-    @keyframes sheet-in {
-      from { transform: translateY(100%); }
-      to   { transform: translateY(0); }
-    }
+    /* ── Editor sheet (floating bottom sheet — see global .bottom-sheet) ── */
+    .editor-sheet { padding: 8px 20px 22px; }
 
     .editor-header {
       display: flex; align-items: center; justify-content: space-between;
@@ -516,6 +504,15 @@ export class TemplatesComponent {
   }
 
   closeEditor(): void { this.editorOpen.set(false); }
+
+  /** Close the editor sheet with Escape, for keyboard and accessibility.
+   *  Skips while a Material dialog (e.g. the exercise picker) is open so its
+   *  own Escape handling takes precedence. */
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    if (this.dialog.openDialogs.length) return;
+    if (this.editorOpen()) this.closeEditor();
+  }
 
   pickExercise(): void {
     const existingIds  = this.editorEntries.map(e => e.exerciseId);
