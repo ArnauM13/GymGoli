@@ -270,7 +270,7 @@ import {
         <div class="setting-row setting-row--top">
           <div class="setting-info">
             <span class="setting-label">Pes corporal</span>
-            <span class="setting-desc">Per comptar els exercicis de propi pes (dominades, fons…) al volum.</span>
+            <span class="setting-desc">Opcional. Si l'afegeixes, els exercicis de propi pes (dominades, fons…) sumaran volum. Si no, es registren igual però no compten al volum.</span>
           </div>
           <div class="rest-input-wrap">
             <input

@@ -403,6 +403,37 @@ animation: bar-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 Use `cubic-bezier(0.34, 1.4, 0.64, 1)` for cards (subtle overshoot) and
 `cubic-bezier(0.34, 1.56, 0.64, 1)` for bottom bars (more bounce).
 
+### Floating bottom sheet
+
+Every bottom-anchored dropdown/picker/logger/editor (fatiga, notes, workout
+picker, sport logger, save-as-template, template editor…) uses **one shared
+global shell** defined in `styles.scss` — never re-implement its positioning or
+animation per component. With the floating capsule nav, sheets float *above* the
+nav pill (inset side margins, all four corners rounded) and slide up from below.
+
+```html
+<div class="bottom-sheet-backdrop" (click)="close()" aria-hidden="true"></div>
+<div class="bottom-sheet my-sheet" role="dialog" aria-modal="true"
+     aria-labelledby="my-sheet-title" cdkTrapFocus cdkTrapFocusAutoCapture>
+  <span class="bottom-sheet-handle" aria-hidden="true"></span>
+  <h2 id="my-sheet-title">…</h2>
+  …
+</div>
+```
+
+- Add `.bottom-sheet-backdrop` to the backdrop, `.bottom-sheet` to the panel,
+  and a `.bottom-sheet-handle` grabber as the first child. The component keeps
+  **only** its own `padding` and inner content styles (the shell owns position,
+  size, rounding, shadow, slide-up + backdrop-fade animation, `max-height`
+  with internal scroll, and `prefers-reduced-motion`).
+- **Accessibility (always):** `role="dialog"`, `aria-modal="true"`,
+  `aria-labelledby` pointing at the title, `cdkTrapFocus cdkTrapFocusAutoCapture`
+  (import `A11yModule`), and Escape-to-close via a
+  `@HostListener('document:keydown.escape')` that no-ops while a Material dialog
+  is open (`this.dialog.openDialogs.length`).
+- Floating cards that aren't full sheets (rest timer, confirm bars) sit above
+  the nav with `bottom: calc(var(--nav-height) + N)` — never a hardcoded px.
+
 ---
 
 ## 9. Interaction Patterns

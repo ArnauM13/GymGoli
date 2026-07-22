@@ -180,6 +180,21 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           </div>
         }
 
+        <!-- ── Nudge contextual: pes corporal per comptar la calistènia al volum ── -->
+        @if (needsBodyweightHint()) {
+          <div class="aw-nudge">
+            <span class="material-symbols-outlined aw-nudge-icon">monitor_weight</span>
+            <div class="aw-nudge-text">
+              <span class="aw-nudge-title">Comptar la calistènia al volum?</span>
+              <span class="aw-nudge-sub">Afegeix el teu pes corporal i les dominades i companyia sumaran volum. Si no, es registren igual però no compten al volum — tu tries.</span>
+            </div>
+            <button class="aw-nudge-cta" (click)="router.navigate(['/settings'])">Afegir</button>
+            <button class="aw-nudge-x" (click)="hintService.dismiss('nudge-bodyweight-volume')" aria-label="No tornar a mostrar">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+        }
+
         <!-- ── Three-dots action menu ── -->
         @if (workoutMenuOpen()) {
           <div class="aw-menu-backdrop" (click)="workoutMenuOpen.set(false)"></div>
@@ -1348,6 +1363,22 @@ export class TrainComponent {
     return this.suggestionService.suggest(category, currentIds, 3);
   });
 
+
+  /** Show the "add your bodyweight" nudge when the live workout has a
+   *  bodyweight/assisted exercise but no bodyweight is set — so calisthenics
+   *  can count towards volume. Dismissible: not adding it is a valid choice
+   *  (those sets are still logged, just not in the volume total). */
+  readonly needsBodyweightHint = computed(() => {
+    const w = this.activeWorkout();
+    if (!w || (w.status ?? 'done') === 'planned') return false;
+    if (this.reorderMode() || this.groupingMode()) return false;
+    if (this.settingsService.bodyweightKg() != null) return false;
+    if (this.hintService.isDismissed('nudge-bodyweight-volume')) return false;
+    return w.entries.some(e => {
+      const lt = this.exerciseService.getById(e.exerciseId)?.loadType;
+      return lt === 'bodyweight' || lt === 'assisted';
+    });
+  });
 
   readonly pickerCat = signal<ExerciseCategory | null>(null);
 
