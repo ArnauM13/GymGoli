@@ -31,16 +31,18 @@ interface NavItem {
     </nav>
   `,
   styles: [`
-    /* Outer band keeps the full --nav-height footprint so fixed elements that
-     * clear the nav via calc(var(--nav-height) + N) still line up; the visible
-     * bar is a floating capsule centred inside it. */
+    /* The nav floats over the page: it's an absolutely-positioned, transparent
+     * band pinned to the bottom, so page content scrolls underneath the capsule
+     * instead of sitting on an opaque shelf. The band keeps the full
+     * --nav-height footprint so fixed elements that clear the nav via
+     * calc(var(--nav-height) + N) still line up. */
     .bottom-nav {
-      flex-shrink: 0;
+      position: absolute; left: 0; right: 0; bottom: 0;
       height: var(--nav-height);
       box-sizing: border-box;
       display: flex; align-items: center;
       padding: 0 14px calc(env(safe-area-inset-bottom, 0px));
-      background: var(--c-bg);
+      background: transparent;
       pointer-events: none;
     }
 

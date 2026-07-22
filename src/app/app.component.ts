@@ -45,6 +45,7 @@ import { OnboardingComponent } from './shared/components/onboarding/onboarding.c
       height: 100vh;
       height: 100dvh;
       padding-top: env(safe-area-inset-top, 0);
+      position: relative;
     }
 
     .app-content {
@@ -52,6 +53,11 @@ import { OnboardingComponent } from './shared/components/onboarding/onboarding.c
       overflow-y: auto;
       overflow-x: hidden;
       position: relative;
+      /* The nav floats over the content (see nav-bar.component). Reserve its
+       * footprint here — instead of the nav's old opaque flex band — so every
+       * page's resting layout is unchanged and content scrolls underneath the
+       * floating capsule. */
+      padding-bottom: var(--nav-height);
     }
 
     /* ── Offline page overlay ── */
