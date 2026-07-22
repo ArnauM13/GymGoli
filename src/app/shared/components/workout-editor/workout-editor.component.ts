@@ -1,6 +1,7 @@
-import { Component, OnDestroy, ViewEncapsulation, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { Component, HostListener, OnDestroy, ViewEncapsulation, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
+import { A11yModule } from '@angular/cdk/a11y';
 import { MatDialog } from '@angular/material/dialog';
 
 import { CATEGORY_COLORS, CATEGORY_LABELS, SUBCATEGORY_LABELS } from '../../../core/models/exercise.model';
@@ -29,7 +30,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 @Component({
   selector: 'app-workout-editor',
   standalone: true,
-  imports: [ReactiveFormsModule, DragDropModule, ExerciseEntryCardComponent],
+  imports: [ReactiveFormsModule, DragDropModule, A11yModule, ExerciseEntryCardComponent],
   encapsulation: ViewEncapsulation.None,
   template: `
     @if (workout(); as w) {
@@ -538,12 +539,14 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
       <!-- ── Fatiga popup ── -->
       @if (feelingPickerFor()) {
-        <div class="we-fatiga-backdrop" (click)="closeFatigaPicker()"></div>
-        <div class="we-fatiga-popup">
+        <div class="we-sheet-backdrop" (click)="closeFatigaPicker()" aria-hidden="true"></div>
+        <div class="we-sheet we-fatiga-popup" role="dialog" aria-modal="true"
+             aria-labelledby="we-fatiga-title" cdkTrapFocus cdkTrapFocusAutoCapture>
+          <span class="we-sheet-handle" aria-hidden="true"></span>
           <div class="we-fatiga-popup-header">
-            <span class="we-fatiga-popup-title">Fatiga</span>
+            <span class="we-fatiga-popup-title" id="we-fatiga-title">Fatiga</span>
             @if (fatigaEntry()?.feeling) {
-              <button class="we-fatiga-clear-btn" (click)="clearFeeling()">
+              <button class="we-fatiga-clear-btn" (click)="clearFeeling()" aria-label="Esborrar fatiga">
                 <span class="material-symbols-outlined">close</span>
               </button>
             }
@@ -552,8 +555,10 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
             @for (level of feelingLevels; track level) {
               <button type="button" class="we-fatiga-option"
                 [class.selected]="fatigaEntry()?.feeling === level"
+                [attr.aria-pressed]="fatigaEntry()?.feeling === level"
+                [attr.aria-label]="getFeelingLabel(level)"
                 (click)="pickFeeling(level)">
-                <span class="we-fatiga-option-emoji">{{ getFeelingEmoji(level) }}</span>
+                <span class="we-fatiga-option-emoji" aria-hidden="true">{{ getFeelingEmoji(level) }}</span>
                 <span class="we-fatiga-option-label">{{ getFeelingLabel(level) }}</span>
               </button>
             }
@@ -563,20 +568,23 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
       <!-- ── Notes popup ── -->
       @if (notesPopupFor()) {
-        <div class="we-fatiga-backdrop" (click)="closeNotesPopup()"></div>
-        <div class="we-notes-popup">
+        <div class="we-sheet-backdrop" (click)="closeNotesPopup()" aria-hidden="true"></div>
+        <div class="we-sheet we-notes-popup" role="dialog" aria-modal="true"
+             aria-labelledby="we-notes-title" cdkTrapFocus cdkTrapFocusAutoCapture>
+          <span class="we-sheet-handle" aria-hidden="true"></span>
           <div class="we-notes-popup-header">
-            <span class="material-symbols-outlined we-notes-popup-icon">sticky_note_2</span>
-            <span class="we-notes-popup-title">Nota de l'exercici</span>
+            <span class="material-symbols-outlined we-notes-popup-icon" aria-hidden="true">sticky_note_2</span>
+            <span class="we-notes-popup-title" id="we-notes-title">Nota de l'exercici</span>
             @if (notesText()) {
-              <button class="we-notes-clear-btn" (click)="notesText.set('')" title="Esborrar nota">
+              <button class="we-notes-clear-btn" (click)="notesText.set('')" aria-label="Esborrar nota">
                 <span class="material-symbols-outlined">close</span>
               </button>
             }
           </div>
-          <textarea class="we-notes-textarea" rows="4"
+          <textarea class="we-notes-textarea" rows="4" cdkFocusInitial
             [value]="notesText()"
             (input)="notesText.set($any($event.target).value)"
+            aria-label="Nota de l'exercici"
             placeholder="Afegeix una nota per recordar a la propera sessió…"></textarea>
           <div class="we-notes-actions">
             <button type="button" class="we-inline-cancel" (click)="closeNotesPopup()">Cancel·lar</button>
@@ -655,17 +663,44 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
 
 
-    /* ── Fatiga popup ── */
-    .we-fatiga-backdrop {
+    /* ── Bottom sheets (fatiga · notes) ──
+     * Float above the new capsule nav instead of sitting flat on it: inset
+     * side margins align with the nav pill, all four corners are rounded and
+     * the sheet slides up from below. */
+    .we-sheet-backdrop {
       position: fixed; inset: 0; z-index: 200;
-      background: rgba(0,0,0,0.35);
+      background: rgba(0,0,0,0.42);
+      animation: we-backdrop-in 0.28s ease both;
     }
-    .we-fatiga-popup {
-      position: fixed; bottom: var(--nav-height); left: 0; right: 0; z-index: 201;
-      background: var(--c-card); border-radius: 20px 20px 0 0;
-      padding: 20px 20px 24px;
-      box-shadow: 0 -4px 24px var(--c-shadow-md);
+    .we-sheet {
+      position: fixed; z-index: 201;
+      left: 12px; right: 12px; bottom: calc(var(--nav-height) + 8px);
+      margin: 0 auto; max-width: 460px;
+      background: var(--c-card); border-radius: 24px;
+      padding: 16px 20px 22px;
+      border: 1px solid color-mix(in srgb, var(--c-border) 55%, transparent);
+      box-shadow: 0 16px 44px rgba(0,0,0,0.24), 0 4px 14px rgba(0,0,0,0.10);
+      animation: we-sheet-in 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
     }
+    .we-sheet-handle {
+      display: block; width: 40px; height: 4px; margin: 0 auto 14px;
+      border-radius: 999px; background: var(--c-border);
+    }
+    @keyframes we-sheet-in {
+      from { opacity: 0; transform: translateY(115%); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes we-backdrop-in {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    /* Respect users who ask for less motion: fade in place, no slide. */
+    @media (prefers-reduced-motion: reduce) {
+      .we-sheet { animation: we-backdrop-in 0.2s ease both; }
+      .we-sheet-backdrop { animation-duration: 0.2s; }
+    }
+
+    /* ── Fatiga popup ── */
     .we-fatiga-popup-header {
       display: flex; align-items: center; justify-content: space-between;
       margin-bottom: 20px;
@@ -787,13 +822,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     }
 
     /* ── Notes popup ── */
-    .we-notes-popup {
-      position: fixed; bottom: var(--nav-height); left: 0; right: 0; z-index: 201;
-      background: var(--c-card); border-radius: 20px 20px 0 0;
-      padding: 20px 20px 24px;
-      box-shadow: 0 -4px 24px var(--c-shadow-md);
-      display: flex; flex-direction: column; gap: 14px;
-    }
+    .we-notes-popup { display: flex; flex-direction: column; gap: 14px; }
     .we-notes-popup-header {
       display: flex; align-items: center; gap: 8px;
     }
@@ -1514,6 +1543,13 @@ export class WorkoutEditorComponent implements OnDestroy {
     return formatFeeling(level, this.settingsService.difficultyScale());
   }
   getFeelingLabel(level: FeelingLevel): string { return FEELING_LABEL[level]; }
+
+  /** Dismiss the open bottom sheet with Escape (fatiga · notes). */
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    if (this.notesPopupFor()) { this.closeNotesPopup(); return; }
+    if (this.feelingPickerFor()) { this.closeFatigaPicker(); }
+  }
 
   openFatigaPicker(exerciseId: string): void { this.feelingPickerFor.set(exerciseId); }
   closeFatigaPicker(): void { this.feelingPickerFor.set(null); }
