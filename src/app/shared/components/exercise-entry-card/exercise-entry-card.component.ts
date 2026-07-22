@@ -280,7 +280,7 @@ export class ExerciseEntryCardComponent {
   readonly statsClick   = output<void>();
   readonly deleteClick  = output<void>();
 
-  readonly totalReps = computed(() => this.entry().sets.reduce((s, set) => s + set.reps, 0));
+  readonly totalReps = computed(() => this.entry().sets.reduce((s, set) => set.warmup ? s : s + set.reps, 0));
   readonly workingSetsCount = computed(() => this.entry().sets.filter(set => !set.warmup).length);
 
   emoji(l: FeelingLevel): string { return formatFeeling(l, this.difficultyScale()); }

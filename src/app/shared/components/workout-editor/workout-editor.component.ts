@@ -101,8 +101,9 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
             <!-- ── Projected body content ──
 
-            <!-- ── Goal recommendation banner ── -->
-            @if (recData()?.exerciseId === entry.exerciseId && addingFor() === entry.exerciseId) {
+            <!-- ── Goal recommendation banner (hidden while logging a warm-up —
+                 the target reps don't apply to warm-up sets) ── -->
+            @if (recData()?.exerciseId === entry.exerciseId && addingFor() === entry.exerciseId && !isWarmupSet()) {
               <div class="we-rec-banner">
                 <div class="we-rec-body">
                   <span class="material-symbols-outlined we-rec-icon">auto_awesome</span>
@@ -165,7 +166,13 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                   @if (isEditingSet(entry.exerciseId, $index)) {
                     <!-- Inline edit row -->
                     <div class="we-edit-set-row">
-                      <span class="we-set-num">{{ $index + 1 }}</span>
+                      <span class="we-set-num">
+                        @if (set.warmup) {
+                          <span class="material-symbols-outlined we-warmup-icon" title="Sèrie d'escalfament">local_fire_department</span>
+                        } @else {
+                          {{ workingSetNumber(entry, $index) }}
+                        }
+                      </span>
                       <form [formGroup]="editSetForm" (ngSubmit)="saveEditSet()" class="we-inline-edit">
                         <div class="we-inline-inputs">
                           <div class="we-inline-group">
@@ -256,7 +263,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                         @if (set.warmup) {
                           <span class="material-symbols-outlined we-warmup-icon" title="Sèrie d'escalfament">local_fire_department</span>
                         } @else {
-                          {{ $index + 1 }}
+                          {{ workingSetNumber(entry, $index) }}
                         }
                       </span>
                       <div class="we-set-pills">
@@ -1604,6 +1611,14 @@ export class WorkoutEditorComponent implements OnDestroy {
 
   entryMaxWeight(entry: WorkoutEntry): number {
     return entry.sets.reduce((m, s) => s.warmup ? m : Math.max(m, setMaxWeight(s)), 0);
+  }
+
+  /** Working-set number for the set at `index`, ignoring warm-up sets — so the
+   *  first real set after two warm-ups is "1", not "3". */
+  workingSetNumber(entry: WorkoutEntry, index: number): number {
+    let n = 0;
+    for (let i = 0; i <= index; i++) if (!entry.sets[i].warmup) n++;
+    return n;
   }
 
   isUnilateral(entry: WorkoutEntry): boolean {
