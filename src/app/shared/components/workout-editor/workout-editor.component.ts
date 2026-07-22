@@ -959,7 +959,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
     /* ── Grouping-mode confirm bar ── */
     .we-group-confirm-bar {
-      position: fixed; bottom: 72px; left: 50%; transform: translateX(-50%);
+      position: fixed; bottom: calc(var(--nav-height) + 16px); left: 50%; transform: translateX(-50%);
       z-index: 100; width: calc(100% - 64px); max-width: 340px;
       display: flex; align-items: center; gap: 10px;
       background: var(--c-card); border-radius: 16px;
@@ -1184,7 +1184,9 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
     /* ── Rest timer ── */
     .we-rest-timer {
-      position: fixed; bottom: 72px; left: 50%; transform: translateX(-50%);
+      /* Sit above the floating capsule nav with breathing room — a fixed 72px
+       * used to overlap it (and the safe-area inset on notched devices). */
+      position: fixed; bottom: calc(var(--nav-height) + 16px); left: 50%; transform: translateX(-50%);
       z-index: 100; width: calc(100% - 64px); max-width: 300px;
       display: flex; flex-direction: column; gap: 4px;
       background: var(--c-card); border-radius: 20px;
