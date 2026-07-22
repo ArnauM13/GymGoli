@@ -58,7 +58,10 @@ interface SessionDetail {
                 <!-- Sets horizontal -->
                 <div class="esd-sets">
                   @for (set of s.sets; track $index) {
-                    <span class="esd-set-pill">
+                    <span class="esd-set-pill" [class.esd-set-pill--warmup]="set.warmup">
+                      @if (set.warmup) {
+                        <span class="material-symbols-outlined esd-warmup-icon" title="Sèrie d'escalfament">local_fire_department</span>
+                      }
                       @if (set.weightLeft != null) {
                         E {{ dispW(set.weightLeft) }}{{ unit() }} · D {{ dispW(set.weightRight!) }}{{ unit() }}
                       } @else {
@@ -172,6 +175,15 @@ interface SessionDetail {
       background: color-mix(in srgb, var(--c-brand) 10%, var(--c-card));
       font-size: 12px; font-weight: 700; color: var(--c-brand);
       white-space: nowrap;
+    }
+    .esd-set-pill--warmup {
+      background: color-mix(in srgb, #ff9800 12%, var(--c-card));
+      color: var(--c-text-3); opacity: 0.85;
+    }
+    .esd-warmup-icon {
+      font-size: 13px; color: #ff9800; margin-right: 3px;
+      font-variation-settings: 'FILL' 1, 'wght' 400;
+      align-self: center;
     }
     .esd-drop-sep { margin: 0 3px; opacity: 0.6; font-weight: 500; }
     .esd-set-reps { font-size: 11px; font-weight: 500; color: var(--c-text-3); }
