@@ -53,13 +53,15 @@ const PAGE_SIZE = 20;
                           (dateSelected)="selectDate($event)" (weekChanged)="currentWeekMonday.set($event)" />
             <app-weekly-summary [weekDate]="selectedDate() ?? workoutService.todayDateString()" />
 
-            <div class="plan-week-strip">
-              <a class="plan-week-btn" [routerLink]="['/train/planner']" [queryParams]="{ week: currentWeekMonday() }">
-                <span class="material-symbols-outlined">event_repeat</span>
-                Planificar la setmana
-                <span class="material-symbols-outlined plan-week-arrow">chevron_right</span>
-              </a>
-            </div>
+            @if (canPlanViewedWeek()) {
+              <div class="plan-week-strip">
+                <a class="plan-week-btn" [routerLink]="['/train/planner']" [queryParams]="{ week: currentWeekMonday() }">
+                  <span class="material-symbols-outlined">event_repeat</span>
+                  Planificar la setmana
+                  <span class="material-symbols-outlined plan-week-arrow">chevron_right</span>
+                </a>
+              </div>
+            }
           </div>
         </div>
       </div>
@@ -801,6 +803,10 @@ export class CalendarPageComponent implements OnDestroy {
    *  (updated on every navigation, independent of a tapped date) — powers
    *  the "Planificar la setmana" quick action in the header. */
   readonly currentWeekMonday = signal<string>(mondayOf(new Date().toISOString().split('T')[0]));
+  /** Planning only makes sense from today onward — the shortcut disappears
+   *  when the week in view has already fully passed. */
+  readonly canPlanViewedWeek = computed(() =>
+    addDays(this.currentWeekMonday(), 6) >= this.workoutService.todayDateString());
   readonly selectedDate  = signal<string | null>(null);
   readonly expandedId    = signal<string | null>(null);
   readonly sortDesc      = signal(true);

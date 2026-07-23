@@ -181,28 +181,47 @@ export class SportService {
     this._writeSportsToStorage(uid, sports);
   }
 
-  /** How many catalog default sports the user is missing (matched by name,
-   *  case-insensitive) — lets existing users pull in newly-shipped ones. */
+  private _metricKeys(defs: SportMetricDef[]): string {
+    return defs.map(d => d.key).sort().join(',');
+  }
+
+  /** How many catalog default sports the user is missing OR has with outdated
+   *  metrics — so existing users can pull in new sports and tailored metrics. */
   readonly missingDefaultCount = computed(() => {
-    const have = new Set(this._sports().map(s => s.name.trim().toLowerCase()));
-    return DEFAULT_SPORTS.filter(s => !have.has(s.name.trim().toLowerCase())).length;
+    const mine = this._sports();
+    return DEFAULT_SPORTS.filter(d => {
+      const have = mine.find(s => s.name.trim().toLowerCase() === d.name.trim().toLowerCase());
+      return !have || this._metricKeys(have.metricDefs) !== this._metricKeys(d.metricDefs);
+    }).length;
   });
 
-  /** Adds the catalog default sports the user doesn't already have, without
-   *  touching their own. Returns how many were added. */
+  /** Adds missing catalog sports and refreshes the metrics of the ones the user
+   *  already has to the sport-specific catalog set (overwriting), merging in any
+   *  new catalog subtypes (e.g. Yoga styles) without dropping the user's own.
+   *  Never touches sports the user created. Returns how many changed. */
   async addMissingDefaults(): Promise<number> {
     const uid = this._uid();
-    const have = new Set(this._sports().map(s => s.name.trim().toLowerCase()));
-    const missing = DEFAULT_SPORTS.filter(s => !have.has(s.name.trim().toLowerCase()));
-    if (missing.length === 0) return 0;
-    for (const s of missing) {
-      await this.supabase.from('sports').insert({
-        user_id: uid, name: s.name, icon: s.icon, color: s.color,
-        subtypes: s.subtypes, metric_defs: s.metricDefs,
-      });
+    const mine = this._sports();
+    let changed = 0;
+    for (const d of DEFAULT_SPORTS) {
+      const have = mine.find(s => s.name.trim().toLowerCase() === d.name.trim().toLowerCase());
+      if (!have) {
+        await this.supabase.from('sports').insert({
+          user_id: uid, name: d.name, icon: d.icon, color: d.color,
+          subtypes: d.subtypes, metric_defs: d.metricDefs,
+        });
+        changed++;
+      } else if (this._metricKeys(have.metricDefs) !== this._metricKeys(d.metricDefs)) {
+        const haveIds = new Set(have.subtypes.map(s => s.id));
+        const subtypes = [...have.subtypes, ...d.subtypes.filter(s => !haveIds.has(s.id))];
+        await this.supabase.from('sports')
+          .update({ metric_defs: d.metricDefs, subtypes })
+          .eq('id', have.id).eq('user_id', uid);
+        changed++;
+      }
     }
-    await this._loadSports(uid);
-    return missing.length;
+    if (changed) await this._loadSports(uid);
+    return changed;
   }
 
   async createSport(payload: Pick<Sport, 'name' | 'icon' | 'color' | 'subtypes' | 'metricDefs'>): Promise<void> {

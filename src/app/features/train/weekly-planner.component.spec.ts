@@ -287,6 +287,11 @@ describe('WeeklyPlannerComponent', () => {
     it('is null in the default (settings/recurring routine) mode', () => {
       expect(component.weekMonday).toBeNull();
     });
+
+    it('never locks days in routine mode (weekdays are abstract, not dates)', () => {
+      for (let i = 0; i < 7; i++) expect(component.isDayLocked(i)).toBeFalse();
+      expect(component.weekHasPastDays()).toBeFalse();
+    });
   });
 
   describe('save() in settings mode (weekMonday is null)', () => {
@@ -319,9 +324,13 @@ describe('WeeklyPlannerComponent', () => {
 
   describe('week mode (single-week planning from the calendar)', () => {
     beforeEach(() => {
+      jasmine.clock().install();
+      jasmine.clock().mockDate(new Date('2024-03-06T12:00:00')); // Wednesday of the requested week
       TestBed.resetTestingModule();
       setup('2024-03-04');
     });
+
+    afterEach(() => jasmine.clock().uninstall());
 
     it('exposes the requested week', () => {
       expect(component.weekMonday).toBe('2024-03-04');
@@ -329,6 +338,33 @@ describe('WeeklyPlannerComponent', () => {
 
     it('weekRange() formats the week label', () => {
       expect(component.weekRange('2024-03-04')).toContain('2024');
+    });
+
+    describe('days before today are locked', () => {
+      it('locks past days and keeps today and future days editable', () => {
+        expect(component.isDayLocked(0)).toBeTrue();  // dilluns 04
+        expect(component.isDayLocked(1)).toBeTrue();  // dimarts 05
+        expect(component.isDayLocked(2)).toBeFalse(); // dimecres 06 (avui)
+        expect(component.isDayLocked(6)).toBeFalse(); // diumenge 10
+      });
+
+      it('toggleDay() cannot expand a locked day', () => {
+        component.toggleDay(0);
+        expect(component.isDayExpanded(0)).toBeFalse();
+        component.toggleDay(2);
+        expect(component.isDayExpanded(2)).toBeTrue();
+      });
+
+      it('weekHasPastDays() is true for the current week once past Monday', () => {
+        expect(component.weekHasPastDays()).toBeTrue();
+      });
+
+      it('locks nothing when planning a future week', () => {
+        TestBed.resetTestingModule();
+        setup('2024-03-11');
+        for (let i = 0; i < 7; i++) expect(component.isDayLocked(i)).toBeFalse();
+        expect(component.weekHasPastDays()).toBeFalse();
+      });
     });
 
     describe('pre-filling the actual planned state for this week (not the persisted routine)', () => {
@@ -465,6 +501,17 @@ describe('WeeklyPlannerComponent', () => {
 
         expect(retractRemoved).toHaveBeenCalledWith(EMPTY_WEEKLY_PLAN, WEEKS_SINGLE, '2024-03-04', 'routine');
         expect(retractRemoved).toHaveBeenCalledWith(component.plan(), WEEKS_SINGLE, '2024-03-04', 'manual');
+        expect(applyPlan).toHaveBeenCalledWith(component.plan(), WEEKS_SINGLE, '2024-03-04', 'manual');
+      });
+
+      it('does not ask when the routine only has items on days already passed', async () => {
+        getPlannedForDate.and.callFake((date: string) =>
+          date === '2024-03-04' /* Monday, before today */ ? [{ id: 'w1', plannedSource: 'routine' } as unknown as Workout] : []);
+        component.toggleGym(3, 'push');
+
+        await component.save();
+
+        expect(chooseAction).not.toHaveBeenCalled();
         expect(applyPlan).toHaveBeenCalledWith(component.plan(), WEEKS_SINGLE, '2024-03-04', 'manual');
       });
     });

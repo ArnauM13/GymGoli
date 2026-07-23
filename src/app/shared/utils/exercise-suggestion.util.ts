@@ -62,7 +62,10 @@ const SATISFIED_GATE = 0.25;
 
 /** Muscle subgroups are independent of the training type (a custom "Bíceps"
  *  type may hold any subgroup), so the balance signal always considers the
- *  full flat list. */
+ *  full flat list. Using ALL_SUBCATEGORY_OPTIONS also means a legacy/foreign
+ *  category value never hits an undefined subcategory table — a throw here
+ *  would bubble through the template expression that reads the suggestions
+ *  and, via the global error handler, into an unstoppable toast loop. */
 function subcatsOf(_category: ExerciseCategory): Set<ExerciseSubcategory> {
   return new Set(ALL_SUBCATEGORY_OPTIONS.map(o => o.value));
 }
