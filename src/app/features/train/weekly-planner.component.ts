@@ -19,6 +19,8 @@ import { addDays, weekRangeLabel } from '../../shared/utils/calendar-utils';
 
 const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
 
+const TODAY = (): string => new Date().toISOString().split('T')[0];
+
 @Component({
   selector: 'app-weekly-planner',
   standalone: true,
@@ -38,21 +40,28 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
         <span class="mode-banner-text">
           @if (weekMonday; as monday) {
             Només per a la setmana del {{ weekRange(monday) }}. La resta de setmanes no es veuran afectades.
+            @if (weekHasPastDays()) {
+              Els dies ja passats no es poden modificar.
+            }
           } @else {
-            Aquesta configuració s'aplica cada setmana, de manera indefinida.
+            Aquesta configuració s'aplica cada setmana, de manera indefinida, a partir d'avui — els dies ja passats no es modifiquen.
           }
         </span>
       </div>
 
       @for (day of days; track day.index) {
-        <div class="card-section" [class.day-open]="isDayExpanded(day.index)">
-          <button type="button" class="day-toggle" (click)="toggleDay(day.index)">
+        <div class="card-section" [class.day-open]="isDayExpanded(day.index)" [class.day-locked]="isDayLocked(day.index)">
+          <button type="button" class="day-toggle" (click)="toggleDay(day.index)" [disabled]="isDayLocked(day.index)">
             <span class="material-symbols-outlined section-icon">today</span>
             <h2 class="section-title">{{ day.label }}</h2>
             @if (itemCount(day.index) > 0) {
               <span class="section-count">{{ itemCount(day.index) }}</span>
             }
-            <span class="material-symbols-outlined day-chevron">{{ isDayExpanded(day.index) ? 'expand_less' : 'expand_more' }}</span>
+            @if (isDayLocked(day.index)) {
+              <span class="material-symbols-outlined day-chevron">lock</span>
+            } @else {
+              <span class="material-symbols-outlined day-chevron">{{ isDayExpanded(day.index) ? 'expand_less' : 'expand_more' }}</span>
+            }
           </button>
 
           @if (!isDayExpanded(day.index)) {
@@ -66,6 +75,8 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
                     </span>
                   }
                 </div>
+              } @else if (isDayLocked(day.index)) {
+                <span class="day-summary-rest">Dia ja passat</span>
               } @else {
                 <span class="day-summary-rest">Dia de descans</span>
               }
@@ -224,6 +235,8 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
       box-shadow: 0 2px 10px var(--c-shadow);
     }
     .card-section.day-open { padding-bottom: 16px; }
+    .card-section.day-locked { opacity: 0.55; }
+    .card-section.day-locked .day-toggle { cursor: default; }
 
     /* ── Collapsible day header ── */
     .day-toggle {
@@ -418,6 +431,10 @@ export class WeeklyPlannerComponent {
    *  or null when editing the persistent routine from Configuració. */
   readonly weekMonday = this.route.snapshot.queryParamMap.get('week');
 
+  /** Frozen at construction so every lock/save decision within the visit
+   *  agrees on what "avui" means. */
+  private readonly _today = TODAY();
+
   readonly saving = signal(false);
   readonly plan = signal<WeeklyPlan>(this._initialPlan());
 
@@ -434,11 +451,24 @@ export class WeeklyPlannerComponent {
     this.sportService.ensureLoaded();
   }
 
+  /** Planning is only allowed from today onward: in week mode, days of the
+   *  target week that are already behind are shown as history and can't be
+   *  edited (WeeklyPlanService skips them on apply/retract too). Routine
+   *  mode plans abstract weekdays, so nothing is ever locked there. */
+  isDayLocked(dayIndex: number): boolean {
+    return !!this.weekMonday && addDays(this.weekMonday, dayIndex) < this._today;
+  }
+
+  weekHasPastDays(): boolean {
+    return !!this.weekMonday && this.weekMonday < this._today;
+  }
+
   isDayExpanded(dayIndex: number): boolean {
-    return this.expandedDays().has(dayIndex);
+    return !this.isDayLocked(dayIndex) && this.expandedDays().has(dayIndex);
   }
 
   toggleDay(dayIndex: number): void {
+    if (this.isDayLocked(dayIndex)) return;
     this.expandedDays.update(set => {
       const next = new Set(set);
       if (next.has(dayIndex)) next.delete(dayIndex); else next.add(dayIndex);
@@ -649,11 +679,13 @@ export class WeeklyPlannerComponent {
   }
 
   /** Whether the persistent routine already has something planned for any
-   *  day of the given week — decides whether save() needs to ask the user
-   *  how to reconcile it with the ad-hoc plan being saved. */
+   *  remaining day (today onward) of the given week — decides whether save()
+   *  needs to ask the user how to reconcile it with the ad-hoc plan being
+   *  saved. Past days don't count: they can't be overwritten anyway. */
   private _weekHasRoutinePlan(monday: string): boolean {
     for (let i = 0; i < 7; i++) {
       const date = addDays(monday, i);
+      if (date < this._today) continue;
       if (this.workoutService.getPlannedForDate(date).some(w => w.plannedSource === 'routine')) return true;
       if (this.sportService.getPlannedSportSessionsForDate(date).some(({ session }) => session.plannedSource === 'routine')) return true;
     }
