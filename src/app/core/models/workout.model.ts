@@ -65,13 +65,17 @@ export interface SetLoadContext {
   /** The user's bodyweight in kg. Falsy → bodyweight/assisted fall back to the
    *  logged weight, so nothing changes until a bodyweight is set. */
   bodyweightKg?: number | null;
+  /** Fraction of bodyweight actually moved by the exercise (0–1). E.g. ~1 for
+   *  pull-ups/dips, ~0.65 for push-ups. Missing → 1 (whole bodyweight). */
+  bodyweightFactor?: number | null;
 }
 
 /** Real load (kg) moved for one rep given how the exercise is loaded:
- *  'bodyweight' adds the user's bodyweight to the logged (extra) weight,
- *  'assisted' subtracts the logged assistance from it, else the logged weight. */
+ *  'bodyweight' adds the moved fraction of bodyweight to the logged (extra)
+ *  weight, 'assisted' subtracts the logged assistance from it, else the
+ *  logged weight. */
 export function effectiveRepWeight(logged: number, ctx?: SetLoadContext): number {
-  const bw = ctx?.bodyweightKg ?? 0;
+  const bw = (ctx?.bodyweightKg ?? 0) * (ctx?.bodyweightFactor ?? 1);
   if (bw > 0 && ctx?.loadType === 'bodyweight') return Math.max(0, bw + logged);
   if (bw > 0 && ctx?.loadType === 'assisted')   return Math.max(0, bw - logged);
   return logged;

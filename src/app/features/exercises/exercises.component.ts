@@ -15,6 +15,7 @@ import {
   SUBCATEGORY_LABELS,
 } from '../../core/models/exercise.model';
 import { ExerciseService } from '../../core/services/exercise.service';
+import { AppHintService } from '../../core/services/app-hint.service';
 import { ExerciseFormDialogComponent } from '../library/components/exercise-form-dialog.component';
 import { FilterBarComponent } from '../../shared/components/filter-bar/filter-bar.component';
 
@@ -37,6 +38,16 @@ import { FilterBarComponent } from '../../shared/components/filter-bar/filter-ba
         [showSort]="false"
         [(searchQuery)]="searchQuery"
         [(category)]="activeFilter" />
+
+      @if (!hintService.isDismissed('exercises-bodyweight-legend')) {
+        <div class="bw-legend">
+          <span class="material-symbols-outlined bw-legend-icon">info</span>
+          <p class="bw-legend-text">Els exercicis de propi pes (dominades, fons, flexions…) compten al volum amb el teu <strong>pes corporal × un factor</strong> segons quant del cos mouen. Afegeix el teu pes a Perfil per activar-ho.</p>
+          <button class="bw-legend-x" (click)="hintService.dismiss('exercises-bodyweight-legend')" aria-label="Tancar">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+      }
 
       @if (exercises().length === 0) {
         <div class="card-section">
@@ -113,6 +124,25 @@ import { FilterBarComponent } from '../../shared/components/filter-bar/filter-ba
   `,
   styles: [`
     .page { padding: 0 0 88px; }
+
+    /* ── Bodyweight-volume legend (dismissible) ── */
+    .bw-legend {
+      display: flex; align-items: flex-start; gap: 10px;
+      margin: 4px 16px 10px; padding: 11px 12px;
+      background: color-mix(in srgb, var(--c-brand) 5%, var(--c-card));
+      border: 1.5px solid color-mix(in srgb, var(--c-brand) 22%, var(--c-border-2));
+      border-radius: 12px;
+    }
+    .bw-legend-icon { font-size: 18px; color: var(--c-brand); flex-shrink: 0; margin-top: 1px; }
+    .bw-legend-text { margin: 0; flex: 1; font-size: 12px; color: var(--c-text-2); line-height: 1.45; }
+    .bw-legend-x {
+      flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      width: 24px; height: 24px; border-radius: 50%; border: none;
+      background: transparent; color: var(--c-text-3); cursor: pointer;
+      touch-action: manipulation; transition: background 0.15s;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover { background: var(--c-hover); color: var(--c-text-2); }
+    }
 
     .page-header {
       display: flex; align-items: center; gap: 10px;
@@ -215,6 +245,7 @@ import { FilterBarComponent } from '../../shared/components/filter-bar/filter-ba
 })
 export class ExercisesComponent {
   private exerciseService = inject(ExerciseService);
+  readonly hintService    = inject(AppHintService);
   private dialog          = inject(MatDialog);
   private feedback        = inject(FeedbackService);
   private confirmDialog   = inject(ConfirmDialogService);

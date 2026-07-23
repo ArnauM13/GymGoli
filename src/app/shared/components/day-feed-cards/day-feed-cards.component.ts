@@ -401,6 +401,7 @@ export class DayFeedCardsComponent {
     return workoutVolumeFmtUtil(w, {
       bodyweightKg: this.settingsService.bodyweightKg(),
       loadTypeOf: this.exerciseService.loadTypeOf,
+      bodyweightFactorOf: this.exerciseService.bodyweightFactorOf,
     });
   }
 

@@ -1609,6 +1609,7 @@ export class TrainComponent implements OnDestroy {
     return workoutVolumeFmtUtil(w, {
       bodyweightKg: this.settingsService.bodyweightKg(),
       loadTypeOf: this.exerciseService.loadTypeOf,
+      bodyweightFactorOf: this.exerciseService.bodyweightFactorOf,
     });
   }
 

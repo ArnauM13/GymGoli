@@ -13,6 +13,7 @@ import {
   MUSCLE_OPTIONS,
   SUBCATEGORY_OPTIONS,
 } from '../../../core/models/exercise.model';
+import { UserSettingsService } from '../../../core/services/user-settings.service';
 
 export interface ExerciseFormDialogData {
   exercise?: Exercise;
@@ -135,6 +136,20 @@ const MUSCLE_GROUPS: { label: string; values: string[] }[] = [
             </div>
             <span class="unilateral-desc">{{ loadTypeDesc() }}</span>
           </div>
+
+          <!-- Factor de pes corporal (només usuaris avançats) -->
+          @if (settingsService.bodyweightFactorEnabled() && loadType() !== 'weighted') {
+            <div class="field">
+              <span class="field-label">% del pes corporal</span>
+              <div class="guide-inputs">
+                <input class="guide-input" type="number" min="1" max="100" inputmode="numeric"
+                       [value]="bodyweightFactorPct()"
+                       (input)="setFactorPct($event)">
+                <span class="guide-sep">%</span>
+              </div>
+              <span class="unilateral-desc">Quant del teu cos mou l'exercici. Orientatiu: dominades/fons 100%, flexions 65%, sentadilla 60%, rem invertit 50%.</span>
+            </div>
+          }
 
           <!-- Guia sèries i reps -->
           <div class="field">
@@ -375,6 +390,7 @@ const MUSCLE_GROUPS: { label: string; values: string[] }[] = [
 export class ExerciseFormDialogComponent {
   private fb = inject(FormBuilder);
   private dialogRef = inject(MatDialogRef<ExerciseFormDialogComponent>);
+  readonly settingsService = inject(UserSettingsService);
   readonly data: ExerciseFormDialogData = inject(MAT_DIALOG_DATA);
 
   readonly isEdit = !!this.data.exercise;
@@ -402,6 +418,15 @@ export class ExerciseFormDialogComponent {
     { value: 'bodyweight', label: 'Propi pes' },
     { value: 'assisted',   label: 'Assistit' },
   ];
+  /** % of bodyweight moved, shown only to advanced users. Preserved even when
+   *  the field is hidden, so a non-advanced edit never wipes a catalog value. */
+  readonly bodyweightFactorPct = signal(Math.round((this.data.exercise?.bodyweightFactor ?? 1) * 100));
+
+  setFactorPct(ev: Event): void {
+    const v = Math.round(+(ev.target as HTMLInputElement).value);
+    if (Number.isFinite(v) && v >= 1 && v <= 100) this.bodyweightFactorPct.set(v);
+  }
+
   readonly loadTypeDesc = computed(() => ({
     weighted:   'Càrrega externa: el pes que registres és la càrrega (barra, mancuernes, màquina).',
     bodyweight: 'Mous el teu propi pes; registres el pes AFEGIT (cinturó llastrat), 0 si és només el cos. Es compta amb el teu pes corporal per al volum.',
@@ -472,6 +497,7 @@ export class ExerciseFormDialogComponent {
       repsRange,
       unilateral: this.unilateral() || undefined,
       loadType: this.loadType() !== 'weighted' ? this.loadType() : undefined,
+      bodyweightFactor: this.loadType() !== 'weighted' ? this.bodyweightFactorPct() / 100 : undefined,
     });
   }
 

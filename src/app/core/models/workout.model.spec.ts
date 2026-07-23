@@ -24,6 +24,13 @@ describe('bodyweight-aware load', () => {
       expect(effectiveRepWeight(0,  { loadType: 'bodyweight' })).toBe(0);
       expect(effectiveRepWeight(10, { loadType: 'bodyweight', bodyweightKg: null })).toBe(10);
     });
+
+    it('scales the bodyweight by the exercise factor', () => {
+      // Push-ups move ~65% of a 80kg bodyweight.
+      expect(effectiveRepWeight(0, { loadType: 'bodyweight', bodyweightKg: 80, bodyweightFactor: 0.65 })).toBe(52);
+      // Missing factor → whole bodyweight.
+      expect(effectiveRepWeight(0, { loadType: 'bodyweight', bodyweightKg: 80 })).toBe(80);
+    });
   });
 
   describe('setVolume', () => {

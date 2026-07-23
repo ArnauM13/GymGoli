@@ -52,6 +52,18 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 
         <div class="setting-row setting-row--top">
           <div class="setting-info">
+            <span class="setting-label">Ajustar el factor de pes corporal</span>
+            <span class="setting-desc">Mostra al formulari d'exercici el % del pes corporal que compta al volum (p. ex. flexions 65%). Per defecte ja ve amb valors sensats.</span>
+          </div>
+          <mat-slide-toggle
+            [checked]="settingsService.bodyweightFactorEnabled()"
+            (change)="toggleBodyweightFactor()"
+            color="primary"
+          />
+        </div>
+
+        <div class="setting-row setting-row--top">
+          <div class="setting-info">
             <span class="setting-label">Escala de dificultat</span>
             <span class="setting-desc">Com es mostra i es registra la sensació de cada exercici.</span>
           </div>
@@ -109,6 +121,10 @@ export class SettingsAdvancedComponent {
 
   toggleRir(): void {
     this.settingsService.update({ rirEnabled: !this.settingsService.rirEnabled() });
+  }
+
+  toggleBodyweightFactor(): void {
+    this.settingsService.update({ bodyweightFactorEnabled: !this.settingsService.bodyweightFactorEnabled() });
   }
 
   setDifficultyScale(scale: DifficultyScale): void {

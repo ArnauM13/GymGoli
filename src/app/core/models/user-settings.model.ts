@@ -59,6 +59,10 @@ export interface UserSettings {
    *  (dominades, fons…) towards volume. Null = not set → those exercises fall
    *  back to their logged (added) weight only. */
   bodyweightKg: number | null;
+  /** Advanced: let the user edit the per-exercise bodyweight factor (% of
+   *  bodyweight moved) in the exercise form. Off by default — the catalog
+   *  ships sensible values and most users never need to touch it. */
+  bodyweightFactorEnabled: boolean;
 }
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
@@ -81,4 +85,5 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   rirEnabled: false,
   difficultyScale: 'emoji',
   bodyweightKg: null,
+  bodyweightFactorEnabled: false,
 };

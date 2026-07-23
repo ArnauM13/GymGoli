@@ -23,6 +23,7 @@ describe('SettingsAdvancedComponent', () => {
             dropsetsEnabled:  signal(false),
             rirEnabled:       signal(false),
             difficultyScale:  signal('emoji'),
+            bodyweightFactorEnabled: signal(false),
             update:           mockUpdate,
           },
         },

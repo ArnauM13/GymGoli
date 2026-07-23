@@ -53,11 +53,17 @@ export interface WorkoutVolumeContext {
   bodyweightKg?: number | null;
   /** Load type of an exercise by id; undefined → 'weighted'. */
   loadTypeOf?: (exerciseId: string) => LoadType | undefined;
+  /** Bodyweight factor of an exercise by id; undefined → 1. */
+  bodyweightFactorOf?: (exerciseId: string) => number | undefined;
 }
 
 export function workoutVolume(w: Workout, ctx?: WorkoutVolumeContext): number {
   return w.entries.reduce((sum, e) => {
-    const setCtx = { bodyweightKg: ctx?.bodyweightKg, loadType: ctx?.loadTypeOf?.(e.exerciseId) };
+    const setCtx = {
+      bodyweightKg: ctx?.bodyweightKg,
+      loadType: ctx?.loadTypeOf?.(e.exerciseId),
+      bodyweightFactor: ctx?.bodyweightFactorOf?.(e.exerciseId),
+    };
     return sum + e.sets.reduce((s2, set) => set.warmup ? s2 : s2 + setVolume(set, setCtx), 0);
   }, 0);
 }

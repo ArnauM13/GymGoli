@@ -1060,7 +1060,8 @@ export class CalendarPageComponent implements OnDestroy {
   totalVolume(workout: Workout): number {
     const bodyweightKg = this.settingsService.bodyweightKg();
     return Math.round(workout.entries.reduce((t, e) => {
-      const ctx = { bodyweightKg, loadType: this.exerciseService.loadTypeOf(e.exerciseId) };
+      const ex = this.exerciseService.getById(e.exerciseId);
+      const ctx = { bodyweightKg, loadType: ex?.loadType, bodyweightFactor: ex?.bodyweightFactor };
       return t + e.sets.reduce((s, set) => set.warmup ? s : s + setVolume(set, ctx), 0);
     }, 0));
   }

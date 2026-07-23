@@ -225,7 +225,8 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
     if (metric === 'weight') return Math.max(...workingSets.map(s => setMaxWeight(s)));
     // Volume folds in bodyweight so dominades & co. count their real load, not
     // just the added weight (0 for pure bodyweight). "Pes màx" stays as logged.
-    const ctx = { bodyweightKg: this.settingsService.bodyweightKg(), loadType: this.exerciseService.loadTypeOf(exId) };
+    const ex = this.exerciseService.getById(exId);
+    const ctx = { bodyweightKg: this.settingsService.bodyweightKg(), loadType: ex?.loadType, bodyweightFactor: ex?.bodyweightFactor };
     return workingSets.reduce((sum, s) => sum + setVolume(s, ctx), 0);
   }
 

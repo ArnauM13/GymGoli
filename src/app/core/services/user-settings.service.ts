@@ -39,6 +39,7 @@ export class UserSettingsService {
   readonly rirEnabled          = computed(() => this._settings().rirEnabled ?? false);
   readonly difficultyScale     = computed(() => (this._settings().difficultyScale ?? 'emoji') as DifficultyScale);
   readonly bodyweightKg        = computed(() => this._settings().bodyweightKg ?? null);
+  readonly bodyweightFactorEnabled = computed(() => this._settings().bodyweightFactorEnabled ?? false);
   readonly dismissedBuiltInTemplateIds = computed(() => this._settings().dismissedBuiltInTemplateIds ?? []);
   readonly dismissedHints              = computed(() => this._settings().dismissedHints ?? []);
 

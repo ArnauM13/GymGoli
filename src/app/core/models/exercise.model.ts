@@ -105,6 +105,10 @@ export interface Exercise {
   /** How the exercise is loaded (see {@link LoadType}). Undefined = 'weighted'.
    *  For 'bodyweight'/'assisted' the volume calc folds in the user's bodyweight. */
   loadType?: LoadType;
+  /** Fraction of bodyweight actually moved (0–1), for 'bodyweight'/'assisted'
+   *  exercises — e.g. ~1 for dominades/fons, ~0.65 for flexions. Undefined = 1.
+   *  Only advanced users edit it; otherwise it comes from the catalog default. */
+  bodyweightFactor?: number;
   createdAt: Date;
 }
 
@@ -146,10 +150,28 @@ export const DEFAULT_EXERCISES: Omit<Exercise, 'id' | 'createdAt'>[] = [
     setsRange: [3, 4], repsRange: [10, 15],
   },
   {
+    name: 'Flexions', category: 'push', subcategory: 'chest',
+    muscles: ['pit', 'triceps', 'espatlles'], loadType: 'bodyweight', bodyweightFactor: 0.65,
+    description: "En planxa amb les mans a l'amplada dels espatlles, baixa el pit fins prop del terra amb els colzes a ~45° i empenta. Manté el cos recte i el core tens.",
+    setsRange: [3, 4], repsRange: [8, 20],
+  },
+  {
+    name: 'Fons en paral·leles', category: 'push', subcategory: 'triceps',
+    muscles: ['triceps', 'pit', 'espatlles'], loadType: 'bodyweight', bodyweightFactor: 1,
+    description: "Suspès entre dues barres paral·leles, baixa flexionant els colzes fins a ~90° i empenta. Inclina't endavant per fer més pit, vertical per més tríceps.",
+    setsRange: [3, 4], repsRange: [5, 12],
+  },
+  {
     name: 'Dominades', category: 'pull', subcategory: 'back',
-    muscles: ['esquena', 'biceps'], loadType: 'bodyweight',
+    muscles: ['esquena', 'biceps'], loadType: 'bodyweight', bodyweightFactor: 1,
     description: "Penja d'una barra amb agafada prona. Puja activant l'esquena fins que el mentó superi la barra. Baixa lentament i de forma controlada.",
     setsRange: [3, 5], repsRange: [5, 10],
+  },
+  {
+    name: 'Rem invertit', category: 'pull', subcategory: 'back',
+    muscles: ['esquena', 'biceps'], loadType: 'bodyweight', bodyweightFactor: 0.5,
+    description: "Estirat sota una barra baixa, cos recte i talons al terra. Tira el pit cap a la barra mantenint el core tens. Com més horitzontal, més dur.",
+    setsRange: [3, 4], repsRange: [8, 15],
   },
   {
     name: 'Rem amb barra', category: 'pull', subcategory: 'back',
@@ -204,6 +226,12 @@ export const DEFAULT_EXERCISES: Omit<Exercise, 'id' | 'createdAt'>[] = [
     muscles: ['bessons'],
     description: "Dempeus en un escaló amb els talons suspesos. Puja sobre les puntes i baixa fins sentir l'estirament complet. Moviment lent i de rang complet.",
     setsRange: [3, 4], repsRange: [12, 20],
+  },
+  {
+    name: 'Sentadilla amb pes corporal', category: 'legs', subcategory: 'quads',
+    muscles: ['quadriceps', 'glutis'], loadType: 'bodyweight', bodyweightFactor: 0.6,
+    description: "Peus a l'amplada dels malucs, baixa els malucs per sota dels genolls mantenint el pit amunt i els talons al terra. Puja empenyent des dels talons.",
+    setsRange: [3, 4], repsRange: [12, 25],
   },
 ];
 
