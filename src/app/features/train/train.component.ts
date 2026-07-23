@@ -329,6 +329,10 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
               </button>
             }
           </div>
+          <button class="section-manage" (click)="router.navigate(['/exercises'])">
+            <span>Configurar exercicis</span>
+            <span class="material-symbols-outlined">chevron_right</span>
+          </button>
         </div>
 
         <!-- ── Esport ── -->
@@ -350,6 +354,10 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
                 </button>
               }
             </div>
+            <button class="section-manage" (click)="router.navigate(['/sports-config'])">
+              <span>Configurar esports</span>
+              <span class="material-symbols-outlined">chevron_right</span>
+            </button>
           } @else {
             <div class="es-empty">
               <span class="material-symbols-outlined es-empty-icon">sports_soccer</span>
@@ -828,6 +836,18 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .type-grid {
       display: grid; gap: 10px;
       &.type-grid--mt { margin-top: 10px; }
+    }
+    /* Quick link to manage this section's catalog (exercises / sports),
+     * same idea as "Gestionar plantilles" in the picker. */
+    .section-manage {
+      display: flex; align-items: center; justify-content: space-between;
+      width: 100%; margin-top: 10px; padding: 10px 8px 2px;
+      border: none; background: transparent;
+      color: var(--c-text-2); font-size: 13px; font-weight: 600;
+      cursor: pointer; touch-action: manipulation; transition: color 0.15s;
+      .material-symbols-outlined { font-size: 18px; color: var(--c-text-3); }
+      &:hover { color: var(--c-text); }
+      &:active { opacity: 0.7; }
     }
     .type-btn {
       display: flex; flex-direction: column; align-items: center; gap: 7px;

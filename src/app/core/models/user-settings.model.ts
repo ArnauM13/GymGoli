@@ -63,6 +63,10 @@ export interface UserSettings {
    *  bodyweight moved) in the exercise form. Off by default — the catalog
    *  ships sensible values and most users never need to touch it. */
   bodyweightFactorEnabled: boolean;
+  /** The user has run (or dismissed) the "update catalog" action once, so we
+   *  never nag again — e.g. after they deliberately delete a default metric
+   *  or subtype, which would otherwise re-flag the catalog as out of date. */
+  catalogUpdateDismissed: boolean;
 }
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
@@ -86,4 +90,5 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   difficultyScale: 'emoji',
   bodyweightKg: null,
   bodyweightFactorEnabled: false,
+  catalogUpdateDismissed: false,
 };

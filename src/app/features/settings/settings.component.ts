@@ -217,7 +217,7 @@ import {
           <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
         </a>
 
-        @if (catalogReady() && missingCatalogCount() > 0) {
+        @if (catalogReady() && missingCatalogCount() > 0 && !settingsService.catalogUpdateDismissed()) {
           <div class="setting-divider"></div>
           <button type="button" class="nav-row" (click)="addCatalogDefaults()" [disabled]="addingCatalog()">
             <span class="material-symbols-outlined nav-row-icon">library_add</span>
@@ -874,6 +874,8 @@ export class SettingsComponent {
       await this.sportService.ensureLoaded();
       const ex = await this.exerciseService.addMissingDefaults();
       const sp = await this.sportService.addMissingDefaults();
+      // Mark as done so a later deliberate deletion doesn't re-nag the user.
+      await this.settingsService.update({ catalogUpdateDismissed: true });
       this.feedback.success(
         ex + sp > 0 ? `Catàleg actualitzat: ${ex} exercicis i ${sp} esports` : 'Ja tens tot el catàleg al dia',
       );
