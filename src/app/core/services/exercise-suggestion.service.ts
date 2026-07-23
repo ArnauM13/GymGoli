@@ -16,6 +16,10 @@ const RECENCY_DECAY = 0.9;
 const TEMPLATE_WEIGHT = 0.8;
 /** Below this many learnable days we stay quiet rather than guess blindly. */
 const MIN_SOURCES = 2;
+/** The engine only knows how to reason about gym categories — a workout can
+ *  carry any legacy/foreign `category` string, and feeding one that isn't a
+ *  real gym category into the engine has nothing to learn from. */
+const GYM_CATEGORIES = new Set<ExerciseCategory>(['push', 'pull', 'legs']);
 
 /**
  * Turns the user's own workout history and templates into "what should I do
@@ -40,6 +44,8 @@ export class ExerciseSuggestionService {
     currentEntryIds: string[],
     limit = 5,
   ): ExerciseSuggestion[] {
+    if (!GYM_CATEGORIES.has(category)) return [];
+
     const exerciseById = new Map<string, Exercise>(
       this.exerciseService.exercises().map(e => [e.id, e]),
     );
