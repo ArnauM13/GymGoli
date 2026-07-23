@@ -217,6 +217,18 @@ import {
           <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
         </a>
 
+        @if (catalogReady() && missingCatalogCount() > 0) {
+          <div class="setting-divider"></div>
+          <button type="button" class="nav-row" (click)="addCatalogDefaults()" [disabled]="addingCatalog()">
+            <span class="material-symbols-outlined nav-row-icon">library_add</span>
+            <div class="setting-info">
+              <span class="setting-label">Afegir novetats del catàleg</span>
+              <span class="setting-desc">{{ missingCatalogCount() }} exercicis i esports nous de sèrie que encara no tens. No esborra ni modifica els teus.</span>
+            </div>
+            <span class="material-symbols-outlined nav-row-arrow">add</span>
+          </button>
+        }
+
         <div class="setting-divider"></div>
 
         <a class="nav-row" routerLink="/train/planner">
@@ -573,7 +585,10 @@ import {
       text-decoration: none; color: inherit;
       cursor: pointer; touch-action: manipulation;
       transition: opacity 0.15s;
+      /* Reset so a <button class="nav-row"> matches the <a> rows. */
+      width: 100%; background: none; border: none; text-align: left; font: inherit;
       &:hover { opacity: 0.8; }
+      &:disabled { opacity: 0.5; cursor: default; }
       &.nav-row--top { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--c-border-2); }
     }
     .nav-row-arrow {
@@ -835,6 +850,39 @@ export class SettingsComponent {
   private feedback         = inject(FeedbackService);
   private doc              = inject(DOCUMENT);
   private confirmDialog    = inject(ConfirmDialogService);
+
+  constructor() {
+    // Load the catalogs so the "add new catalog items" action knows what the
+    // user already has (and never re-inserts duplicates).
+    this.exerciseService.ensureLoaded();
+    this.sportService.ensureLoaded();
+  }
+
+  readonly catalogReady = computed(() =>
+    this.exerciseService.isLoaded() && this.sportService.sportsLoaded());
+  readonly missingCatalogCount = computed(() =>
+    this.exerciseService.missingDefaultCount() + this.sportService.missingDefaultCount());
+  readonly addingCatalog = signal(false);
+
+  /** Adds the catalog default exercises + sports the user is missing, keeping
+   *  all their own. For existing users who predate newly-shipped defaults. */
+  async addCatalogDefaults(): Promise<void> {
+    if (this.addingCatalog()) return;
+    this.addingCatalog.set(true);
+    try {
+      await this.exerciseService.ensureLoaded();
+      await this.sportService.ensureLoaded();
+      const ex = await this.exerciseService.addMissingDefaults();
+      const sp = await this.sportService.addMissingDefaults();
+      this.feedback.success(
+        ex + sp > 0 ? `Afegits ${ex} exercicis i ${sp} esports` : 'Ja tens tot el catàleg',
+      );
+    } catch {
+      this.feedback.error('No s\'han pogut afegir els exercicis');
+    } finally {
+      this.addingCatalog.set(false);
+    }
+  }
 
   readonly userName = computed(() =>
     this.authService.user()?.user_metadata?.['full_name'] as string | undefined

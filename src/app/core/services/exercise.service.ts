@@ -1,4 +1,4 @@
-import { Injectable, Signal, effect, inject, signal } from '@angular/core';
+import { Injectable, Signal, computed, effect, inject, signal } from '@angular/core';
 
 import {
   DEFAULT_EXERCISES,
@@ -139,6 +139,33 @@ export class ExerciseService {
 
   readonly byCategory = (category: ExerciseCategory) =>
     this._exercises().filter(e => e.category === category);
+
+  /** How many catalog default exercises the user is missing (matched by name,
+   *  case-insensitive) — lets existing users pull in newly-shipped ones. */
+  readonly missingDefaultCount = computed(() => {
+    const have = new Set(this._exercises().map(e => e.name.trim().toLowerCase()));
+    return DEFAULT_EXERCISES.filter(e => !have.has(e.name.trim().toLowerCase())).length;
+  });
+
+  /** Adds the catalog defaults the user doesn't already have, without touching
+   *  or duplicating their own exercises. Returns how many were added. */
+  async addMissingDefaults(): Promise<number> {
+    const uid = this.auth.uid();
+    if (!uid) throw new Error('Not authenticated');
+    const have = new Set(this._exercises().map(e => e.name.trim().toLowerCase()));
+    const missing = DEFAULT_EXERCISES.filter(e => !have.has(e.name.trim().toLowerCase()));
+    if (missing.length === 0) return 0;
+
+    const rows = missing.map(e => this._toRow(uid, e));
+    const { data, error } = await this.supabase.from('exercises').insert(rows).select();
+    if (error) throw error;
+
+    const added = (data ?? []).map(r => toExercise(r as Record<string, unknown>));
+    const next = [...this._exercises(), ...added].sort((a, b) => a.name.localeCompare(b.name));
+    this._exercises.set(next);
+    this._writeExercisesToStorage(uid, next);
+    return added.length;
+  }
 
   async create(data: Omit<Exercise, 'id' | 'createdAt'>): Promise<Exercise> {
     const uid = this.auth.uid();

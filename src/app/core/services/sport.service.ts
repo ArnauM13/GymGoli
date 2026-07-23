@@ -181,6 +181,30 @@ export class SportService {
     this._writeSportsToStorage(uid, sports);
   }
 
+  /** How many catalog default sports the user is missing (matched by name,
+   *  case-insensitive) — lets existing users pull in newly-shipped ones. */
+  readonly missingDefaultCount = computed(() => {
+    const have = new Set(this._sports().map(s => s.name.trim().toLowerCase()));
+    return DEFAULT_SPORTS.filter(s => !have.has(s.name.trim().toLowerCase())).length;
+  });
+
+  /** Adds the catalog default sports the user doesn't already have, without
+   *  touching their own. Returns how many were added. */
+  async addMissingDefaults(): Promise<number> {
+    const uid = this._uid();
+    const have = new Set(this._sports().map(s => s.name.trim().toLowerCase()));
+    const missing = DEFAULT_SPORTS.filter(s => !have.has(s.name.trim().toLowerCase()));
+    if (missing.length === 0) return 0;
+    for (const s of missing) {
+      await this.supabase.from('sports').insert({
+        user_id: uid, name: s.name, icon: s.icon, color: s.color,
+        subtypes: s.subtypes, metric_defs: s.metricDefs,
+      });
+    }
+    await this._loadSports(uid);
+    return missing.length;
+  }
+
   async createSport(payload: Pick<Sport, 'name' | 'icon' | 'color' | 'subtypes' | 'metricDefs'>): Promise<void> {
     const uid = this._uid();
     const { error } = await this.supabase.from('sports').insert({

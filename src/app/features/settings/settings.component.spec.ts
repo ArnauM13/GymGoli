@@ -99,11 +99,20 @@ describe('SettingsComponent', () => {
         },
         {
           provide: SportService,
-          useValue: { sports: signal([]), sessions: signal([]) },
+          useValue: {
+            sports: signal([]), sessions: signal([]),
+            sportsLoaded: signal(true), missingDefaultCount: signal(0),
+            ensureLoaded: jasmine.createSpy().and.resolveTo(undefined),
+            addMissingDefaults: jasmine.createSpy().and.resolveTo(0),
+          },
         },
         {
           provide: ExerciseService,
-          useValue: { exercises: signal([]), ensureLoaded: jasmine.createSpy().and.resolveTo(undefined) },
+          useValue: {
+            exercises: signal([]), isLoaded: signal(true), missingDefaultCount: signal(0),
+            ensureLoaded: jasmine.createSpy().and.resolveTo(undefined),
+            addMissingDefaults: jasmine.createSpy().and.resolveTo(0),
+          },
         },
         {
           provide: Router,
