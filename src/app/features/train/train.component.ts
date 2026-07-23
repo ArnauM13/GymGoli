@@ -1,4 +1,4 @@
-import { Component, HostListener, ViewChild, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, HostListener, OnDestroy, ViewChild, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs/operators';
 import { FormsModule } from '@angular/forms';
@@ -38,6 +38,10 @@ import {
 } from '../../shared/utils/workout-card.utils';
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
+
+/** After this long with no change to the workout, treat the session as no
+ *  longer being trained and stop the live "Sèrie activa" suggestions. */
+const STALE_SUGGESTION_MS = 2 * 60 * 60 * 1000; // 2 hours
 
 type GymSuggestion   = { type: 'gym';   category: ExerciseCategory; label: string; color: string; icon: string; reason: string };
 type SportSuggestion = { type: 'sport'; sport: Sport;               label: string; color: string; icon: string; reason: string };
@@ -1185,7 +1189,7 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     }
   `],
 })
-export class TrainComponent {
+export class TrainComponent implements OnDestroy {
   readonly workoutService  = inject(WorkoutService);
   readonly sportService    = inject(SportService);
   readonly offlineService  = inject(OfflineService);
@@ -1348,6 +1352,11 @@ export class TrainComponent {
   /** "Sèrie activa": learned next-exercise guesses for the live workout,
    *  derived from the user's own history + templates. Hidden while
    *  reordering/grouping and for planned days (this is a live-training aid). */
+  /** Ticks every minute so time-based gates (staleness) re-evaluate on their
+   *  own, not only when the workout changes. */
+  private readonly _now = signal(Date.now());
+  private _nowTimer?: ReturnType<typeof setInterval>;
+
   readonly exerciseSuggestions = computed((): ExerciseSuggestion[] => {
     const w = this.activeWorkout();
     if (!w || (w.status ?? 'done') === 'planned') return [];
@@ -1355,6 +1364,9 @@ export class TrainComponent {
     // calendar/history isn't being performed now, so never suggest a "next"
     // exercise for it.
     if (w.date !== TODAY()) return [];
+    // …and only while it's still active: once it's been idle for a couple of
+    // hours (last set/edit), assume the session is over and stay quiet.
+    if (w.updatedAt && this._now() - w.updatedAt.getTime() > STALE_SUGGESTION_MS) return [];
     if (this.reorderMode() || this.groupingMode()) return [];
     // "Sèrie activa" is your *next* move while training, so it stays quiet
     // until you've actually started — at least one logged set in the session.
@@ -1428,6 +1440,7 @@ export class TrainComponent {
 
   constructor() {
     this.sportService.ensureLoaded();
+    this._nowTimer = setInterval(() => this._now.set(Date.now()), 60_000);
 
     // Coming from the home feed with a specific workout to open (e.g. tapping
     // a day's card there navigates here with ?workout=<id>). Reactive (rather
@@ -1692,6 +1705,10 @@ export class TrainComponent {
     if (this.pickerCat() === category) { this.closePicker(); return; }
     this.loggerSport.set(null);
     this.pickerCat.set(category);
+  }
+
+  ngOnDestroy(): void {
+    if (this._nowTimer) clearInterval(this._nowTimer);
   }
 
   closePicker(): void { this.pickerCat.set(null); }

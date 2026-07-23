@@ -111,6 +111,9 @@ export interface Workout {
   /** Set when this workout was created by accepting a trainer proposal */
   sourceProposalId?: string | null;
   createdAt: Date;
+  /** Last time the workout's contents changed (any set/entry/feeling/notes
+   *  edit). Used to tell whether a session is still being trained right now. */
+  updatedAt?: Date;
   /** 'done' (default) or 'planned' (future/scheduled) */
   status?: WorkoutStatus;
   plannedSource?: PlannedSource;

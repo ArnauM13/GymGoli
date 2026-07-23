@@ -19,6 +19,7 @@ function toWorkout(row: Record<string, unknown>): Workout {
     feeling:          (row['feeling'] as FeelingLevel | undefined) ?? undefined,
     sourceProposalId: (row['source_proposal_id'] as string | null | undefined) ?? undefined,
     createdAt:        new Date(row['created_at'] as string),
+    updatedAt:        row['updated_at'] ? new Date(row['updated_at'] as string) : undefined,
     status:           (row['status'] as WorkoutStatus | undefined) ?? 'done',
     plannedSource:    (row['planned_source'] as PlannedSource | undefined) ?? undefined,
   };
@@ -36,6 +37,7 @@ function workoutFromCache(raw: Record<string, unknown>): Workout {
     feeling:          (raw['feeling'] as FeelingLevel | undefined) ?? undefined,
     sourceProposalId: (raw['sourceProposalId'] as string | null | undefined) ?? undefined,
     createdAt:        new Date(raw['createdAt'] as string),
+    updatedAt:        raw['updatedAt'] ? new Date(raw['updatedAt'] as string) : undefined,
     status:           (raw['status'] as WorkoutStatus | undefined) ?? 'done',
     plannedSource:    (raw['plannedSource'] as PlannedSource | undefined) ?? undefined,
   };
@@ -652,7 +654,9 @@ export class WorkoutService {
   }
 
   private _updateWorkout(id: string, changes: Partial<Workout>): void {
-    this._patch(id, changes);
+    // Any content change refreshes the activity timestamp, so we can tell a
+    // session that's still being trained from one abandoned hours ago.
+    this._patch(id, { ...changes, updatedAt: new Date() });
     const snap = this._find(id);
     if (snap) this.syncService.markDirty(id, snap);
   }

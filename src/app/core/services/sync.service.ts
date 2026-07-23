@@ -159,6 +159,7 @@ export class SyncService {
       status:             w.status ?? 'done',
       planned_source:     w.plannedSource ?? null,
       source_proposal_id: w.sourceProposalId ?? null,
+      updated_at:         (w.updatedAt ?? new Date()).toISOString(),
     };
     if (w.category) row['category'] = w.category;
 
