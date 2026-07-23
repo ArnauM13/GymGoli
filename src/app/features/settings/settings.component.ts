@@ -222,8 +222,8 @@ import {
           <button type="button" class="nav-row" (click)="addCatalogDefaults()" [disabled]="addingCatalog()">
             <span class="material-symbols-outlined nav-row-icon">library_add</span>
             <div class="setting-info">
-              <span class="setting-label">Afegir novetats del catàleg</span>
-              <span class="setting-desc">{{ missingCatalogCount() }} exercicis i esports nous de sèrie que encara no tens. No esborra ni modifica els teus.</span>
+              <span class="setting-label">Actualitzar el catàleg de sèrie</span>
+              <span class="setting-desc">Afegeix els exercicis i esports de sèrie que et falten i posa al dia les seves mètriques (p. ex. els estils de Yoga). No toca els que has creat tu.</span>
             </div>
             <span class="material-symbols-outlined nav-row-arrow">add</span>
           </button>
@@ -875,7 +875,7 @@ export class SettingsComponent {
       const ex = await this.exerciseService.addMissingDefaults();
       const sp = await this.sportService.addMissingDefaults();
       this.feedback.success(
-        ex + sp > 0 ? `Afegits ${ex} exercicis i ${sp} esports` : 'Ja tens tot el catàleg',
+        ex + sp > 0 ? `Catàleg actualitzat: ${ex} exercicis i ${sp} esports` : 'Ja tens tot el catàleg al dia',
       );
     } catch {
       this.feedback.error('No s\'han pogut afegir els exercicis');
