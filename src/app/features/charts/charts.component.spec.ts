@@ -9,6 +9,8 @@ import { SportService } from '../../core/services/sport.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { Exercise } from '../../core/models/exercise.model';
 import { Workout } from '../../core/models/workout.model';
+import { TrainingTypeService } from '../../core/services/training-type.service';
+import { DEFAULT_TRAINING_TYPES } from '../../core/models/training-type.model';
 
 function makeExercise(id: string, category: 'push' | 'pull' | 'legs' = 'push'): Exercise {
   return { id, name: `Exercise ${id}`, category, createdAt: new Date() };
@@ -83,6 +85,7 @@ describe('ChartsComponent', () => {
         { provide: ExerciseService,     useValue: mockExerciseService },
         { provide: SportService,        useValue: mockSportService },
         { provide: UserSettingsService, useValue: mockSettingsService },
+        { provide: TrainingTypeService, useValue: { types: signal(DEFAULT_TRAINING_TYPES) } },
       ],
     });
 

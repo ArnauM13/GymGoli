@@ -9,6 +9,8 @@ import { SportService } from '../../core/services/sport.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Exercise } from '../../core/models/exercise.model';
 import { FeedbackService } from '../../shared/services/feedback.service';
+import { TrainingTypeService } from '../../core/services/training-type.service';
+import { DEFAULT_TRAINING_TYPES } from '../../core/models/training-type.model';
 
 function makeExercise(overrides: Partial<Exercise> = {}): Exercise {
   return { id: '1', name: 'Test', category: 'push', createdAt: new Date(), ...overrides };
@@ -46,6 +48,7 @@ describe('LibraryComponent', () => {
         { provide: ExerciseService, useValue: mockExerciseService },
         { provide: SportService,    useValue: mockSportService },
         { provide: AuthService,     useValue: { uid: signal('user-1') } },
+        { provide: TrainingTypeService, useValue: { types: signal(DEFAULT_TRAINING_TYPES) } },
         { provide: MatDialog,       useValue: { open: jasmine.createSpy() } },
         { provide: FeedbackService, useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
       ],

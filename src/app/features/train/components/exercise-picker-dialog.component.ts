@@ -4,7 +4,7 @@ import { MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef } from '@angu
 import {
   Exercise, ExerciseCategory,
   CATEGORY_LABELS, CATEGORY_COLORS,
-  MUSCLE_LABELS, SUBCATEGORY_LABELS, SUBCATEGORY_OPTIONS,
+  ALL_SUBCATEGORY_OPTIONS, MUSCLE_LABELS, SUBCATEGORY_LABELS,
 } from '../../../core/models/exercise.model';
 import { ExerciseService } from '../../../core/services/exercise.service';
 import { FilterBarComponent } from '../../../shared/components/filter-bar/filter-bar.component';
@@ -257,15 +257,12 @@ export class ExercisePickerDialogComponent {
   });
 
   /** Subdivides filtered() by main muscle group (subcategory), in a fixed
-   *  push→pull→legs / chest→shoulders→triceps… order, with an "Altres"
-   *  bucket for exercises that don't have one set. */
+   *  chest→shoulders→triceps→…→calves order, with an "Altres" bucket for
+   *  exercises that don't have one set. Muscle groups are independent of the
+   *  workout's training type, so the full flat list is always used. */
   readonly groupedFiltered = computed(() => {
     const list = this.filtered();
-    const order = [
-      ...SUBCATEGORY_OPTIONS.push,
-      ...SUBCATEGORY_OPTIONS.pull,
-      ...SUBCATEGORY_OPTIONS.legs,
-    ];
+    const order = ALL_SUBCATEGORY_OPTIONS;
 
     const groups: { key: string; label: string; exercises: Exercise[] }[] = [];
     for (const { value, label } of order) {

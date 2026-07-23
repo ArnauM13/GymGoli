@@ -23,6 +23,8 @@ import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../../core/models/weekly-plan.mod
 import { UserSettings, DEFAULT_USER_SETTINGS } from '../../core/models/user-settings.model';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
+import { TrainingTypeService } from '../../core/services/training-type.service';
+import { DEFAULT_TRAINING_TYPES } from '../../core/models/training-type.model';
 
 const TODAY = new Date().toISOString().split('T')[0];
 
@@ -86,6 +88,7 @@ describe('TrainComponent', () => {
         { provide: SportService,        useValue: mockSportService },
         { provide: ExerciseService,     useValue: { exercises: signal([]), isLoaded: signal(true), ensureLoaded: jasmine.createSpy().and.resolveTo(undefined) } },
         { provide: AuthService,         useValue: { uid: signal('user-1') } },
+        { provide: TrainingTypeService, useValue: { types: signal(DEFAULT_TRAINING_TYPES) } },
         {
           provide: UserSettingsService,
           useValue: {

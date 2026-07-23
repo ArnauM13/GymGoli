@@ -6,6 +6,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { AuthService } from '../../core/services/auth.service';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { FitnessMetricsService } from '../../core/services/fitness-metrics.service';
+import { TrainingTypeService } from '../../core/services/training-type.service';
 import { SportService } from '../../core/services/sport.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
@@ -208,6 +209,17 @@ import {
 
         <div class="setting-divider"></div>
 
+        <a class="nav-row" routerLink="/training-types">
+          <span class="material-symbols-outlined nav-row-icon">exercise</span>
+          <div class="setting-info">
+            <span class="setting-label">Configurar tipus d'entrenament</span>
+            <span class="setting-desc">Crea i edita els tipus de gimnàs (Empenta, Tracció, Cames…).</span>
+          </div>
+          <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
+        </a>
+
+        <div class="setting-divider"></div>
+
         <a class="nav-row" routerLink="/sports-config">
           <span class="material-symbols-outlined nav-row-icon">sports_soccer</span>
           <div class="setting-info">
@@ -223,7 +235,7 @@ import {
             <span class="material-symbols-outlined nav-row-icon">library_add</span>
             <div class="setting-info">
               <span class="setting-label">Afegir novetats del catàleg</span>
-              <span class="setting-desc">{{ missingCatalogCount() }} exercicis i esports nous de sèrie que encara no tens. No esborra ni modifica els teus.</span>
+              <span class="setting-desc">{{ missingCatalogCount() }} exercicis, esports i tipus nous de sèrie que encara no tens. No esborra ni modifica els teus.</span>
             </div>
             <span class="material-symbols-outlined nav-row-arrow">add</span>
           </button>
@@ -845,6 +857,7 @@ export class SettingsComponent {
   readonly trainerService  = inject(TrainerService);
   private exerciseService  = inject(ExerciseService);
   private sportService     = inject(SportService);
+  private typeService      = inject(TrainingTypeService);
   private workoutService   = inject(WorkoutService);
   private router           = inject(Router);
   private feedback         = inject(FeedbackService);
@@ -856,12 +869,14 @@ export class SettingsComponent {
     // user already has (and never re-inserts duplicates).
     this.exerciseService.ensureLoaded();
     this.sportService.ensureLoaded();
+    this.typeService.ensureLoaded();
   }
 
   readonly catalogReady = computed(() =>
-    this.exerciseService.isLoaded() && this.sportService.sportsLoaded());
+    this.exerciseService.isLoaded() && this.sportService.sportsLoaded() && this.typeService.isLoaded());
   readonly missingCatalogCount = computed(() =>
-    this.exerciseService.missingDefaultCount() + this.sportService.missingDefaultCount());
+    this.exerciseService.missingDefaultCount() + this.sportService.missingDefaultCount()
+    + this.typeService.missingDefaultCount());
   readonly addingCatalog = signal(false);
 
   /** Adds the catalog default exercises + sports the user is missing, keeping
@@ -872,10 +887,12 @@ export class SettingsComponent {
     try {
       await this.exerciseService.ensureLoaded();
       await this.sportService.ensureLoaded();
+      await this.typeService.ensureLoaded();
       const ex = await this.exerciseService.addMissingDefaults();
       const sp = await this.sportService.addMissingDefaults();
+      const tt = await this.typeService.addMissingDefaults();
       this.feedback.success(
-        ex + sp > 0 ? `Afegits ${ex} exercicis i ${sp} esports` : 'Ja tens tot el catàleg',
+        ex + sp + tt > 0 ? `Afegits ${ex} exercicis, ${sp} esports i ${tt} tipus` : 'Ja tens tot el catàleg',
       );
     } catch {
       this.feedback.error('No s\'han pogut afegir els exercicis');

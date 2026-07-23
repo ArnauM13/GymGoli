@@ -1,5 +1,5 @@
 -- GymGoli – Schema complet i idempotent
--- Consolida totes les migracions (001–020).
+-- Consolida totes les migracions (001–026).
 -- Segur de re-executar: usa IF NOT EXISTS, DROP … IF EXISTS i OR REPLACE.
 -- Executa a: Supabase Dashboard → SQL Editor → New query
 
@@ -113,6 +113,21 @@ CREATE TABLE IF NOT EXISTS sports (
   subtypes    jsonb       NOT NULL DEFAULT '[]',
   metric_defs jsonb       NOT NULL DEFAULT '[]',
   created_at  timestamptz DEFAULT now(),
+  UNIQUE (user_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS training_types (
+  user_id    uuid        NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  -- TEXT id so the built-in defaults keep the stable ids 'push'/'pull'/'legs'
+  -- already stored in exercises.category and workouts.category.
+  id         text        NOT NULL,
+  name       text        NOT NULL,
+  icon       text        NOT NULL DEFAULT 'fitness_center',
+  color      text        NOT NULL DEFAULT '#006874',
+  muscles    text,
+  sort_order integer     NOT NULL DEFAULT 0,
+  created_at timestamptz DEFAULT now(),
+  PRIMARY KEY (user_id, id),
   UNIQUE (user_id, name)
 );
 
@@ -276,6 +291,7 @@ ALTER TABLE sport_sessions
 ALTER TABLE exercises        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workouts         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sports           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE training_types   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sport_sessions   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_settings    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE goal_history     ENABLE ROW LEVEL SECURITY;
@@ -313,6 +329,10 @@ CREATE POLICY "workouts_trainer_read_clients" ON workouts FOR SELECT
   );
 
 -- sports
+DROP POLICY IF EXISTS "users own training_types"    ON training_types;
+CREATE POLICY "users own training_types" ON training_types FOR ALL
+  USING (user_id = auth.uid());
+
 DROP POLICY IF EXISTS "users own sports"            ON sports;
 CREATE POLICY "users own sports" ON sports FOR ALL
   USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
@@ -426,6 +446,9 @@ CREATE INDEX IF NOT EXISTS workouts_exercise_names_trgm_idx
 
 CREATE INDEX IF NOT EXISTS sports_user_id_idx
   ON sports (user_id);
+
+CREATE INDEX IF NOT EXISTS training_types_user_id_idx
+  ON training_types (user_id);
 
 CREATE INDEX IF NOT EXISTS sport_sessions_user_id_date_idx
   ON sport_sessions (user_id, date DESC);

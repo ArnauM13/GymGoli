@@ -15,6 +15,7 @@ import {
   SUBCATEGORY_LABELS,
 } from '../../core/models/exercise.model';
 import { ExerciseService } from '../../core/services/exercise.service';
+import { TrainingTypeService } from '../../core/services/training-type.service';
 import { AppHintService } from '../../core/services/app-hint.service';
 import { ExerciseFormDialogComponent } from '../library/components/exercise-form-dialog.component';
 import { FilterBarComponent } from '../../shared/components/filter-bar/filter-bar.component';
@@ -245,6 +246,7 @@ import { FilterBarComponent } from '../../shared/components/filter-bar/filter-ba
 })
 export class ExercisesComponent {
   private exerciseService = inject(ExerciseService);
+  private typeService     = inject(TrainingTypeService);
   readonly hintService    = inject(AppHintService);
   private dialog          = inject(MatDialog);
   private feedback        = inject(FeedbackService);
@@ -256,11 +258,9 @@ export class ExercisesComponent {
   readonly searchQuery  = signal('');
   readonly activeFilter = signal<ExerciseCategory | null>(null);
 
-  readonly categoryList = (Object.keys(CATEGORY_LABELS) as ExerciseCategory[]).map(value => ({
-    value,
-    label: CATEGORY_LABELS[value],
-    icon: CATEGORY_ICONS[value],
-  }));
+  readonly categoryList = computed(() =>
+    this.typeService.types().map(t => ({ value: t.id, label: t.name, icon: t.icon }))
+  );
 
   readonly hasQuery = computed(() => this.searchQuery().trim().length > 0);
 
@@ -274,7 +274,7 @@ export class ExercisesComponent {
 
   readonly visibleCategories = computed(() => {
     const filter = this.activeFilter();
-    const cats = filter ? this.categoryList.filter(c => c.value === filter) : this.categoryList;
+    const cats = filter ? this.categoryList().filter(c => c.value === filter) : this.categoryList();
     return cats.filter(c => this.filteredByCategory(c.value).length > 0);
   });
 

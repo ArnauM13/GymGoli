@@ -4,16 +4,14 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
 import {
-  CATEGORY_COLORS,
-  CATEGORY_ICONS,
-  CATEGORY_LABELS,
+  ALL_SUBCATEGORY_OPTIONS,
   Exercise,
   ExerciseCategory,
   LoadType,
   MUSCLE_OPTIONS,
-  SUBCATEGORY_OPTIONS,
 } from '../../../core/models/exercise.model';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
+import { TrainingTypeService } from '../../../core/services/training-type.service';
 
 export interface ExerciseFormDialogData {
   exercise?: Exercise;
@@ -58,7 +56,7 @@ const MUSCLE_GROUPS: { label: string; values: string[] }[] = [
           <div class="field">
             <span class="field-label">Tipus</span>
             <div class="cat-grid">
-              @for (cat of categories; track cat.value) {
+              @for (cat of categories(); track cat.value) {
                 <button type="button" class="cat-btn"
                         [class.selected]="selectedCategory() === cat.value"
                         [style.--cat-color]="cat.color"
@@ -71,11 +69,11 @@ const MUSCLE_GROUPS: { label: string; values: string[] }[] = [
           </div>
 
           <!-- Grup muscular principal -->
-          @if (subcategoryOptions().length > 0) {
+          @if (subcategoryOptions.length > 0) {
             <div class="field">
-              <span class="field-label">Grup muscular principal</span>
+              <span class="field-label">Grup muscular principal <span class="optional-hint">(opcional)</span></span>
               <div class="chips-row">
-                @for (sub of subcategoryOptions(); track sub.value) {
+                @for (sub of subcategoryOptions; track sub.value) {
                   <button type="button" class="chip"
                           [class.selected]="form.get('subcategory')?.value === sub.value"
                           (click)="selectSubcategory(sub.value)">
@@ -433,17 +431,15 @@ export class ExerciseFormDialogComponent {
     assisted:   "Propi pes menys assistència; registres l'assistència que et treu la màquina o goma.",
   }[this.loadType()]));
 
-  readonly categories = (Object.keys(CATEGORY_LABELS) as ExerciseCategory[]).map(value => ({
-    value,
-    label: CATEGORY_LABELS[value],
-    icon: CATEGORY_ICONS[value],
-    color: CATEGORY_COLORS[value],
-  }));
+  private typeService = inject(TrainingTypeService);
+  readonly categories = computed(() =>
+    this.typeService.types().map(t => ({ value: t.id, label: t.name, icon: t.icon, color: t.color }))
+  );
 
-  readonly subcategoryOptions = computed(() => {
-    const cat = this.selectedCategory();
-    return cat ? SUBCATEGORY_OPTIONS[cat] : [];
-  });
+  // Muscle subgroups are independent of the training type — always the full
+  // flat list, so an exercise's primary muscle group is never gated by which
+  // type is selected.
+  readonly subcategoryOptions = ALL_SUBCATEGORY_OPTIONS;
 
   readonly form = this.fb.group({
     name:        [this.data.exercise?.name ?? '', [Validators.required, Validators.maxLength(50)]],
@@ -465,8 +461,8 @@ export class ExerciseFormDialogComponent {
   }
 
   selectCategory(cat: ExerciseCategory): void {
+    // Muscle subgroup is independent of the type, so switching type keeps it.
     this.selectedCategory.set(cat);
-    this.form.patchValue({ subcategory: '' });
   }
 
   selectSubcategory(value: string): void {

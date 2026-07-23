@@ -17,6 +17,7 @@ import {
 import { Sport } from '../../core/models/sport.model';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
+import { TrainingTypeService } from '../../core/services/training-type.service';
 import { ExerciseFormDialogComponent } from './components/exercise-form-dialog.component';
 import { SportFormDialogComponent } from './components/sport-form-dialog.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
@@ -33,7 +34,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
       <div class="filter-bar">
         <button class="filter-chip" [class.active]="!activeFilter() && !muscleFilter()"
                 (click)="clearFilters()">Tots</button>
-        @for (cat of categoryList; track cat.value) {
+        @for (cat of categoryList(); track cat.value) {
           <button class="filter-chip" [class.active]="activeFilter() === cat.value"
                   [style.--cat-color]="getCategoryColor(cat.value)"
                   (click)="setCategory(cat.value)">
@@ -457,6 +458,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 export class LibraryComponent {
   private exerciseService = inject(ExerciseService);
   private sportService    = inject(SportService);
+  private typeService     = inject(TrainingTypeService);
   private dialog          = inject(MatDialog);
   private feedback        = inject(FeedbackService);
   private confirmDialog   = inject(ConfirmDialogService);
@@ -476,18 +478,16 @@ export class LibraryComponent {
   readonly muscleFilter = signal<string | null>(null);
   readonly exercises = this.exerciseService.exercises;
 
-  readonly categoryList = (Object.keys(CATEGORY_LABELS) as ExerciseCategory[]).map(value => ({
-    value,
-    label: CATEGORY_LABELS[value],
-    icon: CATEGORY_ICONS[value],
-  }));
+  readonly categoryList = computed(() =>
+    this.typeService.types().map(t => ({ value: t.id, label: t.name, icon: t.icon }))
+  );
 
   readonly muscleList = MUSCLE_OPTIONS;
 
   readonly visibleCategories = computed(() => {
     const filter = this.activeFilter();
-    if (filter) return this.categoryList.filter(c => c.value === filter);
-    return this.categoryList.filter(c => this.exercisesByCategory(c.value).length > 0);
+    if (filter) return this.categoryList().filter(c => c.value === filter);
+    return this.categoryList().filter(c => this.exercisesByCategory(c.value).length > 0);
   });
 
   exercisesByCategory(cat: ExerciseCategory): Exercise[] {

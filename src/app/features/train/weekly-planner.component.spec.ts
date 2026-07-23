@@ -18,6 +18,8 @@ import { WorkoutTemplate } from '../../core/models/template.model';
 import { Exercise } from '../../core/models/exercise.model';
 import { Workout } from '../../core/models/workout.model';
 import { Sport, SportSession } from '../../core/models/sport.model';
+import { TrainingTypeService } from '../../core/services/training-type.service';
+import { DEFAULT_TRAINING_TYPES } from '../../core/models/training-type.model';
 
 function template(overrides: Partial<WorkoutTemplate> = {}): WorkoutTemplate {
   return { id: 't1', name: 'Push A', category: 'push', entries: [], createdAt: '2024-01-01', ...overrides };
@@ -71,6 +73,7 @@ describe('WeeklyPlannerComponent', () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: UserSettingsService, useValue: { weeklyPlan: savedPlan, updateWeeklyPlan } },
+        { provide: TrainingTypeService, useValue: { types: signal(DEFAULT_TRAINING_TYPES) } },
         { provide: WeeklyPlanService,   useValue: { apply: applyPlan, retractRemoved } },
         { provide: WorkoutService,      useValue: { getPlannedForDate, getWorkoutsForDate } },
         { provide: SportService,        useValue: { sports: signal([]), ensureLoaded: jasmine.createSpy(), getSportSessionsForDate, getPlannedSportSessionsForDate } },

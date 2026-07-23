@@ -10,6 +10,8 @@ import { AuthService } from '../../core/services/auth.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { FeelingLevel, Workout, WorkoutEntry } from '../../core/models/workout.model';
+import { TrainingTypeService } from '../../core/services/training-type.service';
+import { DEFAULT_TRAINING_TYPES } from '../../core/models/training-type.model';
 
 const TODAY = new Date().toISOString().split('T')[0];
 
@@ -56,6 +58,7 @@ describe('CalendarPageComponent', () => {
         { provide: ExerciseService,     useValue: mockExerciseService },
         { provide: SportService,        useValue: mockSportService },
         { provide: AuthService,         useValue: { uid: signal('user-1') } },
+        { provide: TrainingTypeService, useValue: { types: signal(DEFAULT_TRAINING_TYPES) } },
         { provide: UserSettingsService, useValue: { weightUnit: signal<'kg' | 'lb'>('kg'), difficultyScale: signal('emoji'), bodyweightKg: signal(null) } },
         { provide: FeedbackService,     useValue: { success: jasmine.createSpy(), error: jasmine.createSpy() } },
       ],

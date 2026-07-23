@@ -9,6 +9,8 @@ import { WorkoutProfileService } from './workout-profile.service';
 import { DEFAULT_USER_SETTINGS, UserSettings } from '../models/user-settings.model';
 import { Workout } from '../models/workout.model';
 import { Sport, SportSession } from '../models/sport.model';
+import { TrainingTypeService } from './training-type.service';
+import { DEFAULT_TRAINING_TYPES } from '../models/training-type.model';
 
 const NEUTRAL_CAT = { daysSinceLast: 2, typicalGapDays: 4, overdueScore: 0.5 };
 const NEUTRAL_PROFILE = {
@@ -64,6 +66,7 @@ describe('FitnessMetricsService', () => {
         { provide: WorkoutService,        useValue: { doneWorkouts: mockWorkouts, getPlannedForDate: jasmine.createSpy().and.returnValue([]) } },
         { provide: SportService,          useValue: { sessions: mockSessions, sports: mockSports, getPlannedSportSessionsForDate: jasmine.createSpy().and.returnValue([]) } },
         { provide: UserSettingsService,   useValue: { settings: mockSettings, fitnessGoal: signal(null) } },
+        { provide: TrainingTypeService, useValue: { types: signal(DEFAULT_TRAINING_TYPES) } },
         { provide: WorkoutProfileService, useValue: { profile: signal(NEUTRAL_PROFILE) } },
       ],
     });
