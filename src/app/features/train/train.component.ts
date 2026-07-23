@@ -1351,6 +1351,10 @@ export class TrainComponent {
   readonly exerciseSuggestions = computed((): ExerciseSuggestion[] => {
     const w = this.activeWorkout();
     if (!w || (w.status ?? 'done') === 'planned') return [];
+    // Only for a workout being trained *today*: a past session opened from the
+    // calendar/history isn't being performed now, so never suggest a "next"
+    // exercise for it.
+    if (w.date !== TODAY()) return [];
     if (this.reorderMode() || this.groupingMode()) return [];
     // "Sèrie activa" is your *next* move while training, so it stays quiet
     // until you've actually started — at least one logged set in the session.
@@ -1371,6 +1375,7 @@ export class TrainComponent {
   readonly needsBodyweightHint = computed(() => {
     const w = this.activeWorkout();
     if (!w || (w.status ?? 'done') === 'planned') return false;
+    if (w.date !== TODAY()) return false;
     if (this.reorderMode() || this.groupingMode()) return false;
     if (this.settingsService.bodyweightKg() != null) return false;
     if (this.hintService.isDismissed('nudge-bodyweight-volume')) return false;
