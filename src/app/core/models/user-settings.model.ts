@@ -63,11 +63,16 @@ export interface UserSettings {
    *  bodyweight moved) in the exercise form. Off by default — the catalog
    *  ships sensible values and most users never need to touch it. */
   bodyweightFactorEnabled: boolean;
-  /** The user has run (or dismissed) the "update catalog" action once, so we
-   *  never nag again — e.g. after they deliberately delete a default metric
-   *  or subtype, which would otherwise re-flag the catalog as out of date. */
-  catalogUpdateDismissed: boolean;
+  /** Highest {@link CATALOG_VERSION} the user has synced their catalog to.
+   *  Below the current version → the "update catalog" prompt may show; once
+   *  synced it's hidden even if the user later deletes a default metric/subtype,
+   *  and it re-appears only when we ship a new catalog version (bump the const). */
+  catalogSyncedVersion: number;
 }
+
+/** Bump whenever DEFAULT_EXERCISES or DEFAULT_SPORTS change in a way existing
+ *  users should be offered — it re-arms the "Actualitzar el catàleg" prompt. */
+export const CATALOG_VERSION = 1;
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
   metricsEnabled: false,
@@ -90,5 +95,5 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   difficultyScale: 'emoji',
   bodyweightKg: null,
   bodyweightFactorEnabled: false,
-  catalogUpdateDismissed: false,
+  catalogSyncedVersion: 0,
 };

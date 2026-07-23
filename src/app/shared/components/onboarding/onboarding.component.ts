@@ -2,6 +2,7 @@ import { Component, inject, output, signal } from '@angular/core';
 
 import {
   FitnessGoal,
+  CATALOG_VERSION,
   FITNESS_GOAL_EMOJIS,
   FITNESS_GOAL_LABELS,
   FITNESS_GOAL_WEEKLY_DEFAULTS,
@@ -283,16 +284,18 @@ export class OnboardingComponent {
     const goal = this.selectedGoal();
     if (!goal) return;
     this.settingsService.update({
-      onboardingDone:      true,
-      fitnessGoal:         goal,
-      metricsEnabled:      true,
-      weeklyActivityGoal:  FITNESS_GOAL_WEEKLY_DEFAULTS[goal],
+      onboardingDone:       true,
+      fitnessGoal:          goal,
+      metricsEnabled:       true,
+      weeklyActivityGoal:   FITNESS_GOAL_WEEKLY_DEFAULTS[goal],
+      // New users are seeded with the current catalog, so mark them up to date.
+      catalogSyncedVersion: CATALOG_VERSION,
     });
     this.done.emit();
   }
 
   finishWithoutGoal(): void {
-    this.settingsService.update({ onboardingDone: true });
+    this.settingsService.update({ onboardingDone: true, catalogSyncedVersion: CATALOG_VERSION });
     this.done.emit();
   }
 }

@@ -15,7 +15,7 @@ import { FeedbackService } from '../../shared/services/feedback.service';
 import { kgToDisplay, displayToKg } from '../../shared/utils/weight.utils';
 import {
   FitnessGoal, GoalMode, ThemeMode, WeightUnit,
-  FITNESS_GOAL_EMOJIS, FITNESS_GOAL_LABELS,
+  FITNESS_GOAL_EMOJIS, FITNESS_GOAL_LABELS, CATALOG_VERSION,
 } from '../../core/models/user-settings.model';
 
 @Component({
@@ -217,7 +217,7 @@ import {
           <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
         </a>
 
-        @if (catalogReady() && missingCatalogCount() > 0 && !settingsService.catalogUpdateDismissed()) {
+        @if (catalogReady() && missingCatalogCount() > 0 && settingsService.catalogSyncedVersion() < CATALOG_VERSION) {
           <div class="setting-divider"></div>
           <button type="button" class="nav-row" (click)="addCatalogDefaults()" [disabled]="addingCatalog()">
             <span class="material-symbols-outlined nav-row-icon">library_add</span>
@@ -858,6 +858,7 @@ export class SettingsComponent {
     this.sportService.ensureLoaded();
   }
 
+  readonly CATALOG_VERSION = CATALOG_VERSION;
   readonly catalogReady = computed(() =>
     this.exerciseService.isLoaded() && this.sportService.sportsLoaded());
   readonly missingCatalogCount = computed(() =>
@@ -874,8 +875,9 @@ export class SettingsComponent {
       await this.sportService.ensureLoaded();
       const ex = await this.exerciseService.addMissingDefaults();
       const sp = await this.sportService.addMissingDefaults();
-      // Mark as done so a later deliberate deletion doesn't re-nag the user.
-      await this.settingsService.update({ catalogUpdateDismissed: true });
+      // Mark as synced to the current catalog version so a later deliberate
+      // deletion doesn't re-nag; a future CATALOG_VERSION bump re-arms it.
+      await this.settingsService.update({ catalogSyncedVersion: CATALOG_VERSION });
       this.feedback.success(
         ex + sp > 0 ? `Catàleg actualitzat: ${ex} exercicis i ${sp} esports` : 'Ja tens tot el catàleg al dia',
       );

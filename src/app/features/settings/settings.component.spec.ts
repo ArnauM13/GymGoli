@@ -69,7 +69,7 @@ describe('SettingsComponent', () => {
             rirEnabled:         signal(false),
             difficultyScale:    signal('emoji'),
             bodyweightKg:       signal(null),
-            catalogUpdateDismissed: signal(false),
+            catalogSyncedVersion: signal(0),
             loaded:             signal(true),
             settings:           signal({
               metricsEnabled: false,
