@@ -60,7 +60,13 @@ const W_BALANCE = 1.5;
 const SATISFIED_GATE = 0.25;
 
 function subcatsOf(category: ExerciseCategory): Set<ExerciseSubcategory> {
-  return new Set(SUBCATEGORY_OPTIONS[category].map(o => o.value));
+  // Defensive: `category` originates from an untyped Workout.category string
+  // cast to ExerciseCategory, so a legacy/foreign value (anything that isn't a
+  // real gym category) has no subcategory table. Fall back to an empty set
+  // instead of crashing on `undefined.map(...)` — a throw here bubbles up
+  // through the template expression that reads the suggestions and, via the
+  // global error handler, into an unstoppable toast loop.
+  return new Set((SUBCATEGORY_OPTIONS[category] ?? []).map(o => o.value));
 }
 
 function normalize(map: Map<string, number>): (id: string) => number {

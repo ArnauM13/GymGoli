@@ -93,4 +93,15 @@ describe('ExerciseSuggestionService', () => {
     ]);
     expect(service.suggest('pull', [])).toEqual([]);
   });
+
+  it('returns [] without throwing for a non-gym category', () => {
+    // A workout can carry a legacy/foreign category string cast to
+    // ExerciseCategory; feeding it in must never crash the suggestion engine.
+    doneWorkouts.set([
+      workout('2024-01-01', 'pull', ['back1', 'bi1']),
+      workout('2024-01-05', 'pull', ['back1', 'bi1']),
+    ]);
+    expect(() => service.suggest('mixed' as ExerciseCategory, ['back1'])).not.toThrow();
+    expect(service.suggest('mixed' as ExerciseCategory, ['back1'])).toEqual([]);
+  });
 });
