@@ -9,6 +9,8 @@ import { AuthService } from './core/services/auth.service';
 import { OfflineService } from './core/services/offline.service';
 import { UserSettingsService } from './core/services/user-settings.service';
 import { DEFAULT_USER_SETTINGS } from './core/models/user-settings.model';
+import { TrainingTypeService } from './core/services/training-type.service';
+import { DEFAULT_TRAINING_TYPES } from './core/models/training-type.model';
 
 @Component({ selector: 'app-stub', template: '', standalone: true })
 class StubComponent {}
@@ -33,6 +35,10 @@ describe('AppComponent', () => {
           { path: 'train/planner', component: StubComponent },
           { path: 'trainer', component: StubComponent },
         ]),
+        {
+          provide: TrainingTypeService,
+          useValue: { types: signal(DEFAULT_TRAINING_TYPES) },
+        },
         {
           provide: AuthService,
           useValue: {

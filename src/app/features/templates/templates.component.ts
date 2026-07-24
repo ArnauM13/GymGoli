@@ -8,6 +8,7 @@ import { CATEGORY_COLORS, CATEGORY_LABELS, Exercise, ExerciseCategory } from '..
 import { BUILT_IN_TEMPLATES, BuiltInTemplate, TemplateEntry, WorkoutTemplate } from '../../core/models/template.model';
 import { TemplateService } from '../../core/services/template.service';
 import { ExerciseService } from '../../core/services/exercise.service';
+import { TrainingTypeService } from '../../core/services/training-type.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { ExercisePickerDialogComponent } from '../train/components/exercise-picker-dialog.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
@@ -15,26 +16,8 @@ import { FeedbackService } from '../../shared/services/feedback.service';
 
 type EditorCat = ExerciseCategory | 'mixed';
 
-const CAT_OPTIONS: { value: EditorCat; label: string; color: string }[] = [
-  { value: 'push',  label: CATEGORY_LABELS.push,  color: CATEGORY_COLORS.push  },
-  { value: 'pull',  label: CATEGORY_LABELS.pull,  color: CATEGORY_COLORS.pull  },
-  { value: 'legs',  label: CATEGORY_LABELS.legs,  color: CATEGORY_COLORS.legs  },
-  { value: 'mixed', label: 'Mixt',                color: '#607d8b'              },
-];
-
-const CAT_COLOR: Record<EditorCat, string> = {
-  push:  CATEGORY_COLORS.push,
-  pull:  CATEGORY_COLORS.pull,
-  legs:  CATEGORY_COLORS.legs,
-  mixed: '#607d8b',
-};
-
-const CAT_LABEL: Record<EditorCat, string> = {
-  push:  CATEGORY_LABELS.push,
-  pull:  CATEGORY_LABELS.pull,
-  legs:  CATEGORY_LABELS.legs,
-  mixed: 'Mixt',
-};
+const MIXED_COLOR = '#607d8b';
+const MIXED_LABEL = 'Mixt';
 
 @Component({
   selector: 'app-templates',
@@ -172,7 +155,7 @@ const CAT_LABEL: Record<EditorCat, string> = {
         <div class="editor-field">
           <label class="editor-label">Categoria</label>
           <div class="cat-chips">
-            @for (opt of catOptions; track opt.value) {
+            @for (opt of catOptions(); track opt.value) {
               <button class="cat-chip" [class.active]="editorCat === opt.value"
                       [style.--cc]="opt.color"
                       (click)="editorCat = opt.value">{{ opt.label }}</button>
@@ -450,6 +433,7 @@ const CAT_LABEL: Record<EditorCat, string> = {
 export class TemplatesComponent {
   readonly templateService = inject(TemplateService);
   private exerciseService  = inject(ExerciseService);
+  private typeService      = inject(TrainingTypeService);
   private settingsService  = inject(UserSettingsService);
   private dialog           = inject(MatDialog);
   private feedback         = inject(FeedbackService);
@@ -460,24 +444,33 @@ export class TemplatesComponent {
 
   readonly visibleBuiltIns = computed(() => {
     const dismissed = new Set(this.settingsService.dismissedBuiltInTemplateIds());
-    return BUILT_IN_TEMPLATES.filter(t => !dismissed.has(t.id));
+    // Hide suggestions for a built-in type the user has removed.
+    const have = new Set(this.typeService.types().map(t => t.id));
+    return BUILT_IN_TEMPLATES.filter(t => !dismissed.has(t.id) && have.has(t.category));
   });
 
-  readonly catOptions = CAT_OPTIONS;
+  readonly catOptions = computed((): { value: EditorCat; label: string; color: string }[] => [
+    ...this.typeService.types().map(t => ({ value: t.id as EditorCat, label: t.name, color: t.color })),
+    { value: 'mixed', label: MIXED_LABEL, color: MIXED_COLOR },
+  ]);
 
   readonly editorOpen  = signal(false);
   readonly editingId   = signal<string | null>(null);
 
   editorName    = '';
-  editorCat: EditorCat = 'push';
+  editorCat: EditorCat = 'mixed';
   editorEntries: TemplateEntry[] = [];
 
   constructor() {
     this.exerciseService.ensureLoaded();
   }
 
-  catColor(cat: EditorCat | string): string { return CAT_COLOR[cat as EditorCat] ?? '#bbb'; }
-  catLabel(cat: EditorCat | string): string { return CAT_LABEL[cat as EditorCat] ?? cat; }
+  catColor(cat: EditorCat | string): string {
+    return cat === 'mixed' ? MIXED_COLOR : (cat in CATEGORY_COLORS ? CATEGORY_COLORS[cat] : '#bbb');
+  }
+  catLabel(cat: EditorCat | string): string {
+    return cat === 'mixed' ? MIXED_LABEL : (CATEGORY_LABELS[cat] ?? cat);
+  }
 
   /** Compact "sets×reps · weight" suffix for an exercise row (empty when
    *  the template didn't specify any). */
@@ -497,7 +490,7 @@ export class TemplatesComponent {
     } else {
       this.editingId.set(null);
       this.editorName    = '';
-      this.editorCat     = 'push';
+      this.editorCat     = this.typeService.types()[0]?.id ?? 'mixed';
       this.editorEntries = [];
     }
     this.editorOpen.set(true);

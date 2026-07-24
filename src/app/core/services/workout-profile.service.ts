@@ -4,6 +4,7 @@ import { ExerciseCategory } from '../models/exercise.model';
 import { Sport } from '../models/sport.model';
 import { UserSettingsService } from './user-settings.service';
 import { SportService } from './sport.service';
+import { TrainingTypeService } from './training-type.service';
 import { WorkoutService } from './workout.service';
 import { workoutCategories } from '../../shared/utils/calendar-utils';
 
@@ -48,13 +49,12 @@ const GOAL_MIN_RECOVERY: Record<string, number> = {
   strength: 2, fitness: 1, weight: 1, sport: 1,
 };
 
-const GYM_CATS: ExerciseCategory[] = ['push', 'pull', 'legs'];
-
 @Injectable({ providedIn: 'root' })
 export class WorkoutProfileService {
   private workoutService  = inject(WorkoutService);
   private sportService    = inject(SportService);
   private settingsService = inject(UserSettingsService);
+  private trainingTypeService = inject(TrainingTypeService);
 
   constructor() {
     // "Days since last <category>" is only right if the *whole* history is
@@ -85,7 +85,10 @@ export class WorkoutProfileService {
 
     const gym = {} as Record<ExerciseCategory, CategoryProfile>;
 
-    for (const cat of GYM_CATS) {
+    // Reads the types signal so the profile recomputes when the user adds,
+    // edits or removes a training type.
+    const gymCats = this.trainingTypeService.types().map(t => t.id);
+    for (const cat of gymCats) {
       // All past dates when this category was trained, sorted newest first
       const catDates = workouts
         .filter(w => workoutCategories(w).includes(cat))

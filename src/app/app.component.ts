@@ -7,6 +7,7 @@ import { AuthService } from './core/services/auth.service';
 import { UserSettingsService } from './core/services/user-settings.service';
 import { OfflineService } from './core/services/offline.service';
 import { NavigationHistoryService } from './core/services/navigation-history.service';
+import { TrainingTypeService } from './core/services/training-type.service';
 import { NavBarComponent } from './shared/components/nav-bar/nav-bar.component';
 import { OnboardingComponent } from './shared/components/onboarding/onboarding.component';
 
@@ -106,6 +107,10 @@ export class AppComponent {
   // Injected here (unused directly) to start tracking navigation from the
   // very first route change, before any page needs goBack().
   private navigationHistory = inject(NavigationHistoryService);
+  // Injected here (unused directly) so the user's training types load at
+  // bootstrap and the colour/label/icon registry is populated app-wide — every
+  // page that renders a workout with a custom type resolves it correctly.
+  private trainingTypeService = inject(TrainingTypeService);
 
   readonly pageAnimToggle = signal(false);
 

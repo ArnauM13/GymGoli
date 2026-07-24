@@ -1,6 +1,7 @@
 import {
+  ALL_SUBCATEGORY_OPTIONS, CATEGORY_LABELS,
   Exercise, ExerciseCategory, ExerciseSubcategory,
-  SUBCATEGORY_LABELS, SUBCATEGORY_OPTIONS,
+  SUBCATEGORY_LABELS,
 } from '../../core/models/exercise.model';
 
 /**
@@ -59,14 +60,14 @@ const W_BALANCE = 1.5;
 /** Soft suppression applied to a muscle group the user has already filled. */
 const SATISFIED_GATE = 0.25;
 
-function subcatsOf(category: ExerciseCategory): Set<ExerciseSubcategory> {
-  // Defensive: `category` originates from an untyped Workout.category string
-  // cast to ExerciseCategory, so a legacy/foreign value (anything that isn't a
-  // real gym category) has no subcategory table. Fall back to an empty set
-  // instead of crashing on `undefined.map(...)` — a throw here bubbles up
-  // through the template expression that reads the suggestions and, via the
-  // global error handler, into an unstoppable toast loop.
-  return new Set((SUBCATEGORY_OPTIONS[category] ?? []).map(o => o.value));
+/** Muscle subgroups are independent of the training type (a custom "Bíceps"
+ *  type may hold any subgroup), so the balance signal always considers the
+ *  full flat list. Using ALL_SUBCATEGORY_OPTIONS also means a legacy/foreign
+ *  category value never hits an undefined subcategory table — a throw here
+ *  would bubble through the template expression that reads the suggestions
+ *  and, via the global error handler, into an unstoppable toast loop. */
+function subcatsOf(_category: ExerciseCategory): Set<ExerciseSubcategory> {
+  return new Set(ALL_SUBCATEGORY_OPTIONS.map(o => o.value));
 }
 
 function normalize(map: Map<string, number>): (id: string) => number {
@@ -180,7 +181,8 @@ export function suggestNextExercises(input: SuggestionInput): ExerciseSuggestion
   const nFollow = normalize(followRaw);
   const nBal    = normalize(balRaw);
 
-  const catLabel = { push: 'empenta', pull: 'tracció', legs: 'cames' }[category];
+  const catLabel = ({ push: 'empenta', pull: 'tracció', legs: 'cames' } as Record<string, string>)[category]
+    ?? CATEGORY_LABELS[category].toLowerCase();
 
   const scored = candidates.map(e => {
     const sub = e.subcategory;

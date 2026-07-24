@@ -1,4 +1,10 @@
-export type ExerciseCategory = 'push' | 'pull' | 'legs';
+/**
+ * A training-type id. Built-ins are `push` / `pull` / `legs`, but users can
+ * create their own, so this is an open string rather than a fixed union. The
+ * label/icon/colour for any id are resolved through the runtime registry in
+ * `training-type.model.ts` (re-exported below as CATEGORY_*).
+ */
+export type ExerciseCategory = string;
 
 /**
  * How an exercise is loaded, which decides how the logged weight becomes the
@@ -16,29 +22,15 @@ export type ExerciseSubcategory =
   | 'back' | 'biceps' | 'forearms'          // pull
   | 'quads' | 'hamstrings' | 'glutes' | 'calves'; // legs
 
-export const CATEGORY_LABELS: Record<ExerciseCategory, string> = {
-  push: 'Empenta',
-  pull: 'Tracció',
-  legs: 'Cames',
-};
-
-export const CATEGORY_ICONS: Record<ExerciseCategory, string> = {
-  push: 'fitness_center',
-  pull: 'sports_gymnastics',
-  legs: 'directions_run',
-};
-
-export const CATEGORY_COLORS: Record<ExerciseCategory, string> = {
-  push: '#e57373',
-  pull: '#64b5f6',
-  legs: '#81c784',
-};
-
-export const CATEGORY_MUSCLES: Record<ExerciseCategory, string> = {
-  push: 'Pit · Espatlles · Tríceps',
-  pull: 'Esquena · Bíceps · Avantbraços',
-  legs: 'Quàdriceps · Isquiotibials · Glutis',
-};
+// The category label/icon/colour/muscle records are now backed by the runtime
+// training-type registry (so custom types resolve too). Re-exported here so the
+// many existing `CATEGORY_COLORS[cat]` etc. call sites keep working unchanged.
+export {
+  CATEGORY_LABELS,
+  CATEGORY_ICONS,
+  CATEGORY_COLORS,
+  CATEGORY_MUSCLES,
+} from './training-type.model';
 
 export const SUBCATEGORY_OPTIONS: Record<ExerciseCategory, { value: ExerciseSubcategory; label: string }[]> = {
   push: [
@@ -58,6 +50,25 @@ export const SUBCATEGORY_OPTIONS: Record<ExerciseCategory, { value: ExerciseSubc
     { value: 'calves', label: 'Bessons' },
   ],
 };
+
+/**
+ * Every muscle subgroup as one flat list. The primary muscle group of an
+ * exercise is chosen from this independently of the workout's training type —
+ * a "pull" type may hold biceps + back, while a dedicated "biceps" type holds
+ * only biceps, so the choice must never be gated by the type.
+ */
+export const ALL_SUBCATEGORY_OPTIONS: { value: ExerciseSubcategory; label: string }[] = [
+  { value: 'chest',      label: 'Pit' },
+  { value: 'shoulders',  label: 'Espatlles' },
+  { value: 'triceps',    label: 'Tríceps' },
+  { value: 'back',       label: 'Esquena' },
+  { value: 'biceps',     label: 'Bíceps' },
+  { value: 'forearms',   label: 'Avantbraços' },
+  { value: 'quads',      label: 'Quàdriceps' },
+  { value: 'hamstrings', label: 'Isquiotibials' },
+  { value: 'glutes',     label: 'Glutis' },
+  { value: 'calves',     label: 'Bessons' },
+];
 
 export const SUBCATEGORY_LABELS: Partial<Record<ExerciseSubcategory, string>> = {
   chest: 'Pit',

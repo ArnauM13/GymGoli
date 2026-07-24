@@ -12,12 +12,11 @@ import { TemplateService } from '../../core/services/template.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, Exercise, ExerciseCategory } from '../../core/models/exercise.model';
+import { TrainingTypeService } from '../../core/services/training-type.service';
 import { EMPTY_WEEKLY_PLAN, WEEKDAY_LABELS, WeeklyPlan, WeeklyPlanItem } from '../../core/models/weekly-plan.model';
 import { TemplateEntry, WorkoutTemplate } from '../../core/models/template.model';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
 import { addDays, weekRangeLabel } from '../../shared/utils/calendar-utils';
-
-const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
 
@@ -90,7 +89,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
               <span class="plan-group-title">Gym</span>
             </div>
             <div class="filter-bar">
-              @for (cat of gymCategories; track cat) {
+              @for (cat of gymCategories(); track cat) {
                 <button class="filter-chip"
                         [class.active]="isGymSelected(day.index, cat)"
                         [style.--cat-color]="categoryColor(cat)"
@@ -101,7 +100,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
               }
             </div>
 
-            @for (cat of gymCategories; track cat) {
+            @for (cat of gymCategories(); track cat) {
               @if (isGymSelected(day.index, cat)) {
                 <div class="plan-detail-card" [style.--pc]="categoryColor(cat)">
                   <div class="plan-detail-bar"></div>
@@ -420,7 +419,8 @@ export class WeeklyPlannerComponent {
   private route            = inject(ActivatedRoute);
   private navHistory       = inject(NavigationHistoryService);
 
-  readonly gymCategories  = GYM_CATEGORIES;
+  private typeService      = inject(TrainingTypeService);
+  readonly gymCategories  = computed(() => this.typeService.types().map(t => t.id));
   readonly days = WEEKDAY_LABELS.map((label, index) => ({ label, index }));
 
   /** Days shown expanded (collapsed by default so the week is easy to scan
@@ -481,7 +481,7 @@ export class WeeklyPlannerComponent {
   daySummary(dayIndex: number): { key: string; label: string; icon: string; color: string }[] {
     const items = this.plan().days[dayIndex];
     const out: { key: string; label: string; icon: string; color: string }[] = [];
-    for (const cat of this.gymCategories) {
+    for (const cat of this.gymCategories()) {
       if (items.some(i => i.type === 'gym' && i.category === cat)) {
         out.push({ key: 'gym-' + cat, label: this.categoryLabel(cat), icon: this.categoryIcon(cat), color: this.categoryColor(cat) });
       }

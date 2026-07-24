@@ -22,9 +22,9 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { FilterBarComponent } from '../../shared/components/filter-bar/filter-bar.component';
 import { WeeklySummaryComponent } from '../train/components/weekly-summary.component';
 import { FeedbackService } from '../../shared/services/feedback.service';
+import { TrainingTypeService } from '../../core/services/training-type.service';
 
 const PAGE_SIZE = 20;
-const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
 
 @Component({
   selector: 'app-calendar-page',
@@ -368,7 +368,7 @@ const GYM_CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
           <div class="dp-add">
             <span class="dp-add-label">Afegir al pla</span>
             <div class="dp-chips">
-              @for (cat of gymCategories; track cat) {
+              @for (cat of gymCategories(); track cat) {
                 <button class="dp-chip" [class.active]="isGymPlanned(cat)"
                         [style.--cat-color]="getCatColor(cat)" (click)="toggleGymPlan(cat)">
                   <span class="material-symbols-outlined">{{ getCatIcon(cat) }}</span>
@@ -795,7 +795,8 @@ export class CalendarPageComponent implements OnDestroy {
   readonly unit = this.settingsService.weightUnit;
   dispW(kg: number): number { return kgToDisplay(kg, this.unit()); }
 
-  readonly gymCategories = GYM_CATEGORIES;
+  private typeService     = inject(TrainingTypeService);
+  readonly gymCategories = computed(() => this.typeService.types().map(t => t.id));
 
   readonly calendarOpen  = signal(true);
   /** Monday of whichever week the calendar widget currently has in view

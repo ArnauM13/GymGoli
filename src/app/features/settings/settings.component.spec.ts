@@ -14,6 +14,8 @@ import { ExerciseService } from '../../core/services/exercise.service';
 import { TrainerService } from '../../core/services/trainer.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
+import { TrainingTypeService } from '../../core/services/training-type.service';
+import { DEFAULT_TRAINING_TYPES } from '../../core/models/training-type.model';
 
 describe('SettingsComponent', () => {
   let component: SettingsComponent;
@@ -97,6 +99,15 @@ describe('SettingsComponent', () => {
         {
           provide: WorkoutService,
           useValue: { workouts: signal([]) },
+        },
+        {
+          provide: TrainingTypeService,
+          useValue: {
+            types: signal(DEFAULT_TRAINING_TYPES),
+            isLoaded: signal(true), missingDefaultCount: signal(0),
+            ensureLoaded: jasmine.createSpy().and.resolveTo(undefined),
+            addMissingDefaults: jasmine.createSpy().and.resolveTo(0),
+          },
         },
         {
           provide: SportService,

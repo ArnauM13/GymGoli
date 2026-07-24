@@ -6,6 +6,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { AuthService } from '../../core/services/auth.service';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { FitnessMetricsService } from '../../core/services/fitness-metrics.service';
+import { TrainingTypeService } from '../../core/services/training-type.service';
 import { SportService } from '../../core/services/sport.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
@@ -208,6 +209,17 @@ import {
 
         <div class="setting-divider"></div>
 
+        <a class="nav-row" routerLink="/training-types">
+          <span class="material-symbols-outlined nav-row-icon">exercise</span>
+          <div class="setting-info">
+            <span class="setting-label">Configurar tipus d'entrenament</span>
+            <span class="setting-desc">Crea i edita els tipus de gimnàs (Empenta, Tracció, Cames…).</span>
+          </div>
+          <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
+        </a>
+
+        <div class="setting-divider"></div>
+
         <a class="nav-row" routerLink="/sports-config">
           <span class="material-symbols-outlined nav-row-icon">sports_soccer</span>
           <div class="setting-info">
@@ -223,7 +235,7 @@ import {
             <span class="material-symbols-outlined nav-row-icon">library_add</span>
             <div class="setting-info">
               <span class="setting-label">Actualitzar el catàleg de sèrie</span>
-              <span class="setting-desc">Afegeix els exercicis i esports de sèrie que et falten i posa al dia les seves mètriques (p. ex. els estils de Yoga). No toca els que has creat tu.</span>
+              <span class="setting-desc">Afegeix els exercicis, esports i tipus d'entrenament de sèrie que et falten i posa al dia les seves mètriques (p. ex. els estils de Yoga). No toca els que has creat tu.</span>
             </div>
             <span class="material-symbols-outlined nav-row-arrow">add</span>
           </button>
@@ -845,6 +857,7 @@ export class SettingsComponent {
   readonly trainerService  = inject(TrainerService);
   private exerciseService  = inject(ExerciseService);
   private sportService     = inject(SportService);
+  private typeService      = inject(TrainingTypeService);
   private workoutService   = inject(WorkoutService);
   private router           = inject(Router);
   private feedback         = inject(FeedbackService);
@@ -856,13 +869,15 @@ export class SettingsComponent {
     // user already has (and never re-inserts duplicates).
     this.exerciseService.ensureLoaded();
     this.sportService.ensureLoaded();
+    this.typeService.ensureLoaded();
   }
 
   readonly CATALOG_VERSION = CATALOG_VERSION;
   readonly catalogReady = computed(() =>
-    this.exerciseService.isLoaded() && this.sportService.sportsLoaded());
+    this.exerciseService.isLoaded() && this.sportService.sportsLoaded() && this.typeService.isLoaded());
   readonly missingCatalogCount = computed(() =>
-    this.exerciseService.missingDefaultCount() + this.sportService.missingDefaultCount());
+    this.exerciseService.missingDefaultCount() + this.sportService.missingDefaultCount()
+    + this.typeService.missingDefaultCount());
   readonly addingCatalog = signal(false);
 
   /** Adds the catalog default exercises + sports the user is missing, keeping
@@ -873,13 +888,15 @@ export class SettingsComponent {
     try {
       await this.exerciseService.ensureLoaded();
       await this.sportService.ensureLoaded();
+      await this.typeService.ensureLoaded();
       const ex = await this.exerciseService.addMissingDefaults();
       const sp = await this.sportService.addMissingDefaults();
+      const tt = await this.typeService.addMissingDefaults();
       // Mark as synced to the current catalog version so a later deliberate
       // deletion doesn't re-nag; a future CATALOG_VERSION bump re-arms it.
       await this.settingsService.update({ catalogSyncedVersion: CATALOG_VERSION });
       this.feedback.success(
-        ex + sp > 0 ? `Catàleg actualitzat: ${ex} exercicis i ${sp} esports` : 'Ja tens tot el catàleg al dia',
+        ex + sp + tt > 0 ? `Catàleg actualitzat: ${ex} exercicis, ${sp} esports i ${tt} tipus` : 'Ja tens tot el catàleg al dia',
       );
     } catch {
       this.feedback.error('No s\'han pogut afegir els exercicis');

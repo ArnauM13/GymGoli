@@ -4,7 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { SharedWorkoutService } from '../../core/services/shared-workout.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
-import { CATEGORY_LABELS } from '../../core/models/exercise.model';
+import { trainingTypeById } from '../../core/models/training-type.model';
 import { SharedWorkout, SharedWorkoutEntry } from '../../core/models/shared-workout.model';
 import { kgToDisplay } from '../../shared/utils/weight.utils';
 
@@ -203,7 +203,10 @@ export class ShareImportComponent implements OnInit {
   }
 
   categoryLabel(cat: SharedWorkout['category']): string {
-    return cat === 'mixed' ? 'Mixt' : CATEGORY_LABELS[cat];
+    if (cat === 'mixed') return 'Mixt';
+    // A workout shared by another user may carry a custom-type id the
+    // receiver doesn't have — show a neutral label instead of a raw UUID.
+    return trainingTypeById(cat)?.name ?? 'Entrenament';
   }
 
   setsSummary(entry: SharedWorkoutEntry): string {

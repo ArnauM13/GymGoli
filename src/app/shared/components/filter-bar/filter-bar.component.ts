@@ -1,9 +1,8 @@
-import { Component, OnDestroy, effect, input, model, signal } from '@angular/core';
+import { Component, OnDestroy, computed, effect, inject, input, model, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, ExerciseCategory } from '../../../core/models/exercise.model';
-
-const CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
+import { TrainingTypeService } from '../../../core/services/training-type.service';
 
 /**
  * Shared search + quick category filter + sort bar. Used identically by the
@@ -43,7 +42,7 @@ const CATEGORIES: ExerciseCategory[] = ['push', 'pull', 'legs'];
         <span class="material-symbols-outlined">apps</span>
       </button>
       -->
-      @for (cat of categories; track cat) {
+      @for (cat of categories(); track cat) {
         <button class="filter-icon" [class.active]="category() === cat"
                 [style.--cat]="catColor(cat)"
                 [attr.aria-label]="catLabel(cat)" [attr.title]="catLabel(cat)"
@@ -124,7 +123,8 @@ export class FilterBarComponent implements OnDestroy {
   readonly sortDesc    = model(true);
   readonly category    = model<ExerciseCategory | null>(null);
 
-  readonly categories = CATEGORIES;
+  private typeService = inject(TrainingTypeService);
+  readonly categories = computed<ExerciseCategory[]>(() => this.typeService.types().map(t => t.id));
 
   private readonly _raw = signal('');
   private _timer: ReturnType<typeof setTimeout> | null = null;

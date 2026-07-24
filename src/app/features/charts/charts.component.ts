@@ -6,6 +6,7 @@ import { map } from 'rxjs';
 import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
 import { setMaxWeight } from '../../core/models/workout.model';
 import { ExerciseService } from '../../core/services/exercise.service';
+import { TrainingTypeService } from '../../core/services/training-type.service';
 import { SportService } from '../../core/services/sport.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
@@ -252,6 +253,7 @@ export class ChartsComponent {
   private workoutService  = inject(WorkoutService);
   private settingsService = inject(UserSettingsService);
   private sportService    = inject(SportService);
+  private typeService     = inject(TrainingTypeService);
   private route           = inject(ActivatedRoute);
 
   private readonly queryExerciseId = toSignal(
@@ -336,7 +338,13 @@ export class ChartsComponent {
       });
 
     const catFilter = this.filterCat();
-    const cats = catFilter ? [catFilter] : (['push', 'pull', 'legs'] as ExerciseCategory[]);
+    // User's types plus any category still present in the data (orphans from
+    // deleted types), so no record ever becomes invisible.
+    const typeIds  = this.typeService.types().map(t => t.id);
+    const present  = [...new Set(records.map(r => r.exercise.category))];
+    const cats = catFilter
+      ? [catFilter]
+      : [...typeIds, ...present.filter(c => !typeIds.includes(c))];
     return cats
       .map(cat => ({
         cat,

@@ -1,13 +1,22 @@
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 
+import { signal } from '@angular/core';
+
 import { FilterBarComponent } from './filter-bar.component';
+import { TrainingTypeService } from '../../../core/services/training-type.service';
+import { DEFAULT_TRAINING_TYPES } from '../../../core/models/training-type.model';
 
 describe('FilterBarComponent', () => {
   let component: FilterBarComponent;
   let fixture: ComponentFixture<FilterBarComponent>;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ imports: [FilterBarComponent] });
+    TestBed.configureTestingModule({
+      imports: [FilterBarComponent],
+      providers: [
+        { provide: TrainingTypeService, useValue: { types: signal(DEFAULT_TRAINING_TYPES) } },
+      ],
+    });
     fixture = TestBed.createComponent(FilterBarComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -62,8 +71,8 @@ describe('FilterBarComponent', () => {
   });
 
   describe('category', () => {
-    it('exposes push/pull/legs as the filterable categories', () => {
-      expect(component.categories).toEqual(['push', 'pull', 'legs']);
+    it("exposes the user's training types as the filterable categories", () => {
+      expect(component.categories()).toEqual(['push', 'pull', 'legs']);
     });
 
     it('is settable directly, e.g. from the template chips', () => {

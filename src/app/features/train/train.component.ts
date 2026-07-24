@@ -20,6 +20,7 @@ import { FeelingLevel, Workout, WorkoutEntry, setMaxWeight } from '../../core/mo
 import { TemplateService } from '../../core/services/template.service';
 import { SharedWorkoutService } from '../../core/services/shared-workout.service';
 import { SportService } from '../../core/services/sport.service';
+import { TrainingTypeService } from '../../core/services/training-type.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { WorkoutService } from '../../core/services/workout.service';
@@ -47,11 +48,7 @@ type GymSuggestion   = { type: 'gym';   category: ExerciseCategory; label: strin
 type SportSuggestion = { type: 'sport'; sport: Sport;               label: string; color: string; icon: string; reason: string };
 type TodaySuggestion = GymSuggestion | SportSuggestion;
 
-const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; color: string }[] = [
-  { value: 'push', label: CATEGORY_LABELS.push, icon: CATEGORY_ICONS.push, color: CATEGORY_COLORS.push },
-  { value: 'pull', label: CATEGORY_LABELS.pull, icon: CATEGORY_ICONS.pull, color: CATEGORY_COLORS.pull },
-  { value: 'legs', label: CATEGORY_LABELS.legs, icon: CATEGORY_ICONS.legs, color: CATEGORY_COLORS.legs },
-];
+interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string; color: string; }
 
 @Component({
   selector: 'app-train',
@@ -317,9 +314,12 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
           <div class="section-header">
             <span class="material-symbols-outlined section-icon">fitness_center</span>
             <h2 class="section-title">Gym</h2>
+            <button class="section-config" (click)="router.navigate(['/training-types'])" aria-label="Configurar tipus d'entrenament">
+              <span class="material-symbols-outlined">tune</span>
+            </button>
           </div>
-          <div class="type-grid" [style.grid-template-columns]="gridCols(workoutTypes.length)">
-            @for (cat of workoutTypes; track cat.value) {
+          <div class="type-grid" [style.grid-template-columns]="gridCols(workoutTypes().length)">
+            @for (cat of workoutTypes(); track cat.value) {
               <button class="type-btn"
                 [style.--cat-color]="cat.color"
                 [class.type-btn--active]="pickerCat() === cat.value"
@@ -925,6 +925,14 @@ const WORKOUT_TYPES: { value: ExerciseCategory; label: string; icon: string; col
     .section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
     .section-icon  { font-size: 21px; color: var(--c-brand); font-variation-settings: 'FILL' 1, 'wght' 400; }
     .section-title { margin: 0; flex: 1; font-size: 17px; font-weight: 800; color: var(--c-text); letter-spacing: 0.1px; }
+    .section-config {
+      width: 32px; height: 32px; flex-shrink: 0; border-radius: 50%;
+      border: none; background: transparent; color: var(--c-text-3);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s, color 0.15s;
+      .material-symbols-outlined { font-size: 19px; }
+      &:hover { background: var(--c-subtle); color: var(--c-text-2); }
+    }
 
     /* ── Workout summary cards ── */
     .workout-card {
@@ -1231,7 +1239,10 @@ export class TrainComponent implements OnDestroy {
 
   readonly selectedDate    = signal<string>(TODAY());
   readonly sportToggling   = signal(false);
-  readonly workoutTypes    = WORKOUT_TYPES;
+  private typeService = inject(TrainingTypeService);
+  readonly workoutTypes = computed((): WorkoutTypeItem[] =>
+    this.typeService.types().map(t => ({ value: t.id, label: t.name, icon: t.icon, color: t.color }))
+  );
   readonly workoutMenuOpen = signal(false);
   /** Off by default — exercises can only be dragged to reorder once the
    *  user turns this on from the workout's three-dot menu. */
@@ -1292,8 +1303,10 @@ export class TrainComponent implements OnDestroy {
     // Score each gym category by how "overdue" it is relative to the user's
     // actual training cycle. Only include categories that have had enough
     // recovery time since the last session.
-    const gymCandidates = (['push', 'pull', 'legs'] as ExerciseCategory[])
-      .map(cat => ({ cat, ...profile.gym[cat] }))
+    const gymCandidates = this.typeService.types().map(t => t.id)
+      .map(cat => ({ cat, profile: profile.gym[cat] }))
+      .filter(c => !!c.profile) // guard against a momentary types/profile skew
+      .map(c => ({ cat: c.cat, ...c.profile }))
       .filter(c => c.daysSinceLast >= profile.minRecovery)
       .sort((a, b) => b.overdueScore - a.overdueScore);
 
@@ -1363,10 +1376,9 @@ export class TrainComponent implements OnDestroy {
     return w ? workoutCategories(w) : [];
   });
 
-  readonly activeWorkoutCategoryItems = computed(() =>
+  readonly activeWorkoutCategoryItems = computed((): WorkoutTypeItem[] =>
     this.activeWorkoutCategories()
-      .map(c => WORKOUT_TYPES.find(t => t.value === c))
-      .filter((t): t is typeof WORKOUT_TYPES[0] => !!t)
+      .map(c => ({ value: c, label: CATEGORY_LABELS[c], icon: CATEGORY_ICONS[c], color: CATEGORY_COLORS[c] }))
   );
 
   /** "Sèrie activa": learned next-exercise guesses for the live workout,
@@ -1426,7 +1438,7 @@ export class TrainComponent implements OnDestroy {
 
   readonly pickerLabel = computed(() => {
     const cat = this.pickerCat();
-    return cat ? (WORKOUT_TYPES.find(t => t.value === cat)?.label ?? '') : '';
+    return cat ? (CATEGORY_LABELS[cat] ?? '') : '';
   });
 
   readonly pickerColor = computed(() => {
