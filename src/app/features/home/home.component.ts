@@ -38,20 +38,32 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
       <!-- ── Avui / dia seleccionat ── -->
       <div class="today-card">
         <button class="today-header" (click)="goToTrain()">
-          <span class="material-symbols-outlined today-header-icon">today</span>
+          <span class="today-header-icon-wrap">
+            <span class="material-symbols-outlined today-header-icon">today</span>
+          </span>
           <div class="today-header-text">
             <h2 class="today-title">{{ previewTitle() }}</h2>
+            <span class="today-sub">{{ todayDateLabel() }}</span>
           </div>
+          @if (plannedCount() > 0) {
+            <span class="today-plan-pill">
+              <span class="material-symbols-outlined">event_upcoming</span>
+              {{ plannedCount() }}
+            </span>
+          }
+          <span class="material-symbols-outlined today-header-chev">chevron_right</span>
         </button>
 
-        @if (previewFeedEntry(); as day) {
-          <app-day-feed-cards [day]="day" (open)="goToWorkout($event)" />
-        } @else {
-          <div class="today-empty">
-            <span class="material-symbols-outlined today-empty-icon">bedtime</span>
-            <span class="today-empty-text">Sense activitat</span>
-          </div>
-        }
+        <div class="today-body">
+          @if (previewFeedEntry(); as day) {
+            <app-day-feed-cards [day]="day" (open)="goToWorkout($event)" />
+          } @else {
+            <div class="today-empty">
+              <span class="material-symbols-outlined today-empty-icon">bedtime</span>
+              <span class="today-empty-text">Sense activitat</span>
+            </div>
+          }
+        </div>
       </div>
 
       @if (isToday()) {
@@ -156,23 +168,42 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
       border-radius: 16px; overflow: hidden;
     }
 
-    /* ── Avui / dia seleccionat: targeta blava (mateix marge que la resta) ── */
+    /* ── Avui / dia seleccionat: targeta destacada amb capçalera de marca ── */
     .today-card {
       margin: 16px 16px 0;
-      padding: 12px;
-      background: color-mix(in srgb, var(--c-brand) 5%, var(--c-card));
-      border: 1.5px solid color-mix(in srgb, var(--c-brand) 24%, var(--c-border-2));
-      border-radius: 18px;
+      background: var(--c-card);
+      border: 1.5px solid color-mix(in srgb, var(--c-brand) 22%, var(--c-border-2));
+      border-radius: 18px; overflow: hidden;
+      box-shadow: 0 4px 16px color-mix(in srgb, var(--c-brand) 10%, var(--c-shadow));
     }
     .today-header {
-      display: flex; align-items: center; gap: 7px; width: 100%;
-      margin: 0 0 10px; padding: 0;
-      border: none; background: transparent; cursor: pointer; touch-action: manipulation;
-      text-align: left;
+      display: flex; align-items: center; gap: 10px; width: 100%;
+      margin: 0; padding: 12px 12px 12px 14px;
+      border: none; text-align: left; cursor: pointer; touch-action: manipulation;
+      background: color-mix(in srgb, var(--c-brand) 8%, var(--c-card));
+      transition: background 0.15s;
+      &:hover { background: color-mix(in srgb, var(--c-brand) 12%, var(--c-card)); }
     }
-    .today-header-icon { font-size: 19px; color: var(--c-brand); font-variation-settings: 'FILL' 1, 'wght' 400; }
-    .today-header-text { flex: 1; min-width: 0; }
-    .today-title { margin: 0; font-size: 15px; font-weight: 800; color: var(--c-text); letter-spacing: 0.1px; text-transform: capitalize; }
+    .today-header-icon-wrap {
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      width: 38px; height: 38px; border-radius: 12px;
+      background: var(--c-brand);
+      box-shadow: 0 2px 8px color-mix(in srgb, var(--c-brand) 35%, transparent);
+    }
+    .today-header-icon { font-size: 21px; color: white; font-variation-settings: 'FILL' 1, 'wght' 400; }
+    .today-header-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .today-title { margin: 0; font-size: 17px; font-weight: 800; color: var(--c-text); letter-spacing: 0.1px; text-transform: capitalize; }
+    .today-sub { font-size: 12px; font-weight: 500; color: var(--c-text-3); }
+    .today-plan-pill {
+      display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0;
+      padding: 4px 9px; border-radius: 20px;
+      background: rgba(var(--c-brand-rgb), 0.14); color: var(--c-brand);
+      font-size: 12px; font-weight: 800;
+      .material-symbols-outlined { font-size: 15px; }
+    }
+    .today-header-chev { font-size: 22px; color: var(--c-brand); flex-shrink: 0; opacity: 0.75; }
+
+    .today-body { padding: 12px; }
 
     .today-empty {
       display: flex; flex-direction: column; align-items: center; gap: 8px;
@@ -338,6 +369,20 @@ export class HomeComponent implements OnDestroy {
   });
 
   readonly previewTitle = computed(() => feedDayLabel(this.effectiveDate(), TODAY()));
+
+  /** Full, human date under the day label (e.g. "Dimarts, 29 de juliol") —
+   *  only the first letter is capitalised, Catalan style. */
+  readonly todayDateLabel = computed(() => {
+    const d = new Date(this.effectiveDate() + 'T00:00:00');
+    const s = d.toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  });
+
+  /** How many planned (not-yet-done) workouts sit on the previewed day, so the
+   *  header can flag that there's something planned. */
+  readonly plannedCount = computed(() =>
+    (this.previewFeedEntry()?.workouts ?? []).filter(w => (w.status ?? 'done') === 'planned').length
+  );
 
   readonly isToday = computed(() => this.effectiveDate() === TODAY());
 

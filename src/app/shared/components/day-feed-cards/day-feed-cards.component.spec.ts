@@ -7,6 +7,7 @@ import { SportService } from '../../../core/services/sport.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 import { ExerciseService } from '../../../core/services/exercise.service';
 import { FeedbackService } from '../../services/feedback.service';
+import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import { Workout } from '../../../core/models/workout.model';
 
 function makeWorkout(overrides: Partial<Workout> = {}): Workout {
@@ -17,22 +18,27 @@ describe('DayFeedCardsComponent', () => {
   let component: DayFeedCardsComponent;
   let fixture: ReturnType<typeof TestBed.createComponent<DayFeedCardsComponent>>;
   let startPlannedWorkout: jasmine.Spy;
+  let deleteWorkout: jasmine.Spy;
   let updateSession: jasmine.Spy;
   let deleteSession: jasmine.Spy;
+  let confirm: jasmine.Spy;
 
   beforeEach(async () => {
     startPlannedWorkout = jasmine.createSpy().and.resolveTo(undefined);
+    deleteWorkout = jasmine.createSpy().and.resolveTo(undefined);
     updateSession = jasmine.createSpy().and.resolveTo(undefined);
     deleteSession = jasmine.createSpy().and.resolveTo(undefined);
+    confirm = jasmine.createSpy().and.resolveTo(true);
 
     await TestBed.configureTestingModule({
       imports: [DayFeedCardsComponent],
       providers: [
-        { provide: WorkoutService, useValue: { startPlannedWorkout } },
+        { provide: WorkoutService, useValue: { startPlannedWorkout, deleteWorkout } },
         { provide: SportService, useValue: { updateSession, deleteSession } },
         { provide: UserSettingsService, useValue: { difficultyScale: signal('emoji'), bodyweightKg: signal(null) } },
         { provide: ExerciseService, useValue: { loadTypeOf: () => undefined, getById: () => undefined } },
         { provide: FeedbackService, useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
+        { provide: ConfirmDialogService, useValue: { confirm } },
       ],
     })
       .overrideComponent(DayFeedCardsComponent, { set: { schemas: [NO_ERRORS_SCHEMA] } })
@@ -71,6 +77,20 @@ describe('DayFeedCardsComponent', () => {
       await component.startPlan(makeWorkout({ id: 'plan1', status: 'planned' }));
       expect(startPlannedWorkout).toHaveBeenCalledWith('plan1');
       expect(openSpy).toHaveBeenCalledWith('plan1');
+    });
+  });
+
+  describe('deletePlan()', () => {
+    it('deletes the planned workout after confirmation', async () => {
+      await component.deletePlan(makeWorkout({ id: 'plan1', status: 'planned' }));
+      expect(confirm).toHaveBeenCalled();
+      expect(deleteWorkout).toHaveBeenCalledWith('plan1');
+    });
+
+    it('does nothing when the confirmation is declined', async () => {
+      confirm.and.resolveTo(false);
+      await component.deletePlan(makeWorkout({ id: 'plan1', status: 'planned' }));
+      expect(deleteWorkout).not.toHaveBeenCalled();
     });
   });
 
