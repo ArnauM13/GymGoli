@@ -200,6 +200,17 @@ const MUSCLE_GROUPS: { label: string; values: string[] }[] = [
             </div>
           </div>
 
+          <!-- Increment de pes (fletxes +/−) -->
+          <div class="field">
+            <span class="field-label">Increment de pes <span class="optional-hint">(fletxes +/−)</span></span>
+            <div class="guide-inputs">
+              <input class="guide-input" type="number" min="0.25" step="0.25" inputmode="decimal"
+                     [value]="weightStepInput()" (input)="setWeightStep($event)">
+              <span class="guide-sep">kg</span>
+            </div>
+            <span class="unilateral-desc">Quant puja o baixa el pes amb cada toc a les fletxes. Per defecte 2,5 kg.</span>
+          </div>
+
           <!-- Descripció -->
           <div class="field">
             <label class="field-label" for="ex-desc">
@@ -425,6 +436,14 @@ export class ExerciseFormDialogComponent {
     if (Number.isFinite(v) && v >= 1 && v <= 100) this.bodyweightFactorPct.set(v);
   }
 
+  /** Per-exercise weight increment (kg) for the +/- arrows. Defaults to 2.5. */
+  readonly weightStepInput = signal<number>(this.data.exercise?.weightStep ?? 2.5);
+
+  setWeightStep(ev: Event): void {
+    const v = +(ev.target as HTMLInputElement).value;
+    if (Number.isFinite(v) && v > 0) this.weightStepInput.set(v);
+  }
+
   readonly loadTypeDesc = computed(() => ({
     weighted:   'Càrrega externa: el pes que registres és la càrrega (barra, mancuernes, màquina).',
     bodyweight: 'Mous el teu propi pes; registres el pes AFEGIT (cinturó llastrat), 0 si és només el cos. Es compta amb el teu pes corporal per al volum.',
@@ -494,6 +513,8 @@ export class ExerciseFormDialogComponent {
       unilateral: this.unilateral() || undefined,
       loadType: this.loadType() !== 'weighted' ? this.loadType() : undefined,
       bodyweightFactor: this.loadType() !== 'weighted' ? this.bodyweightFactorPct() / 100 : undefined,
+      // Only persist a custom step; 2.5 is the default and stays implicit.
+      weightStep: this.weightStepInput() > 0 && this.weightStepInput() !== 2.5 ? this.weightStepInput() : undefined,
     });
   }
 

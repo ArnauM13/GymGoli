@@ -28,6 +28,7 @@ function toExercise(r: Record<string, unknown>): Exercise {
     unilateral:  (r['unilateral'] as boolean | null) ?? undefined,
     loadType:    (r['load_type'] as LoadType | null) ?? undefined,
     bodyweightFactor: (r['bodyweight_factor'] as number | null) ?? undefined,
+    weightStep:  (r['weight_step'] as number | null) ?? undefined,
     createdAt:   new Date(r['created_at'] as string),
   };
 }
@@ -47,6 +48,7 @@ function exerciseFromCache(raw: Record<string, unknown>): Exercise {
     unilateral:  (raw['unilateral'] as boolean | undefined) ?? undefined,
     loadType:    (raw['loadType'] as LoadType | undefined) ?? undefined,
     bodyweightFactor: (raw['bodyweightFactor'] as number | undefined) ?? undefined,
+    weightStep:  (raw['weightStep'] as number | undefined) ?? undefined,
     createdAt:   new Date(raw['createdAt'] as string),
   };
 }
@@ -205,6 +207,7 @@ export class ExerciseService {
     patch['unilateral']  = data.unilateral ?? false;
     patch['load_type']   = data.loadType ?? 'weighted';
     patch['bodyweight_factor'] = data.bodyweightFactor ?? null;
+    patch['weight_step'] = data.weightStep ?? null;
 
     const { error } = await this.supabase
       .from('exercises')
@@ -253,6 +256,7 @@ export class ExerciseService {
       unilateral:  e.unilateral ?? false,
       load_type:   e.loadType ?? 'weighted',
       bodyweight_factor: e.bodyweightFactor ?? null,
+      weight_step: e.weightStep ?? null,
     };
   }
 

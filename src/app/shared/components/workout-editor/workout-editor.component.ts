@@ -12,7 +12,7 @@ import { OfflineService } from '../../../core/services/offline.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component';
-import { kgToDisplay, displayToKg, weightStep } from '../../utils/weight.utils';
+import { kgToDisplay, displayToKg, effectiveWeightStep } from '../../utils/weight.utils';
 import { formatFeeling } from '../../utils/workout-card.utils';
 import { ExerciseEntryCardComponent } from '../exercise-entry-card/exercise-entry-card.component';
 import { FeedbackService } from '../../services/feedback.service';
@@ -180,7 +180,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                             <label for="edit-weight">{{ weightLabel(entry, false) }}</label>
                             <div class="we-number-input compact">
                               <button type="button" (click)="adjustEditWeight(-1)" aria-label="Menys pes">−</button>
-                              <input id="edit-weight" type="number" formControlName="weight" min="0" step="2.5"
+                              <input id="edit-weight" type="number" formControlName="weight" min="0" [step]="editWeightStep()"
                                      (focus)="$any($event.target).select()">
                               <button type="button" (click)="adjustEditWeight(1)" aria-label="Més pes">+</button>
                             </div>
@@ -190,7 +190,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                               <label for="edit-weight-right">Dreta</label>
                               <div class="we-number-input compact">
                                 <button type="button" (click)="adjustEditWeightRight(-1)" aria-label="Menys pes">−</button>
-                                <input id="edit-weight-right" type="number" formControlName="weightRight" min="0" step="2.5"
+                                <input id="edit-weight-right" type="number" formControlName="weightRight" min="0" [step]="editWeightStep()"
                                        (focus)="$any($event.target).select()">
                                 <button type="button" (click)="adjustEditWeightRight(1)" aria-label="Més pes">+</button>
                               </div>
@@ -236,7 +236,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                               <span class="material-symbols-outlined we-drop-arrow">subdirectory_arrow_right</span>
                               <div class="we-number-input compact">
                                 <button type="button" (click)="adjustEditDropWeight($index, -1)" aria-label="Menys pes">−</button>
-                                <input type="number" [value]="d.weight" (change)="setEditDropWeight($index, $any($event.target).value)" min="0" step="2.5">
+                                <input type="number" [value]="d.weight" (change)="setEditDropWeight($index, $any($event.target).value)" min="0" [step]="editWeightStep()">
                                 <button type="button" (click)="adjustEditDropWeight($index, 1)" aria-label="Més pes">+</button>
                               </div>
                               <div class="we-number-input compact">
@@ -364,7 +364,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                       <label for="add-weight">{{ weightLabel(entry, true) }}</label>
                       <div class="we-number-input">
                         <button type="button" (click)="adjustWeight(-1)" aria-label="Menys pes">−</button>
-                        <input id="add-weight" type="number" formControlName="weight" min="0" step="2.5"
+                        <input id="add-weight" type="number" formControlName="weight" min="0" [step]="addWeightStep()"
                                (focus)="$any($event.target).select()">
                         <button type="button" (click)="adjustWeight(1)" aria-label="Més pes">+</button>
                       </div>
@@ -374,7 +374,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                         <label for="add-weight-right">Dreta ({{ unit() }})</label>
                         <div class="we-number-input">
                           <button type="button" (click)="adjustWeightRight(-1)" aria-label="Menys pes">−</button>
-                          <input id="add-weight-right" type="number" formControlName="weightRight" min="0" step="2.5"
+                          <input id="add-weight-right" type="number" formControlName="weightRight" min="0" [step]="addWeightStep()"
                                  (focus)="$any($event.target).select()">
                           <button type="button" (click)="adjustWeightRight(1)" aria-label="Més pes">+</button>
                         </div>
@@ -429,7 +429,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                         <span class="material-symbols-outlined we-drop-arrow">subdirectory_arrow_right</span>
                         <div class="we-number-input compact">
                           <button type="button" (click)="adjustDropWeight($index, -1)" aria-label="Menys pes">−</button>
-                          <input type="number" [value]="d.weight" (change)="setDropWeight($index, $any($event.target).value)" min="0" step="2.5">
+                          <input type="number" [value]="d.weight" (change)="setDropWeight($index, $any($event.target).value)" min="0" [step]="addWeightStep()">
                           <button type="button" (click)="adjustDropWeight($index, 1)" aria-label="Més pes">+</button>
                         </div>
                         <div class="we-number-input compact">
@@ -1365,6 +1365,15 @@ export class WorkoutEditorComponent implements OnDestroy {
   readonly dropsetsEnabled  = computed(() => this.settingsService.dropsetsEnabled());
   readonly rirEnabled       = computed(() => this.settingsService.rirEnabled());
   readonly manualRestEnabled = computed(() => this.settingsService.manualRestEnabled());
+
+  /** +/- stepper increment (display units) for the exercise currently being
+   *  added to / edited, honoring each exercise's configured weightStep. */
+  private stepFor(exerciseId: string | null | undefined): number {
+    const custom = exerciseId ? this.exerciseService.getById(exerciseId)?.weightStep : null;
+    return effectiveWeightStep(custom, this.unit());
+  }
+  readonly addWeightStep  = computed(() => this.stepFor(this.addingFor()));
+  readonly editWeightStep = computed(() => this.stepFor(this.editingSet()?.exerciseId));
   readonly timerActive    = signal(false);
   readonly timerRemaining = signal(0);
   readonly timerTotal     = signal(0);
@@ -1697,12 +1706,12 @@ export class WorkoutEditorComponent implements OnDestroy {
   }
 
   adjustWeight(delta: number): void {
-    const step = weightStep(this.unit());
+    const step = this.addWeightStep();
     const v = (this.setForm.value.weight ?? 0) + delta * step;
     this.setForm.patchValue({ weight: Math.max(0, Math.round(v * 10) / 10) });
   }
   adjustWeightRight(delta: number): void {
-    const step = weightStep(this.unit());
+    const step = this.addWeightStep();
     const v = (this.setForm.value.weightRight ?? 0) + delta * step;
     this.setForm.patchValue({ weightRight: Math.max(0, Math.round(v * 10) / 10) });
   }
@@ -1712,12 +1721,12 @@ export class WorkoutEditorComponent implements OnDestroy {
   }
 
   adjustEditWeight(delta: number): void {
-    const step = weightStep(this.unit());
+    const step = this.editWeightStep();
     const v = (this.editSetForm.value.weight ?? 0) + delta * step;
     this.editSetForm.patchValue({ weight: Math.max(0, Math.round(v * 10) / 10) });
   }
   adjustEditWeightRight(delta: number): void {
-    const step = weightStep(this.unit());
+    const step = this.editWeightStep();
     const v = (this.editSetForm.value.weightRight ?? 0) + delta * step;
     this.editSetForm.patchValue({ weightRight: Math.max(0, Math.round(v * 10) / 10) });
   }
@@ -2028,7 +2037,7 @@ export class WorkoutEditorComponent implements OnDestroy {
 
   // ── Dropsets ─────────────────────────────────────────────────────────────
   addDropStage(): void {
-    const step = weightStep(this.unit());
+    const step = this.addWeightStep();
     const last = this.dropStages().at(-1) ?? { weight: this.setForm.value.weight ?? 0, reps: this.setForm.value.reps ?? 8 };
     const reduced = Math.max(0, Math.round((last.weight * 0.8) / step) * step);
     this.dropStages.update(arr => [...arr, { weight: reduced, reps: last.reps }]);
@@ -2037,7 +2046,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     this.dropStages.update(arr => arr.filter((_, i) => i !== index));
   }
   adjustDropWeight(index: number, delta: number): void {
-    const step = weightStep(this.unit());
+    const step = this.addWeightStep();
     this.dropStages.update(arr => arr.map((d, i) => i === index ? { ...d, weight: Math.max(0, Math.round((d.weight + delta * step) * 10) / 10) } : d));
   }
   adjustDropReps(index: number, delta: number): void {
@@ -2053,7 +2062,7 @@ export class WorkoutEditorComponent implements OnDestroy {
   }
 
   addEditDropStage(): void {
-    const step = weightStep(this.unit());
+    const step = this.editWeightStep();
     const last = this.editDropStages().at(-1) ?? { weight: this.editSetForm.value.weight ?? 0, reps: this.editSetForm.value.reps ?? 8 };
     const reduced = Math.max(0, Math.round((last.weight * 0.8) / step) * step);
     this.editDropStages.update(arr => [...arr, { weight: reduced, reps: last.reps }]);
@@ -2062,7 +2071,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     this.editDropStages.update(arr => arr.filter((_, i) => i !== index));
   }
   adjustEditDropWeight(index: number, delta: number): void {
-    const step = weightStep(this.unit());
+    const step = this.editWeightStep();
     this.editDropStages.update(arr => arr.map((d, i) => i === index ? { ...d, weight: Math.max(0, Math.round((d.weight + delta * step) * 10) / 10) } : d));
   }
   adjustEditDropReps(index: number, delta: number): void {

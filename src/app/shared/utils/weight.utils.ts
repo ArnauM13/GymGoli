@@ -13,3 +13,10 @@ export function displayToKg(val: number, unit: WeightUnit): number {
 export function weightStep(unit: WeightUnit): number {
   return unit === 'lb' ? 5 : 2.5;
 }
+
+/** Increment for the +/- stepper, in DISPLAY units. `customKg` is an exercise's
+ *  own configured step (kg); when unset, falls back to the unit default. */
+export function effectiveWeightStep(customKg: number | null | undefined, unit: WeightUnit): number {
+  if (customKg && customKg > 0) return kgToDisplay(customKg, unit);
+  return weightStep(unit);
+}

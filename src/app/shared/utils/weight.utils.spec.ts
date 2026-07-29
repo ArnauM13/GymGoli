@@ -1,4 +1,4 @@
-import { displayToKg, kgToDisplay, weightStep } from './weight.utils';
+import { displayToKg, effectiveWeightStep, kgToDisplay, weightStep } from './weight.utils';
 
 describe('weight.utils', () => {
   describe('kgToDisplay()', () => {
@@ -33,6 +33,23 @@ describe('weight.utils', () => {
 
     it('is 5 for lb', () => {
       expect(weightStep('lb')).toBe(5);
+    });
+  });
+
+  describe('effectiveWeightStep()', () => {
+    it('falls back to the unit default when no custom step is set', () => {
+      expect(effectiveWeightStep(null, 'kg')).toBe(2.5);
+      expect(effectiveWeightStep(undefined, 'lb')).toBe(5);
+      expect(effectiveWeightStep(0, 'kg')).toBe(2.5);
+    });
+
+    it('uses the configured kg step for kg', () => {
+      expect(effectiveWeightStep(1.25, 'kg')).toBe(1.25);
+      expect(effectiveWeightStep(5, 'kg')).toBe(5);
+    });
+
+    it('converts the configured kg step to lb', () => {
+      expect(effectiveWeightStep(2.5, 'lb')).toBe(kgToDisplay(2.5, 'lb'));
     });
   });
 
