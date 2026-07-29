@@ -126,11 +126,15 @@ describe('HomeComponent', () => {
       expect(entry?.workouts.length).toBe(1);
     });
 
-    it('does not include planned workouts for a selected past date', () => {
-      component.selectDate('2020-01-01');
+    it('includes planned workouts for the selected date so they can be managed', () => {
       const getPlannedForDate = TestBed.inject(WorkoutService).getPlannedForDate as jasmine.Spy;
-      getPlannedForDate.and.callFake(() => [makeWorkout({ id: 'plan1', status: 'planned' })]);
-      expect(component.previewFeedEntry()).toBeNull();
+      getPlannedForDate.and.callFake((date: string) =>
+        date === '2020-01-01' ? [makeWorkout({ id: 'plan1', date: '2020-01-01', status: 'planned' })] : []);
+      component.selectDate('2020-01-01');
+
+      const entry = component.previewFeedEntry();
+      expect(entry?.date).toBe('2020-01-01');
+      expect(entry?.workouts.some(w => w.id === 'plan1')).toBeTrue();
     });
   });
 

@@ -1,4 +1,4 @@
-import { ErrorHandler, Injectable, NgZone, inject, isDevMode } from '@angular/core';
+import { ErrorHandler, Injectable, NgZone, inject } from '@angular/core';
 
 import { FeedbackService } from '../../shared/services/feedback.service';
 
@@ -20,9 +20,11 @@ export class AppErrorHandler implements ErrorHandler {
   private _lastShownAt = 0;
 
   handleError(error: unknown): void {
-    if (isDevMode()) {
-      console.error('[AppError]', error);
-    }
+    // Always log the underlying error — including in production. The toast only
+    // ever shows a generic message, so without this an error that blanks a page
+    // (a template expression throwing every change-detection pass) leaves no
+    // trace in the console and is impossible to diagnose from a user report.
+    console.error('[AppError]', error);
 
     const msg = error instanceof Error ? error.message : String(error);
 

@@ -1396,19 +1396,33 @@ export class TrainComponent implements OnDestroy {
     // calendar/history isn't being performed now, so never suggest a "next"
     // exercise for it.
     if (w.date !== TODAY()) return [];
-    // …and only while it's still active: once it's been idle for a couple of
-    // hours (last set/edit), assume the session is over and stay quiet.
-    if (w.updatedAt && this._now() - w.updatedAt.getTime() > STALE_SUGGESTION_MS) return [];
-    if (this.reorderMode() || this.groupingMode()) return [];
-    // "Sèrie activa" is your *next* move while training, so it stays quiet
-    // until you've actually started — at least one logged set in the session.
-    // Before that (empty card, or an exercise added but no set done) a "next
-    // exercise" hint is premature noise.
-    if (!w.entries.some(e => e.sets.length > 0)) return [];
-    const category = (w.category ?? workoutCategories(w)[0]) as ExerciseCategory | undefined;
-    if (!category) return [];
-    const currentIds = w.entries.map(e => e.exerciseId);
-    return this.suggestionService.suggest(category, currentIds, 3);
+    // Read the reactive deps up-front so the computed still re-runs on their
+    // changes even if the body below bails out early or throws.
+    const now = this._now();
+    const busy = this.reorderMode() || this.groupingMode();
+    // The whole derivation is wrapped: this is the ONLY suggestion path that
+    // runs for today's active workout, so any throw here (a malformed entry, an
+    // engine edge case on the user's own data, …) reads to the user as "opening
+    // today's training crashes" — a template expression that re-throws every
+    // change-detection pass, blanking the page and spamming the error toast. A
+    // live-training nicety must never do that: on any failure, drop the hint.
+    try {
+      // …only while it's still active: once it's been idle for a couple of hours
+      // (last set/edit), assume the session is over and stay quiet.
+      if (w.updatedAt && now - w.updatedAt.getTime() > STALE_SUGGESTION_MS) return [];
+      if (busy) return [];
+      // "Sèrie activa" is your *next* move while training, so it stays quiet
+      // until you've actually started — at least one logged set in the session.
+      // (`sets` comes straight from stored JSON, so guard against a missing one.)
+      if (!w.entries.some(e => (e.sets?.length ?? 0) > 0)) return [];
+      const category = (w.category ?? workoutCategories(w)[0]) as ExerciseCategory | undefined;
+      if (!category) return [];
+      const currentIds = w.entries.map(e => e.exerciseId);
+      return this.suggestionService.suggest(category, currentIds, 3);
+    } catch (err) {
+      console.error('[exerciseSuggestions] failed — dropping the hint', err);
+      return [];
+    }
   });
 
 
@@ -1423,10 +1437,17 @@ export class TrainComponent implements OnDestroy {
     if (this.reorderMode() || this.groupingMode()) return false;
     if (this.settingsService.bodyweightKg() != null) return false;
     if (this.hintService.isDismissed('nudge-bodyweight-volume')) return false;
-    return w.entries.some(e => {
-      const lt = this.exerciseService.getById(e.exerciseId)?.loadType;
-      return lt === 'bodyweight' || lt === 'assisted';
-    });
+    try {
+      return w.entries.some(e => {
+        const lt = this.exerciseService.getById(e.exerciseId)?.loadType;
+        return lt === 'bodyweight' || lt === 'assisted';
+      });
+    } catch (err) {
+      // Same reasoning as exerciseSuggestions: a today-only nudge must not blank
+      // the training view if resolving an exercise trips on unexpected data.
+      console.error('[needsBodyweightHint] exercise lookup failed', err);
+      return false;
+    }
   });
 
   readonly pickerCat = signal<ExerciseCategory | null>(null);
