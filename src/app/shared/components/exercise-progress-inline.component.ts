@@ -29,7 +29,7 @@ import { ExerciseService } from '../../core/services/exercise.service';
 
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, Title, Tooltip, Legend);
 
-type Metric = 'weight' | 'volume' | 'feeling';
+type Metric = 'weight' | 'volume' | 'feeling' | 'reps';
 
 interface ChartPoint { date: string; value: number; }
 
@@ -38,9 +38,10 @@ interface ChartPoint { date: string; value: number; }
   standalone: true,
   template: `
     @if (exerciseId()) {
-      <!-- Metric tabs -->
-      <div class="epi-tabs">
-        @for (m of metrics; track m.value) {
+      <!-- Metric tabs — bodyweight exercises get a 2×2 grid (reps progression
+           + added weight), weighted ones the single-row weight/volume/fatiga. -->
+      <div class="epi-tabs" [class.epi-tabs--grid]="isBodyweight()">
+        @for (m of metrics(); track m.value) {
           <button class="epi-tab"
             [class.active]="selectedMetric() === m.value"
             (click)="selectedMetric.set(m.value)">
@@ -105,6 +106,8 @@ interface ChartPoint { date: string; value: number; }
     .epi-tabs {
       display: flex; gap: 6px; padding: 12px 14px 8px;
     }
+    /* Bodyweight: 4 metrics laid out in 2 rows of 2. */
+    .epi-tabs--grid { display: grid; grid-template-columns: 1fr 1fr; }
     .epi-tab {
       flex: 1; padding: 7px 4px;
       border: 1.5px solid var(--c-border); border-radius: 8px;
@@ -162,11 +165,29 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
 
   readonly selectedMetric = signal<Metric>('weight');
 
-  readonly metrics: { value: Metric; label: string }[] = [
+  private readonly WEIGHTED_METRICS: { value: Metric; label: string }[] = [
     { value: 'weight', label: 'Pes màx' },
     { value: 'volume', label: 'Volum' },
     { value: 'feeling', label: 'Fatiga' },
   ];
+
+  // Bodyweight exercises track reps done (real progression) instead of the
+  // logged weight, which is only the extra load (0 for pure calisthenics).
+  // "Pes afegit" stays as a 4th option so belt/dip-belt work is still charted.
+  private readonly BODYWEIGHT_METRICS: { value: Metric; label: string }[] = [
+    { value: 'reps',    label: 'Reps' },
+    { value: 'volume',  label: 'Volum' },
+    { value: 'feeling', label: 'Fatiga' },
+    { value: 'weight',  label: 'Pes afegit' },
+  ];
+
+  /** Bodyweight (calisthenics) exercises log no base weight, so their
+   *  progression is read from reps, not the added load. */
+  readonly isBodyweight = computed(() =>
+    this.exerciseService.getById(this.exerciseId() ?? '')?.loadType === 'bodyweight');
+
+  readonly metrics = computed(() =>
+    this.isBodyweight() ? this.BODYWEIGHT_METRICS : this.WEIGHTED_METRICS);
 
   private chart: Chart | null = null;
 
@@ -192,7 +213,18 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
 
   readonly isLoading = signal(false);
 
+  private _metricInitialised = false;
+
   constructor() {
+    // Pick the natural default metric once the exercise type is known:
+    // reps for bodyweight, weight for everything else.
+    effect(() => {
+      const ex = this.exerciseService.getById(this.exerciseId() ?? '');
+      if (this._metricInitialised || !ex) return;
+      this._metricInitialised = true;
+      this.selectedMetric.set(ex.loadType === 'bodyweight' ? 'reps' : 'weight');
+    });
+
     effect(() => {
       const id = this.exerciseId();
       if (!id) return;
@@ -223,6 +255,12 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
     const workingSets = entry.sets.filter(s => !s.warmup);
     if (!workingSets.length) return 0;
     if (metric === 'weight') return Math.max(...workingSets.map(s => setMaxWeight(s)));
+    // Total reps across working sets (drop stages included) — the progression
+    // signal for bodyweight exercises where the logged weight stays at 0.
+    if (metric === 'reps') {
+      return workingSets.reduce(
+        (sum, s) => sum + s.reps + (s.drops ?? []).reduce((d, x) => d + x.reps, 0), 0);
+    }
     // Volume folds in bodyweight so dominades & co. count their real load, not
     // just the added weight (0 for pure bodyweight). "Pes màx" stays as logged.
     const ex = this.exerciseService.getById(exId);
@@ -231,7 +269,7 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
   }
 
   private _label(metric: Metric): string {
-    return { weight: 'Pes màxim (kg)', volume: 'Volum (kg)', feeling: 'Fatiga (1-5)' }[metric];
+    return { weight: 'Pes màxim (kg)', volume: 'Volum (kg)', feeling: 'Fatiga (1-5)', reps: 'Reps totals' }[metric];
   }
 
   private _fmt(dateStr: string): string {
