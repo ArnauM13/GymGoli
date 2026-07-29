@@ -37,7 +37,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
 
       <!-- ── Avui / dia seleccionat ── -->
       <div class="today-card">
-        <button class="today-header" (click)="goToTrain()">
+        <div class="today-header">
           <span class="today-header-icon-wrap">
             <span class="material-symbols-outlined today-header-icon">today</span>
           </span>
@@ -51,8 +51,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
               {{ plannedCount() }}
             </span>
           }
-          <span class="material-symbols-outlined today-header-chev">chevron_right</span>
-        </button>
+        </div>
 
         <div class="today-body">
           @if (previewFeedEntry(); as day) {
@@ -179,10 +178,8 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     .today-header {
       display: flex; align-items: center; gap: 10px; width: 100%;
       margin: 0; padding: 12px 12px 12px 14px;
-      border: none; text-align: left; cursor: pointer; touch-action: manipulation;
+      border: none; text-align: left;
       background: color-mix(in srgb, var(--c-brand) 8%, var(--c-card));
-      transition: background 0.15s;
-      &:hover { background: color-mix(in srgb, var(--c-brand) 12%, var(--c-card)); }
     }
     .today-header-icon-wrap {
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
@@ -201,8 +198,6 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
       font-size: 12px; font-weight: 800;
       .material-symbols-outlined { font-size: 15px; }
     }
-    .today-header-chev { font-size: 22px; color: var(--c-brand); flex-shrink: 0; opacity: 0.75; }
-
     .today-body { padding: 12px; }
 
     .today-empty {
@@ -360,7 +355,10 @@ export class HomeComponent implements OnDestroy {
 
   readonly previewFeedEntry = computed((): DayFeedEntry | null => {
     const date    = this.effectiveDate();
-    const planned = date === TODAY() ? this.workoutService.getPlannedForDate(date) : [];
+    // Planned workouts belong to whichever day they sit on, not just today —
+    // selecting a day on the calendar should surface its plan so it can be
+    // started, edited or removed straight from here.
+    const planned = this.workoutService.getPlannedForDate(date);
     const done    = this.workoutService.getDoneWorkoutsForDate(date);
     const workouts: Workout[] = [...planned, ...done];
     const sports: { sport: Sport; session: SportSession }[] = this.sportService.getSportSessionsForDate(date);
@@ -431,7 +429,6 @@ export class HomeComponent implements OnDestroy {
   readonly feedDays = computed(() => {
     const monthsBack = this.feedMonthsBack();
     const today      = new Date();
-    const todayStr   = TODAY();
     const earliest   = new Date(today.getFullYear(), today.getMonth() - monthsBack, 1);
     const days: DayFeedEntry[] = [];
 
@@ -439,7 +436,7 @@ export class HomeComponent implements OnDestroy {
     while (cursor >= earliest) {
       const dateStr  = cursor.toISOString().split('T')[0];
       const done     = this.workoutService.getDoneWorkoutsForDate(dateStr);
-      const planned  = dateStr === todayStr ? this.workoutService.getPlannedForDate(dateStr) : [];
+      const planned  = this.workoutService.getPlannedForDate(dateStr);
       const workouts = [...planned, ...done];
       const sports   = this.sportService.getSportSessionsForDate(dateStr);
       if (workouts.length > 0 || sports.length > 0) days.push({ date: dateStr, workouts, sports });

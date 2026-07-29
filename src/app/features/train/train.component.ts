@@ -1408,7 +1408,17 @@ export class TrainComponent implements OnDestroy {
     const category = (w.category ?? workoutCategories(w)[0]) as ExerciseCategory | undefined;
     if (!category) return [];
     const currentIds = w.entries.map(e => e.exerciseId);
-    return this.suggestionService.suggest(category, currentIds, 3);
+    // The "Sèrie activa" hint is a live-training nicety — it must never take the
+    // whole workout view down. This runs *only* for today's active session (see
+    // the `w.date !== TODAY()` gate above), so a throw here reads to the user as
+    // "opening today's training crashes". If the engine trips on an edge case in
+    // the user's own data, drop the hint and keep the session usable.
+    try {
+      return this.suggestionService.suggest(category, currentIds, 3);
+    } catch (err) {
+      console.error('[exerciseSuggestions] suggestion engine failed', err);
+      return [];
+    }
   });
 
 
@@ -1423,10 +1433,17 @@ export class TrainComponent implements OnDestroy {
     if (this.reorderMode() || this.groupingMode()) return false;
     if (this.settingsService.bodyweightKg() != null) return false;
     if (this.hintService.isDismissed('nudge-bodyweight-volume')) return false;
-    return w.entries.some(e => {
-      const lt = this.exerciseService.getById(e.exerciseId)?.loadType;
-      return lt === 'bodyweight' || lt === 'assisted';
-    });
+    try {
+      return w.entries.some(e => {
+        const lt = this.exerciseService.getById(e.exerciseId)?.loadType;
+        return lt === 'bodyweight' || lt === 'assisted';
+      });
+    } catch (err) {
+      // Same reasoning as exerciseSuggestions: a today-only nudge must not blank
+      // the training view if resolving an exercise trips on unexpected data.
+      console.error('[needsBodyweightHint] exercise lookup failed', err);
+      return false;
+    }
   });
 
   readonly pickerCat = signal<ExerciseCategory | null>(null);
