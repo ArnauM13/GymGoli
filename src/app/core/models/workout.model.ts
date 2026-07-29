@@ -43,6 +43,9 @@ export interface WorkoutSet {
   warmup?: boolean;
   /** Reps In Reserve — how many more reps could have been done (0 = failure). */
   rir?: number;
+  /** Rest taken before this set, in seconds — logged manually, like a note.
+   *  Off by default; enabled from Paràmetres avançats. */
+  restSeconds?: number;
 }
 
 export interface WorkoutEntry {

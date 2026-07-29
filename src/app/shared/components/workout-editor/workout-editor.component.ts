@@ -217,6 +217,18 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                               </div>
                             </div>
                           }
+                          @if (manualRestEnabled()) {
+                            <div class="we-inline-group">
+                              <label for="edit-rest">Descans (s)</label>
+                              <div class="we-number-input compact">
+                                <button type="button" (click)="adjustEditRest(-1)" aria-label="Menys descans">−</button>
+                                <input id="edit-rest" type="number" [value]="editRestValue() ?? ''" placeholder="—"
+                                       (change)="setEditRest($any($event.target).value)" min="0" step="15"
+                                       (focus)="$any($event.target).select()">
+                                <button type="button" (click)="adjustEditRest(1)" aria-label="Més descans">+</button>
+                              </div>
+                            </div>
+                          }
                         </div>
                         <div class="we-drop-stages">
                           @for (d of editDropStages(); track $index) {
@@ -287,6 +299,9 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                           @if (set.rir != null) {
                             <span class="we-set-pill rir">{{ set.rir }}<small>RIR</small></span>
                           }
+                          @if (set.restSeconds != null) {
+                            <span class="we-set-pill rest"><span class="material-symbols-outlined we-rest-pill-icon">timer</span>{{ formatRest(set.restSeconds) }}</span>
+                          }
                           @for (d of (set.drops ?? []); track $index) {
                             <span class="we-chain-arrow">→</span>
                             <span class="we-set-pill weight drop">{{ dispW(d.weight) }}<small>{{ unit() }}</small></span>
@@ -319,6 +334,9 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                           </span>
                           @if (set.rir != null) {
                             <span class="we-set-pill rir">{{ set.rir }}<small>RIR</small></span>
+                          }
+                          @if (set.restSeconds != null) {
+                            <span class="we-set-pill rest"><span class="material-symbols-outlined we-rest-pill-icon">timer</span>{{ formatRest(set.restSeconds) }}</span>
                           }
                         }
                       </div>
@@ -380,6 +398,18 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                                  (change)="setRir($any($event.target).value)" min="0" step="1"
                                  (focus)="$any($event.target).select()">
                           <button type="button" (click)="adjustRir(1)" aria-label="Més RIR">+</button>
+                        </div>
+                      </div>
+                    }
+                    @if (manualRestEnabled()) {
+                      <div class="we-input-group">
+                        <label for="add-rest">Descans (s)</label>
+                        <div class="we-number-input">
+                          <button type="button" (click)="adjustRest(-1)" aria-label="Menys descans">−</button>
+                          <input id="add-rest" type="number" [value]="restValue() ?? ''" placeholder="—"
+                                 (change)="setRest($any($event.target).value)" min="0" step="15"
+                                 (focus)="$any($event.target).select()">
+                          <button type="button" (click)="adjustRest(1)" aria-label="Més descans">+</button>
                         </div>
                       </div>
                     }
@@ -890,6 +920,8 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       &.weight { background: rgba(var(--c-brand-rgb), 0.1); color: var(--c-brand); }
       &.reps   { background: var(--c-border-2); color: var(--c-text-2); }
       &.rir    { background: rgba(255, 152, 0, 0.12); color: #ff9800; padding: 6px 10px; font-size: 13px; }
+      &.rest   { background: rgba(var(--c-brand-rgb), 0.08); color: var(--c-text-2); padding: 6px 10px; font-size: 13px; gap: 4px; align-items: center;
+                 .we-rest-pill-icon { font-size: 15px; opacity: 0.75; } }
       &.we-set-pill--tap {
         cursor: pointer; transition: filter 0.12s;
         &:hover { filter: brightness(0.93); }
@@ -1284,6 +1316,10 @@ export class WorkoutEditorComponent implements OnDestroy {
   readonly rirValue     = signal<number | null>(null);
   readonly editRirValue = signal<number | null>(null);
 
+  // ── Manual rest between sets (seconds) ───────────────────────────────────
+  readonly restValue     = signal<number | null>(null);
+  readonly editRestValue = signal<number | null>(null);
+
   // ── Superset grouping ───────────────────────────────────────────────────
   readonly selectedForGroup = signal<Set<string>>(new Set());
 
@@ -1328,6 +1364,7 @@ export class WorkoutEditorComponent implements OnDestroy {
   readonly restTimerEnabled = computed(() => this.settingsService.restTimerSeconds() > 0);
   readonly dropsetsEnabled  = computed(() => this.settingsService.dropsetsEnabled());
   readonly rirEnabled       = computed(() => this.settingsService.rirEnabled());
+  readonly manualRestEnabled = computed(() => this.settingsService.manualRestEnabled());
   readonly timerActive    = signal(false);
   readonly timerRemaining = signal(0);
   readonly timerTotal     = signal(0);
@@ -1503,6 +1540,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     this.dropStages.set([]);
     this.isWarmupSet.set(false);
     this.rirValue.set(null);
+    this.restValue.set(null);
   }
 
   getFeelingEmoji(level: FeelingLevel): string {
@@ -1703,6 +1741,28 @@ export class WorkoutEditorComponent implements OnDestroy {
     this.editRirValue.set(isNaN(n) ? null : Math.max(0, n));
   }
 
+  /** Rest is stepped in 15-second increments (a natural rest granularity). */
+  private readonly REST_STEP = 15;
+  adjustRest(delta: number): void {
+    this.restValue.set(Math.max(0, (this.restValue() ?? 0) + delta * this.REST_STEP));
+  }
+  setRest(raw: string): void {
+    const n = parseInt(raw, 10);
+    this.restValue.set(isNaN(n) ? null : Math.max(0, n));
+  }
+  adjustEditRest(delta: number): void {
+    this.editRestValue.set(Math.max(0, (this.editRestValue() ?? 0) + delta * this.REST_STEP));
+  }
+  setEditRest(raw: string): void {
+    const n = parseInt(raw, 10);
+    this.editRestValue.set(isNaN(n) ? null : Math.max(0, n));
+  }
+  /** Format seconds as "m:ss" (≥1 min) or "Ns" (under a minute). */
+  formatRest(seconds: number): string {
+    if (seconds < 60) return `${seconds}s`;
+    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  }
+
   async setEntryFeeling(entry: WorkoutEntry, level: FeelingLevel): Promise<void> {
     const w = this.workout();
     if (!w) return;
@@ -1724,6 +1784,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     this.addingFor.set(entry.exerciseId);
     this.isWarmupSet.set(false);
     this.rirValue.set(null);
+    this.restValue.set(null);
     const w    = this.workout();
     const u    = this.unit();
     if (entry.sets.length === 0 && w) {
@@ -1831,6 +1892,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     this.editDropStages.set((set.drops ?? []).map(d => ({ weight: kgToDisplay(d.weight, this.unit()), reps: d.reps })));
     this.editIsWarmupSet.set(!!set.warmup);
     this.editRirValue.set(set.rir ?? null);
+    this.editRestValue.set(set.restSeconds ?? null);
   }
 
   cancelEditSet(): void {
@@ -1838,6 +1900,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     this.editIsWarmupSet.set(false);
     this.editDropStages.set([]);
     this.editRirValue.set(null);
+    this.editRestValue.set(null);
   }
 
   async saveEditSet(): Promise<void> {
@@ -1860,6 +1923,7 @@ export class WorkoutEditorComponent implements OnDestroy {
         ...(drops.length > 0 ? { drops: drops.map(d => ({ weight: displayToKg(d.weight, this.unit()), reps: d.reps })) } : {}),
         ...(this.editIsWarmupSet() ? { warmup: true } : {}),
         ...(this.editRirValue() != null ? { rir: this.editRirValue()! } : {}),
+        ...(this.editRestValue() != null ? { restSeconds: this.editRestValue()! } : {}),
       });
       this.cancelEditSet();
     } catch {
@@ -1879,7 +1943,12 @@ export class WorkoutEditorComponent implements OnDestroy {
     const drops = this.dropStages();
     const warmup = this.isWarmupSet();
     const rir = this.rirValue();
-    const extra = { ...(warmup ? { warmup } : {}), ...(rir != null ? { rir } : {}) };
+    const restSeconds = this.restValue();
+    const extra = {
+      ...(warmup ? { warmup } : {}),
+      ...(rir != null ? { rir } : {}),
+      ...(restSeconds != null ? { restSeconds } : {}),
+    };
     const baseSet: WorkoutSet = unilateral
       ? { weight: Math.max(weightKg, weightRightKg), reps: reps!, weightLeft: weightKg, weightRight: weightRightKg, ...extra }
       : { weight: weightKg, reps: reps!, ...extra };

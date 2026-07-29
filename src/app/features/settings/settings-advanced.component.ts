@@ -52,6 +52,18 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 
         <div class="setting-row setting-row--top">
           <div class="setting-info">
+            <span class="setting-label">Descans entre sèries</span>
+            <span class="setting-desc">Permet anotar manualment el descans fet abans de cada sèrie, com una nota.</span>
+          </div>
+          <mat-slide-toggle
+            [checked]="settingsService.manualRestEnabled()"
+            (change)="toggleManualRest()"
+            color="primary"
+          />
+        </div>
+
+        <div class="setting-row setting-row--top">
+          <div class="setting-info">
             <span class="setting-label">Ajustar el factor de pes corporal</span>
             <span class="setting-desc">Mostra al formulari d'exercici el % del pes corporal que compta al volum (p. ex. flexions 65%). Per defecte ja ve amb valors sensats.</span>
           </div>
@@ -121,6 +133,10 @@ export class SettingsAdvancedComponent {
 
   toggleRir(): void {
     this.settingsService.update({ rirEnabled: !this.settingsService.rirEnabled() });
+  }
+
+  toggleManualRest(): void {
+    this.settingsService.update({ manualRestEnabled: !this.settingsService.manualRestEnabled() });
   }
 
   toggleBodyweightFactor(): void {

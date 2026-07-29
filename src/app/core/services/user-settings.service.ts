@@ -37,6 +37,7 @@ export class UserSettingsService {
   readonly supersetsEnabled    = computed(() => this._settings().supersetsEnabled ?? false);
   readonly dropsetsEnabled     = computed(() => this._settings().dropsetsEnabled ?? false);
   readonly rirEnabled          = computed(() => this._settings().rirEnabled ?? false);
+  readonly manualRestEnabled   = computed(() => this._settings().manualRestEnabled ?? false);
   readonly difficultyScale     = computed(() => (this._settings().difficultyScale ?? 'emoji') as DifficultyScale);
   readonly bodyweightKg        = computed(() => this._settings().bodyweightKg ?? null);
   readonly bodyweightFactorEnabled = computed(() => this._settings().bodyweightFactorEnabled ?? false);

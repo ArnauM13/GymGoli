@@ -54,6 +54,8 @@ export interface UserSettings {
   dropsetsEnabled:  boolean;
   /** Off by default — logging Reps In Reserve per set. */
   rirEnabled: boolean;
+  /** Off by default — manually logging the rest taken between sets (like a note). */
+  manualRestEnabled: boolean;
   difficultyScale: DifficultyScale;
   /** User's bodyweight in kg, used to count bodyweight/assisted exercises
    *  (dominades, fons…) towards volume. Null = not set → those exercises fall
@@ -92,6 +94,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   supersetsEnabled: false,
   dropsetsEnabled: false,
   rirEnabled: false,
+  manualRestEnabled: false,
   difficultyScale: 'emoji',
   bodyweightKg: null,
   bodyweightFactorEnabled: false,
