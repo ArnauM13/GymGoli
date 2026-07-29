@@ -22,6 +22,7 @@ describe('SettingsAdvancedComponent', () => {
             supersetsEnabled: signal(false),
             dropsetsEnabled:  signal(false),
             rirEnabled:       signal(false),
+            manualRestEnabled: signal(false),
             difficultyScale:  signal('emoji'),
             bodyweightFactorEnabled: signal(false),
             update:           mockUpdate,
@@ -59,6 +60,13 @@ describe('SettingsAdvancedComponent', () => {
     it('enables RIR when currently disabled', () => {
       component.toggleRir();
       expect(mockUpdate).toHaveBeenCalledWith({ rirEnabled: true });
+    });
+  });
+
+  describe('toggleManualRest()', () => {
+    it('enables manual rest logging when currently disabled', () => {
+      component.toggleManualRest();
+      expect(mockUpdate).toHaveBeenCalledWith({ manualRestEnabled: true });
     });
   });
 

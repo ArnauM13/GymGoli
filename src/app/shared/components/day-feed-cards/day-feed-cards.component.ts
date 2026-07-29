@@ -7,6 +7,7 @@ import { SportService } from '../../../core/services/sport.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 import { ExerciseService } from '../../../core/services/exercise.service';
 import { FeedbackService } from '../../services/feedback.service';
+import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import {
   formatFeeling, getCatLabel, getExerciseNames, isWorkoutPlanned, sportSessionSummary,
   workoutCardColor, workoutCategoryList, workoutPrimaryColor, workoutSetsCount,
@@ -66,9 +67,16 @@ export interface DayFeedEntry {
           }
         </div>
         @if (isPlanned(w)) {
-          <button class="fc-start" (click)="$event.stopPropagation(); startPlan(w)" title="Comença">
-            <span class="material-symbols-outlined">play_arrow</span>
-          </button>
+          <div class="fc-plan-actions">
+            <button class="fc-plan-del" (click)="$event.stopPropagation(); deletePlan(w)"
+                    title="Eliminar planificació" aria-label="Eliminar planificació">
+              <span class="material-symbols-outlined">delete</span>
+            </button>
+            <button class="fc-start" (click)="$event.stopPropagation(); startPlan(w)"
+                    title="Comença" aria-label="Comença">
+              <span class="material-symbols-outlined">play_arrow</span>
+            </button>
+          </div>
         } @else {
           <span class="material-symbols-outlined fc-chevron">chevron_right</span>
         }
@@ -240,9 +248,19 @@ export interface DayFeedEntry {
     .fc-stat-sep { color: var(--c-border); }
     .fc-stat--vol strong { color: var(--wc, var(--c-brand)); }
     .fc-chevron { font-size: 22px; color: var(--c-text-3); flex-shrink: 0; margin-right: 8px; }
+    .fc-plan-actions {
+      display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-right: 10px;
+    }
+    .fc-plan-del {
+      width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+      border: 1.5px solid var(--c-border-2); background: var(--c-card); color: var(--c-text-3);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { background: rgba(239,83,80,0.1); color: #ef5350; border-color: rgba(239,83,80,0.3); }
+    }
     .fc-start {
       width: 38px; height: 38px; border: none; border-radius: 10px; flex-shrink: 0;
-      margin-right: 10px;
       background: var(--c-brand); color: white;
       display: flex; align-items: center; justify-content: center;
       cursor: pointer; touch-action: manipulation; transition: background 0.15s;
@@ -373,6 +391,7 @@ export class DayFeedCardsComponent {
   private settingsService = inject(UserSettingsService);
   private exerciseService = inject(ExerciseService);
   private feedback       = inject(FeedbackService);
+  private confirmDialog   = inject(ConfirmDialogService);
 
   readonly day  = input<DayFeedEntry | null>(null);
   readonly open = output<string>();
@@ -424,6 +443,21 @@ export class DayFeedCardsComponent {
       this.open.emit(w.id);
     } catch {
       this.feedback.error('Error en iniciar el pla', 2500);
+    }
+  }
+
+  /** Deletes a planned workout straight from the feed — a plan behaves like
+   *  any other workout, no need to go through the weekly planner. */
+  async deletePlan(w: Workout): Promise<void> {
+    const ok = await this.confirmDialog.confirm('Eliminar aquesta planificació?', {
+      variant: 'danger', confirmLabel: 'Eliminar', cancelLabel: 'Cancel·lar',
+    });
+    if (!ok) return;
+    try {
+      await this.workoutService.deleteWorkout(w.id);
+      this.feedback.success('Planificació eliminada', 2000);
+    } catch {
+      this.feedback.error('Error en eliminar', 2500);
     }
   }
 

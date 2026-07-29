@@ -104,7 +104,9 @@ export function sportSessionSummary(
 export function feedDayLabel(date: string, today: string): string {
   if (date === today) return 'Avui';
   const yesterday = (() => {
-    const d = new Date(today + 'T00:00:00');
+    // Noon (not midnight) so toISOString() can't roll the date back a day in
+    // timezones ahead of UTC — otherwise "ahir" resolves to two days ago.
+    const d = new Date(today + 'T12:00:00');
     d.setDate(d.getDate() - 1);
     return d.toISOString().split('T')[0];
   })();

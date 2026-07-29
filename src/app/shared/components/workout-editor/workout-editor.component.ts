@@ -12,7 +12,7 @@ import { OfflineService } from '../../../core/services/offline.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component';
-import { kgToDisplay, displayToKg, weightStep } from '../../utils/weight.utils';
+import { kgToDisplay, displayToKg, effectiveWeightStep } from '../../utils/weight.utils';
 import { formatFeeling } from '../../utils/workout-card.utils';
 import { ExerciseEntryCardComponent } from '../exercise-entry-card/exercise-entry-card.component';
 import { FeedbackService } from '../../services/feedback.service';
@@ -180,7 +180,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                             <label for="edit-weight">{{ weightLabel(entry, false) }}</label>
                             <div class="we-number-input compact">
                               <button type="button" (click)="adjustEditWeight(-1)" aria-label="Menys pes">−</button>
-                              <input id="edit-weight" type="number" formControlName="weight" min="0" step="2.5"
+                              <input id="edit-weight" type="number" formControlName="weight" min="0" [step]="editWeightStep()"
                                      (focus)="$any($event.target).select()">
                               <button type="button" (click)="adjustEditWeight(1)" aria-label="Més pes">+</button>
                             </div>
@@ -190,7 +190,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                               <label for="edit-weight-right">Dreta</label>
                               <div class="we-number-input compact">
                                 <button type="button" (click)="adjustEditWeightRight(-1)" aria-label="Menys pes">−</button>
-                                <input id="edit-weight-right" type="number" formControlName="weightRight" min="0" step="2.5"
+                                <input id="edit-weight-right" type="number" formControlName="weightRight" min="0" [step]="editWeightStep()"
                                        (focus)="$any($event.target).select()">
                                 <button type="button" (click)="adjustEditWeightRight(1)" aria-label="Més pes">+</button>
                               </div>
@@ -217,6 +217,18 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                               </div>
                             </div>
                           }
+                          @if (manualRestEnabled()) {
+                            <div class="we-inline-group">
+                              <label for="edit-rest">Descans (s)</label>
+                              <div class="we-number-input compact">
+                                <button type="button" (click)="adjustEditRest(-1)" aria-label="Menys descans">−</button>
+                                <input id="edit-rest" type="number" [value]="editRestValue() ?? ''" placeholder="—"
+                                       (change)="setEditRest($any($event.target).value)" min="0" step="15"
+                                       (focus)="$any($event.target).select()">
+                                <button type="button" (click)="adjustEditRest(1)" aria-label="Més descans">+</button>
+                              </div>
+                            </div>
+                          }
                         </div>
                         <div class="we-drop-stages">
                           @for (d of editDropStages(); track $index) {
@@ -224,7 +236,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                               <span class="material-symbols-outlined we-drop-arrow">subdirectory_arrow_right</span>
                               <div class="we-number-input compact">
                                 <button type="button" (click)="adjustEditDropWeight($index, -1)" aria-label="Menys pes">−</button>
-                                <input type="number" [value]="d.weight" (change)="setEditDropWeight($index, $any($event.target).value)" min="0" step="2.5">
+                                <input type="number" [value]="d.weight" (change)="setEditDropWeight($index, $any($event.target).value)" min="0" [step]="editWeightStep()">
                                 <button type="button" (click)="adjustEditDropWeight($index, 1)" aria-label="Més pes">+</button>
                               </div>
                               <div class="we-number-input compact">
@@ -287,6 +299,9 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                           @if (set.rir != null) {
                             <span class="we-set-pill rir">{{ set.rir }}<small>RIR</small></span>
                           }
+                          @if (set.restSeconds != null) {
+                            <span class="we-set-pill rest"><span class="material-symbols-outlined we-rest-pill-icon">timer</span>{{ formatRest(set.restSeconds) }}</span>
+                          }
                           @for (d of (set.drops ?? []); track $index) {
                             <span class="we-chain-arrow">→</span>
                             <span class="we-set-pill weight drop">{{ dispW(d.weight) }}<small>{{ unit() }}</small></span>
@@ -320,6 +335,9 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                           @if (set.rir != null) {
                             <span class="we-set-pill rir">{{ set.rir }}<small>RIR</small></span>
                           }
+                          @if (set.restSeconds != null) {
+                            <span class="we-set-pill rest"><span class="material-symbols-outlined we-rest-pill-icon">timer</span>{{ formatRest(set.restSeconds) }}</span>
+                          }
                         }
                       </div>
                       @if (isEntryEditable(entry.exerciseId)) {
@@ -346,7 +364,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                       <label for="add-weight">{{ weightLabel(entry, true) }}</label>
                       <div class="we-number-input">
                         <button type="button" (click)="adjustWeight(-1)" aria-label="Menys pes">−</button>
-                        <input id="add-weight" type="number" formControlName="weight" min="0" step="2.5"
+                        <input id="add-weight" type="number" formControlName="weight" min="0" [step]="addWeightStep()"
                                (focus)="$any($event.target).select()">
                         <button type="button" (click)="adjustWeight(1)" aria-label="Més pes">+</button>
                       </div>
@@ -356,7 +374,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                         <label for="add-weight-right">Dreta ({{ unit() }})</label>
                         <div class="we-number-input">
                           <button type="button" (click)="adjustWeightRight(-1)" aria-label="Menys pes">−</button>
-                          <input id="add-weight-right" type="number" formControlName="weightRight" min="0" step="2.5"
+                          <input id="add-weight-right" type="number" formControlName="weightRight" min="0" [step]="addWeightStep()"
                                  (focus)="$any($event.target).select()">
                           <button type="button" (click)="adjustWeightRight(1)" aria-label="Més pes">+</button>
                         </div>
@@ -383,6 +401,18 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                         </div>
                       </div>
                     }
+                    @if (manualRestEnabled()) {
+                      <div class="we-input-group">
+                        <label for="add-rest">Descans (s)</label>
+                        <div class="we-number-input">
+                          <button type="button" (click)="adjustRest(-1)" aria-label="Menys descans">−</button>
+                          <input id="add-rest" type="number" [value]="restValue() ?? ''" placeholder="—"
+                                 (change)="setRest($any($event.target).value)" min="0" step="15"
+                                 (focus)="$any($event.target).select()">
+                          <button type="button" (click)="adjustRest(1)" aria-label="Més descans">+</button>
+                        </div>
+                      </div>
+                    }
                   </div>
                   @if (dropStages().length === 0) {
                     <div class="we-qty-row">
@@ -399,7 +429,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                         <span class="material-symbols-outlined we-drop-arrow">subdirectory_arrow_right</span>
                         <div class="we-number-input compact">
                           <button type="button" (click)="adjustDropWeight($index, -1)" aria-label="Menys pes">−</button>
-                          <input type="number" [value]="d.weight" (change)="setDropWeight($index, $any($event.target).value)" min="0" step="2.5">
+                          <input type="number" [value]="d.weight" (change)="setDropWeight($index, $any($event.target).value)" min="0" [step]="addWeightStep()">
                           <button type="button" (click)="adjustDropWeight($index, 1)" aria-label="Més pes">+</button>
                         </div>
                         <div class="we-number-input compact">
@@ -890,6 +920,8 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       &.weight { background: rgba(var(--c-brand-rgb), 0.1); color: var(--c-brand); }
       &.reps   { background: var(--c-border-2); color: var(--c-text-2); }
       &.rir    { background: rgba(255, 152, 0, 0.12); color: #ff9800; padding: 6px 10px; font-size: 13px; }
+      &.rest   { background: rgba(var(--c-brand-rgb), 0.08); color: var(--c-text-2); padding: 6px 10px; font-size: 13px; gap: 4px; align-items: center;
+                 .we-rest-pill-icon { font-size: 15px; opacity: 0.75; } }
       &.we-set-pill--tap {
         cursor: pointer; transition: filter 0.12s;
         &:hover { filter: brightness(0.93); }
@@ -1284,6 +1316,10 @@ export class WorkoutEditorComponent implements OnDestroy {
   readonly rirValue     = signal<number | null>(null);
   readonly editRirValue = signal<number | null>(null);
 
+  // ── Manual rest between sets (seconds) ───────────────────────────────────
+  readonly restValue     = signal<number | null>(null);
+  readonly editRestValue = signal<number | null>(null);
+
   // ── Superset grouping ───────────────────────────────────────────────────
   readonly selectedForGroup = signal<Set<string>>(new Set());
 
@@ -1328,6 +1364,16 @@ export class WorkoutEditorComponent implements OnDestroy {
   readonly restTimerEnabled = computed(() => this.settingsService.restTimerSeconds() > 0);
   readonly dropsetsEnabled  = computed(() => this.settingsService.dropsetsEnabled());
   readonly rirEnabled       = computed(() => this.settingsService.rirEnabled());
+  readonly manualRestEnabled = computed(() => this.settingsService.manualRestEnabled());
+
+  /** +/- stepper increment (display units) for the exercise currently being
+   *  added to / edited, honoring each exercise's configured weightStep. */
+  private stepFor(exerciseId: string | null | undefined): number {
+    const custom = exerciseId ? this.exerciseService.getById(exerciseId)?.weightStep : null;
+    return effectiveWeightStep(custom, this.unit());
+  }
+  readonly addWeightStep  = computed(() => this.stepFor(this.addingFor()));
+  readonly editWeightStep = computed(() => this.stepFor(this.editingSet()?.exerciseId));
   readonly timerActive    = signal(false);
   readonly timerRemaining = signal(0);
   readonly timerTotal     = signal(0);
@@ -1503,6 +1549,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     this.dropStages.set([]);
     this.isWarmupSet.set(false);
     this.rirValue.set(null);
+    this.restValue.set(null);
   }
 
   getFeelingEmoji(level: FeelingLevel): string {
@@ -1659,12 +1706,12 @@ export class WorkoutEditorComponent implements OnDestroy {
   }
 
   adjustWeight(delta: number): void {
-    const step = weightStep(this.unit());
+    const step = this.addWeightStep();
     const v = (this.setForm.value.weight ?? 0) + delta * step;
     this.setForm.patchValue({ weight: Math.max(0, Math.round(v * 10) / 10) });
   }
   adjustWeightRight(delta: number): void {
-    const step = weightStep(this.unit());
+    const step = this.addWeightStep();
     const v = (this.setForm.value.weightRight ?? 0) + delta * step;
     this.setForm.patchValue({ weightRight: Math.max(0, Math.round(v * 10) / 10) });
   }
@@ -1674,12 +1721,12 @@ export class WorkoutEditorComponent implements OnDestroy {
   }
 
   adjustEditWeight(delta: number): void {
-    const step = weightStep(this.unit());
+    const step = this.editWeightStep();
     const v = (this.editSetForm.value.weight ?? 0) + delta * step;
     this.editSetForm.patchValue({ weight: Math.max(0, Math.round(v * 10) / 10) });
   }
   adjustEditWeightRight(delta: number): void {
-    const step = weightStep(this.unit());
+    const step = this.editWeightStep();
     const v = (this.editSetForm.value.weightRight ?? 0) + delta * step;
     this.editSetForm.patchValue({ weightRight: Math.max(0, Math.round(v * 10) / 10) });
   }
@@ -1703,6 +1750,28 @@ export class WorkoutEditorComponent implements OnDestroy {
     this.editRirValue.set(isNaN(n) ? null : Math.max(0, n));
   }
 
+  /** Rest is stepped in 15-second increments (a natural rest granularity). */
+  private readonly REST_STEP = 15;
+  adjustRest(delta: number): void {
+    this.restValue.set(Math.max(0, (this.restValue() ?? 0) + delta * this.REST_STEP));
+  }
+  setRest(raw: string): void {
+    const n = parseInt(raw, 10);
+    this.restValue.set(isNaN(n) ? null : Math.max(0, n));
+  }
+  adjustEditRest(delta: number): void {
+    this.editRestValue.set(Math.max(0, (this.editRestValue() ?? 0) + delta * this.REST_STEP));
+  }
+  setEditRest(raw: string): void {
+    const n = parseInt(raw, 10);
+    this.editRestValue.set(isNaN(n) ? null : Math.max(0, n));
+  }
+  /** Format seconds as "m:ss" (≥1 min) or "Ns" (under a minute). */
+  formatRest(seconds: number): string {
+    if (seconds < 60) return `${seconds}s`;
+    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  }
+
   async setEntryFeeling(entry: WorkoutEntry, level: FeelingLevel): Promise<void> {
     const w = this.workout();
     if (!w) return;
@@ -1724,6 +1793,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     this.addingFor.set(entry.exerciseId);
     this.isWarmupSet.set(false);
     this.rirValue.set(null);
+    this.restValue.set(null);
     const w    = this.workout();
     const u    = this.unit();
     if (entry.sets.length === 0 && w) {
@@ -1831,6 +1901,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     this.editDropStages.set((set.drops ?? []).map(d => ({ weight: kgToDisplay(d.weight, this.unit()), reps: d.reps })));
     this.editIsWarmupSet.set(!!set.warmup);
     this.editRirValue.set(set.rir ?? null);
+    this.editRestValue.set(set.restSeconds ?? null);
   }
 
   cancelEditSet(): void {
@@ -1838,6 +1909,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     this.editIsWarmupSet.set(false);
     this.editDropStages.set([]);
     this.editRirValue.set(null);
+    this.editRestValue.set(null);
   }
 
   async saveEditSet(): Promise<void> {
@@ -1860,6 +1932,7 @@ export class WorkoutEditorComponent implements OnDestroy {
         ...(drops.length > 0 ? { drops: drops.map(d => ({ weight: displayToKg(d.weight, this.unit()), reps: d.reps })) } : {}),
         ...(this.editIsWarmupSet() ? { warmup: true } : {}),
         ...(this.editRirValue() != null ? { rir: this.editRirValue()! } : {}),
+        ...(this.editRestValue() != null ? { restSeconds: this.editRestValue()! } : {}),
       });
       this.cancelEditSet();
     } catch {
@@ -1879,7 +1952,12 @@ export class WorkoutEditorComponent implements OnDestroy {
     const drops = this.dropStages();
     const warmup = this.isWarmupSet();
     const rir = this.rirValue();
-    const extra = { ...(warmup ? { warmup } : {}), ...(rir != null ? { rir } : {}) };
+    const restSeconds = this.restValue();
+    const extra = {
+      ...(warmup ? { warmup } : {}),
+      ...(rir != null ? { rir } : {}),
+      ...(restSeconds != null ? { restSeconds } : {}),
+    };
     const baseSet: WorkoutSet = unilateral
       ? { weight: Math.max(weightKg, weightRightKg), reps: reps!, weightLeft: weightKg, weightRight: weightRightKg, ...extra }
       : { weight: weightKg, reps: reps!, ...extra };
@@ -1959,7 +2037,7 @@ export class WorkoutEditorComponent implements OnDestroy {
 
   // ── Dropsets ─────────────────────────────────────────────────────────────
   addDropStage(): void {
-    const step = weightStep(this.unit());
+    const step = this.addWeightStep();
     const last = this.dropStages().at(-1) ?? { weight: this.setForm.value.weight ?? 0, reps: this.setForm.value.reps ?? 8 };
     const reduced = Math.max(0, Math.round((last.weight * 0.8) / step) * step);
     this.dropStages.update(arr => [...arr, { weight: reduced, reps: last.reps }]);
@@ -1968,7 +2046,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     this.dropStages.update(arr => arr.filter((_, i) => i !== index));
   }
   adjustDropWeight(index: number, delta: number): void {
-    const step = weightStep(this.unit());
+    const step = this.addWeightStep();
     this.dropStages.update(arr => arr.map((d, i) => i === index ? { ...d, weight: Math.max(0, Math.round((d.weight + delta * step) * 10) / 10) } : d));
   }
   adjustDropReps(index: number, delta: number): void {
@@ -1984,7 +2062,7 @@ export class WorkoutEditorComponent implements OnDestroy {
   }
 
   addEditDropStage(): void {
-    const step = weightStep(this.unit());
+    const step = this.editWeightStep();
     const last = this.editDropStages().at(-1) ?? { weight: this.editSetForm.value.weight ?? 0, reps: this.editSetForm.value.reps ?? 8 };
     const reduced = Math.max(0, Math.round((last.weight * 0.8) / step) * step);
     this.editDropStages.update(arr => [...arr, { weight: reduced, reps: last.reps }]);
@@ -1993,7 +2071,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     this.editDropStages.update(arr => arr.filter((_, i) => i !== index));
   }
   adjustEditDropWeight(index: number, delta: number): void {
-    const step = weightStep(this.unit());
+    const step = this.editWeightStep();
     this.editDropStages.update(arr => arr.map((d, i) => i === index ? { ...d, weight: Math.max(0, Math.round((d.weight + delta * step) * 10) / 10) } : d));
   }
   adjustEditDropReps(index: number, delta: number): void {

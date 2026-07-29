@@ -43,39 +43,49 @@ const MIXED_LABEL = 'Mixt';
         } @else if (sortedTemplates().length > 0) {
           <div class="list">
             @for (t of sortedTemplates(); track t.id) {
-              <div class="template-card" [style.--tc]="catColor(t.category)">
+              <div class="template-card" [style.--tc]="catColor(t.category)"
+                   [class.template-card--open]="isExpanded(t.id)">
                 <div class="tc-accent"></div>
-                <div class="tc-body">
-                  <div class="tc-top">
-                    <span class="tc-name">{{ t.name }}</span>
-                    <span class="tc-badge" [style.background]="catColor(t.category)">{{ catLabel(t.category) }}</span>
-                  </div>
-
-                  @if (t.entries.length > 0) {
-                    <ul class="tc-ex-list">
-                      @for (e of t.entries; track e.exerciseId) {
-                        <li class="tc-ex-row">
-                          <span class="tc-ex-name">{{ e.exerciseName }}</span>
-                          @if (entryParams(e); as p) { <span class="tc-ex-params">{{ p }}</span> }
-                        </li>
-                      }
-                    </ul>
-                  } @else {
-                    <span class="tc-empty-ex">Sense exercicis</span>
-                  }
-
-                  <div class="tc-footer">
-                    <button class="tc-foot-icon danger" (click)="deleteTemplate(t.id)" aria-label="Eliminar">
+                <div class="tc-content">
+                  <div class="tc-row">
+                    <button class="tc-toggle" (click)="toggleExpanded(t.id)"
+                            [attr.aria-expanded]="isExpanded(t.id)">
+                      <div class="tc-info">
+                        <span class="tc-name">{{ t.name }}</span>
+                        <div class="tc-meta">
+                          <span class="tc-badge" [style.background]="catColor(t.category)">{{ catLabel(t.category) }}</span>
+                          <span class="tc-count">{{ t.entries.length }} {{ t.entries.length === 1 ? 'exercici' : 'exercicis' }}</span>
+                          @if (t.useCount && t.useCount > 0) {
+                            <span class="tc-uses"><span class="material-symbols-outlined">replay</span>{{ t.useCount }}</span>
+                          }
+                        </div>
+                      </div>
+                      <span class="material-symbols-outlined tc-chevron">expand_more</span>
+                    </button>
+                    <button class="tc-action" (click)="openEditor(t)" aria-label="Editar">
+                      <span class="material-symbols-outlined">edit</span>
+                    </button>
+                    <button class="tc-action tc-action--danger" (click)="deleteTemplate(t.id)" aria-label="Eliminar">
                       <span class="material-symbols-outlined">delete</span>
                     </button>
-                    @if (t.useCount && t.useCount > 0) {
-                      <span class="tc-uses"><span class="material-symbols-outlined">replay</span>{{ t.useCount }}</span>
-                    }
-                    <button class="tc-foot-main" (click)="openEditor(t)">
-                      <span class="material-symbols-outlined">edit</span>
-                      Editar
-                    </button>
                   </div>
+
+                  @if (isExpanded(t.id)) {
+                    <div class="tc-detail">
+                      @if (t.entries.length > 0) {
+                        <ul class="tc-ex-list">
+                          @for (e of t.entries; track e.exerciseId) {
+                            <li class="tc-ex-row">
+                              <span class="tc-ex-name">{{ e.exerciseName }}</span>
+                              @if (entryParams(e); as p) { <span class="tc-ex-params">{{ p }}</span> }
+                            </li>
+                          }
+                        </ul>
+                      } @else {
+                        <span class="tc-empty-ex">Sense exercicis</span>
+                      }
+                    </div>
+                  }
                 </div>
               </div>
             }
@@ -99,29 +109,39 @@ const MIXED_LABEL = 'Mixt';
           </div>
           <div class="list">
             @for (t of visibleBuiltIns(); track t.id) {
-              <div class="template-card" [style.--tc]="catColor(t.category)">
+              <div class="template-card" [style.--tc]="catColor(t.category)"
+                   [class.template-card--open]="isExpanded(t.id)">
                 <div class="tc-accent"></div>
-                <div class="tc-body">
-                  <div class="tc-top">
-                    <span class="tc-name">{{ t.name }}</span>
-                    <span class="tc-badge" [style.background]="catColor(t.category)">{{ catLabel(t.category) }}</span>
-                  </div>
-
-                  <ul class="tc-ex-list">
-                    @for (name of t.exerciseNames; track name) {
-                      <li class="tc-ex-row"><span class="tc-ex-name">{{ name }}</span></li>
-                    }
-                  </ul>
-
-                  <div class="tc-footer">
-                    <button class="tc-foot-icon danger" (click)="dismissSuggested(t.id)" aria-label="Descartar">
-                      <span class="material-symbols-outlined">close</span>
+                <div class="tc-content">
+                  <div class="tc-row">
+                    <button class="tc-toggle" (click)="toggleExpanded(t.id)"
+                            [attr.aria-expanded]="isExpanded(t.id)">
+                      <div class="tc-info">
+                        <span class="tc-name">{{ t.name }}</span>
+                        <div class="tc-meta">
+                          <span class="tc-badge" [style.background]="catColor(t.category)">{{ catLabel(t.category) }}</span>
+                          <span class="tc-count">{{ t.exerciseNames.length }} {{ t.exerciseNames.length === 1 ? 'exercici' : 'exercicis' }}</span>
+                        </div>
+                      </div>
+                      <span class="material-symbols-outlined tc-chevron">expand_more</span>
                     </button>
-                    <button class="tc-foot-main brand" (click)="addSuggested(t)">
+                    <button class="tc-action tc-action--brand" (click)="addSuggested(t)" aria-label="Afegir">
                       <span class="material-symbols-outlined">add</span>
-                      Afegir
+                    </button>
+                    <button class="tc-action tc-action--danger" (click)="dismissSuggested(t.id)" aria-label="Eliminar">
+                      <span class="material-symbols-outlined">delete</span>
                     </button>
                   </div>
+
+                  @if (isExpanded(t.id)) {
+                    <div class="tc-detail">
+                      <ul class="tc-ex-list">
+                        @for (name of t.exerciseNames; track name) {
+                          <li class="tc-ex-row"><span class="tc-ex-name">{{ name }}</span></li>
+                        }
+                      </ul>
+                    </div>
+                  }
                 </div>
               </div>
             }
@@ -222,31 +242,63 @@ const MIXED_LABEL = 'Mixt';
 
     .list { display: flex; flex-direction: column; gap: 10px; }
 
-    /* ── Template card ── */
+    /* ── Template card (compact, collapsible — mirrors the exercises list) ── */
     .template-card {
       display: flex; align-items: stretch;
-      background: var(--c-card); border-radius: 14px;
-      box-shadow: 0 2px 8px var(--c-shadow); overflow: hidden;
+      background: var(--c-card); border: 1.5px solid var(--c-border-2); border-radius: 14px;
+      overflow: hidden; transition: box-shadow 0.15s, border-color 0.15s;
+      &:hover { box-shadow: 0 2px 8px var(--c-shadow); border-color: var(--c-border); }
     }
-    .tc-accent { width: 5px; flex-shrink: 0; background: var(--tc); }
-    .tc-body { flex: 1; min-width: 0; padding: 12px 14px 10px; display: flex; flex-direction: column; }
+    .tc-accent { width: 5px; align-self: stretch; flex-shrink: 0; background: var(--tc); }
+    .tc-content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
-    .tc-top { display: flex; align-items: center; gap: 8px; }
+    .tc-row { display: flex; align-items: center; }
+    .tc-toggle {
+      flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;
+      padding: 10px; border: none; background: transparent; text-align: left;
+      cursor: pointer; touch-action: manipulation;
+    }
+    .tc-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
     .tc-name {
-      flex: 1; min-width: 0;
-      font-size: 15px; font-weight: 700; color: var(--c-text);
+      font-size: 14px; font-weight: 700; color: var(--c-text);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
+    .tc-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     .tc-badge {
-      padding: 2px 8px; border-radius: 10px; flex-shrink: 0;
-      font-size: 11px; font-weight: 600; color: white;
+      padding: 1px 7px; border-radius: 8px; flex-shrink: 0;
+      font-size: 10px; font-weight: 600; color: white;
+    }
+    .tc-count { font-size: 11px; font-weight: 600; color: var(--c-text-3); }
+    .tc-uses {
+      display: flex; align-items: center; gap: 3px;
+      font-size: 11px; font-weight: 600; color: var(--c-text-3);
+      .material-symbols-outlined { font-size: 13px; }
+    }
+    .tc-chevron {
+      font-size: 20px; color: var(--c-text-3); flex-shrink: 0;
+      transition: transform 0.2s;
+    }
+    .template-card--open .tc-chevron { transform: rotate(180deg); }
+
+    .tc-action {
+      width: 36px; height: 36px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      border: none; background: transparent; cursor: pointer;
+      color: var(--c-text-3); touch-action: manipulation; transition: color 0.15s, background 0.15s;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { color: var(--c-text-2); background: var(--c-hover); }
+      &.tc-action--danger:hover { color: #ef5350; background: rgba(239,83,80,0.08); }
+      &.tc-action--brand { color: var(--c-brand); }
+      &.tc-action--brand:hover { color: var(--c-brand-dk); background: rgba(var(--c-brand-rgb), 0.08); }
+      &:last-child { margin-right: 4px; }
     }
 
-    /* ── Vertical exercise list ── */
-    .tc-ex-list { list-style: none; margin: 10px 0 0; padding: 0; }
+    /* ── Expanded detail: vertical exercise list ── */
+    .tc-detail { margin: 0 12px 8px; padding-top: 8px; border-top: 1px solid var(--c-border-2); }
+    .tc-ex-list { list-style: none; margin: 0; padding: 0; }
     .tc-ex-row {
       display: flex; align-items: center; gap: 10px;
-      padding: 7px 0;
+      padding: 6px 0;
       border-bottom: 1px solid var(--c-border-2);
       &:last-child { border-bottom: none; }
     }
@@ -259,40 +311,7 @@ const MIXED_LABEL = 'Mixt';
       flex-shrink: 0; font-size: 12px; font-weight: 700; color: var(--c-text-3);
       font-variant-numeric: tabular-nums;
     }
-    .tc-empty-ex { margin-top: 8px; font-size: 12.5px; color: var(--c-text-3); font-style: italic; }
-
-    /* ── Footer actions (delete left, primary right — app detail pattern) ── */
-    .tc-footer {
-      display: flex; align-items: center; gap: 8px;
-      margin-top: 10px; padding-top: 10px;
-      border-top: 1px solid var(--c-border-2);
-    }
-    .tc-foot-icon {
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-      width: 34px; height: 34px; border-radius: 9px;
-      border: 1.5px solid var(--c-border-2); background: var(--c-card);
-      color: var(--c-text-3); cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 17px; }
-      &.danger:hover { background: rgba(239,83,80,0.1); color: #ef5350; border-color: rgba(239,83,80,0.3); }
-    }
-    .tc-uses {
-      display: flex; align-items: center; gap: 3px;
-      font-size: 11.5px; font-weight: 600; color: var(--c-text-3);
-      .material-symbols-outlined { font-size: 14px; }
-    }
-    .tc-foot-main {
-      display: inline-flex; align-items: center; gap: 5px; margin-left: auto; flex-shrink: 0;
-      height: 34px; padding: 0 14px; border-radius: 9px;
-      border: 1.5px solid var(--c-border); background: var(--c-card);
-      color: var(--c-text-2); font-size: 13px; font-weight: 700;
-      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 16px; }
-      &:hover { border-color: var(--c-text-3); color: var(--c-text); }
-      &.brand {
-        border: none; background: var(--c-brand); color: white;
-        &:hover { background: var(--c-brand-dk); }
-      }
-    }
+    .tc-empty-ex { font-size: 12.5px; color: var(--c-text-3); font-style: italic; }
 
     /* ── Empty state (nested under "Les meves plantilles") ── */
     .empty-state {
@@ -456,6 +475,17 @@ export class TemplatesComponent {
 
   readonly editorOpen  = signal(false);
   readonly editingId   = signal<string | null>(null);
+
+  /** Ids of the template cards currently expanded. Empty by default so every
+   *  card opens collapsed — the page stays compact, like the exercises list. */
+  readonly expandedIds = signal<Set<string>>(new Set());
+
+  isExpanded(id: string): boolean { return this.expandedIds().has(id); }
+  toggleExpanded(id: string): void {
+    const next = new Set(this.expandedIds());
+    if (next.has(id)) next.delete(id); else next.add(id);
+    this.expandedIds.set(next);
+  }
 
   editorName    = '';
   editorCat: EditorCat = 'mixed';

@@ -120,6 +120,11 @@ export interface Exercise {
    *  exercises — e.g. ~1 for dominades/fons, ~0.65 for flexions. Undefined = 1.
    *  Only advanced users edit it; otherwise it comes from the catalog default. */
   bodyweightFactor?: number;
+  /** Weight increment (kg) applied by the +/- arrows in the workout editor for
+   *  this exercise. Undefined → the unit default (2.5 kg / 5 lb). Lets exercises
+   *  with finer or coarser jumps (e.g. micro-plates, fixed dumbbells) step by
+   *  their own amount instead of a fixed 2.5. */
+  weightStep?: number;
   createdAt: Date;
 }
 
