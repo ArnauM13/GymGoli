@@ -7,6 +7,19 @@ import { SupabaseService } from './supabase.service';
 import { SyncService } from './sync.service';
 import { FeelingLevel, PlannedSource, Workout, WorkoutEntry, WorkoutSet, WorkoutStatus, setMaxWeight } from '../models/workout.model';
 
+// Entries come straight from a stored JSON column, so an old/partial row can
+// carry an entry whose `sets` is missing or null. Normalising here — at the one
+// boundary every workout passes through — guarantees `entry.sets` is always an
+// array, so no render expression (`entry.sets.length`, `@for (set of …)`) or
+// derivation downstream can throw on it and blank the page.
+function normalizeEntries(raw: unknown): WorkoutEntry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((e): WorkoutEntry => ({
+    ...(e as WorkoutEntry),
+    sets: Array.isArray((e as WorkoutEntry)?.sets) ? (e as WorkoutEntry).sets : [],
+  }));
+}
+
 // ── Supabase row → typed Workout (snake_case keys) ──────────────────────────
 function toWorkout(row: Record<string, unknown>): Workout {
   return {
@@ -14,7 +27,7 @@ function toWorkout(row: Record<string, unknown>): Workout {
     date:             row['date'] as string,
     category:         (row['category'] as string | undefined) ?? undefined,
     categories:       (row['categories'] as string[] | undefined) ?? [],
-    entries:          (row['entries'] as WorkoutEntry[] | undefined) ?? [],
+    entries:          normalizeEntries(row['entries']),
     notes:            (row['notes'] as string | undefined) ?? undefined,
     feeling:          (row['feeling'] as FeelingLevel | undefined) ?? undefined,
     sourceProposalId: (row['source_proposal_id'] as string | null | undefined) ?? undefined,
@@ -32,7 +45,7 @@ function workoutFromCache(raw: Record<string, unknown>): Workout {
     date:             raw['date'] as string,
     category:         (raw['category'] as string | undefined) ?? undefined,
     categories:       (raw['categories'] as string[] | undefined) ?? [],
-    entries:          (raw['entries'] as WorkoutEntry[] | undefined) ?? [],
+    entries:          normalizeEntries(raw['entries']),
     notes:            (raw['notes'] as string | undefined) ?? undefined,
     feeling:          (raw['feeling'] as FeelingLevel | undefined) ?? undefined,
     sourceProposalId: (raw['sourceProposalId'] as string | null | undefined) ?? undefined,
