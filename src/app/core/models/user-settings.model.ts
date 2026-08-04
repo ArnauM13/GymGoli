@@ -52,6 +52,9 @@ export interface UserSettings {
    *  set-adding flow for most users. */
   supersetsEnabled: boolean;
   dropsetsEnabled:  boolean;
+  /** On by default — the live "Sèrie activa" strip that suggests the next
+   *  exercise while you train, learned from your own history and templates. */
+  nextExerciseSuggestionEnabled: boolean;
   /** Off by default — logging Reps In Reserve per set. */
   rirEnabled: boolean;
   /** Off by default — manually logging the rest taken between sets (like a note). */
@@ -93,6 +96,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   dismissedHints: [],
   supersetsEnabled: false,
   dropsetsEnabled: false,
+  nextExerciseSuggestionEnabled: true,
   rirEnabled: false,
   manualRestEnabled: false,
   difficultyScale: 'emoji',

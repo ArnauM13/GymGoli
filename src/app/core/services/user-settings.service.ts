@@ -36,6 +36,7 @@ export class UserSettingsService {
   readonly weeklyPlan          = computed(() => this._settings().weeklyPlan ?? EMPTY_WEEKLY_PLAN);
   readonly supersetsEnabled    = computed(() => this._settings().supersetsEnabled ?? false);
   readonly dropsetsEnabled     = computed(() => this._settings().dropsetsEnabled ?? false);
+  readonly nextExerciseSuggestionEnabled = computed(() => this._settings().nextExerciseSuggestionEnabled ?? true);
   readonly rirEnabled          = computed(() => this._settings().rirEnabled ?? false);
   readonly manualRestEnabled   = computed(() => this._settings().manualRestEnabled ?? false);
   readonly difficultyScale     = computed(() => (this._settings().difficultyScale ?? 'emoji') as DifficultyScale);

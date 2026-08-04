@@ -82,6 +82,7 @@ describe('TrainComponent — today-only aids never crash the workout view', () =
           weightUnit: signal<'kg' | 'lb'>('kg'), fitnessGoal: signal('strength'), loaded: signal(true),
           weeklyPlan: signal(EMPTY_WEEKLY_PLAN), settings: signal(DEFAULT_USER_SETTINGS), update: () => Promise.resolve(),
           supersetsEnabled: signal(false), dropsetsEnabled: signal(false), rirEnabled: signal(false),
+          nextExerciseSuggestionEnabled: signal(true),
           manualRestEnabled: signal(false), difficultyScale: signal('emoji'), restTimerSeconds: signal(90),
           dismissedHints: signal<string[]>([]), bodyweightKg: signal(null),
         } },

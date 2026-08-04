@@ -40,6 +40,18 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 
         <div class="setting-row setting-row--top">
           <div class="setting-info">
+            <span class="setting-label">Suggeriment del proper exercici</span>
+            <span class="setting-desc">Mentre entrenes, mostra el "Sèrie activa" amb el proper exercici recomanat segons el teu historial i plantilles.</span>
+          </div>
+          <mat-slide-toggle
+            [checked]="settingsService.nextExerciseSuggestionEnabled()"
+            (change)="toggleNextExerciseSuggestion()"
+            color="primary"
+          />
+        </div>
+
+        <div class="setting-row setting-row--top">
+          <div class="setting-info">
             <span class="setting-label">RIR (Reps In Reserve)</span>
             <span class="setting-desc">Permet registrar quantes repeticions et quedaven a cada sèrie.</span>
           </div>
@@ -129,6 +141,10 @@ export class SettingsAdvancedComponent {
 
   toggleDropsets(): void {
     this.settingsService.update({ dropsetsEnabled: !this.settingsService.dropsetsEnabled() });
+  }
+
+  toggleNextExerciseSuggestion(): void {
+    this.settingsService.update({ nextExerciseSuggestionEnabled: !this.settingsService.nextExerciseSuggestionEnabled() });
   }
 
   toggleRir(): void {
