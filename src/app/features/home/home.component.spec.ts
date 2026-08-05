@@ -37,6 +37,7 @@ describe('HomeComponent', () => {
 
     const mockWorkoutService = {
       isLoading:              signal(false),
+      workouts:               doneWorkoutsSignal,
       doneWorkouts:           doneWorkoutsSignal,
       getDoneWorkoutsForDate: jasmine.createSpy().and.returnValue([]),
       getPlannedForDate:      jasmine.createSpy().and.returnValue([]),
@@ -46,6 +47,7 @@ describe('HomeComponent', () => {
     const mockSportService = {
       sportsLoaded:                  signal(true),
       sessions:                      sessionsSignal,
+      sports:                        signal<unknown[]>([]),
       getSportSessionsForDate:       jasmine.createSpy().and.returnValue([]),
       getPlannedSportSessionsForDate: jasmine.createSpy().and.returnValue([]),
       ensureMonthLoaded:              jasmine.createSpy(),
@@ -124,6 +126,26 @@ describe('HomeComponent', () => {
       const entry = component.previewFeedEntry();
       expect(entry?.date).toBe('2020-05-01');
       expect(entry?.workouts.length).toBe(1);
+    });
+
+    it('reflects workouts that finish loading after render, without a date click', () => {
+      // Reproduces the reported bug: on cold start the feed/"Avui" card must
+      // fill in the moment the month's workouts arrive — in lock-step with the
+      // calendar — not stay empty until the user taps a day. The preview must
+      // therefore react to the raw workouts() signal, not only to a change in
+      // the selected date.
+      const ws = TestBed.inject(WorkoutService);
+      (ws.getDoneWorkoutsForDate as jasmine.Spy).and.callFake((date: string) =>
+        doneWorkoutsSignal().filter(w => w.date === date));
+
+      expect(component.previewFeedEntry()).withContext('empty before load').toBeNull();
+
+      // Data arrives asynchronously — NO date selected.
+      doneWorkoutsSignal.set([makeWorkout({ id: 'late', date: TODAY })]);
+
+      const entry = component.previewFeedEntry();
+      expect(entry).withContext('preview should reflect the loaded workout').not.toBeNull();
+      expect(entry?.workouts.some(w => w.id === 'late')).toBeTrue();
     });
 
     it('includes planned workouts for the selected date so they can be managed', () => {
