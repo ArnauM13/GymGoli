@@ -149,6 +149,73 @@ export class ExerciseService {
     return DEFAULT_EXERCISES.filter(e => !have.has(e.name.trim().toLowerCase())).length;
   });
 
+  /** Catalog defaults indexed by lower-cased name — the lookup both the
+   *  "missing defaults" and the "backfill descriptions" actions share. */
+  private readonly _catalogByName = new Map(
+    DEFAULT_EXERCISES.map(e => [e.name.trim().toLowerCase(), e] as const),
+  );
+
+  /** Only the fields a catalog match can fill in on a user exercise that has
+   *  them empty — never overwrites anything the user has already set. Returns
+   *  null when there's nothing to fill. */
+  private _backfillPatch(
+    e: Exercise,
+    def: Omit<Exercise, 'id' | 'createdAt'>,
+  ): Partial<Omit<Exercise, 'id' | 'createdAt'>> | null {
+    const patch: Partial<Omit<Exercise, 'id' | 'createdAt'>> = {};
+    if (!e.description?.trim() && def.description) patch.description = def.description;
+    if (!e.muscles?.length && def.muscles?.length) patch.muscles = [...def.muscles];
+    if (!e.subcategory && def.subcategory) patch.subcategory = def.subcategory;
+    if (!e.setsRange && def.setsRange) patch.setsRange = [...def.setsRange] as [number, number];
+    if (!e.repsRange && def.repsRange) patch.repsRange = [...def.repsRange] as [number, number];
+    return Object.keys(patch).length ? patch : null;
+  }
+
+  /** How many of the user's exercises share a name with a catalog default and
+   *  still have at least one empty field the catalog could fill in. */
+  readonly backfillableCount = computed(() =>
+    this._exercises().reduce((n, e) => {
+      const def = this._catalogByName.get(e.name.trim().toLowerCase());
+      return def && this._backfillPatch(e, def) ? n + 1 : n;
+    }, 0),
+  );
+
+  /** Fills the empty description / muscles / subgroup / sets·reps of the user's
+   *  exercises from the matching catalog default, leaving every field they've
+   *  already filled untouched. Returns how many exercises were updated. */
+  async backfillFromCatalog(): Promise<number> {
+    const uid = this.auth.uid();
+    if (!uid) throw new Error('Not authenticated');
+
+    const next = [...this._exercises()];
+    let updated = 0;
+    for (let i = 0; i < next.length; i++) {
+      const e = next[i];
+      const def = this._catalogByName.get(e.name.trim().toLowerCase());
+      if (!def) continue;
+      const patch = this._backfillPatch(e, def);
+      if (!patch) continue;
+
+      const merged = { ...e, ...patch };
+      const { error } = await this.supabase
+        .from('exercises')
+        .update(this._toRow(uid, merged))
+        .eq('id', e.id)
+        .eq('user_id', uid);
+      if (error) throw error;
+
+      next[i] = merged;
+      updated++;
+    }
+
+    if (updated > 0) {
+      next.sort((a, b) => a.name.localeCompare(b.name));
+      this._exercises.set(next);
+      this._writeExercisesToStorage(uid, next);
+    }
+    return updated;
+  }
+
   /** Adds the catalog defaults the user doesn't already have, without touching
    *  or duplicating their own exercises. Returns how many were added. */
   async addMissingDefaults(): Promise<number> {

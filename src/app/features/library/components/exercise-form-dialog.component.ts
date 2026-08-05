@@ -5,6 +5,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
 import {
   ALL_SUBCATEGORY_OPTIONS,
+  DEFAULT_EXERCISES,
   Exercise,
   ExerciseCategory,
   LoadType,
@@ -43,7 +44,8 @@ const MUSCLE_GROUPS: { label: string; values: string[] }[] = [
           <div class="field">
             <label class="field-label" for="ex-name">Nom de l'exercici</label>
             <input id="ex-name" class="field-input" type="text" formControlName="name"
-                   placeholder="Ex: Press banca" autocomplete="off" maxlength="50">
+                   placeholder="Ex: Press banca" autocomplete="off" maxlength="50"
+                   (input)="currentName.set($any($event.target).value)">
             @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
               <span class="field-error">El nom és obligatori</span>
             }
@@ -218,6 +220,12 @@ const MUSCLE_GROUPS: { label: string; values: string[] }[] = [
             </label>
             <textarea id="ex-desc" class="field-input field-textarea" rows="3" formControlName="description"
                       placeholder="Com fer l'exercici, consells de tècnica..."></textarea>
+            @if (catalogDescription()) {
+              <button type="button" class="autofill-btn" (click)="applyCatalogDescription()">
+                <span class="material-symbols-outlined">auto_awesome</span>
+                Descripció automàtica
+              </button>
+            }
           </div>
 
           <!-- Notes -->
@@ -296,6 +304,18 @@ const MUSCLE_GROUPS: { label: string; values: string[] }[] = [
       &:focus { border-color: var(--c-brand); }
     }
     .field-textarea { resize: vertical; min-height: 60px; line-height: 1.4; }
+
+    /* ── Descripció automàtica ── */
+    .autofill-btn {
+      align-self: flex-start;
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 6px 12px; border-radius: 16px;
+      border: 1.5px dashed var(--c-brand); background: transparent;
+      color: var(--c-brand); font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
+      .material-symbols-outlined { font-size: 15px; }
+      &:hover { background: color-mix(in srgb, var(--c-brand) 8%, var(--c-card)); border-style: solid; }
+    }
 
     /* ── Categoria ── */
     .cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -407,6 +427,23 @@ export class ExerciseFormDialogComponent {
 
   readonly muscleGroups = MUSCLE_GROUPS;
   readonly selectedMuscles = signal<string[]>([...(this.data.exercise?.muscles ?? [])]);
+
+  /** Catalog defaults by lower-cased name, for the "descripció automàtica"
+   *  helper that suggests a technique write-up when the name matches. */
+  private readonly _catalogByName = new Map(
+    DEFAULT_EXERCISES.map(e => [e.name.trim().toLowerCase(), e] as const),
+  );
+  /** Tracks the name input so the autofill button reacts as the user types. */
+  readonly currentName = signal(this.data.exercise?.name ?? '');
+  /** The catalog description for the current name, if any (empty → no button). */
+  readonly catalogDescription = computed(
+    () => this._catalogByName.get(this.currentName().trim().toLowerCase())?.description ?? '',
+  );
+
+  applyCatalogDescription(): void {
+    const desc = this.catalogDescription();
+    if (desc) this.form.patchValue({ description: desc });
+  }
 
   private readonly _setsInit = this.data.exercise?.setsRange;
   private readonly _repsInit = this.data.exercise?.repsRange;

@@ -500,6 +500,19 @@ import {
           <div class="setting-divider"></div>
         }
 
+        @if (catalogReady() && exerciseService.backfillableCount() > 0) {
+          <button type="button" class="nav-row" (click)="backfillDescriptions()" [disabled]="fillingDescriptions()">
+            <span class="material-symbols-outlined nav-row-icon">edit_note</span>
+            <div class="setting-info">
+              <span class="setting-label">Omplir descripcions que falten</span>
+              <span class="setting-desc">Completa la descripció, els músculs, el grup i la guia de sèries dels teus exercicis que coincideixen de nom amb el catàleg i tenen camps buits. No sobreescriu res del que ja has escrit.</span>
+            </div>
+            <span class="material-symbols-outlined nav-row-arrow">add</span>
+          </button>
+
+          <div class="setting-divider"></div>
+        }
+
         <div class="setting-row">
           <div class="setting-info">
             <span class="setting-label">Exportar les meves dades</span>
@@ -856,7 +869,7 @@ export class SettingsComponent {
   readonly settingsService = inject(UserSettingsService);
   readonly metricsService  = inject(FitnessMetricsService);
   readonly trainerService  = inject(TrainerService);
-  private exerciseService  = inject(ExerciseService);
+  readonly exerciseService = inject(ExerciseService);
   private sportService     = inject(SportService);
   private typeService      = inject(TrainingTypeService);
   private workoutService   = inject(WorkoutService);
@@ -880,6 +893,25 @@ export class SettingsComponent {
     this.exerciseService.missingDefaultCount() + this.sportService.missingDefaultCount()
     + this.typeService.missingDefaultCount());
   readonly addingCatalog = signal(false);
+  readonly fillingDescriptions = signal(false);
+
+  /** Fills the empty descriptions / details of the user's own exercises from
+   *  the matching catalog default. Never overwrites what they've written. */
+  async backfillDescriptions(): Promise<void> {
+    if (this.fillingDescriptions()) return;
+    this.fillingDescriptions.set(true);
+    try {
+      await this.exerciseService.ensureLoaded();
+      const n = await this.exerciseService.backfillFromCatalog();
+      this.feedback.success(
+        n > 0 ? `Descripcions omplertes: ${n} exercicis` : 'No hi havia res per omplir',
+      );
+    } catch {
+      this.feedback.error('No s\'han pogut omplir les descripcions');
+    } finally {
+      this.fillingDescriptions.set(false);
+    }
+  }
 
   /** Adds the catalog default exercises + sports the user is missing, keeping
    *  all their own. For existing users who predate newly-shipped defaults. */

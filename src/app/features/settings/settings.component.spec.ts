@@ -122,8 +122,10 @@ describe('SettingsComponent', () => {
           provide: ExerciseService,
           useValue: {
             exercises: signal([]), isLoaded: signal(true), missingDefaultCount: signal(0),
+            backfillableCount: signal(0),
             ensureLoaded: jasmine.createSpy().and.resolveTo(undefined),
             addMissingDefaults: jasmine.createSpy().and.resolveTo(0),
+            backfillFromCatalog: jasmine.createSpy().and.resolveTo(0),
           },
         },
         {
