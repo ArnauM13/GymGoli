@@ -355,6 +355,12 @@ export class HomeComponent implements OnDestroy {
 
   readonly previewFeedEntry = computed((): DayFeedEntry | null => {
     const date    = this.effectiveDate();
+    // Depend on the raw data signals directly (same as the calendar) so this
+    // recomputes the moment workouts/sports finish loading — not only when the
+    // selected day changes. The per-date helpers below read memoised indexes
+    // (byDate / _sessionsByDate); touching the source signals here keeps the
+    // feed and the "Avui" card in lock-step with the calendar on first load.
+    this.workoutService.workouts(); this.sportService.sessions(); this.sportService.sports();
     // Planned workouts belong to whichever day they sit on, not just today —
     // selecting a day on the calendar should surface its plan so it can be
     // started, edited or removed straight from here.
@@ -428,6 +434,10 @@ export class HomeComponent implements OnDestroy {
 
   readonly feedDays = computed(() => {
     const monthsBack = this.feedMonthsBack();
+    // Establish reactivity on the underlying data (mirrors the calendar) so the
+    // history feed fills in as soon as a month's workouts/sports load, rather
+    // than staying empty until the user interacts with a day.
+    this.workoutService.workouts(); this.sportService.sessions(); this.sportService.sports();
     const today      = new Date();
     const earliest   = new Date(today.getFullYear(), today.getMonth() - monthsBack, 1);
     const days: DayFeedEntry[] = [];
