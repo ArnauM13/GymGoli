@@ -229,18 +229,6 @@ import {
           <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
         </a>
 
-        @if (catalogReady() && missingCatalogCount() > 0 && settingsService.catalogSyncedVersion() < CATALOG_VERSION) {
-          <div class="setting-divider"></div>
-          <button type="button" class="nav-row" (click)="addCatalogDefaults()" [disabled]="addingCatalog()">
-            <span class="material-symbols-outlined nav-row-icon">library_add</span>
-            <div class="setting-info">
-              <span class="setting-label">Actualitzar el catàleg de sèrie</span>
-              <span class="setting-desc">Afegeix els exercicis, esports i tipus d'entrenament de sèrie que et falten i posa al dia les seves mètriques (p. ex. els estils de Yoga). No toca els que has creat tu.</span>
-            </div>
-            <span class="material-symbols-outlined nav-row-arrow">add</span>
-          </button>
-        }
-
         <div class="setting-divider"></div>
 
         <a class="nav-row" routerLink="/train/planner">
@@ -498,6 +486,19 @@ import {
       <!-- ── Bloc 4: Compte ── -->
       <div class="section section--danger">
         <h2 class="section-title">Compte</h2>
+
+        @if (catalogReady() && missingCatalogCount() > 0 && settingsService.catalogSyncedVersion() < CATALOG_VERSION) {
+          <button type="button" class="nav-row" (click)="addCatalogDefaults()" [disabled]="addingCatalog()">
+            <span class="material-symbols-outlined nav-row-icon">library_add</span>
+            <div class="setting-info">
+              <span class="setting-label">Actualitzar el catàleg de sèrie</span>
+              <span class="setting-desc">Afegeix els exercicis, esports i tipus d'entrenament de sèrie que et falten i posa al dia les seves mètriques (p. ex. els estils de Yoga). No toca els que has creat tu.</span>
+            </div>
+            <span class="material-symbols-outlined nav-row-arrow">add</span>
+          </button>
+
+          <div class="setting-divider"></div>
+        }
 
         <div class="setting-row">
           <div class="setting-info">
