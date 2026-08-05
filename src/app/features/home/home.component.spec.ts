@@ -178,13 +178,26 @@ describe('HomeComponent', () => {
   // ── historyFeedDays() ────────────────────────────────────────────────────
 
   describe('historyFeedDays()', () => {
-    it('includes today so the feed is never empty when the only activity is today', async () => {
+    it('excludes today, which already lives in the "Avui" card above', async () => {
       const getDoneWorkoutsForDate = TestBed.inject(WorkoutService).getDoneWorkoutsForDate as jasmine.Spy;
       getDoneWorkoutsForDate.and.callFake((date: string) => date === TODAY ? [makeWorkout({ id: 'today1' })] : []);
       doneWorkoutsSignal.set([makeWorkout({ id: 'today1' })]);
       await component.loadMoreFeedMonths();
 
-      expect(component.historyFeedDays().some(d => d.date === TODAY)).toBeTrue();
+      // Today's workout must NOT appear in the history log…
+      expect(component.historyFeedDays().some(d => d.date === TODAY)).toBeFalse();
+      // …but it must still surface in real time in the "Avui" preview card.
+      expect(component.previewFeedEntry()?.workouts.some(w => w.id === 'today1')).toBeTrue();
+    });
+
+    it('keeps past days in the history log', async () => {
+      const yesterday = new Date(Date.now() - 86_400_000).toISOString().split('T')[0];
+      const getDoneWorkoutsForDate = TestBed.inject(WorkoutService).getDoneWorkoutsForDate as jasmine.Spy;
+      getDoneWorkoutsForDate.and.callFake((date: string) => date === yesterday ? [makeWorkout({ id: 'past1', date: yesterday })] : []);
+      doneWorkoutsSignal.set([makeWorkout({ id: 'past1', date: yesterday })]);
+      await component.loadMoreFeedMonths();
+
+      expect(component.historyFeedDays().some(d => d.date === yesterday)).toBeTrue();
     });
   });
 

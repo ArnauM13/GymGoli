@@ -455,13 +455,14 @@ export class HomeComponent implements OnDestroy {
     return days;
   });
 
-  /** The full activity timeline shown under "Historial". The prominent
-   *  "Avui / dia seleccionat" card above repeats whichever day is in focus,
-   *  but we deliberately DON'T strip that day from the list — otherwise the
-   *  feed goes blank whenever the only (or most recent) activity is today,
-   *  which reads as "nothing loaded". Keeping the complete log means the feed
-   *  always reflects your activity, today included. */
-  readonly historyFeedDays = computed(() => this.feedDays());
+  /** The activity timeline shown under "Historial". Today is deliberately
+   *  stripped out here: it already lives in the prominent "Avui / dia
+   *  seleccionat" card above (which updates in real time as the day's
+   *  workouts load), so repeating it in the log below would be redundant.
+   *  The history feed is therefore purely a record of *past* activity. */
+  readonly historyFeedDays = computed(() =>
+    this.feedDays().filter(day => day.date !== TODAY())
+  );
 
   async loadMoreFeedMonths(): Promise<void> {
     if (this.feedLoadingMore()) return;
