@@ -136,17 +136,24 @@ type Scope = 'all' | '1m' | '3m' | '6m' | '1y' | 'custom';
       background: var(--c-border-2); border-radius: 10px; padding: 2px 9px;
     }
 
-    .dd-custom { display: flex; gap: 10px; margin-top: 10px; }
-    .dd-field { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+    /* The custom range sits in its own tinted, rounded well so the two date
+       fields have room to breathe instead of butting up against the radio
+       list above and the summary below. */
+    .dd-custom {
+      display: flex; gap: 14px; margin-top: 12px;
+      padding: 14px; border-radius: 12px;
+      background: var(--c-subtle); border: 1px solid var(--c-border-2);
+    }
+    .dd-field { flex: 1; display: flex; flex-direction: column; gap: 7px; }
     .dd-field-lbl {
       font-size: 11px; font-weight: 600; color: var(--c-text-2);
       text-transform: uppercase; letter-spacing: 0.04em;
     }
     .dd-field input {
-      width: 100%; box-sizing: border-box; padding: 9px 10px;
+      width: 100%; box-sizing: border-box; padding: 11px 12px;
       border: 1.5px solid var(--c-border); border-radius: 10px;
-      background: var(--c-subtle); color: var(--c-text);
-      font-size: 13px; font-family: inherit;
+      background: var(--c-card); color: var(--c-text);
+      font-size: 14px; font-family: inherit;
       &:focus { outline: none; border-color: var(--c-brand); }
     }
 

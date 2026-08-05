@@ -147,7 +147,9 @@ import { FilterBarComponent } from '../../shared/components/filter-bar/filter-ba
 
   `,
   styles: [`
-    .page { padding: 0 0 16px; }
+    /* Generous bottom safe area so the last exercise clears the floating nav
+       and stays fully tappable (was 16px, which left it under the pill). */
+    .page { padding: 0 0 84px; }
 
     /* ── Summary card ─────────────────────────────────────── */
     .summary-card {
@@ -189,7 +191,7 @@ import { FilterBarComponent } from '../../shared/components/filter-bar/filter-ba
 
     /* ── Exercise list ────────────────────────────────────── */
     .pr-section {
-      margin: 16px 16px 0; background: var(--c-card);
+      margin: 18px 16px 0; background: var(--c-card);
       border-radius: 14px; box-shadow: 0 2px 8px var(--c-shadow);
       overflow: hidden;
     }
@@ -203,7 +205,7 @@ import { FilterBarComponent } from '../../shared/components/filter-bar/filter-ba
     .pr-item:last-child:has(.expanded) .pr-row { border-bottom: 1px solid var(--c-border-2); }
     .pr-row {
       width: 100%; display: flex; align-items: center; gap: 12px;
-      padding: 13px 14px 13px 0; background: none; border: none;
+      padding: 15px 14px 15px 0; background: none; border: none;
       border-bottom: 1px solid var(--c-border-2); cursor: pointer;
       text-align: left; color: var(--c-text);
       transition: background 0.15s;
