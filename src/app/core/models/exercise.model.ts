@@ -232,6 +232,12 @@ export const DEFAULT_EXERCISES: Omit<Exercise, 'id' | 'createdAt'>[] = [
     setsRange: [3, 4], repsRange: [8, 12],
   },
   {
+    name: 'Curl de femorals tumbat', category: 'legs', subcategory: 'hamstrings',
+    muscles: ['isquiotibials', 'bessons'],
+    description: "Tombat de boca terrosa a la màquina, ancora els turmells sota el corró. Flexiona els genolls pujant els talons cap als glutis contraient els isquiotibials i baixa de forma controlada sense deixar caure el pes. Aïlla els femorals i, en menor mesura, els bessons; les puntes cap a tu (dorsiflexió) carreguen més els femorals.",
+    setsRange: [3, 4], repsRange: [10, 15],
+  },
+  {
     name: 'Hip thrust', category: 'legs', subcategory: 'glutes',
     muscles: ['glutis', 'isquiotibials'],
     description: "Recolza les espatlles al banc amb la barra als malucs. Empenta els malucs cap amunt fins a posició horitzontal contraient els glutis. El millor exercici aïllat per a glutis.",
