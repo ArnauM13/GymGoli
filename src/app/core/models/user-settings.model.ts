@@ -77,7 +77,7 @@ export interface UserSettings {
 
 /** Bump whenever DEFAULT_EXERCISES or DEFAULT_SPORTS change in a way existing
  *  users should be offered — it re-arms the "Actualitzar el catàleg" prompt. */
-export const CATALOG_VERSION = 1;
+export const CATALOG_VERSION = 2;
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
   metricsEnabled: false,
