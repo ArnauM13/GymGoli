@@ -659,6 +659,43 @@ export class WorkoutService {
     if (error) throw error;
   }
 
+  /**
+   * Removes a single exercise's logged data across all its sessions, optionally
+   * limited to an inclusive date range (`from`/`to`, 'YYYY-MM-DD'). A session
+   * left with no remaining exercises is deleted entirely; otherwise just that
+   * exercise's entry is stripped and the session's categories recomputed.
+   *
+   * Returns how many sessions were touched and how many of those were removed
+   * because they became empty — so callers can give precise feedback.
+   */
+  async deleteExerciseData(
+    exerciseId: string,
+    range?: { from?: string; to?: string },
+  ): Promise<{ sessions: number; removedWorkouts: number }> {
+    // Make sure the whole history for this exercise is in the cache first —
+    // otherwise a range like "everything" would only touch the loaded months.
+    await this.loadWorkoutsForExercise(exerciseId);
+
+    const affected = this.doneWorkouts().filter(w =>
+      w.entries.some(e => e.exerciseId === exerciseId) &&
+      (!range?.from || w.date >= range.from) &&
+      (!range?.to   || w.date <= range.to)
+    );
+
+    let removedWorkouts = 0;
+    for (const w of affected) {
+      const entries = w.entries.filter(e => e.exerciseId !== exerciseId);
+      if (entries.length === 0) {
+        await this.deleteWorkout(w.id);
+        removedWorkouts++;
+      } else {
+        const categories = this._computeCategories(entries, w.category);
+        await this._updateWorkout(w.id, { entries, categories });
+      }
+    }
+    return { sessions: affected.length, removedWorkouts };
+  }
+
   // ── Private helpers ───────────────────────────────────────────────────────
   private _uid(): string {
     const uid = this.auth.uid();

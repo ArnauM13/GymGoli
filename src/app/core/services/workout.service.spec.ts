@@ -10,7 +10,7 @@ import { SyncService } from './sync.service';
 interface QueryChain {
   select: jasmine.Spy; eq: jasmine.Spy; neq: jasmine.Spy; order: jasmine.Spy;
   contains: jasmine.Spy; ilike: jasmine.Spy; filter: jasmine.Spy; range: jasmine.Spy;
-  gte: jasmine.Spy; lte: jasmine.Spy;
+  gte: jasmine.Spy; lte: jasmine.Spy; delete: jasmine.Spy;
   then: (resolve: (v: { data?: unknown; count?: number; error?: unknown }) => void) => void;
 }
 
@@ -19,7 +19,7 @@ interface QueryChain {
  *  real supabase-js query when awaited. */
 function makeQueryChain(result: { data?: unknown; count?: number; error?: unknown }): QueryChain {
   const chain = {} as QueryChain;
-  for (const method of ['select', 'eq', 'neq', 'order', 'contains', 'ilike', 'filter', 'range', 'gte', 'lte'] as const) {
+  for (const method of ['select', 'eq', 'neq', 'order', 'contains', 'ilike', 'filter', 'range', 'gte', 'lte', 'delete'] as const) {
     chain[method] = jasmine.createSpy(method).and.callFake(() => chain);
   }
   chain.then = (resolve) => resolve(result);
@@ -252,6 +252,62 @@ describe('WorkoutService', () => {
       await service.addSetsToEntry(id, 'a', [{ weight: 40, reps: 10, warmup: true }]);
 
       expect(service.getLastSessionInfo('a')?.maxWeight).toBe(40);
+    });
+  });
+
+  describe('deleteExerciseData()', () => {
+    // Seed 3 sessions on different dates, each logging exercise 'a' alongside a
+    // second exercise 'b' — so removing 'a' never empties a workout and we stay
+    // on the update path (no supabase delete needed in these stubs).
+    async function seedThreeSessions(): Promise<void> {
+      for (const date of ['2024-01-10', '2024-03-10', '2024-06-10']) {
+        const id = await service.createWorkoutForDate(date);
+        await service.addExerciseToWorkout(id, { exerciseId: 'a', exerciseName: 'A', sets: [] });
+        await service.addExerciseToWorkout(id, { exerciseId: 'b', exerciseName: 'B', sets: [] });
+        await service.addSetsToEntry(id, 'a', [{ weight: 40, reps: 8 }]);
+      }
+    }
+
+    it('removes the exercise from every session when no range is given', async () => {
+      await seedThreeSessions();
+
+      const res = await service.deleteExerciseData('a');
+
+      expect(res.sessions).toBe(3);
+      expect(service.getWorkoutsForExercise('a').length).toBe(0);
+      // The co-logged exercise stays untouched in all 3 sessions.
+      expect(service.getWorkoutsForExercise('b').length).toBe(3);
+    });
+
+    it('only removes sessions inside the given date range', async () => {
+      await seedThreeSessions();
+
+      const res = await service.deleteExerciseData('a', { from: '2024-03-01' });
+
+      expect(res.sessions).toBe(2); // March + June, January kept
+      const remaining = service.getWorkoutsForExercise('a').map(w => w.date);
+      expect(remaining).toEqual(['2024-01-10']);
+    });
+
+    it('respects both range bounds', async () => {
+      await seedThreeSessions();
+
+      const res = await service.deleteExerciseData('a', { from: '2024-02-01', to: '2024-04-01' });
+
+      expect(res.sessions).toBe(1); // only March
+      const remaining = service.getWorkoutsForExercise('a').map(w => w.date).sort();
+      expect(remaining).toEqual(['2024-01-10', '2024-06-10']);
+    });
+
+    it('deletes a session that is left with no exercises', async () => {
+      const id = await service.createWorkoutForDate('2024-03-06');
+      await service.addExerciseToWorkout(id, { exerciseId: 'a', exerciseName: 'A', sets: [] });
+
+      const res = await service.deleteExerciseData('a');
+
+      expect(res.sessions).toBe(1);
+      expect(res.removedWorkouts).toBe(1);
+      expect(service.getWorkoutForDate('2024-03-06')).toBeNull();
     });
   });
 });
