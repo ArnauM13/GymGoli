@@ -41,8 +41,15 @@ import { formatFeeling } from '../../utils/workout-card.utils';
             } @else if (totalReps() > 0) {
               <span class="eec-max">{{ totalReps() }}<small>r</small></span>
             }
-            @if (workingSetsCount() > 0 && showSetsBadge()) {
-              <span class="eec-sets-badge">{{ workingSetsCount() }} sèr</span>
+            @if ((workingSetsCount() > 0 || warmupSetsCount() > 0) && showSetsBadge()) {
+              <span class="eec-sets-badge">
+                {{ workingSetsCount() }} sèr
+                @if (warmupSetsCount() > 0) {
+                  <span class="eec-sets-badge__warmup">
+                    +{{ warmupSetsCount() }}<span class="material-symbols-outlined">local_fire_department</span>
+                  </span>
+                }
+              </span>
             }
             @if (prBadge()) {
               <span class="eec-pr">PR</span>
@@ -189,11 +196,19 @@ import { formatFeeling } from '../../utils/workout-card.utils';
     }
 
     .eec-sets-badge {
+      display: inline-flex; align-items: center; gap: 4px;
       font-size: 11px; font-weight: 700; color: var(--c-text-2);
       padding: 3px 8px; border-radius: 10px; flex-shrink: 0;
       background: color-mix(in srgb, var(--cat) 10%, var(--c-card));
       border: 1px solid color-mix(in srgb, var(--cat) 22%, var(--c-border-2));
       line-height: 1.3;
+    }
+    .eec-sets-badge__warmup {
+      display: inline-flex; align-items: center; gap: 1px;
+      color: #ff9800;
+      .material-symbols-outlined {
+        font-size: 13px; font-variation-settings: 'FILL' 1, 'wght' 400;
+      }
     }
 
     .eec-pr {
@@ -282,6 +297,7 @@ export class ExerciseEntryCardComponent {
 
   readonly totalReps = computed(() => this.entry().sets.reduce((s, set) => set.warmup ? s : s + set.reps, 0));
   readonly workingSetsCount = computed(() => this.entry().sets.filter(set => !set.warmup).length);
+  readonly warmupSetsCount = computed(() => this.entry().sets.filter(set => set.warmup).length);
 
   emoji(l: FeelingLevel): string { return formatFeeling(l, this.difficultyScale()); }
   dispW(v: number): number { return kgToDisplay(v, this.unit() as 'kg' | 'lb'); }
