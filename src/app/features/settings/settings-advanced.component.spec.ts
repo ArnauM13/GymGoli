@@ -21,6 +21,7 @@ describe('SettingsAdvancedComponent', () => {
           useValue: {
             supersetsEnabled: signal(false),
             dropsetsEnabled:  signal(false),
+            nextExerciseSuggestionEnabled: signal(true),
             rirEnabled:       signal(false),
             manualRestEnabled: signal(false),
             difficultyScale:  signal('emoji'),
@@ -53,6 +54,13 @@ describe('SettingsAdvancedComponent', () => {
     it('enables dropsets when currently disabled', () => {
       component.toggleDropsets();
       expect(mockUpdate).toHaveBeenCalledWith({ dropsetsEnabled: true });
+    });
+  });
+
+  describe('toggleNextExerciseSuggestion()', () => {
+    it('disables the next-exercise suggestion when currently enabled', () => {
+      component.toggleNextExerciseSuggestion();
+      expect(mockUpdate).toHaveBeenCalledWith({ nextExerciseSuggestionEnabled: false });
     });
   });
 

@@ -1399,6 +1399,7 @@ export class TrainComponent implements OnDestroy {
     // Read the reactive deps up-front so the computed still re-runs on their
     // changes even if the body below bails out early or throws.
     const now = this._now();
+    const enabled = this.settingsService.nextExerciseSuggestionEnabled();
     const busy = this.reorderMode() || this.groupingMode();
     // The whole derivation is wrapped: this is the ONLY suggestion path that
     // runs for today's active workout, so any throw here (a malformed entry, an
@@ -1407,6 +1408,9 @@ export class TrainComponent implements OnDestroy {
     // change-detection pass, blanking the page and spamming the error toast. A
     // live-training nicety must never do that: on any failure, drop the hint.
     try {
+      // The user can turn the live next-exercise hint off in Advanced settings
+      // (on by default).
+      if (!enabled) return [];
       // …only while it's still active: once it's been idle for a couple of hours
       // (last set/edit), assume the session is over and stay quiet.
       if (w.updatedAt && now - w.updatedAt.getTime() > STALE_SUGGESTION_MS) return [];
