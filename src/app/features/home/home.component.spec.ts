@@ -178,12 +178,13 @@ describe('HomeComponent', () => {
   // ── historyFeedDays() ────────────────────────────────────────────────────
 
   describe('historyFeedDays()', () => {
-    it('excludes whichever day is shown in the "Avui" preview', async () => {
+    it('includes today so the feed is never empty when the only activity is today', async () => {
       const getDoneWorkoutsForDate = TestBed.inject(WorkoutService).getDoneWorkoutsForDate as jasmine.Spy;
       getDoneWorkoutsForDate.and.callFake((date: string) => date === TODAY ? [makeWorkout({ id: 'today1' })] : []);
+      doneWorkoutsSignal.set([makeWorkout({ id: 'today1' })]);
       await component.loadMoreFeedMonths();
 
-      expect(component.historyFeedDays().every(d => d.date !== TODAY)).toBeTrue();
+      expect(component.historyFeedDays().some(d => d.date === TODAY)).toBeTrue();
     });
   });
 
