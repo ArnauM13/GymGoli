@@ -171,6 +171,11 @@ const PAGE_SIZE = 20;
                       <span class="wh-stat">
                         <span class="material-symbols-outlined">repeat</span>
                         <strong>{{ totalSets(workout) }}</strong> sèr
+                        @if (totalWarmupSets(workout); as warm) {
+                          <span class="wh-stat-warmup">
+                            +{{ warm }}<span class="material-symbols-outlined">local_fire_department</span>
+                          </span>
+                        }
                       </span>
                       @if (volumeFmt(workout); as vol) {
                         <span class="wh-stat-sep">·</span>
@@ -209,8 +214,14 @@ const PAGE_SIZE = 20;
                         @if (entry.sets.length > 0) {
                           <div class="entry-sets-col">
                             @for (set of entry.sets; track $index) {
-                              <div class="entry-set-line" [class.entry-set-line--max]="isMaxSet(entry, set)">
-                                <span class="esl-num">{{ $index + 1 }}</span>
+                              <div class="entry-set-line" [class.entry-set-line--max]="isMaxSet(entry, set)"
+                                   [class.entry-set-line--warmup]="set.warmup">
+                                @if (set.warmup) {
+                                  <span class="esl-num esl-num--warmup material-symbols-outlined"
+                                        title="Sèrie d'escalfament">local_fire_department</span>
+                                } @else {
+                                  <span class="esl-num">{{ workingSetNumber(entry, $index) }}</span>
+                                }
                                 <span class="esl-weight-group">
                                   @if (set.weightLeft != null) {
                                     <span class="esl-weight">E {{ dispW(set.weightLeft) }}<small>{{ unit() }}</small></span>
@@ -255,7 +266,7 @@ const PAGE_SIZE = 20;
                     <div class="workout-volume-footer">
                       <span>{{ workout.entries.length }} exercici{{ workout.entries.length !== 1 ? 's' : '' }}</span>
                       <span class="wvf-sep">·</span>
-                      <span>{{ totalSets(workout) }} sèries</span>
+                      <span>{{ totalSets(workout) }} sèries@if (totalWarmupSets(workout); as warm) { <span class="wvf-warmup">+{{ warm }} esc</span>}</span>
                       <span class="wvf-sep">·</span>
                       <span>{{ dispW(totalVolume(workout)) }} {{ unit() }} volum</span>
                     </div>
@@ -646,6 +657,10 @@ const PAGE_SIZE = 20;
     }
     .wh-stat-sep { color: var(--c-border); }
     .wh-stat--vol strong { color: var(--wc, var(--c-brand)); }
+    .wh-stat-warmup {
+      display: inline-flex; align-items: center; gap: 1px; margin-left: 1px; color: #ff9800;
+      .material-symbols-outlined { font-size: 13px; color: #ff9800; font-variation-settings: 'FILL' 1, 'wght' 400; }
+    }
 
     .wh-chevron {
       color: var(--c-text-3); font-size: 22px; flex-shrink: 0;
@@ -692,7 +707,11 @@ const PAGE_SIZE = 20;
     .entry-set-line--max {
       background: color-mix(in srgb, var(--ec, var(--c-brand)) 8%, transparent);
     }
+    .entry-set-line--warmup { opacity: 0.7; }
     .esl-num { font-size: 10px; font-weight: 700; color: var(--c-text-3); text-align: right; }
+    .esl-num--warmup {
+      font-size: 13px; color: #ff9800; font-variation-settings: 'FILL' 1, 'wght' 400;
+    }
     .esl-weight {
       font-size: 13px; font-weight: 700; color: var(--c-text);
       small { font-size: 9px; font-weight: 400; color: var(--c-text-3); margin-left: 1px; }
@@ -731,6 +750,7 @@ const PAGE_SIZE = 20;
       padding-top: 2px;
       font-size: 11px; font-weight: 600; color: var(--c-text-3);
       .wvf-sep { color: var(--c-border-2); }
+      .wvf-warmup { color: #ff9800; margin-left: 3px; }
     }
 
     /* ── Infinite scroll ── */
@@ -1063,6 +1083,16 @@ export class CalendarPageComponent implements OnDestroy {
 
   totalSets(workout: Workout): number {
     return workout.entries.reduce((s, e) => s + e.sets.filter(set => !set.warmup).length, 0);
+  }
+  totalWarmupSets(workout: Workout): number {
+    return workout.entries.reduce((s, e) => s + e.sets.filter(set => set.warmup).length, 0);
+  }
+  /** 1-based position of a working set within its entry (warm-ups skipped),
+   *  matching the numbering used in the workout editor. */
+  workingSetNumber(entry: WorkoutEntry, index: number): number {
+    let n = 0;
+    for (let i = 0; i <= index; i++) if (!entry.sets[i].warmup) n++;
+    return n;
   }
   totalVolume(workout: Workout): number {
     const bodyweightKg = this.settingsService.bodyweightKg();
