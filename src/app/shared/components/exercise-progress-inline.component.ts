@@ -22,10 +22,18 @@ import {
   Tooltip,
 } from 'chart.js';
 
+import { MatDialog } from '@angular/material/dialog';
+import { firstValueFrom } from 'rxjs';
+
 import { Workout, setMaxWeight, setVolume } from '../../core/models/workout.model';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { ExerciseService } from '../../core/services/exercise.service';
+import { FeedbackService } from '../services/feedback.service';
+import {
+  DeleteExerciseDataDialogComponent,
+  DeleteExerciseDataRange,
+} from './delete-exercise-data-dialog.component';
 
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, LineController, Title, Tooltip, Legend);
 
@@ -89,6 +97,17 @@ interface ChartPoint { date: string; value: number; }
       } @else {
         <div class="epi-bottom-pad"></div>
       }
+
+      <!-- Danger zone: wipe this exercise's logged data (all / a time range) -->
+      @if (sessionCount() > 0) {
+        <div class="epi-danger">
+          <button class="epi-delete-btn" [disabled]="isDeleting()"
+                  (click)="openDeleteDialog()">
+            <span class="material-symbols-outlined">delete_sweep</span>
+            {{ isDeleting() ? 'Eliminant…' : "Eliminar dades d'aquest exercici" }}
+          </button>
+        </div>
+      }
     }
   `,
   styles: [`
@@ -151,6 +170,21 @@ interface ChartPoint { date: string; value: number; }
     .positive { color: #4caf50; }
     .negative { color: #ef5350; }
     .epi-bottom-pad { height: 14px; }
+
+    /* ── Danger zone ── */
+    .epi-danger { padding: 2px 14px 14px; }
+    .epi-delete-btn {
+      width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 10px; border-radius: 10px;
+      border: 1.5px solid color-mix(in srgb, #ef5350 38%, var(--c-border));
+      background: color-mix(in srgb, #ef5350 6%, var(--c-card));
+      color: #e04b48; font-size: 13px; font-weight: 600;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover:not(:disabled) { background: color-mix(in srgb, #ef5350 12%, var(--c-card)); border-color: #ef5350; }
+      &:active:not(:disabled) { transform: scale(0.98); }
+      &:disabled { opacity: 0.6; cursor: default; }
+    }
   `],
 })
 export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy {
@@ -159,6 +193,8 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
   private workoutService  = inject(WorkoutService);
   private settingsService = inject(UserSettingsService);
   private exerciseService = inject(ExerciseService);
+  private dialog          = inject(MatDialog);
+  private feedback        = inject(FeedbackService);
 
   readonly exerciseId   = input<string | null>(null);
   readonly exerciseName = input<string | null>(null);
@@ -213,6 +249,15 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
 
   readonly isLoading = signal(false);
 
+  /** Number of logged sessions for this exercise — drives the visibility of
+   *  the "delete data" action (no data ⇒ nothing to delete). */
+  readonly sessionCount = computed(() => {
+    const exId = this.exerciseId();
+    return exId ? this.workoutService.getWorkoutsForExercise(exId).length : 0;
+  });
+
+  readonly isDeleting = signal(false);
+
   private _metricInitialised = false;
 
   constructor() {
@@ -247,6 +292,45 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
   }
 
   ngOnDestroy(): void { this.chart?.destroy(); }
+
+  /** Opens the delete-scope dialog, then wipes the chosen slice of this
+   *  exercise's history — with a running toast at every step so the user
+   *  always knows what happened. */
+  async openDeleteDialog(): Promise<void> {
+    const exId = this.exerciseId();
+    if (!exId || this.isDeleting()) return;
+    const name = this.exerciseName() ?? 'aquest exercici';
+
+    const sessionDates = this.workoutService.getWorkoutsForExercise(exId).map(w => w.date);
+    if (sessionDates.length === 0) {
+      this.feedback.info('No hi ha dades per eliminar');
+      return;
+    }
+
+    const ref = this.dialog.open(DeleteExerciseDataDialogComponent, {
+      data: { exerciseName: name, sessionDates },
+      maxWidth: '360px',
+      panelClass: 'confirm-dialog-panel',
+    });
+    const range = await firstValueFrom(ref.afterClosed()) as DeleteExerciseDataRange | null | undefined;
+    if (!range) return; // cancelled / dismissed
+
+    this.isDeleting.set(true);
+    this.feedback.info('Eliminant dades…', 1500);
+    try {
+      const { sessions } = await this.workoutService.deleteExerciseData(exId, range);
+      if (sessions === 0) {
+        this.feedback.info('No s\'ha eliminat cap sessió');
+      } else {
+        const label = sessions === 1 ? 'sessió' : 'sessions';
+        this.feedback.success(`Dades eliminades · ${sessions} ${label} de ${name}`);
+      }
+    } catch {
+      this.feedback.error('No s\'han pogut eliminar les dades');
+    } finally {
+      this.isDeleting.set(false);
+    }
+  }
 
   private _extractMetric(w: Workout, exId: string, metric: Metric): number {
     const entry = w.entries.find(e => e.exerciseId === exId);
