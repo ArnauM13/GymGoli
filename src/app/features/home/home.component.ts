@@ -28,7 +28,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
       <app-page-header title="Inici" />
 
       <div class="calendar-wrap">
-        <app-calendar [selectedDate]="selectedDate()" (dateSelected)="selectDate($event)" />
+        <app-calendar [selectedDate]="effectiveDate()" (dateSelected)="selectDate($event)" />
       </div>
 
       @if (!offlineService.isOffline() && previewFeedEntry() === null) {
@@ -455,12 +455,13 @@ export class HomeComponent implements OnDestroy {
     return days;
   });
 
-  /** Whichever day is already shown up in the "Avui" preview is excluded
-   *  from the historical list below, whether that's today or a selected
-   *  past date. */
-  readonly historyFeedDays = computed(() =>
-    this.feedDays().filter(d => d.date !== this.effectiveDate())
-  );
+  /** The full activity timeline shown under "Historial". The prominent
+   *  "Avui / dia seleccionat" card above repeats whichever day is in focus,
+   *  but we deliberately DON'T strip that day from the list — otherwise the
+   *  feed goes blank whenever the only (or most recent) activity is today,
+   *  which reads as "nothing loaded". Keeping the complete log means the feed
+   *  always reflects your activity, today included. */
+  readonly historyFeedDays = computed(() => this.feedDays());
 
   async loadMoreFeedMonths(): Promise<void> {
     if (this.feedLoadingMore()) return;
