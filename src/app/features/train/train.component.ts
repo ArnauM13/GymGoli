@@ -82,11 +82,16 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
                 <span class="material-symbols-outlined">fitness_center</span>
                 <strong>{{ w.entries.length }}</strong> exerc
               </span>
-              @if (topbarTotalSets(w); as n) {
+              @if (topbarTotalSets(w) || topbarWarmupSets(w)) {
                 <span class="wc-stat-sep">·</span>
                 <span class="wc-stat">
                   <span class="material-symbols-outlined">repeat</span>
-                  <strong>{{ n }}</strong> sèr
+                  <strong>{{ topbarTotalSets(w) }}</strong> sèr
+                  @if (topbarWarmupSets(w); as warm) {
+                    <span class="wc-stat-warmup">
+                      +{{ warm }}<span class="material-symbols-outlined">local_fire_department</span>
+                    </span>
+                  }
                 </span>
               }
               @if (workoutVolumeFmt(w); as vol) {
@@ -972,6 +977,11 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       .material-symbols-outlined { font-size: 11px; }
       strong { color: var(--c-text-2); font-weight: 700; }
     }
+    .wc-stat-warmup {
+      display: inline-flex; align-items: center; gap: 1px; margin-left: 1px; color: #ff9800;
+      .material-symbols-outlined { font-size: 11px; color: #ff9800; font-variation-settings: 'FILL' 1, 'wght' 400; }
+      strong { color: #ff9800; }
+    }
     .wc-stat-sep { color: var(--c-border); }
     .wc-stat--vol strong { color: var(--wc, var(--c-brand)); }
     .wc-delete {
@@ -1646,6 +1656,10 @@ export class TrainComponent implements OnDestroy {
 
   topbarTotalSets(w: Workout): number {
     return w.entries.reduce((acc, e) => acc + e.sets.filter(s => !s.warmup).length, 0);
+  }
+
+  topbarWarmupSets(w: Workout): number {
+    return w.entries.reduce((acc, e) => acc + e.sets.filter(s => s.warmup).length, 0);
   }
 
   workoutLabel(w: Workout): string {

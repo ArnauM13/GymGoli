@@ -1,7 +1,7 @@
 import { Workout, WorkoutEntry } from '../../core/models/workout.model';
 import {
   feedDayLabel, getExerciseNames, isWorkoutPlanned, workoutCardColor,
-  workoutSetsCount, workoutVolumeFmt,
+  workoutSetsCount, workoutVolumeFmt, workoutWarmupSetsCount,
 } from './workout-card.utils';
 
 function makeWorkout(overrides: Partial<Workout> = {}): Workout {
@@ -32,6 +32,34 @@ describe('workout-card.utils', () => {
         ],
       });
       expect(workoutSetsCount(w)).toBe(3);
+    });
+
+    it('excludes warm-up sets from the working count', () => {
+      const w = makeWorkout({
+        entries: [
+          { exerciseId: 'a', exerciseName: 'A', sets: [{ weight: 20, reps: 10, warmup: true }, { weight: 60, reps: 8 }] },
+        ],
+      });
+      expect(workoutSetsCount(w)).toBe(1);
+    });
+  });
+
+  describe('workoutWarmupSetsCount()', () => {
+    it('returns 0 when there are no warm-up sets', () => {
+      const w = makeWorkout({
+        entries: [{ exerciseId: 'a', exerciseName: 'A', sets: [{ weight: 60, reps: 8 }] }],
+      });
+      expect(workoutWarmupSetsCount(w)).toBe(0);
+    });
+
+    it('counts only the warm-up sets across all entries', () => {
+      const w = makeWorkout({
+        entries: [
+          { exerciseId: 'a', exerciseName: 'A', sets: [{ weight: 20, reps: 10, warmup: true }, { weight: 60, reps: 8 }] },
+          { exerciseId: 'b', exerciseName: 'B', sets: [{ weight: 30, reps: 12, warmup: true }] },
+        ],
+      });
+      expect(workoutWarmupSetsCount(w)).toBe(2);
     });
   });
 

@@ -47,6 +47,12 @@ export function workoutSetsCount(w: Workout): number {
   return w.entries.reduce((sum, e) => sum + e.sets.filter(s => !s.warmup).length, 0);
 }
 
+/** Warm-up sets across the whole workout — counted separately so they can be
+ *  surfaced ("3 sèr + 1 esc") without inflating the working-set total. */
+export function workoutWarmupSetsCount(w: Workout): number {
+  return w.entries.reduce((sum, e) => sum + e.sets.filter(s => s.warmup).length, 0);
+}
+
 /** Optional bodyweight context so bodyweight/assisted exercises count their
  *  real load. Omitted → every exercise is treated as plain weighted (as before). */
 export interface WorkoutVolumeContext {

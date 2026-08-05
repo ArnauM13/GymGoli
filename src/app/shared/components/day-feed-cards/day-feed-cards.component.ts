@@ -10,7 +10,7 @@ import { FeedbackService } from '../../services/feedback.service';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import {
   formatFeeling, getCatLabel, getExerciseNames, isWorkoutPlanned, sportSessionSummary,
-  workoutCardColor, workoutCategoryList, workoutPrimaryColor, workoutSetsCount,
+  workoutCardColor, workoutCategoryList, workoutPrimaryColor, workoutSetsCount, workoutWarmupSetsCount,
   workoutVolumeFmt as workoutVolumeFmtUtil,
 } from '../../utils/workout-card.utils';
 
@@ -45,11 +45,16 @@ export interface DayFeedEntry {
                 <span class="material-symbols-outlined">fitness_center</span>
                 <strong>{{ w.entries.length }}</strong> exerc
               </span>
-              @if (workoutSetsCount(w); as n) {
+              @if (workoutSetsCount(w) || workoutWarmupSetsCount(w)) {
                 <span class="fc-stat-sep">·</span>
                 <span class="fc-stat">
                   <span class="material-symbols-outlined">repeat</span>
-                  <strong>{{ n }}</strong> sèr
+                  <strong>{{ workoutSetsCount(w) }}</strong> sèr
+                  @if (workoutWarmupSetsCount(w); as warm) {
+                    <span class="fc-stat-warmup">
+                      +{{ warm }}<span class="material-symbols-outlined">local_fire_department</span>
+                    </span>
+                  }
                 </span>
               }
               @if (workoutVolumeFmt(w); as vol) {
@@ -245,6 +250,10 @@ export interface DayFeedEntry {
       .material-symbols-outlined { font-size: 14px; color: color-mix(in srgb, var(--wc, var(--c-text-3)) 60%, var(--c-text-3)); }
       strong { font-weight: 700; color: var(--c-text-2); }
     }
+    .fc-stat-warmup {
+      display: inline-flex; align-items: center; gap: 1px; margin-left: 1px; color: #ff9800;
+      .material-symbols-outlined { font-size: 13px; color: #ff9800; font-variation-settings: 'FILL' 1, 'wght' 400; }
+    }
     .fc-stat-sep { color: var(--c-border); }
     .fc-stat--vol strong { color: var(--wc, var(--c-brand)); }
     .fc-chevron { font-size: 22px; color: var(--c-text-3); flex-shrink: 0; margin-right: 8px; }
@@ -414,6 +423,7 @@ export class DayFeedCardsComponent {
   readonly getCatLabel         = getCatLabel;
   readonly getExerciseNames    = getExerciseNames;
   readonly workoutSetsCount    = workoutSetsCount;
+  readonly workoutWarmupSetsCount = workoutWarmupSetsCount;
   /** Bodyweight-aware total volume label (folds in the user's bodyweight for
    *  bodyweight/assisted exercises). */
   workoutVolumeFmt(w: Workout): string {
