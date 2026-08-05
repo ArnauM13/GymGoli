@@ -20,7 +20,7 @@ export type LoadType = 'weighted' | 'bodyweight' | 'assisted';
 export type ExerciseSubcategory =
   | 'chest' | 'shoulders' | 'triceps'       // push
   | 'back' | 'biceps' | 'forearms'          // pull
-  | 'quads' | 'hamstrings' | 'glutes' | 'calves'; // legs
+  | 'quads' | 'hamstrings' | 'glutes' | 'calves' | 'adductors'; // legs
 
 // The category label/icon/colour/muscle records are now backed by the runtime
 // training-type registry (so custom types resolve too). Re-exported here so the
@@ -48,6 +48,7 @@ export const SUBCATEGORY_OPTIONS: Record<ExerciseCategory, { value: ExerciseSubc
     { value: 'hamstrings', label: 'Isquiotibials' },
     { value: 'glutes', label: 'Glutis' },
     { value: 'calves', label: 'Bessons' },
+    { value: 'adductors', label: 'Adductors' },
   ],
 };
 
@@ -68,6 +69,7 @@ export const ALL_SUBCATEGORY_OPTIONS: { value: ExerciseSubcategory; label: strin
   { value: 'hamstrings', label: 'Isquiotibials' },
   { value: 'glutes',     label: 'Glutis' },
   { value: 'calves',     label: 'Bessons' },
+  { value: 'adductors',  label: 'Adductors' },
 ];
 
 export const SUBCATEGORY_LABELS: Partial<Record<ExerciseSubcategory, string>> = {
@@ -81,6 +83,7 @@ export const SUBCATEGORY_LABELS: Partial<Record<ExerciseSubcategory, string>> = 
   hamstrings: 'Isquiotibials',
   glutes: 'Glutis',
   calves: 'Bessons',
+  adductors: 'Adductors',
 };
 
 export const MUSCLE_OPTIONS: { value: string; label: string }[] = [
@@ -95,6 +98,7 @@ export const MUSCLE_OPTIONS: { value: string; label: string }[] = [
   { value: 'isquiotibials', label: 'Isquiotibials' },
   { value: 'glutis',        label: 'Glutis' },
   { value: 'bessons',       label: 'Bessons' },
+  { value: 'adductors',     label: 'Adductors' },
 ];
 
 export const MUSCLE_LABELS: Record<string, string> = Object.fromEntries(
@@ -242,6 +246,12 @@ export const DEFAULT_EXERCISES: Omit<Exercise, 'id' | 'createdAt'>[] = [
     muscles: ['glutis', 'isquiotibials'],
     description: "Recolza les espatlles al banc amb la barra als malucs. Empenta els malucs cap amunt fins a posició horitzontal contraient els glutis. El millor exercici aïllat per a glutis.",
     setsRange: [3, 4], repsRange: [8, 15], weightStep: 5,
+  },
+  {
+    name: 'Màquina d\'adductors', category: 'legs', subcategory: 'adductors',
+    muscles: ['adductors'],
+    description: "Assegut a la màquina amb les cames obertes recolzades als coixinets, prem les cuixes cap al centre contraient els adductors i torna a obrir de forma controlada sense deixar caure el pes. Treballa la cara interna de la cuixa; evita els rebots i fes tot el recorregut.",
+    setsRange: [3, 4], repsRange: [12, 20], weightStep: 5,
   },
   {
     name: 'Elevació de bessons dempeus', category: 'legs', subcategory: 'calves',
