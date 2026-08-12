@@ -40,6 +40,12 @@ import {
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+/** Accept a `?date=` deep-link only when it's a well-formed ISO date, so a
+ *  hand-typed or stale URL can never point the page at a bogus day. */
+const validDateParam = (v: string | null): string | null =>
+  v && ISO_DATE.test(v) && !Number.isNaN(new Date(v + 'T12:00:00').getTime()) ? v : null;
+
 /** After this long with no change to the workout, treat the session as no
  *  longer being trained and stop the live "Sèrie activa" suggestions. */
 const STALE_SUGGESTION_MS = 2 * 60 * 60 * 1000; // 2 hours
@@ -266,6 +272,18 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
 
         <!-- ══ DASHBOARD MODE ══ -->
         <app-page-header title="Entrenament" [showBack]="true" />
+
+        <!-- ── Context d'un dia que no és avui (registrar passat / planificar futur) ── -->
+        @if (!isToday()) {
+          <div class="date-context" [class.date-context--past]="isSelectedPast()">
+            <span class="material-symbols-outlined dc-icon">{{ isSelectedPast() ? 'history' : 'event_upcoming' }}</span>
+            <div class="dc-info">
+              <span class="dc-eyebrow">{{ isSelectedPast() ? 'Registrant' : 'Planificant' }}</span>
+              <span class="dc-date">{{ selectedDateLabel() }}</span>
+            </div>
+            <button class="dc-today" (click)="goToToday()">Avui</button>
+          </div>
+        }
 
         <!-- ── Trainer proposal card ── -->
         @if (activeProposal(); as prop) {
@@ -1063,6 +1081,32 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
     }
 
     /* ── Trainer proposal card ── */
+    .date-context {
+      display: flex; align-items: center; gap: 11px;
+      margin: 14px 16px 0; padding: 10px 12px;
+      background: var(--c-card); border-radius: 16px;
+      border: 2px solid color-mix(in srgb, var(--c-brand) 30%, transparent);
+      box-shadow: 0 2px 10px var(--c-shadow);
+      animation: bar-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .date-context--past {
+      border-color: color-mix(in srgb, #b26a00 32%, transparent);
+      .dc-icon, .dc-eyebrow { color: #b26a00; }
+    }
+    .dc-icon {
+      font-size: 22px; color: var(--c-brand); flex-shrink: 0;
+      font-variation-settings: 'FILL' 1, 'wght' 400;
+    }
+    .dc-info { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+    .dc-eyebrow { font-size: 11px; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase; color: var(--c-brand); }
+    .dc-date { font-size: 15px; font-weight: 700; color: var(--c-text); }
+    .dc-today {
+      flex-shrink: 0; padding: 7px 14px; border-radius: 999px; border: none;
+      background: var(--c-subtle); color: var(--c-text-2);
+      font-size: 13px; font-weight: 700; cursor: pointer; touch-action: manipulation;
+      transition: background 0.15s;
+      &:hover { background: var(--c-hover); }
+    }
     .proposal-card {
       margin: 16px 16px 0;
       padding: 14px 14px 12px;
@@ -1247,7 +1291,12 @@ export class TrainComponent implements OnDestroy {
 
   @ViewChild('editor') editor?: WorkoutEditorComponent;
 
-  readonly selectedDate    = signal<string>(TODAY());
+  /** Seeded synchronously from the route (like `activeWorkoutId`) so a
+   *  `/train?date=YYYY-MM-DD` deep-link — e.g. "registrar" a past day from
+   *  the calendar — lands straight on that day instead of flashing today. */
+  readonly selectedDate    = signal<string>(
+    validDateParam(this.route.snapshot.queryParamMap.get('date')) ?? TODAY()
+  );
   readonly sportToggling   = signal(false);
   private typeService = inject(TrainingTypeService);
   readonly workoutTypes = computed((): WorkoutTypeItem[] =>
@@ -1300,6 +1349,32 @@ export class TrainComponent implements OnDestroy {
   private readonly auth = inject(AuthService);
 
   readonly isToday = computed(() => this.selectedDate() === TODAY());
+
+  /** True when registering a session for a day that has already passed —
+   *  the workout is saved as `done`, not planned, and the UI reads
+   *  "Registrant" rather than "Planificant". */
+  readonly isSelectedPast = computed(() => this.selectedDate() < TODAY());
+
+  /** Human date for the "not today" context banner: Ahir / Demà, otherwise
+   *  the capitalised weekday + day + month. */
+  readonly selectedDateLabel = computed(() => {
+    const sel = this.selectedDate();
+    const shift = (n: number) => {
+      const d = new Date(TODAY() + 'T12:00:00');
+      d.setDate(d.getDate() + n);
+      return d.toISOString().split('T')[0];
+    };
+    if (sel === shift(-1)) return 'Ahir';
+    if (sel === shift(1))  return 'Demà';
+    const label = new Date(sel + 'T12:00:00')
+      .toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  });
+
+  /** Return from a past/future day back to today's dashboard. */
+  goToToday(): void {
+    this.selectedDate.set(TODAY());
+  }
 
   /** Shown regardless of what's already been done today — always suggests
    *  the next overdue category / sport. */

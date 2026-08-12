@@ -295,6 +295,31 @@ describe('TrainComponent', () => {
     });
   });
 
+  // ── isSelectedPast() / goToToday() ───────────────────────────────────────
+
+  describe('registering a past day', () => {
+    it('isSelectedPast() is true for a past date and false for today', () => {
+      component.selectedDate.set('2020-01-01');
+      expect(component.isSelectedPast()).toBeTrue();
+      component.selectedDate.set(TODAY);
+      expect(component.isSelectedPast()).toBeFalse();
+    });
+
+    it('selectedDateLabel() reads "Ahir" for yesterday', () => {
+      const y = new Date(TODAY + 'T12:00:00');
+      y.setDate(y.getDate() - 1);
+      component.selectedDate.set(y.toISOString().split('T')[0]);
+      expect(component.selectedDateLabel()).toBe('Ahir');
+    });
+
+    it('goToToday() returns selectedDate to today', () => {
+      component.selectedDate.set('2020-01-01');
+      component.goToToday();
+      expect(component.selectedDate()).toBe(TODAY);
+      expect(component.isToday()).toBeTrue();
+    });
+  });
+
   // ── topbarDateLabel() ────────────────────────────────────────────────────
 
   describe('topbarDateLabel()', () => {
