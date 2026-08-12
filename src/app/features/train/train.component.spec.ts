@@ -39,6 +39,7 @@ describe('TrainComponent', () => {
   let fixture: ReturnType<typeof TestBed.createComponent<TrainComponent>>;
   let forceOffline: ReturnType<typeof signal<boolean>>;
   let navigateSpy: jasmine.Spy;
+  let goBackSpy: jasmine.Spy;
   let weeklyPlanSignal: ReturnType<typeof signal<WeeklyPlan>>;
   let settingsSignal: ReturnType<typeof signal<UserSettings>>;
   let updateSettings: jasmine.Spy;
@@ -118,6 +119,11 @@ describe('TrainComponent', () => {
     component = fixture.componentInstance;
     fixture.detectChanges();
     navigateSpy = spyOn(component.router, 'navigate').and.resolveTo(true);
+    const navHistory = TestBed.inject(NavigationHistoryService);
+    goBackSpy = (jasmine.isSpy(navHistory.goBack)
+      ? navHistory.goBack
+      : spyOn(navHistory, 'goBack')) as jasmine.Spy;
+    goBackSpy.calls.reset();
   });
 
   it('should create', () => {
@@ -194,17 +200,17 @@ describe('TrainComponent', () => {
       expect(component.activeWorkoutId()).toBeNull();
     });
 
-    it('navigates home on closeWorkout (workouts are only opened from home)', () => {
+    it('returns to the origin on closeWorkout (home, or the calendar when registering a past day)', () => {
       component.openWorkout('abc');
       component.closeWorkout();
-      expect(navigateSpy).toHaveBeenCalledWith(['/home']);
+      expect(goBackSpy).toHaveBeenCalledWith('/home');
     });
   });
 
   // ── deleteActiveWorkout() ────────────────────────────────────────────────
 
   describe('deleteActiveWorkout()', () => {
-    it('deletes the workout and navigates home', async () => {
+    it('deletes the workout and returns to the origin', async () => {
       const w = makeWorkout({ id: 'abc' });
       const workoutService = TestBed.inject(WorkoutService) as unknown as { workouts: ReturnType<typeof signal<Workout[]>>; deleteWorkout: jasmine.Spy };
       workoutService.workouts.set([w]);
@@ -215,7 +221,7 @@ describe('TrainComponent', () => {
 
       expect(workoutService.deleteWorkout).toHaveBeenCalledWith('abc');
       expect(component.activeWorkoutId()).toBeNull();
-      expect(navigateSpy).toHaveBeenCalledWith(['/home']);
+      expect(goBackSpy).toHaveBeenCalledWith('/home');
     });
   });
 
@@ -317,6 +323,23 @@ describe('TrainComponent', () => {
       component.goToToday();
       expect(component.selectedDate()).toBe(TODAY);
       expect(component.isToday()).toBeTrue();
+    });
+
+    it('goToYesterday() lands on yesterday and is flagged as past', () => {
+      const y = new Date(TODAY + 'T12:00:00');
+      y.setDate(y.getDate() - 1);
+      component.goToYesterday();
+      expect(component.selectedDate()).toBe(y.toISOString().split('T')[0]);
+      expect(component.isSelectedPast()).toBeTrue();
+      expect(component.selectedDateLabel()).toBe('Ahir');
+    });
+
+    it('shiftSelectedDate() walks the viewed day by whole days', () => {
+      component.selectedDate.set('2020-01-15');
+      component.shiftSelectedDate(-1);
+      expect(component.selectedDate()).toBe('2020-01-14');
+      component.shiftSelectedDate(2);
+      expect(component.selectedDate()).toBe('2020-01-16');
     });
   });
 

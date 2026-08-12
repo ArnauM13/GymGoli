@@ -66,6 +66,16 @@ const PAGE_SIZE = 20;
         </div>
       </div>
 
+      <!-- ── Registrar un entrenament oblidat en un dia passat, just sota
+             el calendari on s'acaba de triar el dia ── -->
+      @if (selectedDate() && !isFutureOrToday()) {
+        <a class="register-past-btn" [routerLink]="['/train']" [queryParams]="{ date: selectedDate() }">
+          <span class="material-symbols-outlined">add</span>
+          Registrar entrenament
+          <span class="rpb-date">{{ selectedDateLabel() }}</span>
+        </a>
+      }
+
       @if (isInitialLoading()) {
         <!-- ── Skeleton (primer càrrega) ── -->
         <div class="sk-list">
@@ -112,12 +122,6 @@ const PAGE_SIZE = 20;
               <span class="material-symbols-outlined">chevron_right</span>
             </button>
           </div>
-
-          <!-- ── Registrar un entrenament oblidat en aquest dia passat ── -->
-          <a class="register-past-btn" [routerLink]="['/train']" [queryParams]="{ date: selectedDate() }">
-            <span class="material-symbols-outlined">add</span>
-            Registrar entrenament
-          </a>
         }
 
         <!-- ── Esports del dia seleccionat ── -->
@@ -490,14 +494,20 @@ const PAGE_SIZE = 20;
       &:hover { background: rgba(var(--c-brand-rgb), 0.16); }
     }
     .register-past-btn {
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      margin: 0 16px 12px; padding: 11px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+      margin: 2px 16px 14px; padding: 12px; border-radius: 14px;
       border: 1.5px dashed color-mix(in srgb, var(--c-brand) 45%, transparent);
       background: rgba(var(--c-brand-rgb), 0.06); color: var(--c-brand);
       font-size: 14px; font-weight: 700; text-decoration: none;
       cursor: pointer; touch-action: manipulation; transition: background 0.15s;
       .material-symbols-outlined { font-size: 19px; }
       &:hover { background: rgba(var(--c-brand-rgb), 0.12); }
+      &:active { transform: scale(0.99); }
+    }
+    .rpb-date {
+      padding: 2px 9px; border-radius: 999px;
+      background: rgba(var(--c-brand-rgb), 0.14);
+      font-size: 12px; font-weight: 700; text-transform: capitalize;
     }
 
     /* Sports */
