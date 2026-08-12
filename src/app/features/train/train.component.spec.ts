@@ -301,7 +301,7 @@ describe('TrainComponent', () => {
     });
   });
 
-  // ── isSelectedPast() / goToToday() ───────────────────────────────────────
+  // ── isSelectedPast() / selectedDateLabel() ───────────────────────────────
 
   describe('registering a past day', () => {
     it('isSelectedPast() is true for a past date and false for today', () => {
@@ -318,29 +318,6 @@ describe('TrainComponent', () => {
       expect(component.selectedDateLabel()).toBe('Ahir');
     });
 
-    it('goToToday() returns selectedDate to today', () => {
-      component.selectedDate.set('2020-01-01');
-      component.goToToday();
-      expect(component.selectedDate()).toBe(TODAY);
-      expect(component.isToday()).toBeTrue();
-    });
-
-    it('goToYesterday() lands on yesterday and is flagged as past', () => {
-      const y = new Date(TODAY + 'T12:00:00');
-      y.setDate(y.getDate() - 1);
-      component.goToYesterday();
-      expect(component.selectedDate()).toBe(y.toISOString().split('T')[0]);
-      expect(component.isSelectedPast()).toBeTrue();
-      expect(component.selectedDateLabel()).toBe('Ahir');
-    });
-
-    it('shiftSelectedDate() walks the viewed day by whole days', () => {
-      component.selectedDate.set('2020-01-15');
-      component.shiftSelectedDate(-1);
-      expect(component.selectedDate()).toBe('2020-01-14');
-      component.shiftSelectedDate(2);
-      expect(component.selectedDate()).toBe('2020-01-16');
-    });
   });
 
   // ── topbarDateLabel() ────────────────────────────────────────────────────

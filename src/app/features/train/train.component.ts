@@ -282,15 +282,6 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
               <span class="dc-eyebrow">{{ isSelectedPast() ? 'Registrant' : 'Planificant' }}</span>
               <span class="dc-date">{{ selectedDateLabel() }}</span>
             </div>
-            <div class="dc-nav">
-              <button class="dc-nav-btn" (click)="shiftSelectedDate(-1)" aria-label="Dia anterior">
-                <span class="material-symbols-outlined">chevron_left</span>
-              </button>
-              <button class="dc-nav-btn" (click)="shiftSelectedDate(1)" aria-label="Dia següent">
-                <span class="material-symbols-outlined">chevron_right</span>
-              </button>
-            </div>
-            <button class="dc-today" (click)="goToToday()">Avui</button>
           </div>
         }
 
@@ -401,14 +392,6 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
             </div>
           }
         </div>
-
-        <!-- ── Registrar un entrenament d'un dia passat (p. ex. un padel d'ahir) ── -->
-        @if (isToday()) {
-          <button class="register-past-day" (click)="goToYesterday()">
-            <span class="material-symbols-outlined">history</span>
-            Registrar un entrenament d'un altre dia
-          </button>
-        }
 
       }
 
@@ -1117,34 +1100,6 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
     .dc-info { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
     .dc-eyebrow { font-size: 11px; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase; color: var(--c-brand); }
     .dc-date { font-size: 15px; font-weight: 700; color: var(--c-text); }
-    .dc-nav { display: flex; gap: 4px; flex-shrink: 0; }
-    .dc-nav-btn {
-      display: flex; align-items: center; justify-content: center;
-      width: 32px; height: 32px; border-radius: 10px;
-      border: 1.5px solid var(--c-border); background: var(--c-subtle);
-      color: var(--c-text-2); cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 20px; }
-      &:hover { border-color: var(--c-brand); color: var(--c-brand); }
-      &:active { transform: scale(0.94); }
-    }
-    .date-context--past .dc-nav-btn:hover { border-color: #b26a00; color: #b26a00; }
-    .dc-today {
-      flex-shrink: 0; padding: 7px 14px; border-radius: 999px; border: none;
-      background: var(--c-subtle); color: var(--c-text-2);
-      font-size: 13px; font-weight: 700; cursor: pointer; touch-action: manipulation;
-      transition: background 0.15s;
-      &:hover { background: var(--c-hover); }
-    }
-    .register-past-day {
-      display: flex; align-items: center; justify-content: center; gap: 7px;
-      width: calc(100% - 32px); margin: 14px 16px 0; padding: 12px;
-      border-radius: 14px; border: 1.5px dashed color-mix(in srgb, var(--c-brand) 40%, transparent);
-      background: color-mix(in srgb, var(--c-brand) 6%, transparent); color: var(--c-brand);
-      font-size: 14px; font-weight: 700; cursor: pointer; touch-action: manipulation; transition: background 0.15s;
-      .material-symbols-outlined { font-size: 19px; }
-      &:hover { background: color-mix(in srgb, var(--c-brand) 12%, transparent); }
-      &:active { transform: scale(0.99); }
-    }
     .proposal-card {
       margin: 16px 16px 0;
       padding: 14px 14px 12px;
@@ -1410,24 +1365,6 @@ export class TrainComponent implements OnDestroy {
     return label.charAt(0).toUpperCase() + label.slice(1);
   });
 
-  /** Return from a past/future day back to today's dashboard. */
-  goToToday(): void {
-    this.selectedDate.set(TODAY());
-  }
-
-  /** Jump straight to yesterday — the common "em vaig oblidar d'apuntar-ho"
-   *  case — from the today dashboard. */
-  goToYesterday(): void {
-    this.shiftSelectedDate(-1, TODAY());
-  }
-
-  /** Move the viewed day by `delta` days, so the context banner's ‹ ›
-   *  arrows let you walk to any day without leaving the train page. */
-  shiftSelectedDate(delta: number, base = this.selectedDate()): void {
-    const d = new Date(base + 'T12:00:00');
-    d.setDate(d.getDate() + delta);
-    this.selectedDate.set(d.toISOString().split('T')[0]);
-  }
 
   /** Shown regardless of what's already been done today — always suggests
    *  the next overdue category / sport. */

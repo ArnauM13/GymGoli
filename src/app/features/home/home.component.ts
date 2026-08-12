@@ -70,6 +70,11 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
           <span class="material-symbols-outlined">add_circle</span>
           Comença un entrenament
         </button>
+      } @else if (isPast()) {
+        <button class="start-workout-btn start-workout-btn--past" (click)="registerPastWorkout()">
+          <span class="material-symbols-outlined">history</span>
+          Registra un entrenament
+        </button>
       }
 
       @if (showRoutineHint()) {
@@ -219,6 +224,13 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
       .material-symbols-outlined { font-size: 17px; }
       &:hover { background: var(--c-brand-dk); }
       &:active { transform: scale(0.98); }
+    }
+    /* Registrar un dia passat: mateix botó, accent càlid per distingir-lo
+       de l'acció d'avui (en verd de marca). */
+    .start-workout-btn--past {
+      background: #b26a00;
+      box-shadow: 0 2px 8px color-mix(in srgb, #b26a00 30%, transparent);
+      &:hover { background: #9a5c00; }
     }
 
     /* ── "Encara no tens cap rutina" hint ── */
@@ -389,6 +401,17 @@ export class HomeComponent implements OnDestroy {
   );
 
   readonly isToday = computed(() => this.effectiveDate() === TODAY());
+
+  /** A day that has already passed — the "Comença un entrenament" primary
+   *  action is swapped for "Registra un entrenament", which opens the train
+   *  passthrough already pinned to that day. */
+  readonly isPast = computed(() => this.effectiveDate() < TODAY());
+
+  /** Open the train page to log a forgotten workout on the selected past day
+   *  (e.g. "ahir vaig jugar a padel i no ho vaig apuntar"). */
+  registerPastWorkout(): void {
+    this.router.navigate(['/train'], { queryParams: { date: this.effectiveDate() } });
+  }
 
   dayLabel(date: string): string {
     return feedDayLabel(date, TODAY());
