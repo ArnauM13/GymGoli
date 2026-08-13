@@ -490,33 +490,33 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
               }
             }
 
-            <!-- ── Entry footer: feeling + stats + delete ── -->
+            <!-- ── Entry footer: left (edit + stats) · right (notes + feeling + delete) ── -->
             <div class="we-entry-footer">
-              @if (alwaysEditable() || editMode()) {
-                <button type="button" class="we-footer-feeling-btn"
-                  [class.we-footer-feeling-btn--set]="entry.feeling"
-                  (click)="openFatigaPicker(entry.exerciseId)">
-                  @if (entry.feeling) {
-                    {{ getFeelingEmoji(entry.feeling) }}
-                  } @else {
-                    <span class="material-symbols-outlined">sentiment_neutral</span>
-                  }
-                </button>
-              }
               <div class="we-footer-actions">
+                <button class="we-footer-edit-btn" (click)="editExercise(entry)"
+                  title="Editar exercici" aria-label="Editar exercici">
+                  <span class="material-symbols-outlined">edit</span>
+                </button>
                 @if (!offlineService.isOffline()) {
                   <button class="we-footer-stats-btn" (click)="openStats(entry)">
                     <span class="material-symbols-outlined">bar_chart</span>
                   </button>
                 }
-                <button class="we-footer-edit-btn" (click)="editExercise(entry)"
-                  title="Editar exercici" aria-label="Editar exercici">
-                  <span class="material-symbols-outlined">edit</span>
-                </button>
+              </div>
+              <div class="we-footer-actions">
                 @if (alwaysEditable() || editMode()) {
                   <button class="we-footer-notes-btn" [class.we-footer-notes-btn--set]="entry.notes"
                     (click)="openNotesPopup(entry.exerciseId)" title="Nota de l'exercici">
                     <span class="material-symbols-outlined">{{ entry.notes ? 'sticky_note_2' : 'note_add' }}</span>
+                  </button>
+                  <button type="button" class="we-footer-feeling-btn"
+                    [class.we-footer-feeling-btn--set]="entry.feeling"
+                    (click)="openFatigaPicker(entry.exerciseId)">
+                    @if (entry.feeling) {
+                      {{ getFeelingEmoji(entry.feeling) }}
+                    } @else {
+                      <span class="material-symbols-outlined">sentiment_neutral</span>
+                    }
                   </button>
                   <button class="we-footer-delete-btn" (click)="removeEntry(entry.exerciseId)">
                     <span class="material-symbols-outlined">delete</span>
@@ -743,9 +743,9 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     }
     .we-footer-actions { display: flex; align-items: center; gap: 6px; }
 
-    /* ── Entry footer: stats + delete ── */
+    /* ── Entry footer: left (edit + stats) · right (notes + feeling + delete) ── */
     .we-entry-footer {
-      display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
       padding: 10px 14px 14px; border-top: 1px solid var(--c-border-2);
       background: color-mix(in srgb, var(--cat) 9%, var(--c-card));
     }
