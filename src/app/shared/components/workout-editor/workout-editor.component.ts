@@ -644,13 +644,11 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     /* ── Entry drag animation ── */
     .cdk-drag-animating app-exercise-entry-card { transition: transform 200ms ease; }
 
-    /* ── Drop placeholder (skeleton slot) ── */
-    app-exercise-entry-card.cdk-drag-placeholder {
-      border-radius: 14px;
-      border: 2px dashed color-mix(in srgb, var(--c-brand) 55%, var(--c-border-2));
-      background: color-mix(in srgb, var(--c-brand) 8%, var(--c-card));
-    }
-    app-exercise-entry-card.cdk-drag-placeholder > * { visibility: hidden; }
+    /* ── Drop placeholder ──
+       Fully removed from layout while dragging so the moving card leaves no
+       empty slot behind — the remaining entries close up instead of showing
+       a gap. */
+    app-exercise-entry-card.cdk-drag-placeholder { display: none; }
 
     /* ── Section headers ── */
     .we-section-header {
