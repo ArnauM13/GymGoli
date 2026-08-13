@@ -208,41 +208,51 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
           </div>
         }
 
-        <!-- ── Three-dots action menu ── -->
-        @if (workoutMenuOpen()) {
-          <div class="aw-menu-backdrop" (click)="workoutMenuOpen.set(false)"></div>
-          <div class="aw-menu-dropdown">
-            <button class="aw-menu-item" (click)="workoutMenuOpen.set(false); reorderMode.set(!reorderMode()); groupingMode.set(false)">
-              <span class="material-symbols-outlined">{{ reorderMode() ? 'check' : 'swap_vert' }}</span>
-              {{ reorderMode() ? 'Finalitzar ordenació' : 'Ordenar exercicis' }}
-            </button>
-            @if (settingsService.supersetsEnabled() || groupingMode()) {
-              <button class="aw-menu-item" (click)="workoutMenuOpen.set(false); groupingMode.set(!groupingMode()); reorderMode.set(false)">
-                <span class="material-symbols-outlined">{{ groupingMode() ? 'check' : 'link' }}</span>
-                {{ groupingMode() ? 'Finalitzar agrupació' : 'Agrupar en superset' }}
+        <!-- While reordering, the three-dots menu is replaced by a single
+             "save order" button — the reorder is persisted live on each drop,
+             so this just leaves reorder mode. -->
+        @if (reorderMode()) {
+          <button class="aw-reorder-save-fab" (click)="reorderMode.set(false)">
+            <span class="material-symbols-outlined">check</span>
+            Guardar ordre
+          </button>
+        } @else {
+          <!-- ── Three-dots action menu ── -->
+          @if (workoutMenuOpen()) {
+            <div class="aw-menu-backdrop" (click)="workoutMenuOpen.set(false)"></div>
+            <div class="aw-menu-dropdown">
+              <button class="aw-menu-item" (click)="workoutMenuOpen.set(false); reorderMode.set(true); groupingMode.set(false)">
+                <span class="material-symbols-outlined">swap_vert</span>
+                Ordenar exercicis
               </button>
-            }
-            @if (!offlineService.isOffline()) {
-              <button class="aw-menu-item" (click)="openSaveAsTemplate(w)">
-                <span class="material-symbols-outlined">bookmark_add</span>
-                Guardar com a plantilla
+              @if (settingsService.supersetsEnabled() || groupingMode()) {
+                <button class="aw-menu-item" (click)="workoutMenuOpen.set(false); groupingMode.set(!groupingMode()); reorderMode.set(false)">
+                  <span class="material-symbols-outlined">{{ groupingMode() ? 'check' : 'link' }}</span>
+                  {{ groupingMode() ? 'Finalitzar agrupació' : 'Agrupar en superset' }}
+                </button>
+              }
+              @if (!offlineService.isOffline()) {
+                <button class="aw-menu-item" (click)="openSaveAsTemplate(w)">
+                  <span class="material-symbols-outlined">bookmark_add</span>
+                  Guardar com a plantilla
+                </button>
+                <button class="aw-menu-item" (click)="shareWorkout(w)">
+                  <span class="material-symbols-outlined">share</span>
+                  Compartir entrenament
+                </button>
+              }
+              <button class="aw-menu-item aw-menu-item--danger" (click)="workoutMenuOpen.set(false); deleteActiveWorkout()">
+                <span class="material-symbols-outlined">delete</span>
+                Eliminar entrenament
               </button>
-              <button class="aw-menu-item" (click)="shareWorkout(w)">
-                <span class="material-symbols-outlined">share</span>
-                Compartir entrenament
-              </button>
-            }
-            <button class="aw-menu-item aw-menu-item--danger" (click)="workoutMenuOpen.set(false); deleteActiveWorkout()">
-              <span class="material-symbols-outlined">delete</span>
-              Eliminar entrenament
-            </button>
-          </div>
+            </div>
+          }
+          <button class="aw-menu-fab" [class.aw-menu-fab--open]="workoutMenuOpen()"
+                  (click)="workoutMenuOpen.set(!workoutMenuOpen())"
+                  aria-label="Opcions de l'entrenament" [attr.aria-expanded]="workoutMenuOpen()">
+            <span class="material-symbols-outlined">more_vert</span>
+          </button>
         }
-        <button class="aw-menu-fab" [class.aw-menu-fab--open]="workoutMenuOpen()"
-                (click)="workoutMenuOpen.set(!workoutMenuOpen())"
-                aria-label="Opcions de l'entrenament" [attr.aria-expanded]="workoutMenuOpen()">
-          <span class="material-symbols-outlined">more_vert</span>
-        </button>
 
         <!-- ── Save as template bottom sheet ── -->
         @if (saveTemplateOpen()) {
@@ -710,6 +720,22 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       &.aw-menu-fab--open { background: var(--c-subtle); border-color: var(--c-brand); color: var(--c-brand); }
     }
     .aw-menu-backdrop { position: fixed; inset: 0; z-index: 88; }
+    /* ── Save-order button shown while reordering ── */
+    .aw-reorder-save-fab {
+      position: fixed; right: 20px;
+      bottom: calc(var(--nav-height) + 16px);
+      z-index: 89;
+      display: flex; align-items: center; gap: 8px;
+      height: 56px; padding: 0 22px; border-radius: 28px;
+      border: none; background: var(--c-brand); color: #fff;
+      font-size: 15px; font-weight: 700; letter-spacing: 0.2px;
+      cursor: pointer; touch-action: manipulation;
+      box-shadow: 0 4px 16px rgba(var(--c-brand-rgb), 0.4), 0 1px 4px var(--c-shadow);
+      transition: background 0.15s, transform 0.15s;
+      .material-symbols-outlined { font-size: 24px; }
+      &:hover { background: var(--c-brand-dk); transform: scale(1.04); }
+      &:active { transform: scale(0.96); }
+    }
     /* ── Contextual "save as template" nudge ── */
     .aw-nudge {
       position: relative;
