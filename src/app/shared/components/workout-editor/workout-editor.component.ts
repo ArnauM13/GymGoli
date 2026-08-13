@@ -1514,11 +1514,22 @@ export class WorkoutEditorComponent implements OnDestroy {
   isCollapsed(id: string): boolean { return this.collapsedEntries().has(id); }
 
   toggleCollapse(id: string): void {
+    const wasCollapsed = this.collapsedEntries().has(id);
     const s = new Set(this.collapsedEntries());
     s.has(id) ? s.delete(id) : s.add(id);
     this.collapsedEntries.set(s);
     const wid = this.workout()?.id;
     if (wid) _collapsedByWorkout.set(wid, new Set(s));
+
+    // Expanding an empty exercise jumps straight into the add-set editor —
+    // same as a freshly added exercise — so exercises copied from a previous
+    // workout (which start collapsed with no sets) behave like manual ones.
+    if (wasCollapsed) {
+      const entry = this.workout()?.entries.find(e => e.exerciseId === id);
+      if (entry && entry.sets.length === 0 && this.isEntryEditable(id)) {
+        this.startAddSet(entry);
+      }
+    }
   }
 
   isSectionCollapsed(id: string): boolean { return this.collapsedSections().has(id); }
