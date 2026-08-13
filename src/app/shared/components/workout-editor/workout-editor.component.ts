@@ -3,6 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { A11yModule } from '@angular/cdk/a11y';
 import { MatDialog } from '@angular/material/dialog';
+import { Router } from '@angular/router';
 
 import { CATEGORY_COLORS, CATEGORY_LABELS, SUBCATEGORY_LABELS } from '../../../core/models/exercise.model';
 import { FEELING_LABEL, FeelingLevel, Workout, WorkoutEntry, WorkoutSet, setMaxWeight } from '../../../core/models/workout.model';
@@ -508,6 +509,10 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                     <span class="material-symbols-outlined">bar_chart</span>
                   </button>
                 }
+                <button class="we-footer-edit-btn" (click)="editExercise(entry)"
+                  title="Editar exercici" aria-label="Editar exercici">
+                  <span class="material-symbols-outlined">edit</span>
+                </button>
                 @if (alwaysEditable() || editMode()) {
                   <button class="we-footer-notes-btn" [class.we-footer-notes-btn--set]="entry.notes"
                     (click)="openNotesPopup(entry.exerciseId)" title="Nota de l'exercici">
@@ -745,6 +750,15 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       background: color-mix(in srgb, var(--cat) 9%, var(--c-card));
     }
     .we-footer-stats-btn {
+      width: 36px; height: 36px; border-radius: 10px;
+      border: 1.5px solid var(--c-border); background: transparent;
+      color: var(--c-text-2);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { background: var(--c-subtle); color: var(--c-text); }
+    }
+    .we-footer-edit-btn {
       width: 36px; height: 36px; border-radius: 10px;
       border: 1.5px solid var(--c-border); background: transparent;
       color: var(--c-text-2);
@@ -1273,6 +1287,7 @@ export class WorkoutEditorComponent implements OnDestroy {
   private feedback         = inject(FeedbackService);
   private fb               = inject(FormBuilder);
   private dialog           = inject(MatDialog);
+  private router           = inject(Router);
 
   readonly unit = this.settingsService.weightUnit;
 
@@ -1642,6 +1657,11 @@ export class WorkoutEditorComponent implements OnDestroy {
       data: { exerciseId: entry.exerciseId, exerciseName: entry.exerciseName },
       width: '400px', maxHeight: '85vh',
     });
+  }
+
+  /** Jump to the exercise library with this exercise's edit dialog pre-opened. */
+  editExercise(entry: WorkoutEntry): void {
+    this.router.navigate(['/exercises'], { queryParams: { edit: entry.exerciseId } });
   }
 
   async onDrop(event: CdkDragDrop<WorkoutEntry[]>): Promise<void> {
