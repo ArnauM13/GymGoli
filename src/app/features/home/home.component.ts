@@ -23,7 +23,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
   standalone: true,
   imports: [CalendarComponent, DayFeedCardsComponent, FitnessInsightsComponent, PageHeaderComponent, DiscoveryHintComponent],
   template: `
-    <div class="page">
+    <div class="page" [class.page--has-fab]="isToday() || isPast()">
 
       <app-page-header title="Inici" />
 
@@ -65,17 +65,6 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
         </div>
       </div>
 
-      @if (isToday()) {
-        <button class="start-workout-btn" (click)="goToTrain()">
-          <span class="material-symbols-outlined">add_circle</span>
-          Comença un entrenament
-        </button>
-      } @else if (isPast()) {
-        <button class="start-workout-btn start-workout-btn--past" (click)="registerPastWorkout()">
-          <span class="material-symbols-outlined">history</span>
-          Registra un entrenament
-        </button>
-      }
 
       @if (showRoutineHint()) {
         <div class="routine-hint-card">
@@ -161,10 +150,26 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
         }
       </div>
 
+      <!-- ── Acció principal flotant: pinada sobre la barra de navegació ── -->
+      @if (isToday()) {
+        <button class="start-workout-fab" (click)="goToTrain()">
+          <span class="material-symbols-outlined">add</span>
+          Comença un entrenament
+        </button>
+      } @else if (isPast()) {
+        <button class="start-workout-fab start-workout-fab--past" (click)="registerPastWorkout()">
+          <span class="material-symbols-outlined">history</span>
+          Registra un entrenament
+        </button>
+      }
+
     </div>
   `,
   styles: [`
     .page { padding: 0 0 16px; }
+    /* Reserva espai al final quan el FAB flotant és visible, perquè no tapi
+       les últimes targetes de l'historial. */
+    .page--has-fab { padding-bottom: calc(52px + 24px); }
 
     .calendar-wrap {
       margin: 4px 16px 0;
@@ -212,24 +217,30 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     .today-empty-icon { font-size: 32px; color: color-mix(in srgb, var(--c-brand) 35%, var(--c-border)); }
     .today-empty-text { font-size: 13px; color: var(--c-text-3); line-height: 1.4; }
 
-    /* ── Botó "Comença un entrenament" (separat de la targeta d'avui) ── */
-    .start-workout-btn {
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      width: calc(100% - 32px); height: 42px; margin: 12px 16px 0; padding: 0;
-      border: none; border-radius: 12px;
+    /* ── Acció principal flotant: "Comença un entrenament" ──
+       Pinada a l'ample sobre la barra de navegació perquè es distingeixi
+       clarament com l'acció principal, en lloc d'un botó enmig del contingut. */
+    .start-workout-fab {
+      position: fixed; left: 16px; right: 16px; bottom: calc(var(--nav-height) + 16px); z-index: 90;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      height: 52px; padding: 0 20px;
+      border: none; border-radius: 26px;
       background: var(--c-brand); color: white;
-      font-size: 13.5px; font-weight: 700;
-      cursor: pointer; touch-action: manipulation; transition: background 0.15s, transform 0.1s;
-      box-shadow: 0 2px 8px color-mix(in srgb, var(--c-brand) 30%, transparent);
-      .material-symbols-outlined { font-size: 17px; }
+      font-size: 15px; font-weight: 800; letter-spacing: 0.2px;
+      cursor: pointer; touch-action: manipulation;
+      transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.1),
+                  0 0 0 1px color-mix(in srgb, var(--c-brand) 40%, transparent);
+      .material-symbols-outlined { font-size: 22px; font-variation-settings: 'FILL' 1, 'wght' 500; }
       &:hover { background: var(--c-brand-dk); }
-      &:active { transform: scale(0.98); }
+      &:active { transform: scale(0.985); }
     }
-    /* Registrar un dia passat: mateix botó, accent càlid per distingir-lo
+    /* Registrar un dia passat: mateix FAB, accent càlid per distingir-lo
        de l'acció d'avui (en verd de marca). */
-    .start-workout-btn--past {
+    .start-workout-fab--past {
       background: #b26a00;
-      box-shadow: 0 2px 8px color-mix(in srgb, #b26a00 30%, transparent);
+      box-shadow: 0 8px 28px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.1),
+                  0 0 0 1px color-mix(in srgb, #b26a00 40%, transparent);
       &:hover { background: #9a5c00; }
     }
 
