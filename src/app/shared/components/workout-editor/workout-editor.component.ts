@@ -493,15 +493,15 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
             <!-- ── Entry footer: left (edit + stats) · right (notes + feeling + delete) ── -->
             <div class="we-entry-footer">
               <div class="we-footer-actions">
-                <button class="we-footer-edit-btn" (click)="editExercise(entry)"
-                  title="Editar exercici" aria-label="Editar exercici">
-                  <span class="material-symbols-outlined">edit</span>
-                </button>
                 @if (!offlineService.isOffline()) {
                   <button class="we-footer-stats-btn" (click)="openStats(entry)">
                     <span class="material-symbols-outlined">bar_chart</span>
                   </button>
                 }
+                <button class="we-footer-edit-btn" (click)="editExercise(entry)"
+                  title="Editar exercici" aria-label="Editar exercici">
+                  <span class="material-symbols-outlined">edit</span>
+                </button>
               </div>
               <div class="we-footer-actions">
                 @if (alwaysEditable() || editMode()) {

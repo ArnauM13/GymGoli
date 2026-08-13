@@ -351,12 +351,14 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
               <span class="material-symbols-outlined">tune</span>
             </button>
           </div>
+          <p class="section-hint">Tria un tipus per començar</p>
           <div class="type-grid" [style.grid-template-columns]="gridCols(workoutTypes().length)">
             @for (cat of workoutTypes(); track cat.value) {
               <button class="type-btn"
                 [style.--cat-color]="cat.color"
                 [class.type-btn--active]="pickerCat() === cat.value"
                 (click)="selectType(cat.value)">
+                <span class="material-symbols-outlined type-btn-add" aria-hidden="true">add</span>
                 <span class="material-symbols-outlined type-icon">{{ cat.icon }}</span>
                 <span class="type-label">{{ cat.label }}</span>
               </button>
@@ -375,6 +377,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
             <h2 class="section-title">Esport</h2>
           </div>
           @if (sportService.sports().length > 0) {
+            <p class="section-hint">Tria un esport per registrar-lo</p>
             <div class="type-grid" [style.grid-template-columns]="gridCols(sportService.sports().length)">
               @for (sport of sportService.sports(); track sport.id) {
                 <button class="type-btn"
@@ -382,6 +385,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
                   [class.type-btn--active]="loggerSport()?.id === sport.id"
                   (click)="openSessionLogger(sport)"
                   [disabled]="sportToggling()">
+                  <span class="material-symbols-outlined type-btn-add" aria-hidden="true">add</span>
                   <span class="material-symbols-outlined type-icon">{{ sport.icon }}</span>
                   <span class="type-label">{{ sport.name }}</span>
                 </button>
@@ -410,17 +414,36 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
     <!-- ── Suggeriment (ample complet, sobre la barra de navegació) ── -->
     @if (!activeWorkout() && todaySuggestion(); as s) {
       <div class="suggestion-float-row">
-        <button class="suggestion-float" [style.--sc]="s.color" (click)="handleSuggestionClick(s)">
-          <div class="sf-bar"></div>
-          <div class="sf-icon-wrap">
+        <button class="suggestion-float" [style.--sc]="s.color" (click)="handleSuggestionClick(s)"
+                [attr.aria-label]="'Entrenament suggerit: ' + s.label + '. ' + s.reason">
+          <div class="sf-bar" aria-hidden="true"></div>
+          <div class="sf-icon-wrap" aria-hidden="true">
             <span class="material-symbols-outlined sf-icon">{{ s.icon }}</span>
           </div>
-          <div class="sf-info">
+          <div class="sf-info" aria-hidden="true">
             <span class="sf-eyebrow">Suggerit</span>
             <span class="sf-label">{{ s.label }}</span>
             <span class="sf-reason">{{ s.reason }}</span>
           </div>
-          <span class="material-symbols-outlined sf-chevron">chevron_right</span>
+          <span class="material-symbols-outlined sf-chevron" aria-hidden="true">chevron_right</span>
+        </button>
+      </div>
+    } @else if (!activeWorkout() && !creating()) {
+      <!-- Acció principal quan no hi ha suggeriment: mateix format que el
+           suggeriment, amb els accents de marca i millores d'accessibilitat. -->
+      <div class="suggestion-float-row">
+        <button class="suggestion-float suggestion-float--action" (click)="startDefaultWorkout()"
+                aria-label="Nou entrenament: comença a registrar una sessió">
+          <div class="sf-bar" aria-hidden="true"></div>
+          <div class="sf-icon-wrap" aria-hidden="true">
+            <span class="material-symbols-outlined sf-icon">add_circle</span>
+          </div>
+          <div class="sf-info" aria-hidden="true">
+            <span class="sf-eyebrow">Comença</span>
+            <span class="sf-label">Nou entrenament</span>
+            <span class="sf-reason">Registra la teva sessió</span>
+          </div>
+          <span class="material-symbols-outlined sf-chevron" aria-hidden="true">chevron_right</span>
         </button>
       </div>
     }
@@ -898,7 +921,14 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       &:hover { color: var(--c-text); }
       &:active { opacity: 0.7; }
     }
+    /* Text guia sota la capçalera de secció: deixa clar que els mosaics
+       s'han de tocar per començar/registrar. */
+    .section-hint {
+      margin: -2px 0 10px; padding: 0 2px;
+      font-size: 12px; font-weight: 500; color: var(--c-text-3); line-height: 1.3;
+    }
     .type-btn {
+      position: relative;
       display: flex; flex-direction: column; align-items: center; gap: 7px;
       padding: 16px 4px 14px;
       border: 2px solid color-mix(in srgb, var(--cat-color) 55%, var(--c-border));
@@ -906,15 +936,27 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       background: color-mix(in srgb, var(--cat-color) 10%, var(--c-card));
       cursor: pointer;
       color: color-mix(in srgb, var(--cat-color) 80%, var(--c-text));
+      box-shadow: 0 1px 3px var(--c-shadow);
       transition: all 0.18s; touch-action: manipulation;
       &:hover {
         border-color: var(--cat-color);
         background: color-mix(in srgb, var(--cat-color) 18%, var(--c-card));
+        box-shadow: 0 4px 12px color-mix(in srgb, var(--cat-color) 22%, var(--c-shadow));
         transform: translateY(-1px);
       }
       &:active { transform: scale(0.97); }
       .type-icon { font-size: 28px; }
       .type-label { font-size: 11px; font-weight: 700; letter-spacing: 0.2px; text-align: center; }
+    }
+    /* Placa "+" a la cantonada: senyal explícita que el mosaic és un botó
+       d'acció (afegir / començar), no una simple etiqueta. */
+    .type-btn-add {
+      position: absolute; top: 6px; right: 6px;
+      display: flex; align-items: center; justify-content: center;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--cat-color); color: #fff;
+      font-size: 13px; font-variation-settings: 'wght' 600;
+      box-shadow: 0 1px 3px color-mix(in srgb, var(--cat-color) 40%, transparent);
     }
 
     /* ── Loading ── */
@@ -942,6 +984,16 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
         background: color-mix(in srgb, var(--sc) 13%, var(--c-card));
       }
       &:active { transform: scale(0.98); }
+      /* Millora d'accessibilitat: anell de focus visible per a teclat. */
+      &:focus-visible { outline: 2px solid var(--sc); outline-offset: 2px; }
+    }
+    /* Acció principal "Nou entrenament": mateix format de targeta que el
+       suggeriment, amb l'accent de marca i una ombra més elevada perquè
+       ressalti com l'acció principal. */
+    .suggestion-float--action {
+      --sc: var(--c-brand);
+      box-shadow: 0 8px 28px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.1);
+      &:hover { box-shadow: 0 10px 32px rgba(0,0,0,0.2), 0 2px 6px rgba(0,0,0,0.1); }
     }
     .sf-bar { width: 5px; align-self: stretch; flex-shrink: 0; background: var(--sc); }
     .sf-icon-wrap { width: 48px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
@@ -1455,6 +1507,17 @@ export class TrainComponent implements OnDestroy {
   handleSuggestionClick(s: TodaySuggestion): void {
     if (s.type === 'gym') this.selectType(s.category);
     else this.openSessionLogger(s.sport);
+  }
+
+  /** Primary "Nou entrenament" action (shown when there's no suggestion):
+   *  opens the type picker for the first configured gym type so the user can
+   *  start (empty / repeat last / template) in one tap. Falls back to the
+   *  first sport when no gym types exist. */
+  startDefaultWorkout(): void {
+    const firstType = this.workoutTypes()[0];
+    if (firstType) { this.selectType(firstType.value); return; }
+    const firstSport = this.sportService.sports()[0];
+    if (firstSport) this.openSessionLogger(firstSport);
   }
 
   readonly isSelectedFuture = computed(() => this.selectedDate() > TODAY());
