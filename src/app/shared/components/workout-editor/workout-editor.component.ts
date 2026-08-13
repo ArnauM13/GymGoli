@@ -3,6 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { A11yModule } from '@angular/cdk/a11y';
 import { MatDialog } from '@angular/material/dialog';
+import { Router } from '@angular/router';
 
 import { CATEGORY_COLORS, CATEGORY_LABELS, SUBCATEGORY_LABELS } from '../../../core/models/exercise.model';
 import { FEELING_LABEL, FeelingLevel, Workout, WorkoutEntry, WorkoutSet, setMaxWeight } from '../../../core/models/workout.model';
@@ -489,29 +490,33 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
               }
             }
 
-            <!-- ── Entry footer: feeling + stats + delete ── -->
+            <!-- ── Entry footer: left (edit + stats) · right (notes + feeling + delete) ── -->
             <div class="we-entry-footer">
-              @if (alwaysEditable() || editMode()) {
-                <button type="button" class="we-footer-feeling-btn"
-                  [class.we-footer-feeling-btn--set]="entry.feeling"
-                  (click)="openFatigaPicker(entry.exerciseId)">
-                  @if (entry.feeling) {
-                    {{ getFeelingEmoji(entry.feeling) }}
-                  } @else {
-                    <span class="material-symbols-outlined">sentiment_neutral</span>
-                  }
-                </button>
-              }
               <div class="we-footer-actions">
+                <button class="we-footer-edit-btn" (click)="editExercise(entry)"
+                  title="Editar exercici" aria-label="Editar exercici">
+                  <span class="material-symbols-outlined">edit</span>
+                </button>
                 @if (!offlineService.isOffline()) {
                   <button class="we-footer-stats-btn" (click)="openStats(entry)">
                     <span class="material-symbols-outlined">bar_chart</span>
                   </button>
                 }
+              </div>
+              <div class="we-footer-actions">
                 @if (alwaysEditable() || editMode()) {
                   <button class="we-footer-notes-btn" [class.we-footer-notes-btn--set]="entry.notes"
                     (click)="openNotesPopup(entry.exerciseId)" title="Nota de l'exercici">
                     <span class="material-symbols-outlined">{{ entry.notes ? 'sticky_note_2' : 'note_add' }}</span>
+                  </button>
+                  <button type="button" class="we-footer-feeling-btn"
+                    [class.we-footer-feeling-btn--set]="entry.feeling"
+                    (click)="openFatigaPicker(entry.exerciseId)">
+                    @if (entry.feeling) {
+                      {{ getFeelingEmoji(entry.feeling) }}
+                    } @else {
+                      <span class="material-symbols-outlined">sentiment_neutral</span>
+                    }
                   </button>
                   <button class="we-footer-delete-btn" (click)="removeEntry(entry.exerciseId)">
                     <span class="material-symbols-outlined">delete</span>
@@ -639,13 +644,11 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     /* ── Entry drag animation ── */
     .cdk-drag-animating app-exercise-entry-card { transition: transform 200ms ease; }
 
-    /* ── Drop placeholder (skeleton slot) ── */
-    app-exercise-entry-card.cdk-drag-placeholder {
-      border-radius: 14px;
-      border: 2px dashed color-mix(in srgb, var(--c-brand) 55%, var(--c-border-2));
-      background: color-mix(in srgb, var(--c-brand) 8%, var(--c-card));
-    }
-    app-exercise-entry-card.cdk-drag-placeholder > * { visibility: hidden; }
+    /* ── Drop placeholder ──
+       Fully removed from layout while dragging so the moving card leaves no
+       empty slot behind — the remaining entries close up instead of showing
+       a gap. */
+    app-exercise-entry-card.cdk-drag-placeholder { display: none; }
 
     /* ── Section headers ── */
     .we-section-header {
@@ -738,13 +741,22 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     }
     .we-footer-actions { display: flex; align-items: center; gap: 6px; }
 
-    /* ── Entry footer: stats + delete ── */
+    /* ── Entry footer: left (edit + stats) · right (notes + feeling + delete) ── */
     .we-entry-footer {
-      display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
       padding: 10px 14px 14px; border-top: 1px solid var(--c-border-2);
       background: color-mix(in srgb, var(--cat) 9%, var(--c-card));
     }
     .we-footer-stats-btn {
+      width: 36px; height: 36px; border-radius: 10px;
+      border: 1.5px solid var(--c-border); background: transparent;
+      color: var(--c-text-2);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { background: var(--c-subtle); color: var(--c-text); }
+    }
+    .we-footer-edit-btn {
       width: 36px; height: 36px; border-radius: 10px;
       border: 1.5px solid var(--c-border); background: transparent;
       color: var(--c-text-2);
@@ -1273,6 +1285,7 @@ export class WorkoutEditorComponent implements OnDestroy {
   private feedback         = inject(FeedbackService);
   private fb               = inject(FormBuilder);
   private dialog           = inject(MatDialog);
+  private router           = inject(Router);
 
   readonly unit = this.settingsService.weightUnit;
 
@@ -1501,11 +1514,22 @@ export class WorkoutEditorComponent implements OnDestroy {
   isCollapsed(id: string): boolean { return this.collapsedEntries().has(id); }
 
   toggleCollapse(id: string): void {
+    const wasCollapsed = this.collapsedEntries().has(id);
     const s = new Set(this.collapsedEntries());
     s.has(id) ? s.delete(id) : s.add(id);
     this.collapsedEntries.set(s);
     const wid = this.workout()?.id;
     if (wid) _collapsedByWorkout.set(wid, new Set(s));
+
+    // Expanding an empty exercise jumps straight into the add-set editor —
+    // same as a freshly added exercise — so exercises copied from a previous
+    // workout (which start collapsed with no sets) behave like manual ones.
+    if (wasCollapsed) {
+      const entry = this.workout()?.entries.find(e => e.exerciseId === id);
+      if (entry && entry.sets.length === 0 && this.isEntryEditable(id)) {
+        this.startAddSet(entry);
+      }
+    }
   }
 
   isSectionCollapsed(id: string): boolean { return this.collapsedSections().has(id); }
@@ -1642,6 +1666,11 @@ export class WorkoutEditorComponent implements OnDestroy {
       data: { exerciseId: entry.exerciseId, exerciseName: entry.exerciseName },
       width: '400px', maxHeight: '85vh',
     });
+  }
+
+  /** Jump to the exercise library with this exercise's edit dialog pre-opened. */
+  editExercise(entry: WorkoutEntry): void {
+    this.router.navigate(['/exercises'], { queryParams: { edit: entry.exerciseId } });
   }
 
   async onDrop(event: CdkDragDrop<WorkoutEntry[]>): Promise<void> {

@@ -1,5 +1,5 @@
-import { Component, computed, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { Component, computed, effect, inject, signal } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
@@ -252,8 +252,30 @@ export class ExercisesComponent {
   private feedback        = inject(FeedbackService);
   private confirmDialog   = inject(ConfirmDialogService);
   private router          = inject(Router);
+  private route           = inject(ActivatedRoute);
 
-  constructor() { this.exerciseService.ensureLoaded(); }
+  /** Guards the one-shot auto-open triggered by the `?edit=<id>` query param. */
+  private editHandled = false;
+
+  constructor() {
+    this.exerciseService.ensureLoaded();
+
+    // Deep-link: when arriving with `?edit=<exerciseId>` (e.g. from the edit
+    // button in the training view or the progress drawer), open that
+    // exercise's edit dialog as soon as it's loaded, then clear the param so
+    // a refresh doesn't reopen it.
+    const editId = this.route.snapshot.queryParamMap.get('edit');
+    if (editId) {
+      effect(() => {
+        if (this.editHandled) return;
+        const ex = this.allExercises().find(e => e.id === editId);
+        if (!ex) return;
+        this.editHandled = true;
+        this.router.navigate([], { queryParams: {}, replaceUrl: true });
+        this.openForm(ex);
+      });
+    }
+  }
 
   readonly searchQuery  = signal('');
   readonly activeFilter = signal<ExerciseCategory | null>(null);

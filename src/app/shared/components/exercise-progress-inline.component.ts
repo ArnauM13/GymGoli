@@ -23,6 +23,7 @@ import {
 } from 'chart.js';
 
 import { MatDialog } from '@angular/material/dialog';
+import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { Workout, setMaxWeight, setVolume } from '../../core/models/workout.model';
@@ -98,9 +99,13 @@ interface ChartPoint { date: string; value: number; }
         <div class="epi-bottom-pad"></div>
       }
 
-      <!-- Danger zone: wipe this exercise's logged data (all / a time range) -->
+      <!-- Actions: edit the exercise · wipe its logged data (all / a range) -->
       @if (sessionCount() > 0) {
         <div class="epi-danger">
+          <button class="epi-edit-btn" (click)="editExercise()"
+                  title="Editar exercici" aria-label="Editar exercici">
+            <span class="material-symbols-outlined">edit</span>
+          </button>
           <button class="epi-delete-btn" [disabled]="isDeleting()"
                   (click)="openDeleteDialog()">
             <span class="material-symbols-outlined">delete_sweep</span>
@@ -172,9 +177,18 @@ interface ChartPoint { date: string; value: number; }
     .epi-bottom-pad { height: 14px; }
 
     /* ── Danger zone ── */
-    .epi-danger { padding: 2px 14px 14px; }
+    .epi-danger { display: flex; align-items: stretch; gap: 8px; padding: 2px 14px 14px; }
+    .epi-edit-btn {
+      flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      width: 44px; border-radius: 10px;
+      border: 1.5px solid var(--c-border); background: var(--c-card);
+      color: var(--c-text-2); cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { background: var(--c-subtle); color: var(--c-text); border-color: var(--c-text-3); }
+      &:active { transform: scale(0.98); }
+    }
     .epi-delete-btn {
-      width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
       padding: 10px; border-radius: 10px;
       border: 1.5px solid color-mix(in srgb, #ef5350 38%, var(--c-border));
       background: color-mix(in srgb, #ef5350 6%, var(--c-card));
@@ -195,6 +209,7 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
   private exerciseService = inject(ExerciseService);
   private dialog          = inject(MatDialog);
   private feedback        = inject(FeedbackService);
+  private router          = inject(Router);
 
   readonly exerciseId   = input<string | null>(null);
   readonly exerciseName = input<string | null>(null);
@@ -292,6 +307,13 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
   }
 
   ngOnDestroy(): void { this.chart?.destroy(); }
+
+  /** Jump to the exercise library with this exercise's edit dialog pre-opened. */
+  editExercise(): void {
+    const exId = this.exerciseId();
+    if (!exId) return;
+    this.router.navigate(['/exercises'], { queryParams: { edit: exId } });
+  }
 
   /** Opens the delete-scope dialog, then wipes the chosen slice of this
    *  exercise's history — with a running toast at every step so the user
