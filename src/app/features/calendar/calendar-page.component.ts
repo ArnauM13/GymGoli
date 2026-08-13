@@ -15,12 +15,11 @@ import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
 import { AuthService } from '../../core/services/auth.service';
 import { kgToDisplay } from '../../shared/utils/weight.utils';
-import { addDays, mondayOf } from '../../shared/utils/calendar-utils';
+import { addDays } from '../../shared/utils/calendar-utils';
 import { formatFeeling } from '../../shared/utils/workout-card.utils';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { FilterBarComponent } from '../../shared/components/filter-bar/filter-bar.component';
-import { WeeklySummaryComponent } from '../train/components/weekly-summary.component';
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { TrainingTypeService } from '../../core/services/training-type.service';
 
@@ -29,39 +28,35 @@ const PAGE_SIZE = 20;
 @Component({
   selector: 'app-calendar-page',
   standalone: true,
-  imports: [RouterLink, CalendarComponent, PageHeaderComponent, FilterBarComponent, WeeklySummaryComponent],
+  imports: [RouterLink, CalendarComponent, PageHeaderComponent, FilterBarComponent],
   template: `
     <div class="page">
 
       <!-- ── Page header ── -->
-      <app-page-header title="Calendari">
-        <button class="cal-toggle" [class.cal-toggle--open]="calendarOpen()"
-                (click)="calendarOpen.set(!calendarOpen())"
-                [attr.aria-label]="calendarOpen() ? 'Amaga calendari' : 'Mostra calendari'">
-          <span class="material-symbols-outlined">calendar_month</span>
-          <span class="material-symbols-outlined cal-toggle-chev">
-            {{ calendarOpen() ? 'expand_less' : 'expand_more' }}
-          </span>
-        </button>
-      </app-page-header>
+      <app-page-header title="Historial" />
 
-      <!-- ── Calendari plegable ── -->
+      <!-- ── Cerca i filtres (sempre visibles) — el calendari és un filtre més ── -->
+      <app-filter-bar
+        searchPlaceholder="Cerca per exercici..."
+        [(searchQuery)]="searchQuery"
+        [(sortDesc)]="sortDesc"
+        [(category)]="filterCat">
+        <button class="cal-filter-btn"
+                [class.cal-filter-btn--active]="calendarOpen() || !!selectedDate()"
+                (click)="calendarOpen.set(!calendarOpen())"
+                [attr.aria-label]="calendarOpen() ? 'Amaga el calendari' : 'Filtra per data'"
+                [attr.aria-expanded]="calendarOpen()" title="Filtra per data">
+          <span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>
+          @if (selectedDate()) { <span class="cal-filter-dot" aria-hidden="true"></span> }
+        </button>
+      </app-filter-bar>
+
+      <!-- ── Calendari plegable (filtre per data) ── -->
       <div class="cal-collapse" [class.cal-collapse--open]="calendarOpen()">
         <div class="cal-collapse-inner">
           <div class="calendar-wrap">
             <app-calendar [selectedDate]="selectedDate()" [allowFuturePlanning]="true"
-                          (dateSelected)="selectDate($event)" (weekChanged)="currentWeekMonday.set($event)" />
-            <app-weekly-summary [weekDate]="selectedDate() ?? workoutService.todayDateString()" />
-
-            @if (canPlanViewedWeek()) {
-              <div class="plan-week-strip">
-                <a class="plan-week-btn" [routerLink]="['/train/planner']" [queryParams]="{ week: currentWeekMonday() }">
-                  <span class="material-symbols-outlined">event_repeat</span>
-                  Planificar la setmana
-                  <span class="material-symbols-outlined plan-week-arrow">chevron_right</span>
-                </a>
-              </div>
-            }
+                          (dateSelected)="selectDate($event)" />
           </div>
         </div>
       </div>
@@ -99,13 +94,6 @@ const PAGE_SIZE = 20;
       } @else {
 
       @if (!isFutureOrToday()) {
-
-        <!-- ── Cerca i filtres ── -->
-        <app-filter-bar
-          searchPlaceholder="Cerca per exercici..."
-          [(searchQuery)]="searchQuery"
-          [(sortDesc)]="sortDesc"
-          [(category)]="filterCat" />
 
         <!-- ── Data seleccionada (sota els filtres, no inline) ── -->
         @if (selectedDate()) {
@@ -416,38 +404,27 @@ const PAGE_SIZE = 20;
   styles: [`
     .page { padding: 0 0 16px; }
 
-    /* ── "Planificar la setmana" subsection, below the weekly goals ── */
-    .plan-week-strip {
-      display: flex; justify-content: flex-end;
-      padding: 10px 14px;
-      border-top: 1px solid var(--c-border-2);
-      background: var(--c-card);
-    }
-    .plan-week-btn {
-      display: inline-flex; align-items: center; gap: 6px;
-      height: 38px; padding: 0 16px; box-sizing: border-box;
-      border: none; border-radius: 12px;
-      background: var(--c-brand); color: white;
-      font-size: 13px; font-weight: 700;
-      text-decoration: none; cursor: pointer; touch-action: manipulation; transition: background 0.15s, transform 0.1s;
-      box-shadow: 0 3px 10px color-mix(in srgb, var(--c-brand) 35%, transparent);
-      .material-symbols-outlined { font-size: 17px; }
-      &:hover { background: var(--c-brand-dk); }
-      &:active { transform: scale(0.98); }
-    }
-    .plan-week-arrow { color: rgba(255,255,255,0.85); }
-
-    /* ── Calendar toggle ── */
-    .cal-toggle {
-      display: flex; align-items: center; gap: 2px; flex-shrink: 0;
-      height: 34px; padding: 0 8px 0 10px;
-      border: 1.5px solid var(--c-border); border-radius: 10px;
-      background: var(--c-subtle); color: var(--c-text-2);
+    /* ── Calendar-as-filter toggle (projected into the filter bar) ── */
+    .cal-filter-btn {
+      position: relative;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      width: 34px; height: 34px; border-radius: 50%;
+      border: 1.5px solid var(--c-border); background: var(--c-card);
+      color: var(--c-text-2);
       cursor: pointer; touch-action: manipulation; transition: all 0.15s;
       .material-symbols-outlined { font-size: 18px; }
-      .cal-toggle-chev { font-size: 18px; }
-      &:hover { background: var(--c-border-2); color: var(--c-text); }
-      &.cal-toggle--open { background: var(--c-brand); color: white; border-color: var(--c-brand); }
+      &:not(.cal-filter-btn--active):hover { border-color: var(--c-brand); color: var(--c-brand); }
+      &.cal-filter-btn--active {
+        background: var(--c-brand); color: white; border-color: var(--c-brand);
+        box-shadow: 0 2px 6px color-mix(in srgb, var(--c-brand) 35%, transparent);
+      }
+      &:focus-visible { outline: 2px solid var(--c-brand); outline-offset: 2px; }
+    }
+    /* Small dot marking that a specific day is currently filtering the list. */
+    .cal-filter-dot {
+      position: absolute; top: 4px; right: 4px;
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #fff; box-shadow: 0 0 0 2px var(--c-brand);
     }
 
     /* ── Collapsible calendar ── */
@@ -844,15 +821,9 @@ export class CalendarPageComponent implements OnDestroy {
   private typeService     = inject(TrainingTypeService);
   readonly gymCategories = computed(() => this.typeService.types().map(t => t.id));
 
-  readonly calendarOpen  = signal(true);
-  /** Monday of whichever week the calendar widget currently has in view
-   *  (updated on every navigation, independent of a tapped date) — powers
-   *  the "Planificar la setmana" quick action in the header. */
-  readonly currentWeekMonday = signal<string>(mondayOf(new Date().toISOString().split('T')[0]));
-  /** Planning only makes sense from today onward — the shortcut disappears
-   *  when the week in view has already fully passed. */
-  readonly canPlanViewedWeek = computed(() =>
-    addDays(this.currentWeekMonday(), 6) >= this.workoutService.todayDateString());
+  /** The calendar starts collapsed — this is primarily a list page and the
+   *  calendar acts as an optional date filter you expand on demand. */
+  readonly calendarOpen  = signal(false);
   readonly selectedDate  = signal<string | null>(null);
   readonly expandedId    = signal<string | null>(null);
   readonly sortDesc      = signal(true);

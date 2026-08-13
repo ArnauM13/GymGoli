@@ -1,5 +1,5 @@
 import { Component, ElementRef, OnDestroy, computed, effect, inject, signal, viewChild } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 
 import { Sport, SportSession } from '../../core/models/sport.model';
 import { Workout } from '../../core/models/workout.model';
@@ -13,22 +13,37 @@ import { DayFeedCardsComponent, DayFeedEntry } from '../../shared/components/day
 import { FitnessInsightsComponent } from '../../shared/components/fitness-insights/fitness-insights.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { DiscoveryHintComponent } from '../../shared/components/discovery-hint/discovery-hint.component';
+import { WeeklySummaryComponent } from '../train/components/weekly-summary.component';
 import { AppHintService } from '../../core/services/app-hint.service';
 import { feedDayLabel } from '../../shared/utils/workout-card.utils';
+import { addDays, mondayOf } from '../../shared/utils/calendar-utils';
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CalendarComponent, DayFeedCardsComponent, FitnessInsightsComponent, PageHeaderComponent, DiscoveryHintComponent],
+  imports: [RouterLink, CalendarComponent, DayFeedCardsComponent, FitnessInsightsComponent, PageHeaderComponent, DiscoveryHintComponent, WeeklySummaryComponent],
   template: `
     <div class="page" [class.page--has-fab]="isToday() || isPast()">
 
       <app-page-header title="Inici" />
 
       <div class="calendar-wrap">
-        <app-calendar [selectedDate]="effectiveDate()" (dateSelected)="selectDate($event)" />
+        <app-calendar [selectedDate]="effectiveDate()"
+                      (dateSelected)="selectDate($event)"
+                      (weekChanged)="currentWeekMonday.set($event)" />
+        <app-weekly-summary [weekDate]="effectiveDate()" />
+
+        @if (canPlanViewedWeek()) {
+          <div class="plan-week-strip">
+            <a class="plan-week-btn" [routerLink]="['/train/planner']" [queryParams]="{ week: currentWeekMonday() }">
+              <span class="material-symbols-outlined" aria-hidden="true">event_repeat</span>
+              Planificar la setmana
+              <span class="material-symbols-outlined plan-week-arrow" aria-hidden="true">chevron_right</span>
+            </a>
+          </div>
+        }
       </div>
 
       @if (!offlineService.isOffline() && previewFeedEntry() === null) {
@@ -150,16 +165,35 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
         }
       </div>
 
-      <!-- ── Acció principal flotant: pinada sobre la barra de navegació ── -->
+      <!-- ── Acció principal flotant: mateix format que l'entrenament
+             suggerit, amb accents de marca i millores d'accessibilitat. ── -->
       @if (isToday()) {
-        <button class="start-workout-fab" (click)="goToTrain()">
-          <span class="material-symbols-outlined">add</span>
-          Comença un entrenament
+        <button class="start-workout-fab" (click)="goToTrain()"
+                aria-label="Comença un entrenament">
+          <span class="swf-bar" aria-hidden="true"></span>
+          <span class="swf-icon-wrap" aria-hidden="true">
+            <span class="material-symbols-outlined swf-icon">add_circle</span>
+          </span>
+          <span class="swf-info" aria-hidden="true">
+            <span class="swf-eyebrow">Avui</span>
+            <span class="swf-label">Comença un entrenament</span>
+            <span class="swf-reason">Registra la teva sessió</span>
+          </span>
+          <span class="material-symbols-outlined swf-chevron" aria-hidden="true">chevron_right</span>
         </button>
       } @else if (isPast()) {
-        <button class="start-workout-fab start-workout-fab--past" (click)="registerPastWorkout()">
-          <span class="material-symbols-outlined">history</span>
-          Registra un entrenament
+        <button class="start-workout-fab start-workout-fab--past" (click)="registerPastWorkout()"
+                aria-label="Registra un entrenament">
+          <span class="swf-bar" aria-hidden="true"></span>
+          <span class="swf-icon-wrap" aria-hidden="true">
+            <span class="material-symbols-outlined swf-icon">history</span>
+          </span>
+          <span class="swf-info" aria-hidden="true">
+            <span class="swf-eyebrow">Registrar</span>
+            <span class="swf-label">Registra un entrenament</span>
+            <span class="swf-reason">{{ todayDateLabel() }}</span>
+          </span>
+          <span class="material-symbols-outlined swf-chevron" aria-hidden="true">chevron_right</span>
         </button>
       }
 
@@ -169,13 +203,34 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     .page { padding: 0 0 16px; }
     /* Reserva espai al final quan el FAB flotant és visible, perquè no tapi
        les últimes targetes de l'historial. */
-    .page--has-fab { padding-bottom: calc(52px + 24px); }
+    .page--has-fab { padding-bottom: calc(60px + 28px); }
 
     .calendar-wrap {
       margin: 4px 16px 0;
       box-shadow: 0 2px 12px rgba(0,0,0,0.08);
       border-radius: 16px; overflow: hidden;
     }
+
+    /* ── "Planificar la setmana" (sota l'objectiu setmanal) ── */
+    .plan-week-strip {
+      display: flex; justify-content: flex-end;
+      padding: 10px 14px;
+      border-top: 1px solid var(--c-border-2);
+      background: var(--c-card);
+    }
+    .plan-week-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      height: 38px; padding: 0 16px; box-sizing: border-box;
+      border: none; border-radius: 12px;
+      background: var(--c-brand); color: white;
+      font-size: 13px; font-weight: 700;
+      text-decoration: none; cursor: pointer; touch-action: manipulation; transition: background 0.15s, transform 0.1s;
+      box-shadow: 0 3px 10px color-mix(in srgb, var(--c-brand) 35%, transparent);
+      .material-symbols-outlined { font-size: 17px; }
+      &:hover { background: var(--c-brand-dk); }
+      &:active { transform: scale(0.98); }
+    }
+    .plan-week-arrow { color: rgba(255,255,255,0.85); }
 
     /* ── Avui / dia seleccionat: targeta destacada amb capçalera de marca ── */
     .today-card {
@@ -217,32 +272,50 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     .today-empty-icon { font-size: 32px; color: color-mix(in srgb, var(--c-brand) 35%, var(--c-border)); }
     .today-empty-text { font-size: 13px; color: var(--c-text-3); line-height: 1.4; }
 
-    /* ── Acció principal flotant: "Comença un entrenament" ──
-       Pinada a l'ample sobre la barra de navegació perquè es distingeixi
-       clarament com l'acció principal, en lloc d'un botó enmig del contingut. */
+    /* ── Acció principal flotant "Comença un entrenament" ──
+       Mateix format de targeta que l'entrenament suggerit (barra d'accent,
+       icona, text i cheveron), pinada a l'ample sobre la barra de navegació. */
     .start-workout-fab {
+      --sc: var(--c-brand);
       position: fixed; left: 16px; right: 16px; bottom: calc(var(--nav-height) + 16px); z-index: 90;
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      height: 52px; padding: 0 20px;
-      border: none; border-radius: 26px;
-      background: var(--c-brand); color: white;
-      font-size: 15px; font-weight: 800; letter-spacing: 0.2px;
-      cursor: pointer; touch-action: manipulation;
-      transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
-      box-shadow: 0 8px 28px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.1),
-                  0 0 0 1px color-mix(in srgb, var(--c-brand) 40%, transparent);
-      .material-symbols-outlined { font-size: 22px; font-variation-settings: 'FILL' 1, 'wght' 500; }
-      &:hover { background: var(--c-brand-dk); }
-      &:active { transform: scale(0.985); }
+      display: flex; align-items: center; gap: 0;
+      height: 60px; padding: 0; border-radius: 14px;
+      border: 1.5px solid color-mix(in srgb, var(--sc) 35%, var(--c-border-2));
+      background: color-mix(in srgb, var(--sc) 8%, var(--c-card));
+      box-shadow: 0 8px 28px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.1);
+      cursor: pointer; touch-action: manipulation; overflow: hidden; text-align: left;
+      transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s;
+      &:hover {
+        box-shadow: 0 10px 32px rgba(0,0,0,0.2), 0 2px 6px rgba(0,0,0,0.1);
+        border-color: color-mix(in srgb, var(--sc) 55%, var(--c-border));
+        background: color-mix(in srgb, var(--sc) 13%, var(--c-card));
+      }
+      &:active { transform: scale(0.98); }
+      /* Millora d'accessibilitat: anell de focus visible per a teclat. */
+      &:focus-visible { outline: 2px solid var(--sc); outline-offset: 2px; }
     }
-    /* Registrar un dia passat: mateix FAB, accent càlid per distingir-lo
+    /* Registrar un dia passat: mateix format, accent càlid per distingir-lo
        de l'acció d'avui (en verd de marca). */
-    .start-workout-fab--past {
-      background: #b26a00;
-      box-shadow: 0 8px 28px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.1),
-                  0 0 0 1px color-mix(in srgb, #b26a00 40%, transparent);
-      &:hover { background: #9a5c00; }
+    .start-workout-fab--past { --sc: #b26a00; }
+    .swf-bar { width: 5px; align-self: stretch; flex-shrink: 0; background: var(--sc); }
+    .swf-icon-wrap { width: 48px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .swf-icon { font-size: 23px; color: var(--sc); font-variation-settings: 'FILL' 1; }
+    .swf-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .swf-eyebrow {
+      font-size: 9.5px; font-weight: 700; line-height: 1;
+      color: color-mix(in srgb, var(--sc) 70%, var(--c-text-3));
+      text-transform: uppercase; letter-spacing: 0.6px;
     }
+    .swf-label {
+      font-size: 14px; font-weight: 700; color: var(--c-text); line-height: 1.2;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .swf-reason {
+      font-size: 11.5px; font-weight: 600; letter-spacing: 0.1px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      color: color-mix(in srgb, var(--sc) 65%, var(--c-text-3));
+    }
+    .swf-chevron { font-size: 20px; color: var(--c-text-3); margin-right: 12px; flex-shrink: 0; }
 
     /* ── "Encara no tens cap rutina" hint ── */
     .routine-hint-card {
@@ -353,6 +426,14 @@ export class HomeComponent implements OnDestroy {
   private confirmDialog    = inject(ConfirmDialogService);
 
   readonly selectedDate = signal<string | null>(null);
+
+  /** Monday of whichever week the calendar widget currently has in view,
+   *  powering the "Planificar la setmana" quick action below the weekly goal. */
+  readonly currentWeekMonday = signal<string>(mondayOf(TODAY()));
+  /** Planning only makes sense from today onward — the shortcut disappears
+   *  when the week in view has already fully passed. */
+  readonly canPlanViewedWeek = computed(() =>
+    addDays(this.currentWeekMonday(), 6) >= TODAY());
 
   /** Contextual nudge: the user trains both gym and sport but tracks a single
    *  combined weekly goal — suggest splitting it into separate goals. */

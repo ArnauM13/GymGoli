@@ -279,4 +279,22 @@ describe('HomeComponent', () => {
       expect(component.showSeparateGoalsNudge()).toBeFalse();
     });
   });
+
+  // ── canPlanViewedWeek() (moved here with the weekly goal + planning) ──────
+
+  describe('canPlanViewedWeek()', () => {
+    it('is true for the current week (it still has today or future days)', () => {
+      expect(component.canPlanViewedWeek()).toBeTrue();
+    });
+
+    it('is false once the viewed week has fully passed', () => {
+      component.currentWeekMonday.set('2020-01-06');
+      expect(component.canPlanViewedWeek()).toBeFalse();
+    });
+
+    it('is true for a future week', () => {
+      component.currentWeekMonday.set('2099-01-04');
+      expect(component.canPlanViewedWeek()).toBeTrue();
+    });
+  });
 });

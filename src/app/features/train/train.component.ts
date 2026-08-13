@@ -414,25 +414,36 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
     <!-- ── Suggeriment (ample complet, sobre la barra de navegació) ── -->
     @if (!activeWorkout() && todaySuggestion(); as s) {
       <div class="suggestion-float-row">
-        <button class="suggestion-float" [style.--sc]="s.color" (click)="handleSuggestionClick(s)">
-          <div class="sf-bar"></div>
-          <div class="sf-icon-wrap">
+        <button class="suggestion-float" [style.--sc]="s.color" (click)="handleSuggestionClick(s)"
+                [attr.aria-label]="'Entrenament suggerit: ' + s.label + '. ' + s.reason">
+          <div class="sf-bar" aria-hidden="true"></div>
+          <div class="sf-icon-wrap" aria-hidden="true">
             <span class="material-symbols-outlined sf-icon">{{ s.icon }}</span>
           </div>
-          <div class="sf-info">
+          <div class="sf-info" aria-hidden="true">
             <span class="sf-eyebrow">Suggerit</span>
             <span class="sf-label">{{ s.label }}</span>
             <span class="sf-reason">{{ s.reason }}</span>
           </div>
-          <span class="material-symbols-outlined sf-chevron">chevron_right</span>
+          <span class="material-symbols-outlined sf-chevron" aria-hidden="true">chevron_right</span>
         </button>
       </div>
     } @else if (!activeWorkout() && !creating()) {
-      <!-- Acció principal quan no hi ha suggeriment: sempre visible i clara -->
+      <!-- Acció principal quan no hi ha suggeriment: mateix format que el
+           suggeriment, amb els accents de marca i millores d'accessibilitat. -->
       <div class="suggestion-float-row">
-        <button class="new-workout-fab" (click)="startDefaultWorkout()">
-          <span class="material-symbols-outlined">add</span>
-          Nou entrenament
+        <button class="suggestion-float suggestion-float--action" (click)="startDefaultWorkout()"
+                aria-label="Nou entrenament: comença a registrar una sessió">
+          <div class="sf-bar" aria-hidden="true"></div>
+          <div class="sf-icon-wrap" aria-hidden="true">
+            <span class="material-symbols-outlined sf-icon">add_circle</span>
+          </div>
+          <div class="sf-info" aria-hidden="true">
+            <span class="sf-eyebrow">Comença</span>
+            <span class="sf-label">Nou entrenament</span>
+            <span class="sf-reason">Registra la teva sessió</span>
+          </div>
+          <span class="material-symbols-outlined sf-chevron" aria-hidden="true">chevron_right</span>
         </button>
       </div>
     }
@@ -973,23 +984,16 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
         background: color-mix(in srgb, var(--sc) 13%, var(--c-card));
       }
       &:active { transform: scale(0.98); }
+      /* Millora d'accessibilitat: anell de focus visible per a teclat. */
+      &:focus-visible { outline: 2px solid var(--sc); outline-offset: 2px; }
     }
-    /* Acció principal flotant "Nou entrenament" (quan no hi ha suggeriment):
-       mateixa posició que el suggeriment perquè sempre hi hagi UNA acció
-       principal visible sobre la barra de navegació. */
-    .new-workout-fab {
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      width: 100%; height: 56px; padding: 0 20px;
-      border: none; border-radius: 26px;
-      background: var(--c-brand); color: #fff;
-      font-size: 15px; font-weight: 800; letter-spacing: 0.2px;
-      cursor: pointer; touch-action: manipulation;
-      transition: background 0.15s, transform 0.1s;
-      box-shadow: 0 8px 28px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.1),
-                  0 0 0 1px color-mix(in srgb, var(--c-brand) 40%, transparent);
-      .material-symbols-outlined { font-size: 22px; font-variation-settings: 'FILL' 1, 'wght' 500; }
-      &:hover { background: var(--c-brand-dk); }
-      &:active { transform: scale(0.985); }
+    /* Acció principal "Nou entrenament": mateix format de targeta que el
+       suggeriment, amb l'accent de marca i una ombra més elevada perquè
+       ressalti com l'acció principal. */
+    .suggestion-float--action {
+      --sc: var(--c-brand);
+      box-shadow: 0 8px 28px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.1);
+      &:hover { box-shadow: 0 10px 32px rgba(0,0,0,0.2), 0 2px 6px rgba(0,0,0,0.1); }
     }
     .sf-bar { width: 5px; align-self: stretch; flex-shrink: 0; background: var(--sc); }
     .sf-icon-wrap { width: 48px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
