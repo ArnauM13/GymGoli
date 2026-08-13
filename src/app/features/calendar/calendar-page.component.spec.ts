@@ -248,6 +248,31 @@ describe('CalendarPageComponent', () => {
     });
   });
 
+  // ── selectedDateLabel() ──────────────────────────────────────────────────
+
+  describe('selectedDateLabel()', () => {
+    const noonShift = (iso: string, days: number): string => {
+      const d = new Date(iso + 'T12:00:00');
+      d.setDate(d.getDate() + days);
+      return d.toISOString().split('T')[0];
+    };
+
+    it('labels today as "Avui"', () => {
+      component.selectedDate.set(TODAY);
+      expect(component.selectedDateLabel()).toBe('Avui');
+    });
+
+    it('labels the immediately previous day as "Ahir"', () => {
+      component.selectedDate.set(noonShift(TODAY, -1));
+      expect(component.selectedDateLabel()).toBe('Ahir');
+    });
+
+    it('does not mislabel two days ago as "Ahir"', () => {
+      component.selectedDate.set(noonShift(TODAY, -2));
+      expect(component.selectedDateLabel()).not.toBe('Ahir');
+    });
+  });
+
   // ── hasActiveFilter() ────────────────────────────────────────────────────
 
   describe('hasActiveFilter()', () => {

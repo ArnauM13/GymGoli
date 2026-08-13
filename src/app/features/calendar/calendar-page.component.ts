@@ -1017,12 +1017,15 @@ export class CalendarPageComponent implements OnDestroy {
     const today = this.workoutService.todayDateString();
     if (sel === today) return 'Avui';
     const yesterday = (() => {
-      const d = new Date(today + 'T00:00:00');
+      // Anchor at noon: `toISOString()` on a local-midnight date rolls back a
+      // day in positive-offset timezones (e.g. UTC+2), which mislabelled the
+      // day-before-yesterday as "Ahir".
+      const d = new Date(today + 'T12:00:00');
       d.setDate(d.getDate() - 1);
       return d.toISOString().split('T')[0];
     })();
     if (sel === yesterday) return 'Ahir';
-    const d = new Date(sel + 'T00:00:00');
+    const d = new Date(sel + 'T12:00:00');
     const label = d.toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'long' });
     return label.charAt(0).toUpperCase() + label.slice(1);
   });
