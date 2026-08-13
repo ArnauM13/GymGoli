@@ -71,9 +71,10 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
           Comença un entrenament
         </button>
       } @else if (isPast()) {
-        <button class="start-workout-btn start-workout-btn--past" (click)="registerPastWorkout()">
-          <span class="material-symbols-outlined">history</span>
+        <button class="register-past-btn" (click)="registerPastWorkout()">
+          <span class="material-symbols-outlined">add</span>
           Registra un entrenament
+          <span class="rpb-date">{{ previewTitle() }}</span>
         </button>
       }
 
@@ -225,12 +226,25 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
       &:hover { background: var(--c-brand-dk); }
       &:active { transform: scale(0.98); }
     }
-    /* Registrar un dia passat: mateix botó, accent càlid per distingir-lo
-       de l'acció d'avui (en verd de marca). */
-    .start-workout-btn--past {
-      background: #b26a00;
-      box-shadow: 0 2px 8px color-mix(in srgb, #b26a00 30%, transparent);
-      &:hover { background: #9a5c00; }
+    /* Registrar un dia passat: mateix format que el botó "Registrar
+       entrenament" del calendari (vora discontínua, color de marca,
+       píndola amb el dia). */
+    .register-past-btn {
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+      width: calc(100% - 32px); margin: 12px 16px 0; padding: 12px;
+      border-radius: 14px;
+      border: 1.5px dashed color-mix(in srgb, var(--c-brand) 45%, transparent);
+      background: rgba(var(--c-brand-rgb), 0.06); color: var(--c-brand);
+      font-size: 14px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
+      .material-symbols-outlined { font-size: 19px; }
+      &:hover { background: rgba(var(--c-brand-rgb), 0.12); }
+      &:active { transform: scale(0.99); }
+    }
+    .rpb-date {
+      padding: 2px 9px; border-radius: 999px;
+      background: rgba(var(--c-brand-rgb), 0.14);
+      font-size: 12px; font-weight: 700; text-transform: capitalize;
     }
 
     /* ── "Encara no tens cap rutina" hint ── */
