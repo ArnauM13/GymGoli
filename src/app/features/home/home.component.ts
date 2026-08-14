@@ -25,7 +25,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
   standalone: true,
   imports: [RouterLink, CalendarComponent, DayFeedCardsComponent, FitnessInsightsComponent, PageHeaderComponent, DiscoveryHintComponent, WeeklySummaryComponent],
   template: `
-    <div class="page" [class.page--has-fab]="isToday() || isPast()">
+    <div class="page">
 
       <app-page-header title="Inici" />
 
@@ -79,6 +79,38 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
           }
         </div>
       </div>
+
+      <!-- ── Acció principal: registrar l'entrenament del dia seleccionat,
+             just sota la secció del dia (avui o un dia passat). ── -->
+      @if (isToday()) {
+        <button class="start-workout-btn" (click)="goToTrain()"
+                aria-label="Comença un entrenament">
+          <span class="swf-bar" aria-hidden="true"></span>
+          <span class="swf-icon-wrap" aria-hidden="true">
+            <span class="material-symbols-outlined swf-icon">add_circle</span>
+          </span>
+          <span class="swf-info" aria-hidden="true">
+            <span class="swf-eyebrow">Avui</span>
+            <span class="swf-label">Comença un entrenament</span>
+            <span class="swf-reason">Registra la teva sessió</span>
+          </span>
+          <span class="material-symbols-outlined swf-chevron" aria-hidden="true">chevron_right</span>
+        </button>
+      } @else if (isPast()) {
+        <button class="start-workout-btn start-workout-btn--past" (click)="registerPastWorkout()"
+                aria-label="Registra un entrenament">
+          <span class="swf-bar" aria-hidden="true"></span>
+          <span class="swf-icon-wrap" aria-hidden="true">
+            <span class="material-symbols-outlined swf-icon">history</span>
+          </span>
+          <span class="swf-info" aria-hidden="true">
+            <span class="swf-eyebrow">Registrar</span>
+            <span class="swf-label">Registra un entrenament</span>
+            <span class="swf-reason">{{ todayDateLabel() }}</span>
+          </span>
+          <span class="material-symbols-outlined swf-chevron" aria-hidden="true">chevron_right</span>
+        </button>
+      }
 
 
       @if (showRoutineHint()) {
@@ -165,45 +197,10 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
         }
       </div>
 
-      <!-- ── Acció principal flotant: mateix format que l'entrenament
-             suggerit, amb accents de marca i millores d'accessibilitat. ── -->
-      @if (isToday()) {
-        <button class="start-workout-fab" (click)="goToTrain()"
-                aria-label="Comença un entrenament">
-          <span class="swf-bar" aria-hidden="true"></span>
-          <span class="swf-icon-wrap" aria-hidden="true">
-            <span class="material-symbols-outlined swf-icon">add_circle</span>
-          </span>
-          <span class="swf-info" aria-hidden="true">
-            <span class="swf-eyebrow">Avui</span>
-            <span class="swf-label">Comença un entrenament</span>
-            <span class="swf-reason">Registra la teva sessió</span>
-          </span>
-          <span class="material-symbols-outlined swf-chevron" aria-hidden="true">chevron_right</span>
-        </button>
-      } @else if (isPast()) {
-        <button class="start-workout-fab start-workout-fab--past" (click)="registerPastWorkout()"
-                aria-label="Registra un entrenament">
-          <span class="swf-bar" aria-hidden="true"></span>
-          <span class="swf-icon-wrap" aria-hidden="true">
-            <span class="material-symbols-outlined swf-icon">history</span>
-          </span>
-          <span class="swf-info" aria-hidden="true">
-            <span class="swf-eyebrow">Registrar</span>
-            <span class="swf-label">Registra un entrenament</span>
-            <span class="swf-reason">{{ todayDateLabel() }}</span>
-          </span>
-          <span class="material-symbols-outlined swf-chevron" aria-hidden="true">chevron_right</span>
-        </button>
-      }
-
     </div>
   `,
   styles: [`
     .page { padding: 0 0 16px; }
-    /* Reserva espai al final quan el FAB flotant és visible, perquè no tapi
-       les últimes targetes de l'historial. */
-    .page--has-fab { padding-bottom: calc(60px + 28px); }
 
     .calendar-wrap {
       margin: 4px 16px 0;
@@ -272,21 +269,21 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     .today-empty-icon { font-size: 32px; color: color-mix(in srgb, var(--c-brand) 35%, var(--c-border)); }
     .today-empty-text { font-size: 13px; color: var(--c-text-3); line-height: 1.4; }
 
-    /* ── Acció principal flotant "Comença un entrenament" ──
-       Mateix format de targeta que l'entrenament suggerit (barra d'accent,
-       icona, text i cheveron), pinada a l'ample sobre la barra de navegació. */
-    .start-workout-fab {
+    /* ── Acció principal "Comença un entrenament" ──
+       Sota la secció del dia seleccionat, amb el mateix format de targeta que
+       l'entrenament suggerit (barra d'accent, icona, text i cheveron). */
+    .start-workout-btn {
       --sc: var(--c-brand);
-      position: fixed; left: 16px; right: 16px; bottom: calc(var(--nav-height) + 16px); z-index: 90;
+      margin: 12px 16px 0;
       display: flex; align-items: center; gap: 0;
       height: 60px; padding: 0; border-radius: 14px;
       border: 1.5px solid color-mix(in srgb, var(--sc) 35%, var(--c-border-2));
       background: color-mix(in srgb, var(--sc) 8%, var(--c-card));
-      box-shadow: 0 8px 28px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 10px var(--c-shadow);
       cursor: pointer; touch-action: manipulation; overflow: hidden; text-align: left;
       transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s;
       &:hover {
-        box-shadow: 0 10px 32px rgba(0,0,0,0.2), 0 2px 6px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 16px var(--c-shadow-md);
         border-color: color-mix(in srgb, var(--sc) 55%, var(--c-border));
         background: color-mix(in srgb, var(--sc) 13%, var(--c-card));
       }
@@ -296,7 +293,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     }
     /* Registrar un dia passat: mateix format, accent càlid per distingir-lo
        de l'acció d'avui (en verd de marca). */
-    .start-workout-fab--past { --sc: #b26a00; }
+    .start-workout-btn--past { --sc: #b26a00; }
     .swf-bar { width: 5px; align-self: stretch; flex-shrink: 0; background: var(--sc); }
     .swf-icon-wrap { width: 48px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
     .swf-icon { font-size: 23px; color: var(--sc); font-variation-settings: 'FILL' 1; }
