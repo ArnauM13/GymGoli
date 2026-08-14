@@ -97,6 +97,17 @@ describe('WorkoutService', () => {
       expect(workoutsChain.range).toHaveBeenCalledWith(20, 29);
     });
 
+    it('orders by stable secondary keys so no rows are dropped across pages', async () => {
+      await service.loadWorkoutPage({ page: 0, pageSize: 20 });
+
+      // `date` is not unique, so paginating over it alone lets ties shuffle
+      // between page queries and silently drop workouts. created_at + id give
+      // a deterministic total order across every page.
+      expect(workoutsChain.order).toHaveBeenCalledWith('date', { ascending: false });
+      expect(workoutsChain.order).toHaveBeenCalledWith('created_at', { ascending: false });
+      expect(workoutsChain.order).toHaveBeenCalledWith('id', { ascending: false });
+    });
+
     it('returns the mapped workouts and total count', async () => {
       workoutsChain = makeQueryChain({
         data: [{ id: 'w1', date: '2024-03-06', entries: [], categories: [], created_at: '2024-03-06T00:00:00.000Z' }],
