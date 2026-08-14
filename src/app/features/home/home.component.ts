@@ -83,32 +83,14 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
       <!-- ── Acció principal: registrar l'entrenament del dia seleccionat,
              just sota la secció del dia (avui o un dia passat). ── -->
       @if (isToday()) {
-        <button class="start-workout-btn" (click)="goToTrain()"
-                aria-label="Comença un entrenament">
-          <span class="swf-bar" aria-hidden="true"></span>
-          <span class="swf-icon-wrap" aria-hidden="true">
-            <span class="material-symbols-outlined swf-icon">add_circle</span>
-          </span>
-          <span class="swf-info" aria-hidden="true">
-            <span class="swf-eyebrow">Avui</span>
-            <span class="swf-label">Comença un entrenament</span>
-            <span class="swf-reason">Registra la teva sessió</span>
-          </span>
-          <span class="material-symbols-outlined swf-chevron" aria-hidden="true">chevron_right</span>
+        <button class="start-workout-btn" (click)="goToTrain()">
+          <span class="material-symbols-outlined swb-icon" aria-hidden="true">add_circle</span>
+          <span class="swb-label">Comença un entrenament</span>
         </button>
       } @else if (isPast()) {
-        <button class="start-workout-btn start-workout-btn--past" (click)="registerPastWorkout()"
-                aria-label="Registra un entrenament">
-          <span class="swf-bar" aria-hidden="true"></span>
-          <span class="swf-icon-wrap" aria-hidden="true">
-            <span class="material-symbols-outlined swf-icon">history</span>
-          </span>
-          <span class="swf-info" aria-hidden="true">
-            <span class="swf-eyebrow">Registrar</span>
-            <span class="swf-label">Registra un entrenament</span>
-            <span class="swf-reason">{{ todayDateLabel() }}</span>
-          </span>
-          <span class="material-symbols-outlined swf-chevron" aria-hidden="true">chevron_right</span>
+        <button class="start-workout-btn start-workout-btn--past" (click)="registerPastWorkout()">
+          <span class="material-symbols-outlined swb-icon" aria-hidden="true">history</span>
+          <span class="swb-label">Registra un entrenament</span>
         </button>
       }
 
@@ -270,49 +252,33 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     .today-empty-text { font-size: 13px; color: var(--c-text-3); line-height: 1.4; }
 
     /* ── Acció principal "Comença un entrenament" ──
-       Sota la secció del dia seleccionat, amb el mateix format de targeta que
-       l'entrenament suggerit (barra d'accent, icona, text i cheveron). */
+       Botó sòlid i ple, sota la secció del dia seleccionat. Mateix estil que
+       "Planificar la setmana", amb el color de marca per a avui i un accent
+       càlid per als dies passats. */
     .start-workout-btn {
       --sc: var(--c-brand);
+      width: calc(100% - 32px); box-sizing: border-box;
       margin: 12px 16px 0;
-      display: flex; align-items: center; gap: 0;
-      height: 60px; padding: 0; border-radius: 14px;
-      border: 1.5px solid color-mix(in srgb, var(--sc) 35%, var(--c-border-2));
-      background: color-mix(in srgb, var(--sc) 8%, var(--c-card));
-      box-shadow: 0 2px 10px var(--c-shadow);
-      cursor: pointer; touch-action: manipulation; overflow: hidden; text-align: left;
-      transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      height: 54px; padding: 0 16px; border: none; border-radius: 14px;
+      background: var(--sc); color: white;
+      font-size: 15px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation;
+      box-shadow: 0 4px 14px color-mix(in srgb, var(--sc) 38%, transparent);
+      transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
       &:hover {
-        box-shadow: 0 4px 16px var(--c-shadow-md);
-        border-color: color-mix(in srgb, var(--sc) 55%, var(--c-border));
-        background: color-mix(in srgb, var(--sc) 13%, var(--c-card));
+        background: color-mix(in srgb, var(--sc) 88%, black);
+        box-shadow: 0 6px 18px color-mix(in srgb, var(--sc) 45%, transparent);
       }
       &:active { transform: scale(0.98); }
       /* Millora d'accessibilitat: anell de focus visible per a teclat. */
       &:focus-visible { outline: 2px solid var(--sc); outline-offset: 2px; }
     }
-    /* Registrar un dia passat: mateix format, accent càlid per distingir-lo
+    /* Registrar un dia passat: mateix estil, accent càlid per distingir-lo
        de l'acció d'avui (en verd de marca). */
     .start-workout-btn--past { --sc: #b26a00; }
-    .swf-bar { width: 5px; align-self: stretch; flex-shrink: 0; background: var(--sc); }
-    .swf-icon-wrap { width: 48px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-    .swf-icon { font-size: 23px; color: var(--sc); font-variation-settings: 'FILL' 1; }
-    .swf-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-    .swf-eyebrow {
-      font-size: 9.5px; font-weight: 700; line-height: 1;
-      color: color-mix(in srgb, var(--sc) 70%, var(--c-text-3));
-      text-transform: uppercase; letter-spacing: 0.6px;
-    }
-    .swf-label {
-      font-size: 14px; font-weight: 700; color: var(--c-text); line-height: 1.2;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .swf-reason {
-      font-size: 11.5px; font-weight: 600; letter-spacing: 0.1px;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      color: color-mix(in srgb, var(--sc) 65%, var(--c-text-3));
-    }
-    .swf-chevron { font-size: 20px; color: var(--c-text-3); margin-right: 12px; flex-shrink: 0; }
+    .swb-icon { font-size: 21px; font-variation-settings: 'FILL' 1; flex-shrink: 0; }
+    .swb-label { line-height: 1.2; }
 
     /* ── "Encara no tens cap rutina" hint ── */
     .routine-hint-card {
