@@ -23,6 +23,16 @@ export class UserSettingsService {
   readonly weeklyActivityGoal  = computed(() => this._settings().weeklyActivityGoal ?? null);
   readonly weeklyGymGoal       = computed(() => this._settings().weeklyGymGoal ?? null);
   readonly weeklySportGoal     = computed(() => this._settings().weeklySportGoal ?? null);
+  /** Whether the user has defined a weekly goal. This is deliberately
+   *  independent of {@link metricsEnabled}: the weekly goal and the personalised
+   *  insights are separate concepts — you can track a goal without insights, and
+   *  insights merely lean on the goal (plus routines/history) when it exists. */
+  readonly hasWeeklyGoal       = computed(() => {
+    const s = this._settings();
+    return (s.goalMode ?? 'combined') === 'combined'
+      ? s.weeklyActivityGoal != null
+      : s.weeklyGymGoal != null || s.weeklySportGoal != null;
+  });
   readonly themeMode           = computed(() => this._settings().themeMode ?? 'system' as ThemeMode);
   readonly darkMode            = computed(() => {
     const mode = this.themeMode();
