@@ -54,10 +54,9 @@ import {
           }
         </div>
 
-        @if (settingsService.metricsEnabled()) {
-          <div class="setting-divider"></div>
+        <div class="setting-divider"></div>
 
-          <h3 class="subsection-title">Objectiu setmanal</h3>
+        <h3 class="subsection-title">Objectiu setmanal</h3>
 
           <!-- Mode selector -->
           <div class="mode-selector">
@@ -174,12 +173,6 @@ import {
               </span>
             </div>
           }
-        } @else {
-          <div class="setting-hint">
-            <span class="material-symbols-outlined hint-icon">info</span>
-            Activa els insights personalitzats a Preferències per definir un objectiu setmanal.
-          </div>
-        }
       </div>
 
       <!-- ── Progrés ── -->
@@ -333,7 +326,7 @@ import {
         <div class="setting-row setting-row--top">
           <div class="setting-info">
             <span class="setting-label">Insights personalitzats</span>
-            <span class="setting-desc">Consells basats en el teu historial i seguiment de l'objectiu setmanal.</span>
+            <span class="setting-desc">Consells automàtics a Inici basats en el teu historial, les rutines i l'objectiu setmanal.</span>
           </div>
           <mat-slide-toggle
             [checked]="settingsService.metricsEnabled()"
@@ -976,9 +969,9 @@ export class SettingsComponent {
       this.settingsService.update({ fitnessGoal: null });
       return;
     }
-    const patch: Partial<Parameters<typeof this.settingsService.update>[0]> = { fitnessGoal: goal };
-    if (!this.settingsService.metricsEnabled()) patch.metricsEnabled = true;
-    this.settingsService.update(patch);
+    // Choosing a fitness goal no longer force-enables insights — the weekly
+    // goal and the personalised insights are independent features now.
+    this.settingsService.update({ fitnessGoal: goal });
   }
 
   async logout(): Promise<void> {

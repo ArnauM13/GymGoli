@@ -329,12 +329,20 @@ export class WorkoutService {
     const from = page * pageSize;
     const to   = from + pageSize - 1;
 
+    // `date` alone is not a unique key — a user can log several workouts on the
+    // same day. Paginating (a separate `range()` query per page) over a
+    // non-unique sort lets PostgreSQL resolve ties differently between pages,
+    // which silently drops some rows at the page boundaries (and duplicates
+    // others). Add stable secondary keys so the total order is deterministic
+    // across every page and no workout goes missing from the history list.
     let q = this.supabase
       .from('workouts')
       .select('*', { count: 'exact' })
       .eq('user_id', this._uid())
       .neq('status', 'planned')
-      .order('date', { ascending });
+      .order('date', { ascending })
+      .order('created_at', { ascending })
+      .order('id', { ascending });
 
     if (category) q = q.contains('categories', [category]);
     if (date)     q = q.eq('date', date);

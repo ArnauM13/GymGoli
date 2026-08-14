@@ -74,7 +74,9 @@ export class WeeklySummaryComponent {
   /** The date whose week should be shown. Defaults to today. */
   readonly weekDate = input<string | null>(null);
 
-  readonly show = computed(() => this.settingsService.metricsEnabled() && this.settingsService.loaded());
+  // The weekly-goal progress strip is tied to having a goal, not to the
+  // personalised-insights toggle — the two are separate features.
+  readonly show = computed(() => this.settingsService.hasWeeklyGoal() && this.settingsService.loaded());
 
   private readonly _weekDates = computed((): string[] => {
     const monday = mondayOf(this.weekDate() ?? TODAY());
