@@ -313,6 +313,37 @@ content in the middle, action buttons on the right.
 }
 ```
 
+### Action bar button (per-action hue)
+
+For a row of actions on the same object (the exercise card footer), give every
+action **one shape and its own hue**, driven by a `--fb` custom property. The
+hue is a second cue on top of the icon and the label — never the only one.
+
+```scss
+.action-btn {
+  --fb: var(--c-text-3);
+  min-width: 40px; height: 40px; padding: 0 10px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  border: 1.5px solid color-mix(in srgb, var(--fb) 26%, transparent);
+  background: color-mix(in srgb, var(--fb) 9%, transparent);
+  color: var(--fb); cursor: pointer; touch-action: manipulation;
+  .material-symbols-outlined { font-size: 19px; }
+  &:hover  { background: color-mix(in srgb, var(--fb) 17%, transparent); }
+  &:active { transform: scale(0.94); }
+  &:focus-visible { outline: 2px solid var(--fb); outline-offset: 2px; }
+}
+.action-btn--on { background: color-mix(in srgb, var(--fb) 19%, transparent); }
+```
+
+Hues live as tokens in `styles.scss` (light + dark): `--c-act-history` (teal,
+consultation), `--c-act-note` (ochre), `--c-act-feeling` (violet),
+`--c-act-danger` (red). The overflow menu keeps the neutral `--c-text-3`.
+
+**Keep the bar short.** Frequent, in-context actions stay in the bar; rare,
+destructive or navigating-away actions move into an overflow `⋮` that opens a
+floating bottom sheet with *labelled* rows (icon + label + one-line
+description). Reference: the exercise footer in `workout-editor`.
+
 ---
 
 ## 6. Empty State
@@ -444,7 +475,22 @@ nav pill (inset side margins, all four corners rounded) and slide up from below.
 - **Always set:** `touch-action: manipulation;` on interactive elements
 - **Truncation:** every `.ic-name` and `.ic-detail` truncates with ellipsis
   on overflow — never wrap to a second line
-- **Confirm destructive actions:** `confirm("Eliminar X?")` before delete
+- **Confirm destructive actions:** `ConfirmDialogService.confirm()` before a
+  delete that discards data (skip it when there is nothing to lose yet)
+
+### Accessibility (non-negotiable)
+
+- **Icon-only button:** always an `aria-label`; `title` alone does not exist on
+  touch
+- **Decorative glyphs:** every `<span class="material-symbols-outlined">` inside
+  a labelled control needs `aria-hidden="true"`, or a screen reader reads the
+  ligature out loud ("sticky note 2")
+- **Tappable rows:** a `<div>` with `(click)` is invisible to the keyboard — use
+  a real `<button>` for the tappable region and keep the row's other buttons as
+  its siblings, never nested inside it
+- **State:** never signal state with color alone — mirror it in the icon and in
+  the accessible name (`aria-pressed`, `aria-expanded`, or a label suffix)
+- **Focus:** `&:focus-visible { outline: 2px solid <hue>; outline-offset: 2px; }`
 
 ---
 

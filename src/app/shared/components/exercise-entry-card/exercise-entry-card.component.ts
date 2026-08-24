@@ -21,68 +21,69 @@ import { formatFeeling } from '../../utils/workout-card.utils';
 
       <div class="eec-card" [class.eec-card--open]="!collapsed()" [class.eec-card--selected]="selectable() && selected()">
 
-        <!-- ── Header (always visible, same look as history ex-card) ── -->
-        <div class="eec-header" [class.eec-header--minimal]="hideMetaWhenCollapsed()" (click)="headerClick.emit()">
-          <div class="eec-bar" [class.eec-bar--loading]="catLoading()"></div>
-          <div class="eec-body">
-            <span class="eec-name">{{ entry().exerciseName }}</span>
-            @if (feelingLevel()) {
-              <span class="eec-feeling"
-                [class.eec-feeling--editable]="feelingEditable()"
-                (click)="onFeelingClick($event)">
-                {{ emoji(feelingLevel()!) }}
-              </span>
-            } @else if (feelingEditable() && (!collapsed() || !hideMetaWhenCollapsed())) {
-              <span class="material-symbols-outlined eec-feeling-add"
-                (click)="onFeelingClick($event)">sentiment_neutral</span>
-            }
-            @if (maxWeight() > 0) {
-              <span class="eec-max">{{ dispW(maxWeight()) }}<small>{{ unit() }}</small></span>
-            } @else if (totalReps() > 0) {
-              <span class="eec-max">{{ totalReps() }}<small>r</small></span>
-            }
-            @if ((workingSetsCount() > 0 || warmupSetsCount() > 0) && showSetsBadge()) {
-              <span class="eec-sets-badge">
-                {{ workingSetsCount() }} sèr
-                @if (warmupSetsCount() > 0) {
-                  <span class="eec-sets-badge__warmup">
-                    +{{ warmupSetsCount() }}<span class="material-symbols-outlined">local_fire_department</span>
-                  </span>
-                }
-              </span>
-            }
-            @if (prBadge()) {
-              <span class="eec-pr">PR</span>
-            }
-          </div>
+        <!-- ── Header (always visible, same look as history ex-card) ──
+             The name/meta area is a real <button> so collapsing an exercise
+             works with the keyboard; the action buttons stay outside it, as
+             nesting them inside would be invalid markup. -->
+        <div class="eec-header" [class.eec-header--minimal]="hideMetaWhenCollapsed()">
+          <button type="button" class="eec-header-main" (click)="headerClick.emit()"
+            [attr.aria-label]="headerAriaLabel()"
+            [attr.aria-expanded]="selectable() ? null : !collapsed()"
+            [attr.aria-pressed]="selectable() ? selected() : null">
+            <span class="eec-bar" [class.eec-bar--loading]="catLoading()" aria-hidden="true"></span>
+            <span class="eec-body">
+              <span class="eec-name">{{ entry().exerciseName }}</span>
+              @if (feelingLevel()) {
+                <span class="eec-feeling" aria-hidden="true">{{ emoji(feelingLevel()!) }}</span>
+              }
+              @if (maxWeight() > 0) {
+                <span class="eec-max" aria-hidden="true">{{ dispW(maxWeight()) }}<small>{{ unit() }}</small></span>
+              } @else if (totalReps() > 0) {
+                <span class="eec-max" aria-hidden="true">{{ totalReps() }}<small>r</small></span>
+              }
+              @if ((workingSetsCount() > 0 || warmupSetsCount() > 0) && showSetsBadge()) {
+                <span class="eec-sets-badge" aria-hidden="true">
+                  {{ workingSetsCount() }} sèr
+                  @if (warmupSetsCount() > 0) {
+                    <span class="eec-sets-badge__warmup">
+                      +{{ warmupSetsCount() }}<span class="material-symbols-outlined">local_fire_department</span>
+                    </span>
+                  }
+                </span>
+              }
+              @if (prBadge()) {
+                <span class="eec-pr" aria-hidden="true">PR</span>
+              }
+            </span>
+          </button>
           <div class="eec-actions">
             @if (collapsed() && entry().sets.length === 0) {
               @if (showStatsAction()) {
                 <button type="button" class="eec-header-action-btn" aria-label="Estadístiques"
-                  (click)="$event.stopPropagation(); statsClick.emit()">
-                  <span class="material-symbols-outlined">bar_chart</span>
+                  (click)="statsClick.emit()">
+                  <span class="material-symbols-outlined" aria-hidden="true">bar_chart</span>
                 </button>
               }
               @if (showDeleteAction()) {
-                <button type="button" class="eec-header-action-btn eec-header-action-btn--danger" aria-label="Eliminar"
-                  (click)="$event.stopPropagation(); deleteClick.emit()">
-                  <span class="material-symbols-outlined">delete</span>
+                <button type="button" class="eec-header-action-btn eec-header-action-btn--danger" aria-label="Eliminar exercici"
+                  (click)="deleteClick.emit()">
+                  <span class="material-symbols-outlined" aria-hidden="true">delete</span>
                 </button>
               }
             }
             @if (showMenu() && (!collapsed() || !hideMetaWhenCollapsed())) {
               <button type="button" class="eec-menu-btn" aria-label="Opcions"
-                (click)="$event.stopPropagation(); menuClick.emit()">
-                <span class="material-symbols-outlined">more_vert</span>
+                (click)="menuClick.emit()">
+                <span class="material-symbols-outlined" aria-hidden="true">more_vert</span>
               </button>
             }
             @if (selectable()) {
-              <span class="material-symbols-outlined eec-select-check" [class.eec-select-check--on]="selected()">
+              <span class="material-symbols-outlined eec-select-check" [class.eec-select-check--on]="selected()" aria-hidden="true">
                 {{ selected() ? 'check_circle' : 'radio_button_unchecked' }}
               </span>
             } @else {
               <span class="material-symbols-outlined eec-chevron"
-                [class.eec-chevron--big]="hideMetaWhenCollapsed()">
+                [class.eec-chevron--big]="hideMetaWhenCollapsed()" aria-hidden="true">
                 {{ collapsed() ? 'expand_more' : 'expand_less' }}
               </span>
             }
@@ -146,10 +147,19 @@ import { formatFeeling } from '../../utils/workout-card.utils';
 
     .eec-header {
       display: flex; align-items: stretch;
+      background: color-mix(in srgb, var(--cat) 9%, var(--c-card));
+    }
+
+    /* The tappable name/meta area — a bare button that keeps the row layout. */
+    .eec-header-main {
+      flex: 1; min-width: 0;
+      display: flex; align-items: stretch; text-align: left;
+      padding: 0; border: none; background: transparent;
+      font: inherit; color: inherit;
       cursor: pointer; touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
       user-select: none;
-      background: color-mix(in srgb, var(--cat) 9%, var(--c-card));
+      &:focus-visible { outline: 2px solid var(--c-brand); outline-offset: -2px; }
     }
 
     .eec-bar {
@@ -181,13 +191,6 @@ import { formatFeeling } from '../../utils/workout-card.utils';
 
     .eec-feeling {
       font-size: 16px; line-height: 1; flex-shrink: 0;
-      &.eec-feeling--editable { cursor: pointer; touch-action: manipulation; }
-    }
-    .eec-feeling-add {
-      font-size: 16px; color: var(--c-border); flex-shrink: 0;
-      cursor: pointer; touch-action: manipulation;
-      transition: color 0.15s;
-      &:hover { color: var(--c-text-3); }
     }
 
     .eec-max {
@@ -223,7 +226,7 @@ import { formatFeeling } from '../../utils/workout-card.utils';
     }
 
     .eec-menu-btn {
-      width: 34px; height: 34px; border: none; background: transparent;
+      width: 36px; height: 36px; border: none; background: transparent;
       display: flex; align-items: center; justify-content: center;
       cursor: pointer; color: var(--c-text-3); border-radius: 8px;
       touch-action: manipulation; transition: background 0.1s, color 0.1s;
@@ -232,7 +235,7 @@ import { formatFeeling } from '../../utils/workout-card.utils';
     }
 
     .eec-header-action-btn {
-      width: 34px; height: 34px; border: none; background: transparent;
+      width: 36px; height: 36px; border: none; background: transparent;
       display: flex; align-items: center; justify-content: center;
       cursor: pointer; color: var(--c-text-3); border-radius: 8px;
       touch-action: manipulation; transition: background 0.1s, color 0.1s;
@@ -277,7 +280,6 @@ export class ExerciseEntryCardComponent {
   readonly unit                 = input<string>('kg');
   readonly feelingLevel         = input<FeelingLevel | undefined>(undefined);
   readonly difficultyScale      = input<DifficultyScale>('emoji');
-  readonly feelingEditable       = input<boolean>(false);
   readonly showSetsBadge         = input<boolean>(true);
   readonly hideMetaWhenCollapsed = input<boolean>(false);
   /** Stats/delete buttons shown in the header instead of the (hidden) footer
@@ -291,9 +293,18 @@ export class ExerciseEntryCardComponent {
 
   readonly headerClick  = output<void>();
   readonly menuClick    = output<void>();
-  readonly feelingClick = output<void>();
   readonly statsClick   = output<void>();
   readonly deleteClick  = output<void>();
+
+  /** The header button's spoken name — the visual meta (emoji, max weight,
+   *  set badge) is aria-hidden, so it is spelled out here instead of being
+   *  read as a string of loose numbers. */
+  readonly headerAriaLabel = computed(() => {
+    const parts = [this.entry().exerciseName];
+    if (this.workingSetsCount() > 0) parts.push(`${this.workingSetsCount()} sèries`);
+    if (this.maxWeight() > 0) parts.push(`${this.dispW(this.maxWeight())} ${this.unit()} màxim`);
+    return this.selectable() ? `Seleccionar ${parts.join(', ')}` : parts.join(', ');
+  });
 
   readonly totalReps = computed(() => this.entry().sets.reduce((s, set) => set.warmup ? s : s + set.reps, 0));
   readonly workingSetsCount = computed(() => this.entry().sets.filter(set => !set.warmup).length);
@@ -302,8 +313,4 @@ export class ExerciseEntryCardComponent {
   emoji(l: FeelingLevel): string { return formatFeeling(l, this.difficultyScale()); }
   dispW(v: number): number { return kgToDisplay(v, this.unit() as 'kg' | 'lb'); }
 
-  onFeelingClick(e: Event): void {
-    e.stopPropagation();
-    if (this.feelingEditable()) this.feelingClick.emit();
-  }
 }

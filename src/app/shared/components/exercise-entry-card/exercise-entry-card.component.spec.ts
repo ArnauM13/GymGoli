@@ -56,7 +56,7 @@ describe('ExerciseEntryCardComponent', () => {
       const el = fixture.nativeElement as HTMLElement;
       expect(el.querySelectorAll('.eec-header-action-btn').length).toBe(1);
       expect(el.querySelector('[aria-label="Estadístiques"]')).toBeTruthy();
-      expect(el.querySelector('[aria-label="Eliminar"]')).toBeFalsy();
+      expect(el.querySelector('[aria-label="Eliminar exercici"]')).toBeFalsy();
     });
 
     it('emits statsClick and deleteClick without triggering headerClick', () => {
@@ -70,11 +70,62 @@ describe('ExerciseEntryCardComponent', () => {
 
       const el = fixture.nativeElement as HTMLElement;
       (el.querySelector('[aria-label="Estadístiques"]') as HTMLButtonElement).click();
-      (el.querySelector('[aria-label="Eliminar"]') as HTMLButtonElement).click();
+      (el.querySelector('[aria-label="Eliminar exercici"]') as HTMLButtonElement).click();
 
       expect(statsSpy).toHaveBeenCalled();
       expect(deleteSpy).toHaveBeenCalled();
       expect(headerSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('keyboard access', () => {
+    it('exposes the name/meta area as a button with the exercise as its name', () => {
+      setInputs({ collapsed: true, entry: entry({ exerciseName: 'Press banca', sets: [{ weight: 60, reps: 8 }] }) });
+      const main = (fixture.nativeElement as HTMLElement).querySelector('button.eec-header-main');
+      expect(main).toBeTruthy();
+      expect(main!.getAttribute('aria-label')).toContain('Press banca');
+    });
+
+    it('reports the collapsed state through aria-expanded', () => {
+      setInputs({ collapsed: true, entry: entry() });
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('.eec-header-main')!.getAttribute('aria-expanded')).toBe('false');
+
+      fixture.componentRef.setInput('collapsed', false);
+      fixture.detectChanges();
+      expect(el.querySelector('.eec-header-main')!.getAttribute('aria-expanded')).toBe('true');
+    });
+
+    it('activating the header button by keyboard emits headerClick', () => {
+      setInputs({ collapsed: true, entry: entry() });
+      const spy = jasmine.createSpy('header');
+      component.headerClick.subscribe(spy);
+
+      const main = (fixture.nativeElement as HTMLElement).querySelector('button.eec-header-main') as HTMLButtonElement;
+      main.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      main.click(); // what the browser does for Enter/Space on a <button>
+
+      expect(spy).toHaveBeenCalled();
+    });
+
+    it('hides the decorative meta from screen readers', () => {
+      setInputs({ collapsed: false, entry: entry({ sets: [{ weight: 60, reps: 8 }] }) });
+      const el = fixture.nativeElement as HTMLElement;
+      for (const sel of ['.eec-bar', '.eec-max', '.eec-sets-badge', '.eec-chevron']) {
+        expect(el.querySelector(sel)?.getAttribute('aria-hidden')).toBe('true', `${sel} should be aria-hidden`);
+      }
+    });
+
+    it('announces selection state instead of expansion while grouping', () => {
+      fixture.componentRef.setInput('entry', entry());
+      fixture.componentRef.setInput('selectable', true);
+      fixture.componentRef.setInput('selected', true);
+      fixture.detectChanges();
+
+      const main = (fixture.nativeElement as HTMLElement).querySelector('.eec-header-main')!;
+      expect(main.getAttribute('aria-pressed')).toBe('true');
+      expect(main.getAttribute('aria-expanded')).toBeNull();
+      expect(main.getAttribute('aria-label')).toContain('Seleccionar');
     });
   });
 

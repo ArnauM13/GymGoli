@@ -3,7 +3,6 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { A11yModule } from '@angular/cdk/a11y';
 import { MatDialog } from '@angular/material/dialog';
-import { Router } from '@angular/router';
 
 import { CATEGORY_COLORS, CATEGORY_LABELS, SUBCATEGORY_LABELS } from '../../../core/models/exercise.model';
 import { FEELING_LABEL, FeelingLevel, Workout, WorkoutEntry, WorkoutSet, setMaxWeight } from '../../../core/models/workout.model';
@@ -331,32 +330,30 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                       </form>
                     </div>
                   } @else {
-                    <!-- Set row: tap to edit when entry is editable -->
-                    <div class="we-set-row" [class.we-set-row--warmup]="set.warmup"
-                         [class.we-set-row-tappable]="isEntryEditable(entry.exerciseId)"
-                         (click)="isEntryEditable(entry.exerciseId) && startEditSet(entry.exerciseId, $index, set)">
-                      <span class="we-set-num">
+                    <!-- Set row: the whole weight/reps area is one button, so
+                         editing a set works by keyboard as well as by tap -->
+                    <div class="we-set-row" [class.we-set-row--warmup]="set.warmup">
+                      <button type="button" class="we-set-main"
+                              [class.we-set-main--tappable]="isEntryEditable(entry.exerciseId)"
+                              [disabled]="!isEntryEditable(entry.exerciseId)"
+                              [attr.aria-label]="(isEntryEditable(entry.exerciseId) ? 'Editar ' : '') + setAriaLabel(entry, $index, set)"
+                              (click)="startEditSet(entry.exerciseId, $index, set)">
+                      <span class="we-set-num" aria-hidden="true">
                         @if (set.warmup) {
-                          <span class="material-symbols-outlined we-warmup-icon" title="Sèrie d'escalfament">local_fire_department</span>
+                          <span class="material-symbols-outlined we-warmup-icon">local_fire_department</span>
                         } @else {
                           {{ workingSetNumber(entry, $index) }}
                         }
                       </span>
-                      <div class="we-set-pills">
+                      <span class="we-set-pills" aria-hidden="true">
                         @if (set.weightLeft != null) {
-                          <span class="we-set-pill weight side"
-                            [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
-                            (click)="tapSetPill($event, entry.exerciseId, $index, set)">
+                          <span class="we-set-pill weight side">
                             E {{ dispW(set.weightLeft) }}<small>{{ unit() }}</small>
                           </span>
-                          <span class="we-set-pill weight side"
-                            [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
-                            (click)="tapSetPill($event, entry.exerciseId, $index, set)">
+                          <span class="we-set-pill weight side">
                             D {{ dispW(set.weightRight!) }}<small>{{ unit() }}</small>
                           </span>
-                          <span class="we-set-pill reps"
-                            [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
-                            (click)="tapSetPill($event, entry.exerciseId, $index, set)">
+                          <span class="we-set-pill reps">
                             {{ set.reps }}<small>r</small>
                           </span>
                           @if (set.rir != null) {
@@ -373,9 +370,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                         } @else if (set.drops?.length) {
                           <!-- Dropset: one chained pill, so the arrows never get
                                orphaned from their stage when the row wraps. -->
-                          <span class="we-set-pill weight chain"
-                            [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
-                            (click)="tapSetPill($event, entry.exerciseId, $index, set)">
+                          <span class="we-set-pill weight chain">
                             @for (stage of dropChainStages(set); track $index; let first = $first) {
                               @if (!first) { <span class="we-chain-arrow">→</span> }
                               <span class="we-chain-stage" [class.we-chain-stage--drop]="!first">
@@ -385,14 +380,10 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                           </span>
                         } @else {
                           <span class="we-set-pill weight"
-                            [class.we-set-pill--pr]="!set.warmup && prExerciseIds().has(entry.exerciseId) && set.weight > 0 && set.weight === entryMaxWeight(entry)"
-                            [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
-                            (click)="tapSetPill($event, entry.exerciseId, $index, set)">
+                            [class.we-set-pill--pr]="!set.warmup && prExerciseIds().has(entry.exerciseId) && set.weight > 0 && set.weight === entryMaxWeight(entry)">
                             {{ dispW(set.weight) }}<small>{{ unit() }}</small>
                           </span>
-                          <span class="we-set-pill reps"
-                            [class.we-set-pill--tap]="isEntryEditable(entry.exerciseId)"
-                            (click)="tapSetPill($event, entry.exerciseId, $index, set)">
+                          <span class="we-set-pill reps">
                             {{ set.reps }}<small>r</small>
                           </span>
                           @if (set.rir != null) {
@@ -402,12 +393,13 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                             <span class="we-set-pill rest"><span class="material-symbols-outlined we-rest-pill-icon">timer</span>{{ formatRest(set.restSeconds) }}</span>
                           }
                         }
-                      </div>
+                      </span>
+                      </button>
                       @if (isEntryEditable(entry.exerciseId)) {
-                        <button class="we-icon-btn-sm danger"
-                          (click)="$event.stopPropagation(); removeSet(entry.exerciseId, $index)"
-                          aria-label="Eliminar sèrie">
-                          <span class="material-symbols-outlined">close</span>
+                        <button type="button" class="we-icon-btn-sm danger"
+                          (click)="removeSet(entry.exerciseId, $index)"
+                          [attr.aria-label]="'Eliminar ' + setAriaLabel(entry, $index, set)">
+                          <span class="material-symbols-outlined" aria-hidden="true">close</span>
                         </button>
                       }
                     </div>
@@ -552,46 +544,46 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
               }
             }
 
-            <!-- ── Entry footer: left (edit + stats) · right (notes + feeling + delete) ── -->
+            <!-- ── Entry footer: consultation (left) · logging + overflow (right).
+                 Each action owns a hue so it is told apart at a glance, always
+                 backed by its own icon and label — never by color alone. ── -->
             <div class="we-entry-footer">
               <div class="we-footer-actions">
                 @if (lastSession(entry); as ls) {
-                  <button class="we-footer-history-btn"
-                    [class.we-footer-history-btn--open]="lastSessionPanelFor() === entry.exerciseId"
+                  <button type="button" class="we-footer-btn we-footer-btn--history"
+                    [class.we-footer-btn--on]="lastSessionPanelFor() === entry.exerciseId"
                     [attr.aria-expanded]="lastSessionPanelFor() === entry.exerciseId"
                     (click)="toggleLastSession(entry.exerciseId)"
-                    title="Consultar l'última sessió" aria-label="Consultar l'última sessió">
-                    <span class="material-symbols-outlined">history</span>
-                    <span class="we-footer-history-date">{{ formatLastDate(ls.date) }}</span>
+                    [attr.aria-label]="'Última sessió, ' + formatLastDate(ls.date)">
+                    <span class="material-symbols-outlined" aria-hidden="true">history</span>
+                    <span class="we-footer-btn-label">{{ formatLastDate(ls.date) }}</span>
                   </button>
                 }
-                @if (!offlineService.isOffline()) {
-                  <button class="we-footer-stats-btn" (click)="openStats(entry)">
-                    <span class="material-symbols-outlined">bar_chart</span>
-                  </button>
-                }
-                <button class="we-footer-edit-btn" (click)="editExercise(entry)"
-                  title="Editar exercici" aria-label="Editar exercici">
-                  <span class="material-symbols-outlined">edit</span>
-                </button>
               </div>
               <div class="we-footer-actions">
                 @if (alwaysEditable() || editMode()) {
-                  <button class="we-footer-notes-btn" [class.we-footer-notes-btn--set]="entry.notes"
-                    (click)="openNotesPopup(entry.exerciseId)" title="Nota de l'exercici">
-                    <span class="material-symbols-outlined">{{ entry.notes ? 'sticky_note_2' : 'note_add' }}</span>
+                  <button type="button" class="we-footer-btn we-footer-btn--note"
+                    [class.we-footer-btn--on]="entry.notes"
+                    (click)="openNotesPopup(entry.exerciseId)"
+                    [attr.aria-label]="entry.notes ? 'Nota escrita, editar' : 'Afegir una nota'">
+                    <span class="material-symbols-outlined" aria-hidden="true">{{ entry.notes ? 'sticky_note_2' : 'note_add' }}</span>
                   </button>
-                  <button type="button" class="we-footer-feeling-btn"
-                    [class.we-footer-feeling-btn--set]="entry.feeling"
-                    (click)="openFatigaPicker(entry.exerciseId)">
+                  <button type="button" class="we-footer-btn we-footer-btn--feeling"
+                    [class.we-footer-btn--on]="entry.feeling"
+                    (click)="openFatigaPicker(entry.exerciseId)"
+                    [attr.aria-label]="entry.feeling ? 'Fatiga: ' + getFeelingLabel(entry.feeling) : 'Marcar la fatiga'">
                     @if (entry.feeling) {
-                      {{ getFeelingEmoji(entry.feeling) }}
+                      <span aria-hidden="true">{{ getFeelingEmoji(entry.feeling) }}</span>
                     } @else {
-                      <span class="material-symbols-outlined">sentiment_neutral</span>
+                      <span class="material-symbols-outlined" aria-hidden="true">sentiment_neutral</span>
                     }
                   </button>
-                  <button class="we-footer-delete-btn" (click)="removeEntry(entry.exerciseId)">
-                    <span class="material-symbols-outlined">delete</span>
+                  <button type="button" class="we-footer-btn we-footer-btn--menu"
+                    [class.we-footer-btn--on]="optionsFor() === entry.exerciseId"
+                    [attr.aria-expanded]="optionsFor() === entry.exerciseId"
+                    (click)="openOptions(entry.exerciseId)"
+                    aria-label="Més opcions de l'exercici" aria-haspopup="dialog">
+                    <span class="material-symbols-outlined" aria-hidden="true">more_vert</span>
                   </button>
                 }
               </div>
@@ -669,6 +661,37 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                 <span class="we-fatiga-option-label">{{ getFeelingLabel(level) }}</span>
               </button>
             }
+          </div>
+        </div>
+      }
+
+      <!-- ── Exercise options sheet — the rare, out-of-flow actions that used
+           to sit in the footer as unlabelled icons ── -->
+      @if (optionsEntry(); as oe) {
+        <div class="bottom-sheet-backdrop" (click)="closeOptions()" aria-hidden="true"></div>
+        <div class="bottom-sheet we-options-sheet" role="dialog" aria-modal="true"
+             aria-labelledby="we-options-title" cdkTrapFocus cdkTrapFocusAutoCapture>
+          <span class="bottom-sheet-handle" aria-hidden="true"></span>
+          <div class="we-options-header">
+            <span class="we-options-title" id="we-options-title">{{ oe.exerciseName }}</span>
+          </div>
+          <div class="we-options-list">
+            @if (!offlineService.isOffline()) {
+              <button type="button" class="we-option we-option--stats" cdkFocusInitial (click)="openStatsFromOptions(oe)">
+                <span class="material-symbols-outlined" aria-hidden="true">bar_chart</span>
+                <span class="we-option-body">
+                  <span class="we-option-label">Estadístiques i gràfiques</span>
+                  <span class="we-option-desc">Tot l'històric d'aquest exercici</span>
+                </span>
+              </button>
+            }
+            <button type="button" class="we-option we-option--danger" (click)="removeEntryFromOptions(oe)">
+              <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+              <span class="we-option-body">
+                <span class="we-option-label">Eliminar exercici</span>
+                <span class="we-option-desc">{{ deleteOptionDesc(oe) }}</span>
+              </span>
+            </button>
           </div>
         </div>
       }
@@ -800,52 +823,34 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     .we-entry-footer {
       display: flex; align-items: center; justify-content: space-between; gap: 8px;
       padding: 10px 14px 14px; border-top: 1px solid var(--c-border-2);
-    }
-    .we-footer-feeling-btn {
-      width: 36px; height: 36px; border-radius: 10px; border: 1.5px solid transparent;
-      background: var(--c-subtle); font-size: 18px; line-height: 1;
-      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      display: flex; align-items: center; justify-content: center;
-      .material-symbols-outlined { font-size: 20px; color: var(--c-text-3); }
-      &:hover { background: var(--c-hover); }
-      &:active { transform: scale(0.92); }
-      &.we-footer-feeling-btn--set { border-color: rgba(var(--c-brand-rgb), 0.3); background: rgba(var(--c-brand-rgb), 0.07); }
-    }
-    .we-footer-actions { display: flex; align-items: center; gap: 6px; }
-
-    /* ── Entry footer: left (edit + stats) · right (notes + feeling + delete) ── */
-    .we-entry-footer {
-      display: flex; align-items: center; justify-content: space-between; gap: 8px;
-      padding: 10px 14px 14px; border-top: 1px solid var(--c-border-2);
       background: color-mix(in srgb, var(--cat) 9%, var(--c-card));
     }
-    .we-footer-stats-btn {
-      width: 36px; height: 36px; border-radius: 10px;
-      border: 1.5px solid var(--c-border); background: transparent;
-      color: var(--c-text-2);
-      display: flex; align-items: center; justify-content: center;
+    .we-footer-actions { display: flex; align-items: center; gap: 8px; }
+
+    /* One button shape for the whole footer; --fb is the action's hue, which
+       always rides along with its own icon and label — never color alone. */
+    .we-footer-btn {
+      --fb: var(--c-text-3);
+      min-width: 40px; height: 40px; padding: 0 10px; border-radius: 11px;
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+      border: 1.5px solid color-mix(in srgb, var(--fb) 26%, transparent);
+      background: color-mix(in srgb, var(--fb) 9%, transparent);
+      color: var(--fb); font: inherit; font-size: 18px; line-height: 1;
       cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 18px; }
-      &:hover { background: var(--c-subtle); color: var(--c-text); }
+      .material-symbols-outlined { font-size: 19px; }
+      &:hover  { background: color-mix(in srgb, var(--fb) 17%, transparent); }
+      &:active { transform: scale(0.94); }
+      &:focus-visible { outline: 2px solid var(--fb); outline-offset: 2px; }
     }
-    .we-footer-edit-btn {
-      width: 36px; height: 36px; border-radius: 10px;
-      border: 1.5px solid var(--c-border); background: transparent;
-      color: var(--c-text-2);
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 18px; }
-      &:hover { background: var(--c-subtle); color: var(--c-text); }
+    .we-footer-btn--on {
+      background: color-mix(in srgb, var(--fb) 19%, transparent);
+      border-color: color-mix(in srgb, var(--fb) 55%, transparent);
     }
-    .we-footer-delete-btn {
-      width: 36px; height: 36px; border-radius: 10px;
-      border: 1.5px solid rgba(239,83,80,0.3); background: transparent;
-      color: #ef5350;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 18px; }
-      &:hover { background: rgba(239,83,80,0.08); border-color: #ef5350; }
-    }
+    .we-footer-btn--history { --fb: var(--c-act-history); }
+    .we-footer-btn--note    { --fb: var(--c-act-note); }
+    .we-footer-btn--feeling { --fb: var(--c-act-feeling); }
+    .we-footer-btn--menu    { --fb: var(--c-text-3); }
+    .we-footer-btn-label { font-size: 12px; font-weight: 700; }
 
     /* ── Last session consultation panel ── */
     .we-ls-panel {
@@ -944,39 +949,6 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       &:hover { background: rgba(239,83,80,0.08); border-color: #ef5350; }
     }
 
-    /* ── History footer button ── */
-    .we-footer-history-btn {
-      height: 36px; padding: 0 10px; border-radius: 10px;
-      border: 1.5px solid var(--c-border); background: transparent;
-      color: var(--c-text-3);
-      display: flex; align-items: center; gap: 5px;
-      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 18px; }
-      &:hover { background: var(--c-subtle); color: var(--c-text-2); }
-      &.we-footer-history-btn--open {
-        border-color: rgba(var(--c-brand-rgb), 0.35);
-        color: var(--c-brand);
-        background: rgba(var(--c-brand-rgb), 0.07);
-      }
-    }
-    .we-footer-history-date { font-size: 11.5px; font-weight: 700; }
-
-    /* ── Notes footer button ── */
-    .we-footer-notes-btn {
-      width: 36px; height: 36px; border-radius: 10px;
-      border: 1.5px solid var(--c-border); background: transparent;
-      color: var(--c-text-3);
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 18px; }
-      &:hover { background: var(--c-subtle); color: var(--c-text-2); }
-      &.we-footer-notes-btn--set {
-        border-color: rgba(var(--c-brand-rgb), 0.35);
-        color: var(--c-brand);
-        background: rgba(var(--c-brand-rgb), 0.07);
-      }
-    }
-
     /* ── Previous-note banner ── */
     .we-prev-note-banner {
       display: flex; align-items: flex-start; gap: 10px;
@@ -996,6 +968,33 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       .material-symbols-outlined { font-size: 14px; }
       &:hover { background: var(--c-hover); }
     }
+
+    /* ── Exercise options sheet (floating bottom sheet — see global .bottom-sheet) ── */
+    .we-options-sheet { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 22px; }
+    .we-options-header { display: flex; align-items: center; gap: 8px; padding: 0 4px; }
+    .we-options-title {
+      font-size: 17px; font-weight: 700; color: var(--c-text); flex: 1; min-width: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .we-options-list { display: flex; flex-direction: column; gap: 8px; }
+    .we-option {
+      --op: var(--c-text-2);
+      display: flex; align-items: center; gap: 12px; text-align: left;
+      padding: 12px 14px; border-radius: 12px;
+      border: 1.5px solid color-mix(in srgb, var(--op) 26%, transparent);
+      background: color-mix(in srgb, var(--op) 7%, transparent);
+      color: var(--op); font: inherit;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 22px; flex-shrink: 0; }
+      &:hover  { background: color-mix(in srgb, var(--op) 14%, transparent); }
+      &:active { transform: scale(0.98); }
+      &:focus-visible { outline: 2px solid var(--op); outline-offset: 2px; }
+    }
+    .we-option--stats  { --op: var(--c-act-history); }
+    .we-option--danger { --op: var(--c-act-danger); }
+    .we-option-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .we-option-label { font-size: 15px; font-weight: 700; }
+    .we-option-desc  { font-size: 12px; font-weight: 500; color: var(--c-text-3); }
 
     /* ── Notes popup (floating bottom sheet — see global .bottom-sheet) ── */
     .we-notes-popup { display: flex; flex-direction: column; gap: 14px; padding: 12px 20px 22px; }
@@ -1072,15 +1071,21 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       display: flex; align-items: center; gap: 10px;
       min-height: 48px; border-bottom: 1px solid var(--c-border-2);
       border-radius: 8px; padding: 0 4px;
-      transition: background 0.12s;
       &:last-child { border-bottom: none; }
-
-      &.we-set-row-tappable {
-        cursor: pointer;
-        &:hover { background: rgba(var(--c-brand-rgb), 0.05); }
+      &.we-set-row--warmup { opacity: 0.75; }
+    }
+    .we-set-main {
+      flex: 1; min-width: 0;
+      display: flex; align-items: center; gap: 10px;
+      min-height: 48px; padding: 0 4px; border: none; border-radius: 8px;
+      background: transparent; font: inherit; color: inherit; text-align: left;
+      transition: background 0.12s;
+      &.we-set-main--tappable {
+        cursor: pointer; touch-action: manipulation;
+        &:hover  { background: rgba(var(--c-brand-rgb), 0.05); }
         &:active { background: rgba(var(--c-brand-rgb), 0.1); }
       }
-      &.we-set-row--warmup { opacity: 0.75; }
+      &:focus-visible { outline: 2px solid var(--c-brand); outline-offset: -2px; }
     }
 
     .we-set-num {
@@ -1104,11 +1109,6 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       &.rir    { background: rgba(255, 152, 0, 0.12); color: #ff9800; padding: 6px 10px; font-size: 13px; }
       &.rest   { background: rgba(var(--c-brand-rgb), 0.08); color: var(--c-text-2); padding: 6px 10px; font-size: 13px; gap: 4px; align-items: center;
                  .we-rest-pill-icon { font-size: 15px; opacity: 0.75; } }
-      &.we-set-pill--tap {
-        cursor: pointer; transition: filter 0.12s;
-        &:hover { filter: brightness(0.93); }
-        &:active { filter: brightness(0.85); }
-      }
       &.drop { padding: 4px 9px; font-size: 12px; opacity: 0.75; }
       &.side { padding: 6px 10px; font-size: 13px; }
       &.chain { flex-wrap: wrap; row-gap: 2px; }
@@ -1456,7 +1456,6 @@ export class WorkoutEditorComponent implements OnDestroy {
   private confirmDialog    = inject(ConfirmDialogService);
   private fb               = inject(FormBuilder);
   private dialog           = inject(MatDialog);
-  private router           = inject(Router);
 
   readonly unit = this.settingsService.weightUnit;
 
@@ -1483,6 +1482,8 @@ export class WorkoutEditorComponent implements OnDestroy {
   readonly lastSessionPanelFor = signal<string | null>(null);
   readonly recData          = signal<{ exerciseId: string; sets: number; reps: number; goalLabel: string } | null>(null);
   readonly feelingPickerFor = signal<string | null>(null);
+  /** Exercise whose options sheet is open (stats · delete). */
+  readonly optionsFor      = signal<string | null>(null);
   readonly notesPopupFor   = signal<string | null>(null);
   readonly notesText       = signal<string>('');
   readonly prevNoteData    = signal<{ exerciseId: string; notes: string } | null>(null);
@@ -1760,7 +1761,35 @@ export class WorkoutEditorComponent implements OnDestroy {
   onEscape(): void {
     if (this.dialog.openDialogs.length) return;
     if (this.notesPopupFor()) { this.closeNotesPopup(); return; }
+    if (this.optionsFor()) { this.closeOptions(); return; }
     if (this.feelingPickerFor()) { this.closeFatigaPicker(); }
+  }
+
+  // ── Exercise options sheet ───────────────────────────────────────────────
+
+  readonly optionsEntry = computed(() => {
+    const id = this.optionsFor();
+    return id ? (this.workout()?.entries.find(e => e.exerciseId === id) ?? null) : null;
+  });
+
+  openOptions(exerciseId: string): void { this.optionsFor.set(exerciseId); }
+
+  deleteOptionDesc(entry: WorkoutEntry): string {
+    return entry.sets.length === 0
+      ? 'Encara no hi ha cap sèrie registrada'
+      : `S'esborraran les ${entry.sets.length} sèries d'avui`;
+  }
+
+  closeOptions(): void { this.optionsFor.set(null); }
+
+  openStatsFromOptions(entry: WorkoutEntry): void {
+    this.closeOptions();
+    this.openStats(entry);
+  }
+
+  async removeEntryFromOptions(entry: WorkoutEntry): Promise<void> {
+    this.closeOptions();
+    await this.removeEntry(entry.exerciseId);
   }
 
   openFatigaPicker(exerciseId: string): void { this.feelingPickerFor.set(exerciseId); }
@@ -1839,11 +1868,6 @@ export class WorkoutEditorComponent implements OnDestroy {
       data: { exerciseId: entry.exerciseId, exerciseName: entry.exerciseName },
       width: '400px', maxHeight: '85vh',
     });
-  }
-
-  /** Jump to the exercise library with this exercise's edit dialog pre-opened. */
-  editExercise(entry: WorkoutEntry): void {
-    this.router.navigate(['/exercises'], { queryParams: { edit: entry.exerciseId } });
   }
 
   async onDrop(event: CdkDragDrop<WorkoutEntry[]>): Promise<void> {
@@ -1968,6 +1992,22 @@ export class WorkoutEditorComponent implements OnDestroy {
     const n = parseInt(raw, 10);
     this.editRestValue.set(isNaN(n) ? null : Math.max(0, n));
   }
+  /** Spoken description of a logged set — the visual row is a row of pills
+   *  with no words in it, so the whole thing is aria-hidden and named here. */
+  setAriaLabel(entry: WorkoutEntry, index: number, set: WorkoutSet): string {
+    const u     = this.unit();
+    const parts = [set.warmup ? 'sèrie d\'escalfament' : `sèrie ${this.workingSetNumber(entry, index)}`];
+    if (set.weightLeft != null) {
+      parts.push(`esquerra ${this.dispW(set.weightLeft)} ${u}, dreta ${this.dispW(set.weightRight!)} ${u} per ${set.reps} repeticions`);
+    } else {
+      parts.push(`${this.dispW(set.weight)} ${u} per ${set.reps} repeticions`);
+    }
+    for (const d of set.drops ?? []) parts.push(`després ${this.dispW(d.weight)} ${u} per ${d.reps}`);
+    if (set.rir != null)         parts.push(`${set.rir} RIR`);
+    if (set.restSeconds != null) parts.push(`${this.formatRest(set.restSeconds)} de descans`);
+    return parts.join(', ');
+  }
+
   /** Format seconds as "m:ss" (≥1 min) or "Ns" (under a minute). */
   formatRest(seconds: number): string {
     if (seconds < 60) return `${seconds}s`;
@@ -2079,12 +2119,6 @@ export class WorkoutEditorComponent implements OnDestroy {
   isEditingSet(exerciseId: string, index: number): boolean {
     const es = this.editingSet();
     return es?.exerciseId === exerciseId && es?.index === index;
-  }
-
-  tapSetPill(event: Event, exerciseId: string, setIndex: number, set: WorkoutSet): void {
-    if (!this.isEntryEditable(exerciseId)) return;
-    event.stopPropagation();
-    this.startEditSet(exerciseId, setIndex, set);
   }
 
   startEditSet(exerciseId: string, index: number, set: WorkoutSet): void {
@@ -2259,9 +2293,19 @@ export class WorkoutEditorComponent implements OnDestroy {
     }
   }
 
+  /** Confirms only when there is logged work to lose — deleting an exercise
+   *  added by mistake, with no sets yet, stays a single tap. */
   async removeEntry(exerciseId: string): Promise<void> {
     const w = this.workout();
     if (!w) return;
+    const entry = w.entries.find(e => e.exerciseId === exerciseId);
+    if (entry && entry.sets.length > 0) {
+      const ok = await this.confirmDialog.confirm(
+        `S'esborraran les ${entry.sets.length} sèries registrades d'aquest exercici.`,
+        { title: `Eliminar ${entry.exerciseName}?`, confirmLabel: 'Eliminar', variant: 'danger' },
+      );
+      if (!ok) return;
+    }
     if (this._timerForExercise === exerciseId) this.cancelTimer();
     try {
       await this.workoutService.removeEntryFromWorkout(w.id, exerciseId);
