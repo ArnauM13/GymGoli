@@ -34,6 +34,28 @@ mobile-first touch targets**.
 > **Use `color-mix()` for tinted variants**, never hard-code lighter shades:
 > `background: color-mix(in srgb, var(--ic) 7%, white);`
 
+#### Action hues
+
+Red, blue and green belong to the training types, and a custom type can be
+any color, so per-action color draws only from these:
+
+| Token             | Use                          | Light                                | Dark                                  |
+| ----------------- | ---------------------------- | ------------------------------------ | ------------------------------------- |
+| `--c-act-history` | Consulting past data         | `--c-brand`                          | brand lightened 60% toward text       |
+| `--c-act-note`    | Notes                        | `--c-amber` darkened 70%             | `--c-amber`                           |
+| `--c-act-neutral` | Everything else / overflow   | `--c-text-2`                         | `--c-text-2`                          |
+| `--c-act-danger`  | Destructive                  | `--c-danger` darkened 90%            | `--c-danger` lightened 80% toward text |
+
+Rules that keep them accessible on a surface tinted by an unknown category color:
+
+- **Mix surfaces with `var(--c-card)`, never with `transparent`** — a
+  translucent fill would land on whatever hue the training type carries.
+- **Surface `10%` · hover / active state `15%` · border `75%`.** Those three
+  give ≥4.5:1 for the text and ≥3:1 for the border against a footer tinted
+  with any category color, in both themes.
+- Color is always a second cue: every action keeps its own icon and its own
+  `aria-label`.
+
 ### Spacing
 
 - **Page horizontal margin:** `16px`

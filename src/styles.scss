@@ -39,12 +39,20 @@ html {
   --c-shadow:    rgba(0, 0, 0, 0.07);
   --c-shadow-md: rgba(0, 0, 0, 0.11);
 
-  // Per-action hues — each one always travels with its own icon and label,
-  // so color is a second cue, never the only one (WCAG 1.4.1).
+  // Accents already used across the app, promoted to tokens.
+  --c-amber:  #d97706;
+  --c-danger: #d32f2f;
+
+  // Per-action hues for the exercise footer and its options sheet. Red, blue
+  // and green belong to the training types — and a custom type can be any
+  // color at all — so actions only ever use the brand teal, the amber and
+  // neutral, and each hue always travels with its own icon and accessible
+  // name: color is a second cue, never the only one (WCAG 1.4.1).
+  // Darkened until the text clears 4.5:1 on its own 10% surface.
   --c-act-history: var(--c-brand);
-  --c-act-note:    #b45309;
-  --c-act-feeling: #6d5bb5;
-  --c-act-danger:  #d32f2f;
+  --c-act-note:    color-mix(in srgb, var(--c-amber) 70%, black);
+  --c-act-neutral: var(--c-text-2);
+  --c-act-danger:  color-mix(in srgb, var(--c-danger) 90%, black);
 }
 
 html.dark {
@@ -64,9 +72,14 @@ html.dark {
   --c-shadow:    rgba(0, 0, 0, 0.4);
   --c-shadow-md: rgba(0, 0, 0, 0.5);
 
-  --c-act-note:    #e0a253;
-  --c-act-feeling: #ab9cf0;
-  --c-act-danger:  #ef5350;
+  --c-amber:  #ff9800;
+  --c-danger: #ef5350;
+
+  // Same hues lightened instead of darkened, for the same 4.5:1 on dark.
+  --c-act-history: color-mix(in srgb, var(--c-brand) 60%, var(--c-text));
+  --c-act-note:    var(--c-amber);
+  --c-act-neutral: var(--c-text-2);
+  --c-act-danger:  color-mix(in srgb, var(--c-danger) 80%, var(--c-text));
 }
 
 // Reset + base

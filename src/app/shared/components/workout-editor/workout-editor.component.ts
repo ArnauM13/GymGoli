@@ -830,26 +830,34 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     /* One button shape for the whole footer; --fb is the action's hue, which
        always rides along with its own icon and label — never color alone. */
     .we-footer-btn {
-      --fb: var(--c-text-3);
+      --fb: var(--c-act-neutral);
       min-width: 40px; height: 40px; padding: 0 10px; border-radius: 11px;
       display: flex; align-items: center; justify-content: center; gap: 5px;
-      border: 1.5px solid color-mix(in srgb, var(--fb) 26%, transparent);
-      background: color-mix(in srgb, var(--fb) 9%, transparent);
+      /* Surfaces are mixed with the card, not layered over the footer: the
+         footer carries the training type's tint, which the user can set to
+         any color, so a translucent fill would land on an unknown ground. */
+      border: 1.5px solid color-mix(in srgb, var(--fb) 75%, var(--c-card));
+      background: color-mix(in srgb, var(--fb) 10%, var(--c-card));
       color: var(--fb); font: inherit; font-size: 18px; line-height: 1;
       cursor: pointer; touch-action: manipulation; transition: all 0.15s;
       .material-symbols-outlined { font-size: 19px; }
-      &:hover  { background: color-mix(in srgb, var(--fb) 17%, transparent); }
+      &:hover  { background: color-mix(in srgb, var(--fb) 15%, var(--c-card)); }
       &:active { transform: scale(0.94); }
       &:focus-visible { outline: 2px solid var(--fb); outline-offset: 2px; }
     }
     .we-footer-btn--on {
-      background: color-mix(in srgb, var(--fb) 19%, transparent);
-      border-color: color-mix(in srgb, var(--fb) 55%, transparent);
+      background: color-mix(in srgb, var(--fb) 15%, var(--c-card));
+      border-color: var(--fb);
     }
     .we-footer-btn--history { --fb: var(--c-act-history); }
     .we-footer-btn--note    { --fb: var(--c-act-note); }
-    .we-footer-btn--feeling { --fb: var(--c-act-feeling); }
-    .we-footer-btn--menu    { --fb: var(--c-text-3); }
+    .we-footer-btn--feeling { --fb: var(--c-act-neutral); }
+    /* Overflow is tertiary: a bare icon, no surface competing with the rest. */
+    .we-footer-btn--menu {
+      --fb: var(--c-act-neutral);
+      border-color: transparent; background: transparent;
+      &:hover { background: var(--c-hover); }
+    }
     .we-footer-btn-label { font-size: 12px; font-weight: 700; }
 
     /* ── Last session consultation panel ── */
@@ -945,8 +953,9 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       &:hover { background: var(--c-brand-dk); }
     }
     .we-ls-btn--danger {
-      border-color: rgba(239,83,80,0.4); color: #ef5350; background: transparent;
-      &:hover { background: rgba(239,83,80,0.08); border-color: #ef5350; }
+      border-color: color-mix(in srgb, var(--c-act-danger) 55%, var(--c-card));
+      color: var(--c-act-danger); background: transparent;
+      &:hover { background: color-mix(in srgb, var(--c-act-danger) 10%, var(--c-card)); border-color: var(--c-act-danger); }
     }
 
     /* ── Previous-note banner ── */
@@ -978,15 +987,15 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     }
     .we-options-list { display: flex; flex-direction: column; gap: 8px; }
     .we-option {
-      --op: var(--c-text-2);
+      --op: var(--c-act-neutral);
       display: flex; align-items: center; gap: 12px; text-align: left;
       padding: 12px 14px; border-radius: 12px;
-      border: 1.5px solid color-mix(in srgb, var(--op) 26%, transparent);
-      background: color-mix(in srgb, var(--op) 7%, transparent);
+      border: 1.5px solid color-mix(in srgb, var(--op) 75%, var(--c-card));
+      background: color-mix(in srgb, var(--op) 10%, var(--c-card));
       color: var(--op); font: inherit;
       cursor: pointer; touch-action: manipulation; transition: all 0.15s;
       .material-symbols-outlined { font-size: 22px; flex-shrink: 0; }
-      &:hover  { background: color-mix(in srgb, var(--op) 14%, transparent); }
+      &:hover  { background: color-mix(in srgb, var(--op) 15%, var(--c-card)); }
       &:active { transform: scale(0.98); }
       &:focus-visible { outline: 2px solid var(--op); outline-offset: 2px; }
     }
