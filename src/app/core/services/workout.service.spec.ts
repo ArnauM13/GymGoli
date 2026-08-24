@@ -266,6 +266,74 @@ describe('WorkoutService', () => {
     });
   });
 
+  describe('getLastSessionEntry()', () => {
+    it('returns the sets, note and derived counts of the most recent session', async () => {
+      const older = await service.createWorkoutForDate('2024-03-01');
+      await service.addExerciseToWorkout(older, { exerciseId: 'a', exerciseName: 'A', sets: [] });
+      await service.addSetsToEntry(older, 'a', [{ weight: 30, reps: 10 }]);
+
+      const recent = await service.createWorkoutForDate('2024-03-06');
+      await service.addExerciseToWorkout(recent, { exerciseId: 'a', exerciseName: 'A', sets: [] });
+      await service.addSetsToEntry(recent, 'a', [
+        { weight: 40, reps: 10, warmup: true },
+        { weight: 60, reps: 8 },
+        { weight: 60, reps: 6 },
+      ]);
+      await service.updateEntryNotes(recent, 'a', 'Bona sensació');
+
+      const last = service.getLastSessionEntry('a')!;
+      expect(last.date).toBe('2024-03-06');
+      expect(last.sets.length).toBe(3);
+      expect(last.workingSets).toBe(2);
+      expect(last.warmupSets).toBe(1);
+      expect(last.totalReps).toBe(14);
+      expect(last.maxWeight).toBe(60);
+      expect(last.notes).toBe('Bona sensació');
+    });
+
+    it('skips the excluded workout so today\'s own sets are never its own "last session"', async () => {
+      const older = await service.createWorkoutForDate('2024-03-01');
+      await service.addExerciseToWorkout(older, { exerciseId: 'a', exerciseName: 'A', sets: [] });
+      await service.addSetsToEntry(older, 'a', [{ weight: 30, reps: 10 }]);
+
+      const today = await service.createWorkoutForDate('2024-03-06');
+      await service.addExerciseToWorkout(today, { exerciseId: 'a', exerciseName: 'A', sets: [] });
+      await service.addSetsToEntry(today, 'a', [{ weight: 80, reps: 5 }]);
+
+      expect(service.getLastSessionEntry('a', today)?.date).toBe('2024-03-01');
+    });
+
+    it('returns null when the exercise has never been logged', () => {
+      expect(service.getLastSessionEntry('never-done')).toBeNull();
+    });
+  });
+
+  describe('replaceEntrySets()', () => {
+    it('swaps the entry\'s sets instead of appending them', async () => {
+      const id = await service.createWorkoutForDate('2024-03-06');
+      await service.addExerciseToWorkout(id, { exerciseId: 'a', exerciseName: 'A', sets: [] });
+      await service.addSetsToEntry(id, 'a', [{ weight: 20, reps: 12 }, { weight: 20, reps: 10 }]);
+
+      await service.replaceEntrySets(id, 'a', [{ weight: 60, reps: 8 }]);
+
+      const entry = service.getWorkoutForDate('2024-03-06')!.entries.find(e => e.exerciseId === 'a')!;
+      expect(entry.sets).toEqual([{ weight: 60, reps: 8 }]);
+    });
+
+    it('leaves the other entries untouched', async () => {
+      const id = await service.createWorkoutForDate('2024-03-06');
+      await service.addExerciseToWorkout(id, { exerciseId: 'a', exerciseName: 'A', sets: [] });
+      await service.addExerciseToWorkout(id, { exerciseId: 'b', exerciseName: 'B', sets: [] });
+      await service.addSetsToEntry(id, 'a', [{ weight: 20, reps: 12 }]);
+      await service.addSetsToEntry(id, 'b', [{ weight: 50, reps: 5 }]);
+
+      await service.replaceEntrySets(id, 'a', [{ weight: 60, reps: 8 }]);
+
+      const entries = service.getWorkoutForDate('2024-03-06')!.entries;
+      expect(entries.find(e => e.exerciseId === 'b')!.sets).toEqual([{ weight: 50, reps: 5 }]);
+    });
+  });
+
   describe('deleteExerciseData()', () => {
     // Seed 3 sessions on different dates, each logging exercise 'a' alongside a
     // second exercise 'b' — so removing 'a' never empties a workout and we stay

@@ -56,6 +56,18 @@ function workoutFromCache(raw: Record<string, unknown>): Workout {
   };
 }
 
+/** Read-only snapshot of an exercise's most recent completed session. */
+export interface LastSessionEntry {
+  date:        string;
+  maxWeight:   number;
+  feeling?:    FeelingLevel;
+  notes?:      string;
+  sets:        WorkoutSet[];
+  workingSets: number;
+  warmupSets:  number;
+  totalReps:   number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class WorkoutService {
   private supabase        = inject(SupabaseService).client;
@@ -396,6 +408,15 @@ export class WorkoutService {
   }
 
   getLastSessionInfo(exerciseId: string, excludeWorkoutId?: string): { date: string; maxWeight: number; feeling?: FeelingLevel } | null {
+    const full = this.getLastSessionEntry(exerciseId, excludeWorkoutId);
+    if (!full) return null;
+    return { date: full.date, maxWeight: full.maxWeight, feeling: full.feeling };
+  }
+
+  /** Everything the "last session" consultation panel needs about the most
+   *  recent completed session for an exercise: its sets, note and feeling
+   *  plus the derived summary (max weight, set counts, total reps). */
+  getLastSessionEntry(exerciseId: string, excludeWorkoutId?: string): LastSessionEntry | null {
     const past = this.doneWorkouts()
       .filter(w =>
         w.id !== excludeWorkoutId &&
@@ -406,7 +427,16 @@ export class WorkoutService {
     const entry       = past[0].entries.find(e => e.exerciseId === exerciseId)!;
     const workingSets = entry.sets.filter(s => !s.warmup);
     const maxWeight   = Math.max(...(workingSets.length ? workingSets : entry.sets).map(s => setMaxWeight(s)));
-    return { date: past[0].date, maxWeight, feeling: entry.feeling };
+    return {
+      date:        past[0].date,
+      maxWeight,
+      feeling:     entry.feeling,
+      notes:       entry.notes,
+      sets:        entry.sets,
+      workingSets: workingSets.length,
+      warmupSets:  entry.sets.length - workingSets.length,
+      totalReps:   workingSets.reduce((sum, s) => sum + s.reps, 0),
+    };
   }
 
   // ── Query helpers ────────────────────────────────────────────────────────
@@ -530,6 +560,18 @@ export class WorkoutService {
     if (!workout) return;
     const entries = workout.entries.map(e =>
       e.exerciseId === exerciseId ? { ...e, sets: [...e.sets, ...sets] } : e
+    );
+    await this._updateWorkout(workoutId, { entries });
+  }
+
+  /** Swaps every set of an entry for a new list in a single write — used by
+   *  "sobreescriure amb l'última sessió", where removing set by set would
+   *  fire one persist round-trip per set. */
+  async replaceEntrySets(workoutId: string, exerciseId: string, sets: WorkoutSet[]): Promise<void> {
+    const workout = this._find(workoutId);
+    if (!workout) return;
+    const entries = workout.entries.map(e =>
+      e.exerciseId === exerciseId ? { ...e, sets: [...sets] } : e
     );
     await this._updateWorkout(workoutId, { entries });
   }

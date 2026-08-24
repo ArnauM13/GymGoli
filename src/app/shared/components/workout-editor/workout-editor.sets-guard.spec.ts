@@ -20,7 +20,7 @@ function render(workout: Workout) {
   TestBed.configureTestingModule({
     imports: [WorkoutEditorComponent, ReactiveFormsModule],
     providers: [
-      { provide: WorkoutService, useValue: { workouts: signal([workout]), doneWorkouts: signal([workout]), getAllTimeMaxWeight: () => 0, getLastSessionInfo: () => null } },
+      { provide: WorkoutService, useValue: { workouts: signal([workout]), doneWorkouts: signal([workout]), getAllTimeMaxWeight: () => 0, getLastSessionInfo: () => null, getLastSessionEntry: () => null } },
       { provide: ExerciseService, useValue: { exercises: signal([...exBy.values()]), isLoaded: signal(true), ensureLoaded: () => Promise.resolve(), getById: (id: string) => exBy.get(id), loadTypeOf: () => undefined, bodyweightFactorOf: () => undefined } },
       { provide: UserSettingsService, useValue: { weightUnit: signal<'kg' | 'lb'>('kg'), difficultyScale: signal('emoji'), restTimerSeconds: signal(90), bodyweightKg: signal(null), dropsetsEnabled: signal(false), rirEnabled: signal(false), manualRestEnabled: signal(false), supersetsEnabled: signal(false) } },
       { provide: OfflineService, useValue: { isOffline: signal(false) } },
