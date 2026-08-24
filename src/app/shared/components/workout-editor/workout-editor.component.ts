@@ -11,12 +11,13 @@ import { FitnessGoal, FITNESS_GOAL_LABELS } from '../../../core/models/user-sett
 import { ExerciseService } from '../../../core/services/exercise.service';
 import { OfflineService } from '../../../core/services/offline.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
-import { WorkoutService } from '../../../core/services/workout.service';
+import { LastSessionEntry, WorkoutService } from '../../../core/services/workout.service';
 import { ExerciseStatsDialogComponent } from '../exercise-stats-dialog.component';
 import { kgToDisplay, displayToKg, effectiveWeightStep } from '../../utils/weight.utils';
 import { formatFeeling } from '../../utils/workout-card.utils';
 import { ExerciseEntryCardComponent } from '../exercise-entry-card/exercise-entry-card.component';
 import { FeedbackService } from '../../services/feedback.service';
+import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 
 const GOAL_REC: Record<FitnessGoal, { sets: number; reps: number }> = {
   strength: { sets: 4, reps: 5 },
@@ -126,22 +127,83 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
               </div>
             }
 
-            <!-- ── Last session info banner — tap to copy every set from the
-                 previous session into this exercise ── -->
-            @if (lastSessionData()?.exerciseId === entry.exerciseId && entry.sets.length === 0 && addingFor() === entry.exerciseId && !recData()) {
-              <div class="we-last-session-banner" role="button" tabindex="0"
-                (click)="applyLastSession(entry.exerciseId)"
-                (keydown.enter)="applyLastSession(entry.exerciseId)"
-                (keydown.space)="applyLastSession(entry.exerciseId)">
-                <span class="material-symbols-outlined we-lsb-icon">history</span>
-                <div class="we-lsb-info">
-                  <span class="we-lsb-label">Última sessió</span>
-                  <span class="we-lsb-date">{{ formatLastDate(lastSessionData()!.date) }}</span>
+            <!-- ── Last session consultation panel — read-only by itself:
+                 opened from the footer's history button at any time, and
+                 applied only through its explicit actions ── -->
+            @if (lastSessionPanelFor() === entry.exerciseId && lastSession(entry); as ls) {
+              <div class="we-ls-panel">
+                <div class="we-ls-head">
+                  <span class="material-symbols-outlined we-ls-icon">history</span>
+                  <div class="we-ls-title">
+                    <span class="we-ls-label">Última sessió</span>
+                    <span class="we-ls-date">{{ formatLastDate(ls.date) }}</span>
+                  </div>
+                  @if (ls.feeling) {
+                    <span class="we-ls-feeling" [title]="getFeelingLabel(ls.feeling!)">{{ getFeelingEmoji(ls.feeling!) }}</span>
+                  }
+                  <button type="button" class="we-ls-close" (click)="closeLastSession()" aria-label="Tancar">
+                    <span class="material-symbols-outlined">close</span>
+                  </button>
                 </div>
-                <div class="we-lsb-stats">
-                  <span class="we-lsb-weight">{{ dispW(lastSessionData()!.maxWeight) }}{{ unit() }}</span>
-                  @if (lastSessionData()!.feeling) {
-                    <span class="we-lsb-feeling">{{ getFeelingEmoji(lastSessionData()!.feeling!) }}</span>
+
+                <div class="we-ls-summary">
+                  <span class="we-ls-stat"><strong>{{ ls.workingSets }}</strong> sèries</span>
+                  @if (ls.warmupSets > 0) {
+                    <span class="we-ls-stat we-ls-stat--warmup">
+                      +{{ ls.warmupSets }}<span class="material-symbols-outlined">local_fire_department</span>
+                    </span>
+                  }
+                  <span class="we-ls-dot">·</span>
+                  <span class="we-ls-stat"><strong>{{ dispW(ls.maxWeight) }}</strong>{{ unit() }} màx</span>
+                  @if (ls.totalReps > 0) {
+                    <span class="we-ls-dot">·</span>
+                    <span class="we-ls-stat"><strong>{{ ls.totalReps }}</strong> reps</span>
+                  }
+                </div>
+
+                @if (ls.notes) {
+                  <p class="we-ls-note">
+                    <span class="material-symbols-outlined">sticky_note_2</span>
+                    <span>{{ ls.notes }}</span>
+                  </p>
+                }
+
+                <div class="we-ls-sets">
+                  @for (set of ls.sets; track $index) {
+                    <button type="button" class="we-ls-set-pill" [class.we-ls-set-pill--warmup]="set.warmup"
+                            (click)="copyLastSessionSet(entry, set)"
+                            title="Afegir només aquesta sèrie a avui">
+                      @if (set.warmup) {
+                        <span class="material-symbols-outlined we-ls-warmup-icon">local_fire_department</span>
+                      }
+                      @if (set.weightLeft != null) {
+                        E {{ dispW(set.weightLeft) }}{{ unit() }} · D {{ dispW(set.weightRight!) }}{{ unit() }}
+                      } @else {
+                        {{ dispW(set.weight) }}{{ unit() }}
+                      }
+                      <span class="we-ls-set-reps">&nbsp;×&nbsp;{{ set.reps }}</span>
+                      @for (d of (set.drops ?? []); track $index) {
+                        <span class="we-ls-drop-sep">→</span>{{ dispW(d.weight) }}{{ unit() }}<span class="we-ls-set-reps">&nbsp;×&nbsp;{{ d.reps }}</span>
+                      }
+                    </button>
+                  }
+                </div>
+
+                <div class="we-ls-actions">
+                  @if (entry.sets.length === 0) {
+                    <button type="button" class="we-ls-btn we-ls-btn--primary" (click)="applyLastSession(entry, 'append')">
+                      <span class="material-symbols-outlined">content_copy</span>
+                      Copiar les {{ ls.sets.length }} sèries
+                    </button>
+                  } @else {
+                    <button type="button" class="we-ls-btn" (click)="applyLastSession(entry, 'append')">
+                      <span class="material-symbols-outlined">add</span>
+                      Afegir-les
+                    </button>
+                    <button type="button" class="we-ls-btn we-ls-btn--danger" (click)="applyLastSession(entry, 'replace')">
+                      <span class="material-symbols-outlined">swap_horiz</span>
+                      Sobreescriure
+                    </button>
                   }
                 </div>
               </div>
@@ -493,6 +555,16 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
             <!-- ── Entry footer: left (edit + stats) · right (notes + feeling + delete) ── -->
             <div class="we-entry-footer">
               <div class="we-footer-actions">
+                @if (lastSession(entry); as ls) {
+                  <button class="we-footer-history-btn"
+                    [class.we-footer-history-btn--open]="lastSessionPanelFor() === entry.exerciseId"
+                    [attr.aria-expanded]="lastSessionPanelFor() === entry.exerciseId"
+                    (click)="toggleLastSession(entry.exerciseId)"
+                    title="Consultar l'última sessió" aria-label="Consultar l'última sessió">
+                    <span class="material-symbols-outlined">history</span>
+                    <span class="we-footer-history-date">{{ formatLastDate(ls.date) }}</span>
+                  </button>
+                }
                 @if (!offlineService.isOffline()) {
                   <button class="we-footer-stats-btn" (click)="openStats(entry)">
                     <span class="material-symbols-outlined">bar_chart</span>
@@ -775,21 +847,119 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       &:hover { background: rgba(239,83,80,0.08); border-color: #ef5350; }
     }
 
-    /* ── Last session banner ── */
-    .we-last-session-banner {
-      display: flex; align-items: center; gap: 10px;
-      margin: 10px 14px; padding: 10px 14px;
-      background: rgba(var(--c-brand-rgb), 0.07); border: 1px solid rgba(var(--c-brand-rgb), 0.15);
-      border-radius: 10px; cursor: pointer; transition: background 0.15s;
-      &:hover { background: rgba(var(--c-brand-rgb), 0.13); }
+    /* ── Last session consultation panel ── */
+    .we-ls-panel {
+      display: flex; flex-direction: column; gap: 9px;
+      margin: 10px 14px; padding: 11px 12px 12px;
+      background: rgba(var(--c-brand-rgb), 0.06);
+      border: 1px solid rgba(var(--c-brand-rgb), 0.16);
+      border-radius: 12px;
+      animation: we-ls-in 0.2s ease both;
     }
-    .we-lsb-icon { font-size: 20px; color: var(--c-brand); flex-shrink: 0; }
-    .we-lsb-info { display: flex; flex-direction: column; gap: 1px; flex: 1; }
-    .we-lsb-label { font-size: 10px; font-weight: 600; color: var(--c-text-2); text-transform: uppercase; letter-spacing: 0.4px; }
-    .we-lsb-date  { font-size: 13px; font-weight: 600; color: var(--c-text); }
-    .we-lsb-stats { display: flex; align-items: center; gap: 6px; }
-    .we-lsb-weight { font-size: 16px; font-weight: 700; color: var(--c-brand); }
-    .we-lsb-feeling { font-size: 20px; line-height: 1; }
+    @keyframes we-ls-in {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .we-ls-head { display: flex; align-items: center; gap: 9px; }
+    .we-ls-icon { font-size: 20px; color: var(--c-brand); flex-shrink: 0; }
+    .we-ls-title { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+    .we-ls-label { font-size: 10px; font-weight: 700; color: var(--c-text-3); text-transform: uppercase; letter-spacing: 0.4px; }
+    .we-ls-date  { font-size: 13px; font-weight: 700; color: var(--c-text); }
+    .we-ls-feeling { font-size: 20px; line-height: 1; flex-shrink: 0; }
+    .we-ls-close {
+      display: flex; align-items: center; justify-content: center;
+      width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+      border: none; background: transparent; cursor: pointer; color: var(--c-text-3);
+      touch-action: manipulation; transition: background 0.12s;
+      .material-symbols-outlined { font-size: 15px; }
+      &:hover { background: var(--c-hover); }
+    }
+
+    /* Summary row */
+    .we-ls-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+    .we-ls-stat {
+      display: inline-flex; align-items: center; gap: 2px;
+      font-size: 12px; color: var(--c-text-2);
+      strong { font-size: 14px; font-weight: 700; color: var(--c-text); }
+    }
+    .we-ls-stat--warmup {
+      color: #ff9800; font-weight: 700;
+      .material-symbols-outlined { font-size: 13px; font-variation-settings: 'FILL' 1, 'wght' 400; }
+    }
+    .we-ls-dot { color: var(--c-text-3); font-size: 12px; }
+
+    /* Previous note */
+    .we-ls-note {
+      display: flex; align-items: flex-start; gap: 6px; margin: 0;
+      font-size: 12.5px; font-style: italic; color: var(--c-text-2); line-height: 1.45;
+      word-break: break-word;
+      .material-symbols-outlined { font-size: 15px; color: var(--c-brand); flex-shrink: 0; margin-top: 1px; font-style: normal; }
+    }
+
+    /* Set pills — tapping one copies just that set into today */
+    .we-ls-sets { display: flex; flex-wrap: wrap; gap: 5px; }
+    .we-ls-set-pill {
+      display: inline-flex; align-items: baseline;
+      padding: 4px 10px; border-radius: 20px; border: none;
+      background: color-mix(in srgb, var(--c-brand) 12%, var(--c-card));
+      font-size: 12px; font-weight: 700; color: var(--c-brand);
+      white-space: nowrap; cursor: pointer; touch-action: manipulation;
+      transition: background 0.15s, transform 0.1s;
+      &:hover  { background: color-mix(in srgb, var(--c-brand) 22%, var(--c-card)); }
+      &:active { transform: scale(0.96); }
+    }
+    .we-ls-set-pill--warmup {
+      background: color-mix(in srgb, #ff9800 14%, var(--c-card));
+      color: var(--c-text-3);
+      &:hover { background: color-mix(in srgb, #ff9800 24%, var(--c-card)); }
+    }
+    .we-ls-warmup-icon {
+      font-size: 13px; color: #ff9800; margin-right: 3px;
+      font-variation-settings: 'FILL' 1, 'wght' 400;
+      align-self: center;
+    }
+    .we-ls-drop-sep { margin: 0 3px; opacity: 0.6; font-weight: 500; }
+    .we-ls-set-reps { font-size: 11px; font-weight: 500; color: var(--c-text-3); }
+
+    /* Actions */
+    .we-ls-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .we-ls-btn {
+      flex: 1; min-width: 120px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+      padding: 9px 12px; border-radius: 10px;
+      border: 1.5px solid var(--c-border-2); background: var(--c-card);
+      font-size: 13px; font-weight: 700; color: var(--c-text-2);
+      cursor: pointer; touch-action: manipulation;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+      .material-symbols-outlined { font-size: 17px; }
+      &:hover  { background: var(--c-subtle); }
+      &:active { transform: scale(0.98); }
+    }
+    .we-ls-btn--primary {
+      border-color: transparent; background: var(--c-brand); color: #fff;
+      &:hover { background: var(--c-brand-dk); }
+    }
+    .we-ls-btn--danger {
+      border-color: rgba(239,83,80,0.4); color: #ef5350; background: transparent;
+      &:hover { background: rgba(239,83,80,0.08); border-color: #ef5350; }
+    }
+
+    /* ── History footer button ── */
+    .we-footer-history-btn {
+      height: 36px; padding: 0 10px; border-radius: 10px;
+      border: 1.5px solid var(--c-border); background: transparent;
+      color: var(--c-text-3);
+      display: flex; align-items: center; gap: 5px;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { background: var(--c-subtle); color: var(--c-text-2); }
+      &.we-footer-history-btn--open {
+        border-color: rgba(var(--c-brand-rgb), 0.35);
+        color: var(--c-brand);
+        background: rgba(var(--c-brand-rgb), 0.07);
+      }
+    }
+    .we-footer-history-date { font-size: 11.5px; font-weight: 700; }
 
     /* ── Notes footer button ── */
     .we-footer-notes-btn {
@@ -1283,6 +1453,7 @@ export class WorkoutEditorComponent implements OnDestroy {
   readonly settingsService = inject(UserSettingsService);
   readonly offlineService  = inject(OfflineService);
   private feedback         = inject(FeedbackService);
+  private confirmDialog    = inject(ConfirmDialogService);
   private fb               = inject(FormBuilder);
   private dialog           = inject(MatDialog);
   private router           = inject(Router);
@@ -1307,7 +1478,9 @@ export class WorkoutEditorComponent implements OnDestroy {
   readonly setQty           = signal(1);
   readonly setQtyOptions    = [1, 2, 3, 4, 5];
   readonly editingSet       = signal<{ exerciseId: string; index: number } | null>(null);
-  readonly lastSessionData  = signal<{ exerciseId: string; date: string; maxWeight: number; feeling?: FeelingLevel; sets: WorkoutSet[] } | null>(null);
+  /** Exercise whose "última sessió" consultation panel is open — the panel is
+   *  read-only, applying it is always an explicit action inside it. */
+  readonly lastSessionPanelFor = signal<string | null>(null);
   readonly recData          = signal<{ exerciseId: string; sets: number; reps: number; goalLabel: string } | null>(null);
   readonly feelingPickerFor = signal<string | null>(null);
   readonly notesPopupFor   = signal<string | null>(null);
@@ -1560,7 +1733,7 @@ export class WorkoutEditorComponent implements OnDestroy {
 
   reset(): void {
     this._resetForm();
-    this.lastSessionData.set(null);
+    this.lastSessionPanelFor.set(null);
     this.recData.set(null);
     this.prevNoteData.set(null);
   }
@@ -1826,15 +1999,13 @@ export class WorkoutEditorComponent implements OnDestroy {
     const w    = this.workout();
     const u    = this.unit();
     if (entry.sets.length === 0 && w) {
-      const info = this.workoutService.getLastSessionInfo(entry.exerciseId, w.id);
+      const info = this.lastSessions().get(entry.exerciseId) ?? null;
       const goal = this.settingsService.fitnessGoal();
       if (info) {
-        const lastEntry = this.workoutService.doneWorkouts()
-          .filter(wk => wk.id !== w.id && wk.entries.some(e => e.exerciseId === entry.exerciseId && e.sets.length > 0))
-          .sort((a, b) => b.date.localeCompare(a.date))[0]
-          ?.entries.find(e => e.exerciseId === entry.exerciseId);
-        this.lastSessionData.set({ exerciseId: entry.exerciseId, ...info, sets: lastEntry?.sets ?? [] });
-        this.prevNoteData.set(lastEntry?.notes ? { exerciseId: entry.exerciseId, notes: lastEntry.notes } : null);
+        this.prevNoteData.set(info.notes ? { exerciseId: entry.exerciseId, notes: info.notes } : null);
+        // Nothing is logged yet, so surface the previous session right away —
+        // the panel is read-only, applying it is still an explicit tap.
+        this.lastSessionPanelFor.set(entry.exerciseId);
         const wR = kgToDisplay(info.maxWeight, u);
         if (goal) {
           const rec = GOAL_REC[goal];
@@ -1845,7 +2016,6 @@ export class WorkoutEditorComponent implements OnDestroy {
           this.setForm.patchValue({ weight: kgToDisplay(info.maxWeight, u), weightRight: wR, reps: 8 });
         }
       } else {
-        this.lastSessionData.set(null);
         this.prevNoteData.set(null);
         if (goal) {
           const rec = GOAL_REC[goal];
@@ -1857,7 +2027,6 @@ export class WorkoutEditorComponent implements OnDestroy {
         }
       }
     } else {
-      this.lastSessionData.set(null);
       this.recData.set(null);
       this.prevNoteData.set(null);
       const last = entry.sets.at(-1);
@@ -1888,7 +2057,6 @@ export class WorkoutEditorComponent implements OnDestroy {
 
   cancelSet(): void {
     this._resetForm();
-    this.lastSessionData.set(null);
     this.recData.set(null);
     this.prevNoteData.set(null);
   }
@@ -2001,16 +2169,83 @@ export class WorkoutEditorComponent implements OnDestroy {
     }
   }
 
-  async applyLastSession(exerciseId: string): Promise<void> {
-    const data = this.lastSessionData();
-    const w    = this.workout();
-    if (!data || !w || data.sets.length === 0) return;
+  // ── Last session consultation ────────────────────────────────────────────
+
+  /** Last completed session per exercise in this workout, for the footer
+   *  badge and the consultation panel. Recomputes when the workout or the
+   *  historical workouts change. */
+  readonly lastSessions = computed<Map<string, LastSessionEntry>>(() => {
+    const w = this.workout();
+    if (!w) return new Map();
+    const map = new Map<string, LastSessionEntry>();
+    for (const entry of w.entries) {
+      const info = this.workoutService.getLastSessionEntry(entry.exerciseId, w.id);
+      if (info) map.set(entry.exerciseId, info);
+    }
+    return map;
+  });
+
+  lastSession(entry: WorkoutEntry): LastSessionEntry | null {
+    return this.lastSessions().get(entry.exerciseId) ?? null;
+  }
+
+  toggleLastSession(exerciseId: string): void {
+    this.lastSessionPanelFor.update(cur => (cur === exerciseId ? null : exerciseId));
+  }
+
+  closeLastSession(): void {
+    this.lastSessionPanelFor.set(null);
+  }
+
+  /** Sets are copied, never referenced — the historical workout must not be
+   *  mutated when today's copy is later edited. */
+  private _cloneSet(set: WorkoutSet): WorkoutSet {
+    return { ...set, ...(set.drops ? { drops: set.drops.map(d => ({ ...d })) } : {}) };
+  }
+
+  /** Writes the last session's sets into today's entry — `append` adds them
+   *  after what's already logged, `replace` swaps today's sets for them
+   *  (confirmed first, since it discards logged work). */
+  async applyLastSession(entry: WorkoutEntry, mode: 'append' | 'replace'): Promise<void> {
+    const w  = this.workout();
+    const ls = this.lastSession(entry);
+    if (!w || !ls || ls.sets.length === 0) return;
+
+    if (mode === 'replace' && entry.sets.length > 0) {
+      const ok = await this.confirmDialog.confirm(
+        `S'esborraran les ${entry.sets.length} sèries d'avui d'aquest exercici i es substituiran per les ${ls.sets.length} de l'última sessió.`,
+        { title: 'Sobreescriure les sèries?', confirmLabel: 'Sobreescriure', variant: 'danger' },
+      );
+      if (!ok) return;
+    }
+
+    const sets = ls.sets.map(set => this._cloneSet(set));
     try {
-      await this.workoutService.addSetsToEntry(w.id, exerciseId, data.sets);
-      this.lastSessionData.set(null);
-      this.cancelSet();
+      if (mode === 'replace') {
+        await this.workoutService.replaceEntrySets(w.id, entry.exerciseId, sets);
+      } else {
+        await this.workoutService.addSetsToEntry(w.id, entry.exerciseId, sets);
+      }
+      this.lastSessionPanelFor.set(null);
+      if (this.addingFor() === entry.exerciseId) this.cancelSet();
+      this.feedback.info(
+        mode === 'replace' ? 'Sèries sobreescrites' : `${sets.length} sèries copiades`,
+        2000,
+      );
     } catch {
       this.feedback.error('Error en aplicar l\'última sessió', 3000);
+    }
+  }
+
+  /** Copies a single set from the consultation panel into today's entry. */
+  async copyLastSessionSet(entry: WorkoutEntry, set: WorkoutSet): Promise<void> {
+    const w = this.workout();
+    if (!w) return;
+    try {
+      await this.workoutService.addSetsToEntry(w.id, entry.exerciseId, [this._cloneSet(set)]);
+      this.feedback.info('Sèrie copiada', 1800);
+    } catch {
+      this.feedback.error('Error en copiar la sèrie', 3000);
     }
   }
 
