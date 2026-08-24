@@ -174,6 +174,6 @@ describe('WorkoutEditor — last session consultation', () => {
     const h = render(workout);
 
     expect(h.component.lastSession(h.entry)).toBeNull();
-    expect(h.fixture.nativeElement.querySelector('.we-footer-history-btn')).toBeNull();
+    expect(h.fixture.nativeElement.querySelector('.we-footer-btn--history')).toBeNull();
   });
 });
