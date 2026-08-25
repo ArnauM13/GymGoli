@@ -7,7 +7,9 @@ create table exercises (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid references auth.users not null,
   name        text not null,
-  category    text not null check (category in ('push', 'pull', 'legs')),
+  -- Un id de training_types: 'push' / 'pull' / 'legs' o l'UUID d'un tipus
+  -- creat per l'usuari. Text lliure a propòsit (vegeu la migració 028).
+  category    text not null,
   subcategory text,
   notes       text,
   created_at  timestamptz default now()

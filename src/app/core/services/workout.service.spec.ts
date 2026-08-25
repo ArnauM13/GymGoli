@@ -1,7 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 
-import { WorkoutService } from './workout.service';
+import { WorkoutService, matchesHistoryFilters } from './workout.service';
+import { Workout } from '../models/workout.model';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { ExerciseService } from './exercise.service';
@@ -51,11 +52,12 @@ describe('WorkoutService', () => {
         { provide: SupabaseService, useValue: { client: { from: fromSpy, channel: () => channelStub } } },
         { provide: ExerciseService, useValue: { getById: () => undefined } },
         { provide: SyncService,     useValue: {
-          markDirty:   jasmine.createSpy('markDirty'),
-          pendingIds:  signal<string[]>([]),
-          getSnapshot: () => null,
-          cancelDirty: jasmine.createSpy('cancelDirty'),
-          isInsert:    () => false,
+          markDirty:    jasmine.createSpy('markDirty'),
+          pendingIds:   signal<string[]>([]),
+          pendingCount: signal(0),
+          getSnapshot:  () => null,
+          cancelDirty:  jasmine.createSpy('cancelDirty'),
+          isInsert:     () => false,
         } },
       ],
     });
@@ -388,5 +390,45 @@ describe('WorkoutService', () => {
       expect(res.removedWorkouts).toBe(1);
       expect(service.getWorkoutForDate('2024-03-06')).toBeNull();
     });
+  });
+});
+
+// ── matchesHistoryFilters() ─────────────────────────────────────────────────
+//
+// The client-side twin of loadWorkoutPage()'s server filters, used to merge
+// not-yet-synced workouts into the paginated Historial list.
+
+describe('matchesHistoryFilters()', () => {
+  function make(overrides: Partial<Workout> = {}): Workout {
+    return { id: 'w1', date: '2024-03-06', entries: [], createdAt: new Date(), ...overrides };
+  }
+
+  it('accepts a done workout when no filter is active', () => {
+    expect(matchesHistoryFilters(make(), {})).toBeTrue();
+  });
+
+  it('rejects a planned workout, like the server .neq() does', () => {
+    expect(matchesHistoryFilters(make({ status: 'planned' }), {})).toBeFalse();
+  });
+
+  it('matches on date', () => {
+    expect(matchesHistoryFilters(make(), { date: '2024-03-06' })).toBeTrue();
+    expect(matchesHistoryFilters(make(), { date: '2024-03-07' })).toBeFalse();
+  });
+
+  it('matches on category, including a user-created training type', () => {
+    const custom = 'c0ffee00-0000-4000-8000-000000000000';
+    expect(matchesHistoryFilters(make({ categories: [custom] }), { category: custom })).toBeTrue();
+    expect(matchesHistoryFilters(make({ categories: ['push'] }), { category: custom })).toBeFalse();
+  });
+
+  it('falls back to the legacy single `category` field', () => {
+    expect(matchesHistoryFilters(make({ category: 'legs' }), { category: 'legs' })).toBeTrue();
+  });
+
+  it('matches exercise names case-insensitively', () => {
+    const w = make({ entries: [{ exerciseId: 'a', exerciseName: 'Press banca', sets: [] }] });
+    expect(matchesHistoryFilters(w, { search: 'PRESS' })).toBeTrue();
+    expect(matchesHistoryFilters(w, { search: 'dominades' })).toBeFalse();
   });
 });

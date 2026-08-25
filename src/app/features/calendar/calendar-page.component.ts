@@ -10,7 +10,7 @@ import {
 import { FeelingLevel, Workout, WorkoutEntry, WorkoutSet, setMaxWeight, setVolume } from '../../core/models/workout.model';
 import { Sport, SportSubtype } from '../../core/models/sport.model';
 import { UserSettingsService } from '../../core/services/user-settings.service';
-import { WorkoutService } from '../../core/services/workout.service';
+import { WorkoutService, matchesHistoryFilters } from '../../core/services/workout.service';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -149,13 +149,20 @@ const PAGE_SIZE = 20;
                   </div>
 
                   <div class="wh-content">
-                    @if ((workout.categories ?? (workout.category ? [workout.category] : [])).length > 0) {
+                    @let cats = workout.categories ?? (workout.category ? [workout.category] : []);
+                    @if (cats.length > 0 || isUnsynced(workout.id)) {
                       <div class="wh-badges">
-                        @for (cat of (workout.categories ?? (workout.category ? [workout.category] : [])); track cat) {
+                        @for (cat of cats; track cat) {
                           <span class="wh-badge wh-badge--{{ cat }}">{{ getCatLabel(cat) }}</span>
                         }
                         @if ((workout.categories ?? []).length > 1) {
                           <span class="wh-badge wh-badge--hybrid">Híbrid</span>
+                        }
+                        @if (isUnsynced(workout.id)) {
+                          <span class="wh-badge wh-badge--unsynced" title="Encara no s'ha desat al servidor">
+                            <span class="material-symbols-outlined">cloud_off</span>
+                            Sense sincronitzar
+                          </span>
                         }
                       </div>
                     }
@@ -643,6 +650,12 @@ const PAGE_SIZE = 20;
     html.dark .wh-badge--pull  { background: rgba(100,181,246,0.18); color: #90caf9; }
     html.dark .wh-badge--legs  { background: rgba(129,199,132,0.18); color: #a5d6a7; }
     html.dark .wh-badge--hybrid { background: rgba(180,180,180,0.1); }
+    .wh-badge--unsynced {
+      display: inline-flex; align-items: center; gap: 3px;
+      background: rgba(255,152,0,0.15); color: #b26500;
+      .material-symbols-outlined { font-size: 12px; }
+    }
+    html.dark .wh-badge--unsynced { background: rgba(255,152,0,0.18); color: #ffb74d; }
     .wh-exercises {
       font-size: 13px; font-weight: 700; color: var(--c-text);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -895,14 +908,53 @@ export class CalendarPageComponent implements OnDestroy {
   }
 
   // ── Pagination state ────────────────────────────────────────────────────
-  private readonly _items    = signal<Workout[]>([]);
+  private readonly _serverItems = signal<Workout[]>([]);
   private readonly _total    = signal(0);
   private readonly _page     = signal(0);
   readonly isInitialLoading  = signal(true);
   readonly isLoadingMore     = signal(false);
 
-  readonly items   = this._items.asReadonly();
-  readonly hasMore = computed(() => this._items().length < this._total());
+  /** Ids of the listed workouts that only exist locally — flagged in the list
+   *  so an entrenament that never reached Supabase is visible as such instead
+   *  of silently missing from the history. */
+  readonly unsyncedIds = computed(
+    () => new Set(this.workoutService.unsyncedWorkouts().map(w => w.id))
+  );
+  isUnsynced(id: string): boolean { return this.unsyncedIds().has(id); }
+
+  /**
+   * The server page(s) plus every workout still queued for sync that matches
+   * the active filters. Without this merge the history silently drops any
+   * session that hasn't reached Supabase — it stays visible on Inici (which
+   * reads the local month cache) but never appears here.
+   */
+  readonly items = computed((): Workout[] => {
+    const server  = this._serverItems();
+    const known   = new Set(server.map(w => w.id));
+    const filters = {
+      category: this.filterCat() ?? undefined,
+      date:     this.selectedDate() ?? undefined,
+      search:   this.searchQuery().trim() || undefined,
+    };
+    const pending = this.workoutService.unsyncedWorkouts()
+      .filter(w => !known.has(w.id) && matchesHistoryFilters(w, filters));
+    if (pending.length === 0) return server;
+    return [...server, ...pending].sort((a, b) => this._compare(a, b));
+  });
+
+  /** Mirrors the server's total order (date → created_at → id) so merged-in
+   *  local workouts land where they belong in the list. */
+  private _compare(a: Workout, b: Workout): number {
+    const dir = this.sortDesc() ? -1 : 1;
+    if (a.date !== b.date) return a.date.localeCompare(b.date) * dir;
+    const at = a.createdAt?.getTime() ?? 0;
+    const bt = b.createdAt?.getTime() ?? 0;
+    if (at !== bt) return (at - bt) * dir;
+    return a.id.localeCompare(b.id) * dir;
+  }
+
+  /** Only the server list paginates — the local ones are all loaded already. */
+  readonly hasMore = computed(() => this._serverItems().length < this._total());
 
   readonly hasActiveFilter = computed(
     () => !!this.filterCat() || !!this.searchQuery() || !!this.selectedDate()
@@ -944,7 +996,7 @@ export class CalendarPageComponent implements OnDestroy {
 
   // ── Data loading ─────────────────────────────────────────────────────────
   private _resetAndLoad(): void {
-    this._items.set([]);
+    this._serverItems.set([]);
     this._total.set(0);
     this._page.set(0);
     this.isInitialLoading.set(true);
@@ -954,12 +1006,17 @@ export class CalendarPageComponent implements OnDestroy {
   private _loadNextPage(): void {
     if (!this.hasMore() || this.isLoadingMore()) return;
     const next = this._page() + 1;
-    this._page.set(next);
     this.isLoadingMore.set(true);
-    this._fetchPage(next).finally(() => this.isLoadingMore.set(false));
+    // The cursor only advances once the page is actually in: bumping it
+    // up-front means a single failed request skips those 20 workouts for
+    // good, since the next intersection would ask for the page after it.
+    this._fetchPage(next)
+      .then(loaded => { if (loaded) this._page.set(next); })
+      .finally(() => this.isLoadingMore.set(false));
   }
 
-  private async _fetchPage(page: number): Promise<void> {
+  /** Resolves to whether the page was actually loaded. */
+  private async _fetchPage(page: number): Promise<boolean> {
     try {
       const { workouts, total } = await this.workoutService.loadWorkoutPage({
         page,
@@ -970,9 +1027,11 @@ export class CalendarPageComponent implements OnDestroy {
         ascending: !this.sortDesc(),
       });
       this._total.set(total);
-      this._items.update(prev => page === 0 ? workouts : [...prev, ...workouts]);
+      this._serverItems.update(prev => page === 0 ? workouts : [...prev, ...workouts]);
+      return true;
     } catch {
-      // Network failure — keep current state
+      // Network failure — keep current state, and let this page be retried.
+      return false;
     }
   }
 
@@ -1013,7 +1072,7 @@ export class CalendarPageComponent implements OnDestroy {
   private _setSelectedDate(date: string | null): void {
     this.selectedDate.set(date);
     if (date) {
-      const found = this._items().find(w => w.date === date)
+      const found = this.items().find(w => w.date === date)
                  ?? this.workoutService.getWorkoutForDate(date);
       this.expandedId.set(found?.id ?? null);
     } else {
