@@ -27,6 +27,23 @@ describe('ExerciseEntryCardComponent', () => {
     fixture.detectChanges();
   }
 
+  describe('header summary', () => {
+    it('counts a dropset\'s secondary stages in the rep total', () => {
+      setInputs({ collapsed: true, entry: entry({ sets: [
+        { weight: 0, reps: 8, drops: [{ weight: 0, reps: 6 }, { weight: 0, reps: 4 }] },
+      ] }) });
+      expect(component.totalReps()).toBe(18);
+    });
+
+    it('still excludes warm-ups, drop stages and all', () => {
+      setInputs({ collapsed: true, entry: entry({ sets: [
+        { weight: 0, reps: 10, warmup: true, drops: [{ weight: 0, reps: 5 }] },
+        { weight: 0, reps: 8, drops: [{ weight: 0, reps: 6 }] },
+      ] }) });
+      expect(component.totalReps()).toBe(14);
+    });
+  });
+
   describe('header stats/delete actions (collapsed + no sets)', () => {
     it('renders stats and delete buttons in the header when collapsed with no sets', () => {
       setInputs({ collapsed: true, entry: entry({ sets: [] }), showStatsAction: true, showDeleteAction: true });
@@ -106,6 +123,25 @@ describe('ExerciseEntryCardComponent', () => {
       main.click(); // what the browser does for Enter/Space on a <button>
 
       expect(spy).toHaveBeenCalled();
+    });
+
+    it('toggles from the chevron too, not just the header', () => {
+      setInputs({ collapsed: true, entry: entry() });
+      const spy = jasmine.createSpy('header');
+      component.headerClick.subscribe(spy);
+
+      const chevron = (fixture.nativeElement as HTMLElement)
+        .querySelector('button.eec-chevron-btn') as HTMLButtonElement;
+      chevron.click();
+
+      expect(spy).toHaveBeenCalled();
+    });
+
+    it('keeps the chevron out of the tab order — the header button owns it', () => {
+      setInputs({ collapsed: true, entry: entry() });
+      const chevron = (fixture.nativeElement as HTMLElement).querySelector('button.eec-chevron-btn')!;
+      expect(chevron.getAttribute('tabindex')).toBe('-1');
+      expect(chevron.getAttribute('aria-hidden')).toBe('true');
     });
 
     it('hides the decorative meta from screen readers', () => {

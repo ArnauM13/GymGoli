@@ -115,9 +115,14 @@ export interface DayFeedEntry {
                   }
                 </div>
                 <div class="sd-stepper">
-                  <button class="sd-step-btn" (click)="adjustDuration(-5)">−5</button>
-                  <span class="sd-step-val">{{ editDuration() }}<small>min</small></span>
-                  <button class="sd-step-btn" (click)="adjustDuration(5)">+5</button>
+                  <button class="sd-step-btn" (click)="adjustDuration(-5)" aria-label="Restar 5 minuts">−5</button>
+                  <label class="sd-step-val">
+                    <input class="sd-step-input" type="number" inputmode="numeric" min="0" step="1"
+                           [value]="editDuration()" (input)="setDuration($any($event.target).value)"
+                           aria-label="Durada en minuts">
+                    <small aria-hidden="true">min</small>
+                  </label>
+                  <button class="sd-step-btn" (click)="adjustDuration(5)" aria-label="Sumar 5 minuts">+5</button>
                 </div>
               </div>
             </div>
@@ -151,9 +156,15 @@ export interface DayFeedEntry {
                   </div>
                 } @else {
                   <div class="sd-stepper">
-                    <button class="sd-step-btn" (click)="adjustMetric(def, -1)">−</button>
-                    <span class="sd-step-val">{{ editMetricNum(def) }}<small>@if (def.unit) { {{ def.unit }} }</small></span>
-                    <button class="sd-step-btn" (click)="adjustMetric(def, 1)">+</button>
+                    <button class="sd-step-btn" (click)="adjustMetric(def, -1)" [attr.aria-label]="'Restar ' + def.label">−</button>
+                    <label class="sd-step-val">
+                      <input class="sd-step-input" type="number" inputmode="decimal"
+                             [min]="def.min ?? 0" [max]="def.max ?? 9999" [step]="def.step ?? 1"
+                             [value]="editMetricNum(def)" (input)="setMetricNum(def, $any($event.target).value)"
+                             [attr.aria-label]="def.label">
+                      <small aria-hidden="true">@if (def.unit) { {{ def.unit }} }</small>
+                    </label>
+                    <button class="sd-step-btn" (click)="adjustMetric(def, 1)" [attr.aria-label]="'Sumar ' + def.label">+</button>
                   </div>
                 }
               </div>
@@ -333,9 +344,20 @@ export interface DayFeedEntry {
       &:hover { border-color: var(--c-brand); color: var(--c-brand); }
     }
     .sd-step-val {
+      display: inline-flex; align-items: baseline; justify-content: center;
       min-width: 50px; text-align: center;
       font-size: 16px; font-weight: 800; color: var(--c-text);
       small { font-size: 11px; color: var(--c-text-3); margin-left: 2px; }
+    }
+    /* The value is a real field: the ± buttons are the quick path, typing is
+     * the direct one. Chrome/Firefox spinners are hidden — the buttons are it. */
+    .sd-step-input {
+      width: 3ch; min-width: 3ch; padding: 2px 0; border: none; background: transparent;
+      font: inherit; color: inherit; text-align: center;
+      -moz-appearance: textfield; appearance: textfield;
+      &::-webkit-outer-spin-button, &::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+      &:focus { outline: none; }
+      &:focus-visible { outline: 2px solid var(--c-brand); outline-offset: 2px; border-radius: 6px; }
     }
     .sd-chips { display: flex; gap: 7px; flex-wrap: wrap; }
     .sd-chip {
@@ -516,6 +538,23 @@ export class DayFeedCardsComponent {
 
   adjustDuration(delta: number): void {
     this.editDuration.update(v => Math.max(5, v + delta));
+  }
+
+  /** Typed duration. Blank or nonsense leaves the value alone, so clearing the
+   *  field to retype it doesn't blow the session away mid-edit. */
+  setDuration(value: string): void {
+    const n = Number(value);
+    if (value.trim() === '' || !Number.isFinite(n)) return;
+    this.editDuration.set(Math.max(0, Math.round(n)));
+  }
+
+  /** Typed metric value, clamped to the metric's own range. */
+  setMetricNum(def: SportMetricDef, value: string): void {
+    const n = Number(value);
+    if (value.trim() === '' || !Number.isFinite(n)) return;
+    this.editMetrics.update(m => ({
+      ...m, [def.key]: Math.max(def.min ?? 0, Math.min(def.max ?? 9999, n)),
+    }));
   }
 
   toggleFeeling(level: FeelingLevel): void {

@@ -101,6 +101,13 @@ export function setVolume(set: WorkoutSet, ctx?: SetLoadContext): number {
   return base + (set.drops ?? []).reduce((sum, d) => sum + w(d.weight) * d.reps, 0);
 }
 
+/** Total reps performed in this set, drop stages included — a dropset's
+ *  secondary stages are reps you actually did, so every rep count in the app
+ *  goes through here. */
+export function setTotalReps(set: WorkoutSet): number {
+  return set.reps + (set.drops ?? []).reduce((sum, d) => sum + d.reps, 0);
+}
+
 export interface Workout {
   id: string;
   date: string; // YYYY-MM-DD

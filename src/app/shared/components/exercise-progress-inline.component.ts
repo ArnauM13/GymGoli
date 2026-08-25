@@ -26,7 +26,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
-import { Workout, setMaxWeight, setVolume } from '../../core/models/workout.model';
+import { Workout, setMaxWeight, setTotalReps, setVolume } from '../../core/models/workout.model';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { ExerciseService } from '../../core/services/exercise.service';
@@ -363,10 +363,7 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
     if (metric === 'weight') return Math.max(...workingSets.map(s => setMaxWeight(s)));
     // Total reps across working sets (drop stages included) — the progression
     // signal for bodyweight exercises where the logged weight stays at 0.
-    if (metric === 'reps') {
-      return workingSets.reduce(
-        (sum, s) => sum + s.reps + (s.drops ?? []).reduce((d, x) => d + x.reps, 0), 0);
-    }
+    if (metric === 'reps') return workingSets.reduce((sum, s) => sum + setTotalReps(s), 0);
     // Volume folds in bodyweight so dominades & co. count their real load, not
     // just the added weight (0 for pure bodyweight). "Pes màx" stays as logged.
     const ex = this.exerciseService.getById(exId);

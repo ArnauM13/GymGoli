@@ -6,6 +6,7 @@ import { A11yModule } from '@angular/cdk/a11y';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { workoutCategories } from '../../shared/utils/calendar-utils';
+import { kgToDisplay } from '../../shared/utils/weight.utils';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { TrainerService } from '../../core/services/trainer.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -15,7 +16,7 @@ import {
   Exercise, ExerciseCategory,
 } from '../../core/models/exercise.model';
 import { Sport, SportMetricDef } from '../../core/models/sport.model';
-import { WorkoutTemplate } from '../../core/models/template.model';
+import { TemplateEntry, WorkoutTemplate } from '../../core/models/template.model';
 import { FeelingLevel, Workout, WorkoutEntry, setMaxWeight } from '../../core/models/workout.model';
 import { TemplateService } from '../../core/services/template.service';
 import { SharedWorkoutService } from '../../core/services/shared-workout.service';
@@ -155,23 +156,33 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
         <!-- ── Sèrie activa: proper exercici suggerit (aprèn de l'usuari) ── -->
         @if (exerciseSuggestions(); as sugg) {
           @if (sugg.length && !reorderMode() && !groupingMode()) {
-            <div class="aw-suggest">
-              <div class="aw-suggest-head">
-                <span class="material-symbols-outlined aw-suggest-icon">auto_awesome</span>
-                <span class="aw-suggest-title">Sèrie activa</span>
-                <span class="aw-suggest-sub">El teu proper exercici</span>
-              </div>
-              <div class="aw-suggest-list">
-                @for (s of sugg; track s.exerciseId) {
-                  <button class="aw-suggest-chip" (click)="addSuggestion(s)">
-                    <span class="aw-suggest-chip-top">
-                      <span class="material-symbols-outlined aw-suggest-add">add</span>
-                      <span class="aw-suggest-name">{{ s.exerciseName }}</span>
-                    </span>
-                    <span class="aw-suggest-reason">{{ s.reason }}</span>
-                  </button>
-                }
-              </div>
+            <div class="aw-suggest" [class.aw-suggest--open]="suggestOpen()">
+              <button type="button" class="aw-suggest-head" (click)="suggestOpen.set(!suggestOpen())"
+                      [attr.aria-expanded]="suggestOpen()"
+                      [attr.aria-label]="'Sèrie activa, ' + sugg.length + ' suggeriments. '
+                        + (suggestOpen() ? 'Plegar' : 'Desplegar')">
+                <span class="material-symbols-outlined aw-suggest-icon" aria-hidden="true">auto_awesome</span>
+                <span class="aw-suggest-title" aria-hidden="true">Sèrie activa</span>
+                <span class="aw-suggest-sub" aria-hidden="true">
+                  {{ suggestOpen() ? 'El teu proper exercici' : sugg.length + ' suggeriment' + (sugg.length === 1 ? '' : 's') }}
+                </span>
+                <span class="material-symbols-outlined aw-suggest-chevron" aria-hidden="true">
+                  {{ suggestOpen() ? 'expand_less' : 'expand_more' }}
+                </span>
+              </button>
+              @if (suggestOpen()) {
+                <div class="aw-suggest-list">
+                  @for (s of sugg; track s.exerciseId) {
+                    <button class="aw-suggest-chip" (click)="addSuggestion(s)">
+                      <span class="aw-suggest-chip-top">
+                        <span class="material-symbols-outlined aw-suggest-add" aria-hidden="true">add</span>
+                        <span class="aw-suggest-name">{{ s.exerciseName }}</span>
+                      </span>
+                      <span class="aw-suggest-reason">{{ s.reason }}</span>
+                    </button>
+                  }
+                </div>
+              }
             </div>
           }
         }
@@ -475,26 +486,82 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
           </div>
         </button>
 
-        @if (pickerLast()) {
-          <button class="tp-option" (click)="pickerStartFromLast()">
-            <span class="material-symbols-outlined tp-opt-icon">history</span>
-            <div class="tp-opt-info">
-              <span class="tp-opt-name">Repetir últim</span>
-              <span class="tp-opt-sub">{{ pickerLastAgo() }} · {{ pickerLast()!.entries.length }} exercici{{ pickerLast()!.entries.length === 1 ? '' : 's' }}</span>
-            </div>
-          </button>
+        @if (pickerLast(); as last) {
+          <div class="tp-offer" [class.tp-offer--open]="pickerPreview() === 'last'">
+            <button class="tp-option tp-option--offer" (click)="togglePreview('last')"
+                    [attr.aria-expanded]="pickerPreview() === 'last'">
+              <span class="material-symbols-outlined tp-opt-icon" aria-hidden="true">history</span>
+              <div class="tp-opt-info">
+                <span class="tp-opt-name">Repetir últim</span>
+                <span class="tp-opt-sub">{{ pickerLastAgo() }} · {{ last.entries.length }} exercici{{ last.entries.length === 1 ? '' : 's' }}</span>
+              </div>
+              <span class="material-symbols-outlined tp-opt-chevron" aria-hidden="true">
+                {{ pickerPreview() === 'last' ? 'expand_less' : 'expand_more' }}
+              </span>
+            </button>
+            @if (pickerPreview() === 'last') {
+              <div class="tp-preview">
+                @if (last.entries.length) {
+                  <ul class="tp-preview-list">
+                    @for (e of last.entries; track e.exerciseId) {
+                      <li class="tp-preview-item">
+                        <span class="tp-preview-name">{{ e.exerciseName }}</span>
+                        @if (lastEntryLine(e); as line) {
+                          <span class="tp-preview-detail">{{ line }}</span>
+                        }
+                      </li>
+                    }
+                  </ul>
+                } @else {
+                  <p class="tp-preview-empty">Sense exercicis</p>
+                }
+                <button class="tp-preview-start" (click)="pickerStartFromLast()">
+                  <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
+                  Començar
+                </button>
+              </div>
+            }
+          </div>
         }
 
         @if (pickerUserTemplates().length) {
           <div class="tp-section">Les meves plantilles</div>
           @for (t of pickerUserTemplates(); track t.id) {
-            <button class="tp-option" (click)="pickerStartFromTemplate(t)">
-              <span class="material-symbols-outlined tp-opt-icon">bookmark</span>
-              <div class="tp-opt-info">
-                <span class="tp-opt-name">{{ t.name }}</span>
-                <span class="tp-opt-sub">{{ t.entries.length ? t.entries.length + ' exercici' + (t.entries.length === 1 ? '' : 's') : 'Sense exercicis' }}</span>
-              </div>
-            </button>
+            <div class="tp-offer" [class.tp-offer--open]="pickerPreview() === t.id">
+              <button class="tp-option tp-option--offer" (click)="togglePreview(t.id)"
+                      [attr.aria-expanded]="pickerPreview() === t.id">
+                <span class="material-symbols-outlined tp-opt-icon" aria-hidden="true">bookmark</span>
+                <div class="tp-opt-info">
+                  <span class="tp-opt-name">{{ t.name }}</span>
+                  <span class="tp-opt-sub">{{ t.entries.length ? t.entries.length + ' exercici' + (t.entries.length === 1 ? '' : 's') : 'Sense exercicis' }}</span>
+                </div>
+                <span class="material-symbols-outlined tp-opt-chevron" aria-hidden="true">
+                  {{ pickerPreview() === t.id ? 'expand_less' : 'expand_more' }}
+                </span>
+              </button>
+              @if (pickerPreview() === t.id) {
+                <div class="tp-preview">
+                  @if (t.entries.length) {
+                    <ul class="tp-preview-list">
+                      @for (e of t.entries; track e.exerciseId) {
+                        <li class="tp-preview-item">
+                          <span class="tp-preview-name">{{ e.exerciseName }}</span>
+                          @if (templateEntryLine(e); as line) {
+                            <span class="tp-preview-detail">{{ line }}</span>
+                          }
+                        </li>
+                      }
+                    </ul>
+                  } @else {
+                    <p class="tp-preview-empty">Sense exercicis</p>
+                  }
+                  <button class="tp-preview-start" (click)="pickerStartFromTemplate(t)">
+                    <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
+                    Començar
+                  </button>
+                </div>
+              }
+            </div>
           }
 
           <button class="tp-manage" (click)="goToTemplates()">
@@ -542,9 +609,14 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
               }
             </div>
             <div class="sl-stepper">
-              <button class="sl-step-btn" (click)="adjustDuration(-5)">−5</button>
-              <span class="sl-step-val">{{ loggerDuration() }}<small>min</small></span>
-              <button class="sl-step-btn" (click)="adjustDuration(5)">+5</button>
+              <button class="sl-step-btn" (click)="adjustDuration(-5)" aria-label="Restar 5 minuts">−5</button>
+              <label class="sl-step-val">
+                <input class="sl-step-input" type="number" inputmode="numeric" min="0" step="1"
+                       [value]="loggerDuration()" (input)="setDuration($any($event.target).value)"
+                       aria-label="Durada en minuts">
+                <small aria-hidden="true">min</small>
+              </label>
+              <button class="sl-step-btn" (click)="adjustDuration(5)" aria-label="Sumar 5 minuts">+5</button>
             </div>
           </div>
         </div>
@@ -578,9 +650,15 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
               </div>
             } @else {
               <div class="sl-stepper">
-                <button class="sl-step-btn" (click)="adjustMetric(def, -1)">−</button>
-                <span class="sl-step-val">{{ loggerMetricNum(def) }}<small>@if (def.unit) { {{ def.unit }} }</small></span>
-                <button class="sl-step-btn" (click)="adjustMetric(def, 1)">+</button>
+                <button class="sl-step-btn" (click)="adjustMetric(def, -1)" [attr.aria-label]="'Restar ' + def.label">−</button>
+                <label class="sl-step-val">
+                  <input class="sl-step-input" type="number" inputmode="decimal"
+                         [min]="def.min ?? 0" [max]="def.max ?? 9999" [step]="def.step ?? 1"
+                         [value]="loggerMetricNum(def)" (input)="setMetricNum(def, $any($event.target).value)"
+                         [attr.aria-label]="def.label">
+                  <small aria-hidden="true">@if (def.unit) { {{ def.unit }} }</small>
+                </label>
+                <button class="sl-step-btn" (click)="adjustMetric(def, 1)" [attr.aria-label]="'Sumar ' + def.label">+</button>
               </div>
             }
           </div>
@@ -797,13 +875,23 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       animation: aw-suggest-in 0.25s ease;
     }
     @keyframes aw-suggest-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
-    .aw-suggest-head { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+    .aw-suggest-head {
+      display: flex; align-items: center; gap: 6px; width: 100%;
+      padding: 0; border: none; background: transparent; text-align: left;
+      cursor: pointer; touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      &:focus-visible { outline: 2px solid var(--c-brand); outline-offset: 2px; border-radius: 6px; }
+    }
+    .aw-suggest--open .aw-suggest-head { margin-bottom: 10px; }
     .aw-suggest-icon { font-size: 18px; color: var(--c-brand); flex-shrink: 0; }
     .aw-suggest-title { font-size: 12.5px; font-weight: 800; color: var(--c-text); }
     .aw-suggest-sub {
       font-size: 10.5px; font-weight: 600; color: var(--c-text-3);
       text-transform: uppercase; letter-spacing: 0.3px; margin-left: auto;
     }
+    .aw-suggest-chevron { font-size: 20px; color: var(--c-text-3); flex-shrink: 0; }
+    .aw-suggest--open .aw-suggest-chevron { color: var(--c-brand); }
+    .aw-suggest-list { animation: aw-suggest-in 0.2s ease; }
     .aw-suggest-list { display: flex; flex-direction: column; gap: 6px; }
     .aw-suggest-chip {
       display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
@@ -1144,9 +1232,50 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       &:hover { background: rgba(var(--c-brand-rgb), 0.09); border-color: var(--c-brand); border-style: solid; }
     }
     .tp-opt-icon { font-size: 22px; color: var(--c-text-3); flex-shrink: 0; }
-    .tp-opt-info { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+    .tp-opt-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
     .tp-opt-name { font-size: 15px; font-weight: 600; color: var(--c-text); }
     .tp-opt-sub  { font-size: 12px; color: var(--c-text-3); }
+
+    /* ── Offered workout: preview what's inside before starting it ── */
+    .tp-offer { margin-bottom: 6px; }
+    .tp-option--offer { margin-bottom: 0; }
+    .tp-offer--open .tp-option--offer {
+      border-color: rgba(var(--c-brand-rgb), 0.35);
+      border-bottom-left-radius: 0; border-bottom-right-radius: 0;
+    }
+    .tp-opt-chevron { font-size: 20px; color: var(--c-text-3); flex-shrink: 0; }
+    .tp-offer--open .tp-opt-chevron { color: var(--c-brand); }
+    .tp-preview {
+      padding: 10px 12px 12px;
+      border: 1.5px solid rgba(var(--c-brand-rgb), 0.35); border-top: none;
+      border-radius: 0 0 12px 12px;
+      background: rgba(var(--c-brand-rgb), 0.04);
+      animation: tp-preview-in 0.18s ease;
+    }
+    @keyframes tp-preview-in { from { opacity: 0; } to { opacity: 1; } }
+    .tp-preview-list {
+      margin: 0 0 10px; padding: 0; list-style: none;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .tp-preview-item {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    }
+    .tp-preview-name {
+      font-size: 13px; font-weight: 600; color: var(--c-text);
+      min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .tp-preview-detail { font-size: 11.5px; color: var(--c-text-3); flex-shrink: 0; }
+    .tp-preview-empty { margin: 0 0 10px; font-size: 12px; color: var(--c-text-3); font-style: italic; }
+    .tp-preview-start {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      width: 100%; padding: 10px 12px; border-radius: 10px; border: none;
+      background: var(--c-brand); color: #fff;
+      font-size: 14px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { background: var(--c-brand-dk); }
+      &:active { transform: scale(0.98); }
+    }
     .tp-manage {
       display: flex; align-items: center; justify-content: space-between;
       width: 100%; padding: 14px 12px; border-radius: 12px;
@@ -1282,9 +1411,20 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       &:hover { border-color: var(--c-brand); color: var(--c-brand); }
     }
     .sl-step-val {
+      display: inline-flex; align-items: baseline; justify-content: center;
       min-width: 52px; text-align: center;
       font-size: 18px; font-weight: 800; color: var(--c-text);
       small { font-size: 11px; color: var(--c-text-3); margin-left: 2px; }
+    }
+    /* The value is a real field: the ± buttons are the quick path, typing is
+     * the direct one. Chrome/Firefox spinners are hidden — the buttons are it. */
+    .sl-step-input {
+      width: 3ch; min-width: 3ch; padding: 2px 0; border: none; background: transparent;
+      font: inherit; color: inherit; text-align: center;
+      -moz-appearance: textfield; appearance: textfield;
+      &::-webkit-outer-spin-button, &::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+      &:focus { outline: none; }
+      &:focus-visible { outline: 2px solid var(--c-brand); outline-offset: 2px; border-radius: 6px; }
     }
     .sl-chips { display: flex; gap: 7px; flex-wrap: wrap; }
     .sl-chip {
@@ -1553,6 +1693,10 @@ export class TrainComponent implements OnDestroy {
   private readonly _now = signal(Date.now());
   private _nowTimer?: ReturnType<typeof setInterval>;
 
+  /** The panel starts folded: a hint should stay out of the way of the sets
+   *  being logged, and only open when the user asks for it. */
+  readonly suggestOpen = signal(false);
+
   readonly exerciseSuggestions = computed((): ExerciseSuggestion[] => {
     const w = this.activeWorkout();
     if (!w || (w.status ?? 'done') === 'planned') return [];
@@ -1658,6 +1802,34 @@ export class TrainComponent implements OnDestroy {
     const cat = this.pickerCat();
     return cat ? this.templateService.forCategory(cat) : [];
   });
+
+  /** Which offered workout is showing its contents — 'last' for "Repetir
+   *  últim", otherwise a template id. Only one is open at a time, and starting
+   *  the workout is its own explicit action inside the preview, so nothing gets
+   *  loaded before the user has seen what's in it. */
+  readonly pickerPreview = signal<string | null>(null);
+
+  togglePreview(key: string): void {
+    this.pickerPreview.set(this.pickerPreview() === key ? null : key);
+  }
+
+  /** Per-exercise line of a "Repetir últim" preview: what was actually logged. */
+  lastEntryLine(entry: WorkoutEntry): string {
+    const working = entry.sets.filter(s => !s.warmup);
+    if (!working.length) return '';
+    const parts = [`${working.length} sèrie${working.length === 1 ? '' : 's'}`];
+    const max = this.maxWeight(entry);
+    if (max > 0) parts.push(`${kgToDisplay(max, this.settingsService.weightUnit())} ${this.settingsService.weightUnit()}`);
+    return parts.join(' · ');
+  }
+
+  /** Per-exercise line of a template preview: its planned sets, reps and weight. */
+  templateEntryLine(e: TemplateEntry): string {
+    const parts: string[] = [];
+    if (e.sets && e.reps) parts.push(`${e.sets}×${e.reps}`);
+    if (e.weight) parts.push(`${kgToDisplay(e.weight, this.settingsService.weightUnit())} ${this.settingsService.weightUnit()}`);
+    return parts.join(' · ');
+  }
 
   constructor() {
     this.sportService.ensureLoaded();
@@ -1944,6 +2116,7 @@ export class TrainComponent implements OnDestroy {
   selectType(category: ExerciseCategory): void {
     if (this.pickerCat() === category) { this.closePicker(); return; }
     this.loggerSport.set(null);
+    this.pickerPreview.set(null);
     this.pickerCat.set(category);
   }
 
@@ -1951,7 +2124,7 @@ export class TrainComponent implements OnDestroy {
     if (this._nowTimer) clearInterval(this._nowTimer);
   }
 
-  closePicker(): void { this.pickerCat.set(null); }
+  closePicker(): void { this.pickerCat.set(null); this.pickerPreview.set(null); }
 
   /** Dismiss the top-most open overlay with Escape (picker · logger · save
    *  sheet · action menu), for keyboard and accessibility. Skips while a
@@ -2059,6 +2232,8 @@ export class TrainComponent implements OnDestroy {
     const w = this.activeWorkout();
     if (!w || w.entries.some(e => e.exerciseId === s.exerciseId)) return;
     const defaultCategory = (w.category ?? workoutCategories(w)[0]) as ExerciseCategory | undefined;
+    // Fold back once acted on — the flow jumps into the new exercise's set editor.
+    this.suggestOpen.set(false);
     this.addExerciseToActive(s.exerciseId, s.exerciseName, defaultCategory);
   }
 
@@ -2154,6 +2329,23 @@ export class TrainComponent implements OnDestroy {
 
   adjustDuration(delta: number): void {
     this.loggerDuration.update(v => Math.max(5, v + delta));
+  }
+
+  /** Typed duration. Blank or nonsense leaves the value alone, so clearing the
+   *  field to retype it doesn't blow the session away mid-edit. */
+  setDuration(value: string): void {
+    const n = Number(value);
+    if (value.trim() === '' || !Number.isFinite(n)) return;
+    this.loggerDuration.set(Math.max(0, Math.round(n)));
+  }
+
+  /** Typed metric value, clamped to the metric's own range. */
+  setMetricNum(def: SportMetricDef, value: string): void {
+    const n = Number(value);
+    if (value.trim() === '' || !Number.isFinite(n)) return;
+    this.loggerMetrics.update(m => ({
+      ...m, [def.key]: Math.max(def.min ?? 0, Math.min(def.max ?? 9999, n)),
+    }));
   }
 
   toggleFeeling(level: FeelingLevel): void {

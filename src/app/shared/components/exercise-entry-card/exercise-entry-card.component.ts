@@ -1,7 +1,7 @@
 import { Component, computed, input, output } from '@angular/core';
 import { DragDropModule } from '@angular/cdk/drag-drop';
 
-import { FeelingLevel, WorkoutEntry } from '../../../core/models/workout.model';
+import { FeelingLevel, WorkoutEntry, setTotalReps } from '../../../core/models/workout.model';
 import { DifficultyScale } from '../../../core/models/user-settings.model';
 import { kgToDisplay } from '../../utils/weight.utils';
 import { formatFeeling } from '../../utils/workout-card.utils';
@@ -82,10 +82,16 @@ import { formatFeeling } from '../../utils/workout-card.utils';
                 {{ selected() ? 'check_circle' : 'radio_button_unchecked' }}
               </span>
             } @else {
-              <span class="material-symbols-outlined eec-chevron"
-                [class.eec-chevron--big]="hideMetaWhenCollapsed()" aria-hidden="true">
-                {{ collapsed() ? 'expand_more' : 'expand_less' }}
-              </span>
+              <!-- Redundant hit target: the whole header already toggles, but the
+                   chevron is what people aim at, so it toggles too. Hidden from
+                   assistive tech and the tab order — the header button owns both. -->
+              <button type="button" class="eec-chevron-btn" (click)="headerClick.emit()"
+                tabindex="-1" aria-hidden="true">
+                <span class="material-symbols-outlined eec-chevron"
+                  [class.eec-chevron--big]="hideMetaWhenCollapsed()" aria-hidden="true">
+                  {{ collapsed() ? 'expand_more' : 'expand_less' }}
+                </span>
+              </button>
             }
           </div>
         </div>
@@ -244,6 +250,13 @@ import { formatFeeling } from '../../utils/workout-card.utils';
       &.eec-header-action-btn--danger:hover { background: rgba(239, 83, 80, 0.1); color: #ef5350; }
     }
 
+    .eec-chevron-btn {
+      display: flex; align-items: center; justify-content: center;
+      padding: 8px 4px; margin: 0; border: none; background: transparent;
+      cursor: pointer; touch-action: manipulation; border-radius: 8px;
+      -webkit-tap-highlight-color: transparent;
+      &:hover { background: var(--c-hover); }
+    }
     .eec-chevron {
       font-size: 20px; color: var(--c-text-3);
       align-self: center; transition: color 0.15s, font-size 0.15s;
@@ -306,7 +319,8 @@ export class ExerciseEntryCardComponent {
     return this.selectable() ? `Seleccionar ${parts.join(', ')}` : parts.join(', ');
   });
 
-  readonly totalReps = computed(() => this.entry().sets.reduce((s, set) => set.warmup ? s : s + set.reps, 0));
+  readonly totalReps = computed(() =>
+    this.entry().sets.reduce((s, set) => set.warmup ? s : s + setTotalReps(set), 0));
   readonly workingSetsCount = computed(() => this.entry().sets.filter(set => !set.warmup).length);
   readonly warmupSetsCount = computed(() => this.entry().sets.filter(set => set.warmup).length);
 

@@ -380,4 +380,76 @@ describe('TrainComponent', () => {
       expect(sharedWorkoutService.share).toHaveBeenCalledWith(jasmine.any(String), 'mixed', w.entries);
     });
   });
+  // ── Sèrie activa (next-exercise hint) ────────────────────────────────────
+
+  describe('sèrie activa panel', () => {
+    it('starts folded — a hint never covers the sets being logged', () => {
+      expect(component.suggestOpen()).toBe(false);
+    });
+
+    it('opens and closes on the header toggle', () => {
+      component.suggestOpen.set(!component.suggestOpen());
+      expect(component.suggestOpen()).toBe(true);
+      component.suggestOpen.set(!component.suggestOpen());
+      expect(component.suggestOpen()).toBe(false);
+    });
+  });
+
+  // ── Offered workout preview (start sheet) ────────────────────────────────
+
+  describe('workout preview before starting', () => {
+    it('opens one offer at a time and closes it on a second tap', () => {
+      component.togglePreview('last');
+      expect(component.pickerPreview()).toBe('last');
+
+      component.togglePreview('tpl-1');
+      expect(component.pickerPreview()).toBe('tpl-1');
+
+      component.togglePreview('tpl-1');
+      expect(component.pickerPreview()).toBeNull();
+    });
+
+    it('forgets the open preview when the sheet closes', () => {
+      component.togglePreview('last');
+      component.closePicker();
+      expect(component.pickerPreview()).toBeNull();
+    });
+
+    it('summarises a logged entry by its working sets and top weight', () => {
+      const entry: WorkoutEntry = {
+        exerciseId: 'x', exerciseName: 'X',
+        sets: [{ weight: 40, reps: 10, warmup: true }, { weight: 80, reps: 5 }, { weight: 75, reps: 6 }],
+      };
+      expect(component.lastEntryLine(entry)).toBe('2 sèries · 80 kg');
+    });
+
+    it('summarises a template entry by its planned sets, reps and weight', () => {
+      expect(component.templateEntryLine({ exerciseId: 'x', exerciseName: 'X', sets: 4, reps: 8, weight: 60 }))
+        .toBe('4×8 · 60 kg');
+      expect(component.templateEntryLine({ exerciseId: 'x', exerciseName: 'X' })).toBe('');
+    });
+  });
+
+  // ── Sport duration as a typed field ──────────────────────────────────────
+
+  describe('setDuration()', () => {
+    it('takes a typed value', () => {
+      component.setDuration('75');
+      expect(component.loggerDuration()).toBe(75);
+    });
+
+    it('leaves the value alone while the field is empty mid-edit', () => {
+      component.setDuration('75');
+      component.setDuration('');
+      expect(component.loggerDuration()).toBe(75);
+    });
+
+    it('ignores a non-numeric value and never goes negative', () => {
+      component.setDuration('75');
+      component.setDuration('abc');
+      expect(component.loggerDuration()).toBe(75);
+      component.setDuration('-20');
+      expect(component.loggerDuration()).toBe(0);
+    });
+  });
 });

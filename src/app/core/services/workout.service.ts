@@ -5,7 +5,7 @@ import { ExerciseService } from './exercise.service';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { SyncService } from './sync.service';
-import { FeelingLevel, PlannedSource, Workout, WorkoutEntry, WorkoutSet, WorkoutStatus, setMaxWeight } from '../models/workout.model';
+import { FeelingLevel, PlannedSource, Workout, WorkoutEntry, WorkoutSet, WorkoutStatus, setMaxWeight, setTotalReps } from '../models/workout.model';
 
 // Entries come straight from a stored JSON column, so an old/partial row can
 // carry an entry whose `sets` is missing or null. Normalising here — at the one
@@ -435,7 +435,7 @@ export class WorkoutService {
       sets:        entry.sets,
       workingSets: workingSets.length,
       warmupSets:  entry.sets.length - workingSets.length,
-      totalReps:   workingSets.reduce((sum, s) => sum + s.reps, 0),
+      totalReps:   workingSets.reduce((sum, s) => sum + setTotalReps(s), 0),
     };
   }
 

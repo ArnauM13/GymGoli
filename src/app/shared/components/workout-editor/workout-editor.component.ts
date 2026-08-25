@@ -347,10 +347,12 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                       </span>
                       <span class="we-set-pills" aria-hidden="true">
                         @if (set.weightLeft != null) {
-                          <span class="we-set-pill weight side">
+                          <span class="we-set-pill weight side"
+                                [class.we-set-pill--pr]="isPrSet(entry, set) && set.weightLeft >= set.weightRight!">
                             E {{ dispW(set.weightLeft) }}<small>{{ unit() }}</small>
                           </span>
-                          <span class="we-set-pill weight side">
+                          <span class="we-set-pill weight side"
+                                [class.we-set-pill--pr]="isPrSet(entry, set) && set.weightRight! >= set.weightLeft">
                             D {{ dispW(set.weightRight!) }}<small>{{ unit() }}</small>
                           </span>
                           <span class="we-set-pill reps">
@@ -370,7 +372,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                         } @else if (set.drops?.length) {
                           <!-- Dropset: one chained pill, so the arrows never get
                                orphaned from their stage when the row wraps. -->
-                          <span class="we-set-pill weight chain">
+                          <span class="we-set-pill weight chain" [class.we-set-pill--pr]="isPrSet(entry, set)">
                             @for (stage of dropChainStages(set); track $index; let first = $first) {
                               @if (!first) { <span class="we-chain-arrow">→</span> }
                               <span class="we-chain-stage" [class.we-chain-stage--drop]="!first">
@@ -379,8 +381,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                             }
                           </span>
                         } @else {
-                          <span class="we-set-pill weight"
-                            [class.we-set-pill--pr]="!set.warmup && prExerciseIds().has(entry.exerciseId) && set.weight > 0 && set.weight === entryMaxWeight(entry)">
+                          <span class="we-set-pill weight" [class.we-set-pill--pr]="isPrSet(entry, set)">
                             {{ dispW(set.weight) }}<small>{{ unit() }}</small>
                           </span>
                           <span class="we-set-pill reps">
@@ -1577,7 +1578,9 @@ export class WorkoutEditorComponent implements OnDestroy {
   private _timerForExercise: string | null = null;
 
   // ── Personal Records ───────────────────────────────────────────────────────
-  // Reactive computed: recalculates whenever workout entries or historical data change
+  // Reactive computed: recalculates whenever workout entries or historical data change.
+  // No history is not a reason to withhold the badge — the first time an exercise
+  // is logged, that weight *is* the record, so only a heavier past session cancels it.
   readonly prExerciseIds = computed(() => {
     const w = this.workout();
     if (!w) return new Set<string>();
@@ -1586,8 +1589,9 @@ export class WorkoutEditorComponent implements OnDestroy {
       if (entry.sets.length === 0) continue;
       const maxInEntry = this.entryMaxWeight(entry);
       if (maxInEntry <= 0) continue;
-      const prevMax = this.workoutService.getAllTimeMaxWeight(entry.exerciseId, w.id);
-      if (prevMax > 0 && maxInEntry > prevMax) ids.add(entry.exerciseId);
+      if (maxInEntry > this.workoutService.getAllTimeMaxWeight(entry.exerciseId, w.id)) {
+        ids.add(entry.exerciseId);
+      }
     }
     return ids;
   });
@@ -1899,6 +1903,14 @@ export class WorkoutEditorComponent implements OnDestroy {
     return entry.sets.reduce((m, s) => s.warmup ? m : Math.max(m, setMaxWeight(s)), 0);
   }
 
+  /** Whether this set carries the entry's PR — always the heaviest working set,
+   *  per-side and drop stages included, never just the plain logged weight. */
+  isPrSet(entry: WorkoutEntry, set: WorkoutSet): boolean {
+    if (set.warmup || !this.prExerciseIds().has(entry.exerciseId)) return false;
+    const max = this.entryMaxWeight(entry);
+    return max > 0 && setMaxWeight(set) === max;
+  }
+
   /** Working-set number for the set at `index`, ignoring warm-up sets — so the
    *  first real set after two warm-ups is "1", not "3". */
   workingSetNumber(entry: WorkoutEntry, index: number): number {
@@ -1934,10 +1946,12 @@ export class WorkoutEditorComponent implements OnDestroy {
   repeatLabel(entry: WorkoutEntry): string {
     const last = entry.sets[entry.sets.length - 1];
     const u = this.unit();
+    const drops = (last.drops ?? [])
+      .map(d => ` → ${this.dispW(d.weight)}${u} × ${d.reps}`).join('');
     if (last.weightLeft != null) {
-      return `E ${this.dispW(last.weightLeft)}${u} · D ${this.dispW(last.weightRight!)}${u} × ${last.reps}`;
+      return `E ${this.dispW(last.weightLeft)}${u} · D ${this.dispW(last.weightRight!)}${u} × ${last.reps}${drops}`;
     }
-    return `${this.dispW(last.weight)}${u} × ${last.reps}`;
+    return `${this.dispW(last.weight)}${u} × ${last.reps}${drops}`;
   }
 
   adjustWeight(delta: number): void {
@@ -2119,6 +2133,9 @@ export class WorkoutEditorComponent implements OnDestroy {
         weight: last.weight, reps: last.reps,
         ...(last.weightLeft != null ? { weightLeft: last.weightLeft, weightRight: last.weightRight } : {}),
         ...(last.warmup ? { warmup: true } : {}),
+        // A dropset repeats as the whole chain — the secondary stages are part
+        // of the set, not decoration on it.
+        ...(last.drops?.length ? { drops: last.drops.map(d => ({ ...d })) } : {}),
       }]);
     } catch {
       this.feedback.error('Error en repetir', 2000);

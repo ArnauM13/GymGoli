@@ -1,4 +1,4 @@
-import { WorkoutSet, effectiveRepWeight, setVolume } from './workout.model';
+import { WorkoutSet, effectiveRepWeight, setTotalReps, setVolume } from './workout.model';
 
 describe('bodyweight-aware load', () => {
   const set = (weight: number, reps: number): WorkoutSet => ({ weight, reps });
@@ -43,5 +43,21 @@ describe('bodyweight-aware load', () => {
     it('adds belt weight on top of bodyweight', () => {
       expect(setVolume(set(10, 5), { loadType: 'bodyweight', bodyweightKg: 75 })).toBe(425);
     });
+  });
+});
+
+describe('setTotalReps', () => {
+  it('counts the reps of a plain set', () => {
+    expect(setTotalReps({ weight: 60, reps: 8 })).toBe(8);
+  });
+
+  it('counts the dropset\'s secondary stages too — they were performed', () => {
+    // 70×8 → 50×6 → 30×4 is 18 reps, not 8.
+    const set: WorkoutSet = { weight: 70, reps: 8, drops: [{ weight: 50, reps: 6 }, { weight: 30, reps: 4 }] };
+    expect(setTotalReps(set)).toBe(18);
+  });
+
+  it('ignores an empty drops array', () => {
+    expect(setTotalReps({ weight: 60, reps: 8, drops: [] })).toBe(8);
   });
 });
