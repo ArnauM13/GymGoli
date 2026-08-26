@@ -56,6 +56,32 @@ function workoutFromCache(raw: Record<string, unknown>): Workout {
   };
 }
 
+/** The filters the Historial list can have active at once. */
+export interface HistoryFilters {
+  category?: string;
+  date?:     string;
+  search?:   string;
+}
+
+/**
+ * Client-side twin of `loadWorkoutPage()`'s server filters, so a workout that
+ * only exists locally can be matched against the same criteria and merged
+ * into the paginated list.
+ */
+export function matchesHistoryFilters(w: Workout, f: HistoryFilters): boolean {
+  if ((w.status ?? 'done') === 'planned') return false;
+  if (f.date && w.date !== f.date) return false;
+  if (f.category) {
+    const cats = w.categories?.length ? w.categories : (w.category ? [w.category] : []);
+    if (!cats.includes(f.category)) return false;
+  }
+  if (f.search) {
+    const names = w.entries.map(e => e.exerciseName).join(' ').toLowerCase();
+    if (!names.includes(f.search.toLowerCase())) return false;
+  }
+  return true;
+}
+
 /** Read-only snapshot of an exercise's most recent completed session. */
 export interface LastSessionEntry {
   date:        string;
@@ -110,6 +136,20 @@ export class WorkoutService {
   readonly doneWorkouts = computed((): Workout[] =>
     this.workouts().filter(w => (w.status ?? 'done') !== 'planned')
   );
+
+  /**
+   * Workouts still queued for Supabase — created offline, or rejected by the
+   * server and waiting on a retry. They live in `localStorage` only, so any
+   * view that reads from Supabase (Historial) would show a shorter history
+   * than the ones reading the local cache (Inici) unless it merges these in.
+   * Tracks `pendingCount` so it re-evaluates as the queue fills and drains.
+   */
+  readonly unsyncedWorkouts = computed((): Workout[] => {
+    this.syncService.pendingCount();
+    return this.syncService.pendingIds()
+      .map(id => this.syncService.getSnapshot(id))
+      .filter((w): w is Workout => w !== null);
+  });
 
   readonly plannedByDate = computed(() => {
     const map = new Map<string, Workout[]>();

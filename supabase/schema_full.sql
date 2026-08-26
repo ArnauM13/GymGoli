@@ -1,5 +1,5 @@
 -- GymGoli – Schema complet i idempotent
--- Consolida totes les migracions (001–026).
+-- Consolida totes les migracions (001–028).
 -- Segur de re-executar: usa IF NOT EXISTS, DROP … IF EXISTS i OR REPLACE.
 -- Executa a: Supabase Dashboard → SQL Editor → New query
 
@@ -27,7 +27,10 @@ CREATE TABLE IF NOT EXISTS exercises (
   id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     uuid        NOT NULL REFERENCES auth.users ON DELETE CASCADE,
   name        text        NOT NULL,
-  category    text        NOT NULL CHECK (category IN ('push', 'pull', 'legs')),
+  -- Un id de training_types: 'push' / 'pull' / 'legs' o l'UUID d'un tipus
+  -- creat per l'usuari. Text lliure a propòsit — el vocabulari el mana la
+  -- taula training_types, no un CHECK (vegeu la migració 028).
+  category    text        NOT NULL,
   subcategory text,
   notes       text,
   muscles     text[]      DEFAULT NULL,
@@ -169,7 +172,7 @@ CREATE TABLE IF NOT EXISTS templates (
   id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id    uuid        NOT NULL REFERENCES auth.users ON DELETE CASCADE,
   name       text        NOT NULL,
-  category   text        NOT NULL CHECK (category IN ('push', 'pull', 'legs', 'mixed')),
+  category   text        NOT NULL,
   entries    jsonb       NOT NULL DEFAULT '[]',
   use_count  integer     NOT NULL DEFAULT 0,
   last_used  date,
@@ -182,7 +185,7 @@ CREATE TABLE IF NOT EXISTS templates (
 CREATE TABLE IF NOT EXISTS shared_workouts (
   id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   name       text        NOT NULL,
-  category   text        NOT NULL CHECK (category IN ('push', 'pull', 'legs', 'mixed')),
+  category   text        NOT NULL,
   entries    jsonb       NOT NULL DEFAULT '[]',
   created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -262,6 +265,57 @@ END $$;
 
 -- Permet múltiples entrenaments per dia (elimina la restricció antiga)
 ALTER TABLE workouts DROP CONSTRAINT IF EXISTS workouts_user_id_date_key;
+
+-- Categories obertes als tipus d'entrenament de l'usuari (migració 028).
+-- Els ids propis són UUIDs, així que ni el CHECK original ni l'ENUM
+-- exercise_category_t de la migració 013 hi caben: un entrenament etiquetat
+-- amb un tipus propi era rebutjat pel servidor i es quedava només en local.
+DO $$
+DECLARE
+  t text;
+  c record;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['exercises', 'workouts', 'templates', 'shared_workouts'] LOOP
+    FOR c IN
+      SELECT con.conname
+      FROM pg_constraint con
+      JOIN pg_class     rel ON rel.oid = con.conrelid
+      JOIN pg_namespace ns  ON ns.oid  = rel.relnamespace
+      WHERE ns.nspname = 'public'
+        AND rel.relname = t
+        AND con.contype = 'c'
+        AND pg_get_constraintdef(con.oid) ILIKE '%categor%'
+    LOOP
+      EXECUTE format('ALTER TABLE public.%I DROP CONSTRAINT %I', t, c.conname);
+    END LOOP;
+  END LOOP;
+END $$;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'exercises'
+      AND column_name = 'category' AND udt_name = 'exercise_category_t'
+  ) THEN
+    ALTER TABLE public.exercises ALTER COLUMN category DROP DEFAULT;
+    ALTER TABLE public.exercises
+      ALTER COLUMN category TYPE text USING category::text;
+  END IF;
+
+  -- Un array d'ENUM es veu com '_exercise_category_t' a udt_name.
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'workouts'
+      AND column_name = 'categories' AND udt_name = '_exercise_category_t'
+  ) THEN
+    ALTER TABLE public.workouts ALTER COLUMN categories DROP DEFAULT;
+    -- Cast d'array directe: `USING` no admet subconsultes (error 0A000).
+    ALTER TABLE public.workouts
+      ALTER COLUMN categories TYPE text[] USING categories::text[];
+    ALTER TABLE public.workouts ALTER COLUMN categories SET DEFAULT '{}';
+  END IF;
+END $$;
 
 -- FK amb CASCADE DELETE (per si les taules es van crear sense CASCADE)
 ALTER TABLE exercises
@@ -438,6 +492,10 @@ CREATE INDEX IF NOT EXISTS workouts_user_id_date_idx
 
 CREATE INDEX IF NOT EXISTS workouts_user_status_date_idx
   ON workouts (user_id, status, date);
+
+-- Filtre per tipus d'entrenament de l'historial (categories @> ARRAY[<tipus>])
+CREATE INDEX IF NOT EXISTS workouts_categories_gin_idx
+  ON workouts USING gin (categories);
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 

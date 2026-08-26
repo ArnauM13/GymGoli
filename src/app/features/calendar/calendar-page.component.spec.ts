@@ -21,10 +21,13 @@ function makeWorkout(overrides: Partial<Workout> = {}): Workout {
 
 describe('CalendarPageComponent', () => {
   let component: CalendarPageComponent;
+  let unsynced: ReturnType<typeof signal<Workout[]>>;
 
   beforeEach(async () => {
+    unsynced = signal<Workout[]>([]);
     const mockWorkoutService = {
       isLoading:           signal(false),
+      unsyncedWorkouts:    unsynced,
       getWorkoutForDate:   jasmine.createSpy().and.returnValue(null),
       getWorkoutsForDate:  jasmine.createSpy().and.returnValue([]),
       todayDateString:     jasmine.createSpy().and.returnValue(TODAY),
@@ -303,10 +306,64 @@ describe('CalendarPageComponent', () => {
     it('starts as an empty array', () => {
       expect(component.items()).toEqual([]);
     });
+
+    // Historial reads from Supabase while Inici reads the local month cache, so
+    // a workout still queued for sync used to show on Inici and never here.
+    it('merges in workouts that are still queued for sync', () => {
+      unsynced.set([makeWorkout({ id: 'local-1', date: '2024-03-10' })]);
+      expect(component.items().map(w => w.id)).toEqual(['local-1']);
+      expect(component.isUnsynced('local-1')).toBeTrue();
+    });
+
+    it('leaves out queued workouts that do not match the active filters', () => {
+      unsynced.set([makeWorkout({ id: 'local-1', date: '2024-03-10', categories: ['push'] })]);
+      component.filterCat.set('legs');
+      expect(component.items()).toEqual([]);
+    });
+
+    it('leaves out queued workouts that are only planned', () => {
+      unsynced.set([makeWorkout({ id: 'local-1', date: '2024-03-10', status: 'planned' })]);
+      expect(component.items()).toEqual([]);
+    });
+
+    it('sorts merged workouts by date, newest first by default', () => {
+      unsynced.set([
+        makeWorkout({ id: 'older', date: '2024-03-10' }),
+        makeWorkout({ id: 'newer', date: '2024-03-14' }),
+      ]);
+      expect(component.items().map(w => w.id)).toEqual(['newer', 'older']);
+    });
+
+    it('follows the ascending sort when it is toggled', () => {
+      unsynced.set([
+        makeWorkout({ id: 'older', date: '2024-03-10' }),
+        makeWorkout({ id: 'newer', date: '2024-03-14' }),
+      ]);
+      component.sortDesc.set(false);
+      expect(component.items().map(w => w.id)).toEqual(['older', 'newer']);
+    });
+
+    it('keeps the search filter applied to queued workouts', () => {
+      unsynced.set([makeWorkout({
+        id: 'local-1', date: '2024-03-10',
+        entries: [{ exerciseId: 'a', exerciseName: 'Press banca', sets: [] }],
+      })]);
+      component.searchQuery.set('press');
+      expect(component.items().map(w => w.id)).toEqual(['local-1']);
+      component.searchQuery.set('dominades');
+      expect(component.items()).toEqual([]);
+    });
   });
 
   describe('hasMore()', () => {
     it('is false when items equals total (both zero)', () => {
+      expect(component.hasMore()).toBeFalse();
+    });
+
+    // Locally-queued workouts aren't paginated, so they must not make the list
+    // look "complete" while server pages are still outstanding.
+    it('ignores merged local workouts', () => {
+      unsynced.set([makeWorkout({ id: 'local-1' })]);
       expect(component.hasMore()).toBeFalse();
     });
   });
