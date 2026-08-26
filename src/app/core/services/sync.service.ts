@@ -9,6 +9,13 @@ export type SyncStatus = 'synced' | 'pending' | 'syncing' | 'error';
 
 interface BackoffState { retryCount: number; nextRetryAt: number; }
 
+/** How often a queue that still has pending workouts is retried on its own.
+ *  The event triggers (edit debounce, `online`, `visibilitychange`) only fire
+ *  when the user does something; without this a queue rejected by the server
+ *  — a column the database doesn't accept, an RLS policy — would sit there
+ *  for ever once the per-workout backoff runs out. */
+const RETRY_INTERVAL_MS = 60_000;
+
 @Injectable({ providedIn: 'root' })
 export class SyncService {
   private supabase: SupabaseClient = inject(SupabaseService).client;
@@ -16,9 +23,12 @@ export class SyncService {
 
   readonly status       = signal<SyncStatus>('synced');
   readonly pendingCount = signal<number>(0);
+  /** Why the last write failed, so the UI can say more than "pendent". */
+  readonly lastError    = signal<string | null>(null);
 
   private _backoff       = new Map<string, BackoffState>();
   private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private _retryTimer: ReturnType<typeof setInterval> | null = null;
   private _isFlushRunning = false;
 
   constructor() {
@@ -29,7 +39,8 @@ export class SyncService {
         if (navigator.onLine && this._loadDirtyIds(uid).length > 0) this._triggerFlush();
       } else {
         this.status.set('synced');
-        this.pendingCount.set(0);
+        this.lastError.set(null);
+        this._setPendingCount(0);
       }
     });
 
@@ -59,7 +70,7 @@ export class SyncService {
         this._writeInsertIds(uid, inserts);
       }
     }
-    this.pendingCount.set(ids.length);
+    this._setPendingCount(ids.length);
     if (this.status() === 'synced') this.status.set('pending');
 
     if (navigator.onLine) {
@@ -79,8 +90,11 @@ export class SyncService {
     this._writeInsertIds(uid, inserts);
     this._backoff.delete(workoutId);
 
-    this.pendingCount.set(ids.length);
-    if (ids.length === 0 && !this._isFlushRunning) this.status.set('synced');
+    this._setPendingCount(ids.length);
+    if (ids.length === 0 && !this._isFlushRunning) {
+      this.status.set('synced');
+      this.lastError.set(null);
+    }
   }
 
   cancelDirty(workoutId: string): void {
@@ -110,6 +124,25 @@ export class SyncService {
     } catch { return null; }
   }
 
+  /**
+   * Manual "torna-ho a provar". Drops every backoff window so the whole queue
+   * is attempted at once instead of waiting out the per-workout delays, and
+   * resolves to `true` only if the queue ended up empty.
+   */
+  async retryNow(): Promise<boolean> {
+    this._backoff.clear();
+    this.lastError.set(null);
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      this.lastError.set('Sense connexió');
+      this.status.set(this.pendingCount() > 0 ? 'error' : 'synced');
+      return this.pendingCount() === 0;
+    }
+
+    await this.flush();
+    return this.pendingCount() === 0;
+  }
+
   async flush(): Promise<void> {
     if (this._isFlushRunning || !navigator.onLine) return;
     const uid = this.auth.uid();
@@ -131,8 +164,9 @@ export class SyncService {
       try {
         await this._upsertToSupabase(uid, snap, this.isInsert(workoutId));
         this.markClean(workoutId);
-      } catch {
+      } catch (err) {
         anyError = true;
+        this.lastError.set(describeSyncError(err));
         const count = (this._backoff.get(workoutId)?.retryCount ?? 0) + 1;
         const delay = [5_000, 10_000, 30_000, 60_000][Math.min(count - 1, 3)];
         this._backoff.set(workoutId, { retryCount: count, nextRetryAt: Date.now() + delay });
@@ -141,7 +175,8 @@ export class SyncService {
 
     this._isFlushRunning = false;
     const remaining = this.pendingIds().length;
-    this.pendingCount.set(remaining);
+    this._setPendingCount(remaining);
+    if (remaining === 0) this.lastError.set(null);
     this.status.set(remaining === 0 ? 'synced' : anyError ? 'error' : 'pending');
   }
 
@@ -205,11 +240,45 @@ export class SyncService {
 
   private _hydrate(uid: string): void {
     const count = this._loadDirtyIds(uid).length;
-    this.pendingCount.set(count);
+    this._setPendingCount(count);
     this.status.set(count > 0 ? 'pending' : 'synced');
   }
 
   private _triggerFlush(): void {
     setTimeout(() => this.flush(), 1000);
   }
+
+  // ── Private: periodic retry ────────────────────────────────────────────────
+
+  /** Single place where `pendingCount` changes, so the retry ticker is always
+   *  running exactly while there is something left to send. */
+  private _setPendingCount(count: number): void {
+    this.pendingCount.set(count);
+    if (count > 0) this._startRetryTimer();
+    else this._stopRetryTimer();
+  }
+
+  private _startRetryTimer(): void {
+    if (this._retryTimer !== null || typeof window === 'undefined') return;
+    this._retryTimer = setInterval(() => {
+      if (navigator.onLine && this.pendingCount() > 0) void this.flush();
+    }, RETRY_INTERVAL_MS);
+  }
+
+  private _stopRetryTimer(): void {
+    if (this._retryTimer === null) return;
+    clearInterval(this._retryTimer);
+    this._retryTimer = null;
+  }
+}
+
+/** Supabase rejections arrive as `PostgrestError` (a plain object with
+ *  `message`), network ones as `Error` — both are surfaced verbatim so a
+ *  server-side rejection is diagnosable from the screen. */
+function describeSyncError(err: unknown): string {
+  if (typeof err === 'object' && err !== null && 'message' in err) {
+    const message = (err as { message?: unknown }).message;
+    if (typeof message === 'string' && message.trim()) return message.trim();
+  }
+  return 'Error desconegut en sincronitzar';
 }

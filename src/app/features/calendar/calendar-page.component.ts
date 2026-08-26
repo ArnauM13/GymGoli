@@ -14,6 +14,7 @@ import { WorkoutService, matchesHistoryFilters } from '../../core/services/worko
 import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
 import { AuthService } from '../../core/services/auth.service';
+import { SyncService } from '../../core/services/sync.service';
 import { kgToDisplay } from '../../shared/utils/weight.utils';
 import { addDays } from '../../shared/utils/calendar-utils';
 import { formatFeeling } from '../../shared/utils/workout-card.utils';
@@ -34,6 +35,27 @@ const PAGE_SIZE = 20;
 
       <!-- ── Page header ── -->
       <app-page-header title="Historial" />
+
+      <!-- ── Estat de sincronització. Sense això una cua rebutjada pel
+             servidor és invisible: els entrenaments es veuen (amb el seu
+             distintiu) però ningú no sap què passa ni com reintentar-ho. ── -->
+      @if (showSyncBanner()) {
+        <div class="sync-banner" [class.sync-banner--error]="syncStatus() === 'error'" role="status">
+          <span class="material-symbols-outlined sync-banner-icon"
+                [class.sync-banner-icon--spin]="syncStatus() === 'syncing'" aria-hidden="true">
+            {{ syncIcon() }}
+          </span>
+          <div class="sync-banner-text">
+            <strong>{{ syncTitle() }}</strong>
+            <span class="sync-banner-detail">{{ syncDetail() }}</span>
+          </div>
+          <button class="sync-retry-btn" (click)="retrySync()" [disabled]="isRetrying()"
+                  aria-label="Torna a sincronitzar els entrenaments pendents">
+            <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
+            {{ isRetrying() ? 'Provant…' : 'Reintenta' }}
+          </button>
+        </div>
+      }
 
       <!-- ── Cerca i filtres (sempre visibles) — el calendari és un filtre més ── -->
       <app-filter-bar
@@ -634,6 +656,48 @@ const PAGE_SIZE = 20;
       flex: 1; min-width: 0;
       display: flex; flex-direction: column; gap: 4px;
     }
+    /* ── Sync banner ── */
+    /* Grid, not a row: the message is long enough that a trailing button
+       would squeeze it into a four-line column on a phone. Icon and text
+       share the first row, the action sits under the text. */
+    .sync-banner {
+      display: grid; grid-template-columns: auto 1fr; gap: 6px 10px;
+      margin: 0 16px 12px; padding: 10px 12px;
+      background: color-mix(in srgb, var(--c-amber) 10%, var(--c-card));
+      border: 1px solid color-mix(in srgb, var(--c-amber) 35%, var(--c-card));
+      border-radius: 14px;
+    }
+    .sync-banner--error {
+      background: color-mix(in srgb, var(--c-danger) 10%, var(--c-card));
+      border-color: color-mix(in srgb, var(--c-danger) 35%, var(--c-card));
+    }
+    .sync-banner-icon { font-size: 18px; margin-top: 1px; color: var(--c-act-note); }
+    .sync-banner--error .sync-banner-icon { color: var(--c-act-danger); }
+    .sync-banner-icon--spin { animation: sync-spin 1.1s linear infinite; }
+    @keyframes sync-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .sync-banner-icon--spin { animation: none; } }
+    .sync-banner-text {
+      min-width: 0; display: flex; flex-direction: column; gap: 2px;
+      strong { font-size: 12.5px; font-weight: 700; color: var(--c-text); }
+    }
+    .sync-banner-detail {
+      font-size: 11.5px; color: var(--c-text-2); line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .sync-retry-btn {
+      grid-column: 2; justify-self: start;
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 7px 12px; border-radius: 10px; cursor: pointer;
+      font-size: 12px; font-weight: 700; font-family: inherit;
+      background: var(--c-card); color: var(--c-text);
+      border: 1px solid color-mix(in srgb, var(--c-amber) 45%, var(--c-card));
+      transition: background 0.15s;
+      .material-symbols-outlined { font-size: 15px; }
+      &:hover:not(:disabled) { background: var(--c-hover); }
+      &:disabled { opacity: 0.55; cursor: default; }
+    }
+    .sync-banner--error .sync-retry-btn { border-color: color-mix(in srgb, var(--c-danger) 45%, var(--c-card)); }
+
     .wh-badges { display: flex; flex-wrap: wrap; gap: 4px; }
     .wh-badge {
       display: inline-block; padding: 2px 8px; border-radius: 8px;
@@ -826,6 +890,7 @@ export class CalendarPageComponent implements OnDestroy {
   readonly sportService    = inject(SportService);
   private settingsService = inject(UserSettingsService);
   private authService     = inject(AuthService);
+  private syncService     = inject(SyncService);
   private feedback        = inject(FeedbackService);
 
   readonly unit = this.settingsService.weightUnit;
@@ -921,6 +986,57 @@ export class CalendarPageComponent implements OnDestroy {
     () => new Set(this.workoutService.unsyncedWorkouts().map(w => w.id))
   );
   isUnsynced(id: string): boolean { return this.unsyncedIds().has(id); }
+
+  // ── Sync status + manual retry ──────────────────────────────────────────
+  readonly syncStatus  = this.syncService.status;
+  readonly syncPending = this.syncService.pendingCount;
+  readonly isRetrying   = signal(false);
+
+  readonly showSyncBanner = computed(
+    () => this.syncPending() > 0 || this.syncStatus() === 'error'
+  );
+
+  readonly syncIcon = computed(() => {
+    switch (this.syncStatus()) {
+      case 'syncing': return 'sync';
+      case 'error':   return 'sync_problem';
+      default:        return 'cloud_off';
+    }
+  });
+
+  readonly syncTitle = computed(() => {
+    if (this.syncStatus() === 'syncing') return 'Sincronitzant…';
+    const n = this.syncPending();
+    return n === 1
+      ? '1 entrenament sense sincronitzar'
+      : `${n} entrenaments sense sincronitzar`;
+  });
+
+  readonly syncDetail = computed(() => {
+    if (this.syncStatus() === 'syncing') return 'Desant els canvis pendents al servidor.';
+    const err = this.syncService.lastError();
+    if (err) return `El servidor ha rebutjat el desat: ${err}`;
+    return 'Es desen sols cada minut, en recuperar la connexió i en tornar a l\'app.';
+  });
+
+  /** Retries the whole queue at once, ignoring the per-workout backoff. On
+   *  success the server page is reloaded so the newly-stored workouts come
+   *  back as real rows instead of merged-in local ones. */
+  async retrySync(): Promise<void> {
+    if (this.isRetrying()) return;
+    this.isRetrying.set(true);
+    try {
+      const done = await this.syncService.retryNow();
+      if (done) {
+        this.feedback.success('Tot sincronitzat');
+        this._resetAndLoad();
+      } else {
+        this.feedback.error(this.syncService.lastError() ?? 'No s\'han pogut sincronitzar tots els entrenaments');
+      }
+    } finally {
+      this.isRetrying.set(false);
+    }
+  }
 
   /**
    * The server page(s) plus every workout still queued for sync that matches
