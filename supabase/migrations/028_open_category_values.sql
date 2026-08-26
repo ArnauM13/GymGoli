@@ -82,9 +82,12 @@ BEGIN
       AND column_name = 'categories' AND udt_name = '_exercise_category_t'
   ) THEN
     ALTER TABLE public.workouts ALTER COLUMN categories DROP DEFAULT;
+    -- Cast d'array directe: `USING` no admet subconsultes (0A000 "cannot use
+    -- subquery in transform expression"), així que aquí no serveix el
+    -- ARRAY(SELECT unnest(…)) que fa servir la migració 013. `enum[]::text[]`
+    -- ja converteix element a element.
     ALTER TABLE public.workouts
-      ALTER COLUMN categories TYPE text[]
-        USING ARRAY(SELECT unnest(categories)::text);
+      ALTER COLUMN categories TYPE text[] USING categories::text[];
     ALTER TABLE public.workouts ALTER COLUMN categories SET DEFAULT '{}';
   END IF;
 END $$;
