@@ -32,10 +32,28 @@ describe('WorkoutService', () => {
   let fromSpy: jasmine.Spy;
   let workoutsChain: ReturnType<typeof makeQueryChain>;
   let service: WorkoutService;
+  let syncMock: {
+    queueUpsert: jasmine.Spy; queueDelete: jasmine.Spy; setSnapshotResolver: jasmine.Spy;
+    pendingIds: () => string[]; pendingDeleteIds: () => string[];
+    pendingCount: ReturnType<typeof signal<number>>; getSnapshot: () => null;
+  };
+  /** Ids the sync queue is holding a tombstone for. */
+  let pendingDeletes: string[];
 
   function setup(): void {
+    pendingDeletes = [];
     uid = signal<string | null>('user-1');
     workoutsChain = makeQueryChain({ data: [], count: 0, error: null });
+
+    syncMock = {
+      queueUpsert:         jasmine.createSpy('queueUpsert'),
+      queueDelete:         jasmine.createSpy('queueDelete'),
+      setSnapshotResolver: jasmine.createSpy('setSnapshotResolver'),
+      pendingIds:          () => [] as string[],
+      pendingDeleteIds:    () => pendingDeletes,
+      pendingCount:        signal(0),
+      getSnapshot:         () => null,
+    };
 
     fromSpy = jasmine.createSpy('from').and.callFake((table: string) =>
       table === 'workouts' ? workoutsChain : makeQueryChain({ data: [], count: 0, error: null }));
@@ -51,14 +69,7 @@ describe('WorkoutService', () => {
         { provide: AuthService,     useValue: { uid } },
         { provide: SupabaseService, useValue: { client: { from: fromSpy, channel: () => channelStub } } },
         { provide: ExerciseService, useValue: { getById: () => undefined } },
-        { provide: SyncService,     useValue: {
-          markDirty:    jasmine.createSpy('markDirty'),
-          pendingIds:   signal<string[]>([]),
-          pendingCount: signal(0),
-          getSnapshot:  () => null,
-          cancelDirty:  jasmine.createSpy('cancelDirty'),
-          isInsert:     () => false,
-        } },
+        { provide: SyncService,     useValue: syncMock },
       ],
     });
     service = TestBed.inject(WorkoutService);
@@ -391,6 +402,43 @@ describe('WorkoutService', () => {
       expect(service.getWorkoutForDate('2024-03-06')).toBeNull();
     });
   });
+
+  describe('deleteWorkout()', () => {
+    it('goes through the sync queue instead of writing to Supabase directly', async () => {
+      await service.deleteWorkout('w1');
+
+      expect(syncMock.queueDelete).toHaveBeenCalledWith('w1');
+      expect(workoutsChain.delete).not.toHaveBeenCalled();
+    });
+
+    // Deleting while offline used to lose the deletion: the local copy went
+    // away and the server kept the row, which came back at the next load.
+    it('does not throw when the server is unreachable', async () => {
+      await expectAsync(service.deleteWorkout('w1')).toBeResolved();
+    });
+  });
+
+  describe('workouts already deleted locally', () => {
+    it('are kept out of a fetched page until the tombstone reaches the server', async () => {
+      pendingDeletes = ['w2'];
+      workoutsChain.then = (resolve) => resolve({
+        data: [
+          { id: 'w1', date: '2024-03-06', entries: [], created_at: '2024-03-06T10:00:00Z' },
+          { id: 'w2', date: '2024-03-05', entries: [], created_at: '2024-03-05T10:00:00Z' },
+        ],
+        count: 2,
+        error: null,
+      });
+
+      const page = await service.loadWorkoutPage({ page: 0, pageSize: 20 });
+
+      expect(page.workouts.map(w => w.id)).toEqual(['w1']);
+      // The count must drop with them, or the list keeps asking for a page it
+      // can never fill.
+      expect(page.total).toBe(1);
+    });
+  });
+
 });
 
 // ── matchesHistoryFilters() ─────────────────────────────────────────────────

@@ -7,7 +7,6 @@ import { WorkoutService } from '../../core/services/workout.service';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
 import { AuthService } from '../../core/services/auth.service';
-import { SyncService, SyncStatus } from '../../core/services/sync.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { FeelingLevel, Workout, WorkoutEntry } from '../../core/models/workout.model';
@@ -23,17 +22,9 @@ function makeWorkout(overrides: Partial<Workout> = {}): Workout {
 describe('CalendarPageComponent', () => {
   let component: CalendarPageComponent;
   let unsynced: ReturnType<typeof signal<Workout[]>>;
-  let syncStatus: ReturnType<typeof signal<SyncStatus>>;
-  let syncPending: ReturnType<typeof signal<number>>;
-  let syncLastError: ReturnType<typeof signal<string | null>>;
-  let retryNowSpy: jasmine.Spy;
 
   beforeEach(async () => {
-    unsynced      = signal<Workout[]>([]);
-    syncStatus    = signal<SyncStatus>('synced');
-    syncPending   = signal(0);
-    syncLastError = signal<string | null>(null);
-    retryNowSpy   = jasmine.createSpy('retryNow').and.resolveTo(true);
+    unsynced = signal<Workout[]>([]);
     const mockWorkoutService = {
       isLoading:           signal(false),
       unsyncedWorkouts:    unsynced,
@@ -70,13 +61,6 @@ describe('CalendarPageComponent', () => {
         { provide: ExerciseService,     useValue: mockExerciseService },
         { provide: SportService,        useValue: mockSportService },
         { provide: AuthService,         useValue: { uid: signal('user-1') } },
-        {
-          provide: SyncService,
-          useValue: {
-            status: syncStatus, pendingCount: syncPending,
-            lastError: syncLastError, retryNow: retryNowSpy,
-          },
-        },
         { provide: TrainingTypeService, useValue: { types: signal(DEFAULT_TRAINING_TYPES) } },
         { provide: UserSettingsService, useValue: { weightUnit: signal<'kg' | 'lb'>('kg'), difficultyScale: signal('emoji'), bodyweightKg: signal(null) } },
         { provide: FeedbackService,     useValue: { success: jasmine.createSpy(), error: jasmine.createSpy() } },
@@ -327,8 +311,9 @@ describe('CalendarPageComponent', () => {
     // a workout still queued for sync used to show on Inici and never here.
     it('merges in workouts that are still queued for sync', () => {
       unsynced.set([makeWorkout({ id: 'local-1', date: '2024-03-10' })]);
+      // Merged in silently — the list shows it like any other session; the
+      // queue behind it is not the user's problem.
       expect(component.items().map(w => w.id)).toEqual(['local-1']);
-      expect(component.isUnsynced('local-1')).toBeTrue();
     });
 
     it('leaves out queued workouts that do not match the active filters', () => {
@@ -394,88 +379,6 @@ describe('CalendarPageComponent', () => {
     it('can be expanded', () => {
       component.calendarOpen.set(true);
       expect(component.calendarOpen()).toBeTrue();
-    });
-  });
-  // ── Sync banner ──────────────────────────────────────────────────────────
-
-  describe('sync banner', () => {
-    it('stays hidden while everything is stored', () => {
-      expect(component.showSyncBanner()).toBeFalse();
-    });
-
-    it('shows up as soon as something is queued', () => {
-      syncPending.set(3);
-      syncStatus.set('pending');
-      expect(component.showSyncBanner()).toBeTrue();
-      expect(component.syncTitle()).toBe('3 entrenaments sense sincronitzar');
-    });
-
-    it('uses the singular for a single pending workout', () => {
-      syncPending.set(1);
-      expect(component.syncTitle()).toBe('1 entrenament sense sincronitzar');
-    });
-
-    // A queue rejected by the server drains to zero pending only when it
-    // succeeds — the error state must stay visible either way.
-    it('shows up on an error even with nothing pending', () => {
-      syncStatus.set('error');
-      expect(component.showSyncBanner()).toBeTrue();
-    });
-
-    it('reports the server message when there is one', () => {
-      syncStatus.set('error');
-      syncLastError.set('invalid input value for enum');
-      expect(component.syncDetail()).toContain('invalid input value for enum');
-      expect(component.syncIcon()).toBe('sync_problem');
-    });
-
-    it('switches to the in-progress state while syncing', () => {
-      syncPending.set(2);
-      syncStatus.set('syncing');
-      expect(component.syncTitle()).toBe('Sincronitzant…');
-      expect(component.syncIcon()).toBe('sync');
-    });
-  });
-
-  // ── retrySync() ──────────────────────────────────────────────────────────
-
-  describe('retrySync()', () => {
-    it('drains the queue and reloads the server page', async () => {
-      const workoutService = TestBed.inject(WorkoutService) as any;
-      workoutService.loadWorkoutPage.calls.reset();
-      syncPending.set(2);
-
-      await component.retrySync();
-
-      expect(retryNowSpy).toHaveBeenCalled();
-      expect(workoutService.loadWorkoutPage).toHaveBeenCalled();
-      expect(component.isRetrying()).toBeFalse();
-    });
-
-    it('reports the failure instead of reloading', async () => {
-      const workoutService = TestBed.inject(WorkoutService) as any;
-      const feedback       = TestBed.inject(FeedbackService) as any;
-      workoutService.loadWorkoutPage.calls.reset();
-      retryNowSpy.and.resolveTo(false);
-      syncLastError.set('permission denied for table workouts');
-
-      await component.retrySync();
-
-      expect(feedback.error).toHaveBeenCalledWith('permission denied for table workouts');
-      expect(workoutService.loadWorkoutPage).not.toHaveBeenCalled();
-    });
-
-    it('ignores a second tap while one retry is in flight', async () => {
-      let release: (v: boolean) => void = () => {};
-      retryNowSpy.and.returnValue(new Promise<boolean>(res => (release = res)));
-
-      const first = component.retrySync();
-      await component.retrySync();
-      expect(retryNowSpy).toHaveBeenCalledTimes(1);
-
-      release(true);
-      await first;
-      expect(component.isRetrying()).toBeFalse();
     });
   });
 });

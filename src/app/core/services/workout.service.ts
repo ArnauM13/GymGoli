@@ -183,6 +183,11 @@ export class WorkoutService {
 
   // ── Constructor ──────────────────────────────────────────────────────────
   constructor() {
+    // The queue keeps its own snapshot of every pending workout; if
+    // localStorage ever loses one, this lets it rebuild the payload from the
+    // live cache instead of dropping the workout.
+    this.syncService.setSnapshotResolver(id => this._find(id));
+
     effect(() => {
       const uid = this.auth.uid();
 
@@ -222,7 +227,7 @@ export class WorkoutService {
       .eq('user_id', uid)
       .eq('date', this._todayStr);
 
-    const fresh    = (data ?? []).map(r => toWorkout(r as Record<string, unknown>));
+    const fresh    = this._withoutPendingDeletes((data ?? []).map(r => toWorkout(r as Record<string, unknown>)));
     const key      = this._todayStr.substring(0, 7);
     const existing = (this._monthCache.get(key) ?? []).filter(w => w.date !== this._todayStr);
     // Keep local dirty versions — don't overwrite unsent changes with stale server data
@@ -279,7 +284,7 @@ export class WorkoutService {
         .lte('date', end)
         .order('date', { ascending: false });
 
-      const fetched  = (data ?? []).map(r => toWorkout(r as Record<string, unknown>));
+      const fetched  = this._withoutPendingDeletes((data ?? []).map(r => toWorkout(r as Record<string, unknown>)));
       const inFlight = this._monthCache.get(key) ?? [];
       const freshDirtyIds = new Set(this.syncService.pendingIds());
       const dirtyLocal    = inFlight.filter(w => freshDirtyIds.has(w.id));
@@ -325,9 +330,11 @@ export class WorkoutService {
         return;
       }
 
-      const fetched = (data ?? [])
-        .map(r => toWorkout(r as Record<string, unknown>))
-        .filter(w => w.entries.some(e => e.exerciseId === exerciseId));
+      const fetched = this._withoutPendingDeletes(
+        (data ?? [])
+          .map(r => toWorkout(r as Record<string, unknown>))
+          .filter(w => w.entries.some(e => e.exerciseId === exerciseId))
+      );
 
       for (const w of fetched) {
         const key    = w.date.substring(0, 7);
@@ -354,8 +361,9 @@ export class WorkoutService {
         .eq('user_id', this._uid())
         .order('date', { ascending: false });
 
-      for (const row of data ?? []) {
-        const w   = toWorkout(row as Record<string, unknown>);
+      for (const w of this._withoutPendingDeletes(
+        (data ?? []).map(row => toWorkout(row as Record<string, unknown>))
+      )) {
         const key = w.date.substring(0, 7);
         if (!this._monthCache.has(key)) this._monthCache.set(key, []);
         const bucket = this._monthCache.get(key)!;
@@ -406,9 +414,15 @@ export class WorkoutService {
     const { data, count, error } = await q.range(from, to);
     if (error) throw error;
 
+    const fetched = (data ?? []).map(r => toWorkout(r as Record<string, unknown>));
+    const visible = this._withoutPendingDeletes(fetched);
+
     return {
-      workouts: (data ?? []).map(r => toWorkout(r as Record<string, unknown>)),
-      total: count ?? 0,
+      workouts: visible,
+      // The server still counts the rows whose deletion hasn't reached it yet;
+      // discount the ones dropped here so the list doesn't claim more pages
+      // than it can fill.
+      total: Math.max(0, (count ?? 0) - (fetched.length - visible.length)),
     };
   }
 
@@ -500,7 +514,7 @@ export class WorkoutService {
     const monthKey = date.substring(0, 7);
     this._monthCache.set(monthKey, [newWorkout, ...(this._monthCache.get(monthKey) ?? [])]);
     this._rebuildHistorical();
-    this.syncService.markDirty(id, newWorkout, true);
+    this.syncService.queueUpsert(id, newWorkout);
     return id;
   }
 
@@ -521,7 +535,7 @@ export class WorkoutService {
     const monthKey = date.substring(0, 7);
     this._monthCache.set(monthKey, [newWorkout, ...(this._monthCache.get(monthKey) ?? [])]);
     this._rebuildHistorical();
-    this.syncService.markDirty(id, newWorkout, true);
+    this.syncService.queueUpsert(id, newWorkout);
     return id;
   }
 
@@ -546,7 +560,7 @@ export class WorkoutService {
     const monthKey = date.substring(0, 7);
     this._monthCache.set(monthKey, [newWorkout, ...(this._monthCache.get(monthKey) ?? [])]);
     this._rebuildHistorical();
-    this.syncService.markDirty(id, newWorkout, true);
+    this.syncService.queueUpsert(id, newWorkout);
     return id;
   }
 
@@ -564,7 +578,7 @@ export class WorkoutService {
     const monthKey = date.substring(0, 7);
     this._monthCache.set(monthKey, [newWorkout, ...(this._monthCache.get(monthKey) ?? [])]);
     this._rebuildHistorical();
-    this.syncService.markDirty(id, newWorkout, true);
+    this.syncService.queueUpsert(id, newWorkout);
     return id;
   }
 
@@ -736,17 +750,14 @@ export class WorkoutService {
     return result;
   }
 
+  /** Local first, server whenever it can be reached: the deletion goes into
+   *  the same durable queue as every write, so it survives being offline, a
+   *  reload or a failed request instead of leaving the row behind on the
+   *  server to reappear at the next load. */
   async deleteWorkout(id: string): Promise<void> {
-    const wasPendingInsert = this.syncService.isInsert(id);
-    this.syncService.cancelDirty(id);
+    this._uid();                      // still refuses to touch data when signed out
     this._removeFromCache(id);
-    if (wasPendingInsert) return; // never reached Supabase, nothing to delete
-    const { error } = await this.supabase
-      .from('workouts')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', this._uid());
-    if (error) throw error;
+    this.syncService.queueDelete(id);
   }
 
   /**
@@ -798,7 +809,7 @@ export class WorkoutService {
     // session that's still being trained from one abandoned hours ago.
     this._patch(id, { ...changes, updatedAt: new Date() });
     const snap = this._find(id);
-    if (snap) this.syncService.markDirty(id, snap);
+    if (snap) this.syncService.queueUpsert(id, snap);
   }
 
   private _mergeCategories(existing: string[], newCat?: string): string[] {
@@ -822,6 +833,14 @@ export class WorkoutService {
     const all = Array.from(this._monthCache.values()).flat();
     all.sort((a, b) => b.date.localeCompare(a.date));
     this._historical.set(all);
+  }
+
+  /** A workout deleted locally whose tombstone hasn't reached the server yet
+   *  still comes back in every fetch. Dropping it here is what keeps the
+   *  deletion from flickering back into the lists until the queue drains. */
+  private _withoutPendingDeletes(workouts: Workout[]): Workout[] {
+    const tombstoned = new Set(this.syncService.pendingDeleteIds());
+    return tombstoned.size === 0 ? workouts : workouts.filter(w => !tombstoned.has(w.id));
   }
 
   private _find(id: string): Workout | undefined {
