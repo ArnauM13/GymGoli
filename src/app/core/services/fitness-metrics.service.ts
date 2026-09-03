@@ -2,6 +2,7 @@ import { Injectable, computed, inject } from '@angular/core';
 
 import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../models/exercise.model';
 import { Mascot } from '../models/mascot.model';
+import { pickVariant } from '../models/mascot.voice';
 import { FitnessGoal } from '../models/user-settings.model';
 import { SportService } from './sport.service';
 import { UserSettingsService } from './user-settings.service';
@@ -134,7 +135,11 @@ export class FitnessMetricsService {
         mascot: 'marley',
         emoji: '😴',
         title: 'T\'has guanyat el descans',
-        message: '7 dies a tope. Avui toca sofà.',
+        message: `7 dies a tope. ${pickVariant([
+          'Avui toca sofà.',
+          'Avui, sofà.',
+          'Jo ja hi soc, al sofà.',
+        ], today + 'descansa')}`,
         color: '#5e35b1',
       });
     }
@@ -148,7 +153,11 @@ export class FitnessMetricsService {
         let fluixaMsg: string;
         let fluixaMascot: Mascot;
         if (hasPlannedSport) {
-          fluixaMsg = `Setmana tranquil·la, però avui tens ${todayPlannedSports[0].sport.name}. Sortim!`;
+          fluixaMsg = `Setmana tranquil·la, però avui tens ${todayPlannedSports[0].sport.name}. ${pickVariant([
+            'Sortim!',
+            'Vinga!',
+            'Ja soc a la porta!',
+          ], today + 'setmana_fluixa')}`;
           fluixaMascot = 'xoco';
         } else if (hasPlannedGym) {
           fluixaMsg = 'Setmana tranquil·la, però avui tens gym. Ves-hi.';
@@ -185,7 +194,11 @@ export class FitnessMetricsService {
           mascot: 'marley',
           emoji: '🏋️',
           title: 'El gym, quan tu vulguis',
-          message: `Portes ${last7Sessions.length} sessions d'esport. Tu diràs.`,
+          message: `Portes ${last7Sessions.length} sessions d'esport. ${pickVariant([
+            'Tu diràs.',
+            'Quan vulguis.',
+            'Ja saps on soc.',
+          ], today + 'prova_gym')}`,
           color: '#006874',
         });
       }
@@ -211,7 +224,11 @@ export class FitnessMetricsService {
           mascot: 'xoco',
           emoji: '🏃',
           title: 'Sortim?',
-          message: `Portes ${last7Workouts.length} entrenos de gym. Toca ${sportName}?`,
+          message: `Portes ${last7Workouts.length} entrenos de gym. ${pickVariant([
+            `Toca ${sportName}?`,
+            `Fem ${sportName}?`,
+            `I si avui, ${sportName}?`,
+          ], today + 'prova_esport')}`,
           color: '#2e7d32',
         });
       }
@@ -244,7 +261,11 @@ export class FitnessMetricsService {
               mascot: 'xoco',
               emoji: '😏',
               title: `Tornem al ${favSport.name}?`,
-              message: `L'últim ${favSport.name} va ser ${ago}. Quan vulguis!`,
+              message: `L'últim ${favSport.name} va ser ${ago}. ${pickVariant([
+                'Quan vulguis!',
+                'Ja tinc ganes!',
+                'Tu diràs!',
+              ], today + 'recupera_esport')}`,
               color: favSport.color,
             });
           }
@@ -473,7 +494,11 @@ export class FitnessMetricsService {
             mascot: 'marley',
             emoji: '📆',
             title: dayLabel(cat),
-            message: `Fa ${daysStr} que no fas ${CATEGORY_LABELS[cat]} (cicle habitual cada ${p.typicalGapDays} dies). Hi tornem?`,
+            message: `Fa ${daysStr} que no fas ${CATEGORY_LABELS[cat]} (cicle habitual cada ${p.typicalGapDays} dies). ${pickVariant([
+              'Hi tornem?',
+              'Quan vulguis.',
+              'Tu mateix.',
+            ], today + 'categoria_endarrerida')}`,
             color: CATEGORY_COLORS[cat],
           });
         }

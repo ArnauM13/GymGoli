@@ -1,5 +1,7 @@
 import { Component, computed, inject, input } from '@angular/core';
 
+import { MASCOTS } from '../../../core/models/mascot.model';
+import { FitnessMetricsService } from '../../../core/services/fitness-metrics.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { SportService } from '../../../core/services/sport.service';
@@ -23,6 +25,20 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
             <span class="ws-badge" [class.ws-badge--done]="bar.pct >= 100">
               {{ bar.done }}/{{ bar.target }}
             </span>
+          </div>
+        }
+
+        <!-- ── Ratxa: setmanes seguides assolint l'objectiu ── -->
+        @if (streak(); as n) {
+          <div class="ws-streak">
+            <span class="ws-streak-dogs" aria-hidden="true">
+              <img class="ws-streak-dog" [src]="marley.avatar" alt="">
+              <img class="ws-streak-dog" [src]="xoco.avatar" alt="">
+            </span>
+            <span class="ws-streak-text">
+              <strong>{{ n }} setmanes</strong> seguides
+            </span>
+            <span class="material-symbols-outlined ws-streak-icon" aria-hidden="true">local_fire_department</span>
           </div>
         }
       </div>
@@ -64,15 +80,59 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
       flex-shrink: 0; min-width: 28px; text-align: right;
     }
     .ws-badge--done { color: #43a047; }
+
+    /* La ratxa és l'únic lloc fix on surten tots dos: és el missatge més
+     * transversal que hi ha. Comparteix la mateixa alçada que una barra. */
+    .ws-streak {
+      display: flex; align-items: center; gap: 8px;
+      padding-top: 2px;
+    }
+
+    .ws-streak-dogs { display: flex; align-items: center; flex-shrink: 0; }
+
+    .ws-streak-dog {
+      width: 20px; height: 20px; border-radius: 50%;
+      object-fit: cover; display: block;
+      border: 1.5px solid var(--c-card);
+      &:not(:first-child) { margin-left: -8px; }
+    }
+
+    .ws-streak-text {
+      flex: 1; min-width: 0;
+      font-size: 11px; font-weight: 500; color: var(--c-text-3);
+      strong { font-weight: 800; color: var(--c-text-2); }
+    }
+
+    .ws-streak-icon {
+      font-size: 14px; color: #e65100; flex-shrink: 0;
+      font-variation-settings: 'FILL' 1, 'wght' 400;
+    }
   `],
 })
 export class WeeklySummaryComponent {
   private readonly workoutService  = inject(WorkoutService);
   private readonly sportService    = inject(SportService);
   private readonly settingsService = inject(UserSettingsService);
+  private readonly metricsService  = inject(FitnessMetricsService);
+
+  readonly marley = MASCOTS.marley;
+  readonly xoco   = MASCOTS.xoco;
 
   /** The date whose week should be shown. Defaults to today. */
   readonly weekDate = input<string | null>(null);
+
+  /**
+   * Setmanes seguides assolint l'objectiu, o `null` si no n'hi ha prou per
+   * cantar-ho. Amb 1 setmana encara no hi ha ratxa, i mirant una setmana
+   * passada la ratxa d'avui no vol dir res, així que només surt a l'actual.
+   */
+  readonly streak = computed((): number | null => {
+    const viewed = mondayOf(this.weekDate() ?? TODAY());
+    if (viewed !== mondayOf(TODAY())) return null;
+
+    const n = this.metricsService.goalStreak();
+    return n >= 2 ? n : null;
+  });
 
   // The weekly-goal progress strip is tied to having a goal, not to the
   // personalised-insights toggle — the two are separate features.

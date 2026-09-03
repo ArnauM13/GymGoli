@@ -68,11 +68,21 @@ sense problema: també sap estar quiet, si hi ha companyia.
 
 ---
 
-## On parlen
+## On són
 
-Als insights de `home`, i enlloc més de moment.
+**Parlen** només als insights de `home`. A la resta hi són sense dir res.
 
-- `train` (l'entrenament d'avui) es queda net.
+| Lloc | Qui | Diu res? |
+| ---- | --- | -------- |
+| Insights de `home` | segons el tipus (taula de sota) | Sí |
+| Ratxa al resum setmanal | tots dos | No — hi són i prou |
+| Suggeriment de `train` | Marley si és gym, Xoco si és esport | No — l'eyebrow els anomena |
+
+Que al suggeriment de `train` no parlin és deliberat: allà hi vas a entrenar, no
+a llegir. L'avatar diu qui ho proposa i el motiu el segueix donant la dada
+(«Fa 5 dies · ja toca»).
+
+- Mentre entrenes (amb un entrenament actiu obert) no hi surten enlloc.
 - La proposta de l'entrenador tampoc: aquella és la veu d'una persona real.
 
 | Insight | Qui |
@@ -84,12 +94,31 @@ Als insights de `home`, i enlloc més de moment.
 
 ---
 
+## Variants
+
+Perquè no diguin sempre el mateix quan la situació es repeteix, alguns
+missatges tenen 2-3 finals i `pickVariant()` (`core/models/mascot.voice.ts`)
+en tria un amb la data com a llavor: fix tot el dia, diferent l'endemà. No és
+atzar a propòsit — els insights són `computed()` i una frase que canviés a cada
+recàlcul es notaria.
+
+En tenen: `descansa`, `prova_gym`, `prova_esport`, `recupera_esport`,
+`categoria_endarrerida` i `setmana_fluixa`.
+
+---
+
 ## Per evolucionar
 
-Idees sobre la taula, encara no decidides:
+Decidit pel camí:
 
-- Fer-los presents en un comptador de ratxa visible (avui la ratxa només surt
-  com a insight).
-- Variants de missatge per no repetir sempre la mateixa frase en el mateix cas.
-- Si el Xoco necessita veu pròpia als missatges transversals o hi continua
-  acompanyant en silenci.
+- **El Xoco no necessita veu pròpia als missatges transversals.** Als
+  objectius i la ratxa hi són tots dos i cap dels dos parla en primera
+  persona. La dada mana i ells acompanyen.
+
+Encara obert:
+
+- Variants per als casos que encara en tenen una de sola.
+- Si la ratxa mereix alguna cosa més que una fila quan és molt llarga (10+
+  setmanes), o si val més que es mantingui igual de discreta sempre.
+- Moments d'alegria de debò: ara mateix no hi ha res per a quan **acabes** un
+  entrenament, que és quan un gos et rebria millor.
