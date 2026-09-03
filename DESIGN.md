@@ -660,3 +660,96 @@ When in doubt, look at how it's done in:
 | `features/library/library.component.ts` | Page header, filter chips, item cards with category color bar |
 | `features/settings/settings.component.ts` | Sub-page with back button, setting row, hint banner |
 | `shared/components/fitness-insights/fitness-insights.component.ts` | Color-tinted item cards with dynamic accent |
+
+---
+
+## 13. Mascotes — Marley i Xoco
+
+Dos acompanyants amistosos, un especialitzat en esport i l'altre en
+entrenaments. **Ajudants, sempre positius** — no són decoració: són la veu del
+feedback. Cada insight l'explica el gos que li toca, i això dona personalitat a
+l'app sense afegir cap pantalla nova. Viu a `core/models/mascot.model.ts`.
+
+**Les personalitats i les regles de veu són a `MASCOTES.md`.** Aquí sota hi ha
+només com es pinten.
+
+| Mascota  | Àmbit    | Veu                                                     |
+| -------- | -------- | ------------------------------------------------------- |
+| `marley` | Gimnàs   | Calmat, t'espera, mai t'apressa. Constància i descans.   |
+| `xoco`   | Esport   | Enèrgic, sempre vol sortir, et porta la corretja.        |
+| `both`   | Transversal | Objectius, ratxa, resum de setmana. No parlen en primera persona: hi són com a acompanyament. |
+
+La divisió no és inventada: segueix la que ja existeix al model de dades
+(`GoalMode = 'combined' | 'separate'`).
+
+### Regles
+
+- **Cap dels dos culpabilitza mai.** L'onboarding promet «sense alarmes ni
+  pressions» i els gossos hi estan subjectes. Un gos s'alegra de veure't tant
+  si has entrenat com si no.
+- **Curt.** Una frase de dada i una frase de gos de dues a cinc paraules.
+  «Sortim?» i para. Si el missatge necessita explicació, no és d'ells.
+- **Ofereix, no constatis.** Un acompanyant no t'assenyala el que no has fet,
+  t'ofereix el que podeu fer. El títol és una porta oberta, no un diagnòstic:
+
+  | No | Sí |
+  | -- | -- |
+  | «Fa dies del gym...» | «El gym, quan tu vulguis» |
+  | «Molta gym, gens d'esport!» | «I si avui sortim?» |
+  | «Fa temps que no fem Pàdel!» | «Tornem al Pàdel?» |
+  | «Sensació baixant a Pàdel» | «Anem amb calma al Pàdel» |
+  | «Última oportunitat!» | «Encara hi ets a temps!» |
+
+  Les dades (números, dies, noms d'esport) es mantenen intactes — el que canvia
+  és el marc, no la informació.
+- **Primera persona del plural** quan parlen d'una activitat teva: «hi
+  tornem?», «fa temps que no fem pàdel». Un gos s'hi inclou.
+- **Un gos per targeta.** Els dos junts només quan el missatge és transversal
+  o quan és la marca (icona, login, onboarding).
+- **`train` (l'entrenament d'avui) es queda net.** Cap mascota mentre entrenes.
+- **La proposta de l'entrenador tampoc.** Aquella és la veu d'una persona real.
+- **No són un codi de color.** Els esports i els tipus d'entrenament ja tenen
+  color propi i configurable (`sport.color`, `TRAINING_TYPE_COLORS`); l'avatar
+  no el substitueix mai.
+
+### Com es pinta
+
+L'avatar diu **qui parla**; l'emoji, que ja hi era, es queda com a xapa i diu
+**com se sent**. Quan el missatge és transversal, els dos avatars van
+encavalcats en comptes d'una foto de grup, que a 30px no es llegeix.
+
+```html
+<div class="ic-who" [class.ic-who--pair]="mascotsOf(insight).length > 1">
+  @for (m of mascotsOf(insight); track m.name) {
+    <img class="ic-avatar" [src]="m.avatar" [alt]="m.alt">
+  }
+  <span class="ic-emoji">{{ insight.emoji }}</span>
+</div>
+```
+
+Cada mascota té dues imatges a `mascot.model.ts`, i no són intercanviables:
+
+| Camp | Fitxer | Quan |
+| ---- | ------ | ---- |
+| `avatar` | `marley.png`, `xoco.png` (256×256) | Petit i dins d'un cercle: targetes, barres, xapes |
+| `figure` | `marley-full.png`, `xoco-full.png`, `bibis-full.png` (300px d'alt, amb transparència) | Gran i sense cercle: la bafarada |
+
+Tots surten de `assets/bibis.png`, que segueix sent la icona de l'app.
+
+### La bafarada
+
+`<app-mascot-bubble>` és fixa a baix a la dreta, per sobre de la barra de
+navegació. Si la pantalla ja té alguna cosa fixa a baix, puja-la amb `lift`
+(píxels per sobre de la barra) en comptes de tocar-ne el CSS:
+
+```html
+<!-- a `train`, per sobre de la targeta de suggeriment (60px + marges) -->
+<app-mascot-bubble [mascot]="'marley'" [message]="..." [lift]="92"
+                   (close)="..." />
+```
+
+`MascotBubbleService` recorda què has tancat, amb la data desada al costat de
+les claus perquè tot torni a obrir-se l'endemà.
+
+**La bafarada mai substitueix la targeta.** És una capa a sobre: el que diu ha
+de seguir sent accessible a sota després de tancar-la.

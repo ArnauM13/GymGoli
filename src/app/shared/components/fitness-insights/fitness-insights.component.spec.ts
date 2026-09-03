@@ -9,6 +9,7 @@ import { UserSettingsService } from '../../../core/services/user-settings.servic
 function makeInsight(type: string, overrides: Partial<FitnessInsight> = {}): FitnessInsight {
   return {
     type: type as FitnessInsight['type'],
+    mascot: 'both',
     emoji: '🔥',
     title: `Title for ${type}`,
     message: `Message for ${type}`,
@@ -133,6 +134,35 @@ describe('FitnessInsightsComponent', () => {
       // signal emits same value again
       mockInsights.set([makeInsight('gran_setmana')]);
       expect(component.visibleInsights()).toEqual([]);
+    });
+  });
+
+  describe('mascotsOf', () => {
+    it('returns only Marley for a gym insight', () => {
+      const avatars = component.mascotsOf(makeInsight('prova_gym', { mascot: 'marley' }));
+      expect(avatars.length).toBe(1);
+      expect(avatars[0].avatar).toContain('marley');
+    });
+
+    it('returns only Xoco for a sport insight', () => {
+      const avatars = component.mascotsOf(makeInsight('prova_esport', { mascot: 'xoco' }));
+      expect(avatars.length).toBe(1);
+      expect(avatars[0].avatar).toContain('xoco');
+    });
+
+    it('returns both avatars, Marley first, for a cross-cutting insight', () => {
+      const avatars = component.mascotsOf(makeInsight('objectiu_assolit', { mascot: 'both' }));
+      expect(avatars.length).toBe(2);
+      expect(avatars[0].name).toBe('Marley');
+      expect(avatars[1].name).toBe('Xoco');
+    });
+
+    it('every avatar carries alt text', () => {
+      for (const m of (['marley', 'xoco', 'both'] as const)) {
+        for (const meta of component.mascotsOf(makeInsight('gran_setmana', { mascot: m }))) {
+          expect(meta.alt).toBeTruthy();
+        }
+      }
     });
   });
 });

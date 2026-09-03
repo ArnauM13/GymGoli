@@ -14,6 +14,7 @@ import {
   CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_MUSCLES,
   Exercise, ExerciseCategory,
 } from '../../core/models/exercise.model';
+import { MASCOTS, Mascot, MascotMeta } from '../../core/models/mascot.model';
 import { Sport, SportMetricDef } from '../../core/models/sport.model';
 import { WorkoutTemplate } from '../../core/models/template.model';
 import { FeelingLevel, Workout, WorkoutEntry, setMaxWeight } from '../../core/models/workout.model';
@@ -26,6 +27,8 @@ import { FeedbackService } from '../../shared/services/feedback.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { OfflineService } from '../../core/services/offline.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
+import { MascotBubbleComponent } from '../../shared/components/mascot-bubble/mascot-bubble.component';
+import { MascotBubbleService } from '../../core/services/mascot-bubble.service';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
 import { AppHintService } from '../../core/services/app-hint.service';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
@@ -60,7 +63,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
 @Component({
   selector: 'app-train',
   standalone: true,
-  imports: [FormsModule, A11yModule, WorkoutEditorComponent, PageHeaderComponent],
+  imports: [FormsModule, A11yModule, WorkoutEditorComponent, PageHeaderComponent, MascotBubbleComponent],
   template: `
     <div class="page" [style.padding-bottom]="pagePaddingBottom()">
 
@@ -411,6 +414,16 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
 
     </div>
 
+    <!-- ── El gos et proposa el d'avui (capa; la targeta de sota no es mou) ── -->
+    @if (!activeWorkout() && todaySuggestion(); as s) {
+      @if (bubbleService.isOpen(bubbleKey(s))) {
+        <app-mascot-bubble [mascot]="suggestionMascotId(s)"
+                           [message]="suggestionBubbleText(s)"
+                           [lift]="92"
+                           (close)="bubbleService.dismiss(bubbleKey(s))" />
+      }
+    }
+
     <!-- ── Suggeriment (ample complet, sobre la barra de navegació) ── -->
     @if (!activeWorkout() && todaySuggestion(); as s) {
       <div class="suggestion-float-row">
@@ -419,9 +432,10 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
           <div class="sf-bar" aria-hidden="true"></div>
           <div class="sf-icon-wrap" aria-hidden="true">
             <span class="material-symbols-outlined sf-icon">{{ s.icon }}</span>
+            <img class="sf-dog" [src]="suggestionMascot(s).avatar" alt="">
           </div>
           <div class="sf-info" aria-hidden="true">
-            <span class="sf-eyebrow">Suggerit</span>
+            <span class="sf-eyebrow">Idea del {{ suggestionMascot(s).name }}</span>
             <span class="sf-label">{{ s.label }}</span>
             <span class="sf-reason">{{ s.reason }}</span>
           </div>
@@ -996,8 +1010,16 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       &:hover { box-shadow: 0 10px 32px rgba(0,0,0,0.2), 0 2px 6px rgba(0,0,0,0.1); }
     }
     .sf-bar { width: 5px; align-self: stretch; flex-shrink: 0; background: var(--sc); }
-    .sf-icon-wrap { width: 48px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .sf-icon-wrap { width: 48px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; position: relative; }
     .sf-icon { font-size: 23px; color: var(--sc); font-variation-settings: 'FILL' 1; }
+    /* El gos va de xapa sobre la icona de categoria: qui ho proposa sense
+     * robar-li el lloc al que es proposa. */
+    .sf-dog {
+      position: absolute; right: 2px; bottom: -1px;
+      width: 18px; height: 18px; border-radius: 50%;
+      object-fit: cover; display: block;
+      border: 1.5px solid var(--c-card);
+    }
     .sf-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
     .sf-eyebrow {
       font-size: 9.5px; font-weight: 700; line-height: 1;
@@ -1353,6 +1375,7 @@ export class TrainComponent implements OnDestroy {
   private exerciseService  = inject(ExerciseService);
   private sharedWorkoutService = inject(SharedWorkoutService);
   private profileService   = inject(WorkoutProfileService);
+  readonly bubbleService   = inject(MascotBubbleService);
   readonly hintService     = inject(AppHintService);
   readonly router          = inject(Router);
   private route            = inject(ActivatedRoute);
@@ -1503,6 +1526,33 @@ export class TrainComponent implements OnDestroy {
         return nextSport ? mkSport(nextSport) : null;
     }
   });
+
+  /**
+   * Qui proposa el suggeriment. La divisió és la de sempre: el gimnàs és cosa
+   * del Marley i l'esport, del Xoco.
+   */
+  suggestionMascotId(s: TodaySuggestion): Mascot {
+    return s.type === 'gym' ? 'marley' : 'xoco';
+  }
+
+  suggestionMascot(s: TodaySuggestion): MascotMeta {
+    return MASCOTS[this.suggestionMascotId(s)];
+  }
+
+  /**
+   * El que diu la bafarada. Curt i en la seva veu: el motiu («Fa 5 dies · ja
+   * toca») el segueix donant la targeta de sota, que no es toca.
+   */
+  suggestionBubbleText(s: TodaySuggestion): string {
+    return s.type === 'gym'
+      ? `Avui et proposo ${s.label}.`
+      : `Sortim a fer ${s.label}?`;
+  }
+
+  /** Una bafarada per suggeriment i dia: si la tanques, no torna fins demà. */
+  bubbleKey(s: TodaySuggestion): string {
+    return `train:${s.type}:${s.label}`;
+  }
 
   handleSuggestionClick(s: TodaySuggestion): void {
     if (s.type === 'gym') this.selectType(s.category);
