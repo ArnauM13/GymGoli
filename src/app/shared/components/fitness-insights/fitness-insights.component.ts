@@ -84,11 +84,10 @@ import { MascotBubbleComponent } from '../mascot-bubble/mascot-bubble.component'
       box-shadow: 0 1px 4px var(--c-shadow);
     }
 
-    /* Quan hi són tots dos es veuen sencers, l'un al costat de l'altre.
-     * Encavalcats, el segon en tapava mig i semblava que només n'hi hagués un. */
-    .ic-who--pair {
-      gap: 3px;
-      .ic-avatar { width: 27px; height: 27px; }
+    .ic-who--pair .ic-avatar {
+      width: 30px; height: 30px;
+      border: 2px solid var(--c-card);
+      &:not(:first-child) { margin-left: -12px; }
     }
 
     .ic-emoji {
