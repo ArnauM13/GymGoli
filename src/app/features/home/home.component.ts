@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnDestroy, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
 import { Sport, SportSession } from '../../core/models/sport.model';
@@ -19,6 +19,10 @@ import { feedDayLabel } from '../../shared/utils/workout-card.utils';
 import { addDays, mondayOf } from '../../shared/utils/calendar-utils';
 
 const TODAY = (): string => new Date().toISOString().split('T')[0];
+
+/** Fins on arriba "Activitat recent" a Inici. Tot el que queda més enrere
+ *  viu a l'Historial, que hi té cerca, filtres i calendari. */
+const RECENT_DAYS = 30;
 
 @Component({
   selector: 'app-home',
@@ -137,11 +141,12 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
         <app-discovery-hint />
       }
 
-      <!-- ── Historial ── -->
+      <!-- ── Activitat recent (últims 30 dies) ── -->
       <div class="card-section history-card">
         <div class="section-header">
-          <span class="material-symbols-outlined section-icon">history</span>
-          <h2 class="section-title">Historial</h2>
+          <span class="material-symbols-outlined section-icon" aria-hidden="true">history</span>
+          <h2 class="section-title">Activitat recent</h2>
+          <span class="section-hint">30 dies</span>
         </div>
 
         @if ((workoutService.isLoading() || !sportService.sportsLoaded()) && historyFeedDays().length === 0) {
@@ -169,14 +174,15 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
               <app-day-feed-cards [day]="day" (open)="goToWorkout($event)" />
             </div>
           }
-
-          <div #feedSentinel class="scroll-sentinel"></div>
-          @if (feedLoadingMore()) {
-            <div class="loading-state">
-              <span class="material-symbols-outlined spin">sync</span>
-            </div>
-          }
         }
+
+        <!-- Inici només ensenya el que és recent; tot el que hi ha abans viu
+             a l'Historial, que té cerca, filtres i calendari. -->
+        <a class="history-all-link" routerLink="/calendar">
+          <span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>
+          Veure tot l'historial
+          <span class="material-symbols-outlined hal-arrow" aria-hidden="true">chevron_right</span>
+        </a>
       </div>
 
     </div>
@@ -325,6 +331,22 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     .section-header { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; }
     .section-icon  { font-size: 18px; color: var(--c-text-3); font-variation-settings: 'FILL' 0, 'wght' 300; }
     .section-title { margin: 0; flex: 1; font-size: 14px; font-weight: 700; color: var(--c-text-2); letter-spacing: 0.2px; }
+    .section-hint {
+      flex-shrink: 0; padding: 2px 8px; border-radius: 999px;
+      background: var(--c-subtle); color: var(--c-text-3);
+      font-size: 10.5px; font-weight: 700; letter-spacing: 0.2px;
+    }
+
+    .history-all-link {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      margin-top: 4px; padding: 10px; border-radius: 12px;
+      border: 1.5px solid var(--c-border-2); background: var(--c-subtle);
+      color: var(--c-text-2); font-size: 12.5px; font-weight: 700; text-decoration: none;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 17px; color: var(--c-text-3); }
+      &:hover { border-color: var(--c-brand); color: var(--c-brand); .material-symbols-outlined { color: var(--c-brand); } }
+    }
+    .hal-arrow { margin-left: -2px; }
 
     /* ── Activity feed ── */
     .feed-day { margin: 0 0 14px; }
@@ -334,15 +356,6 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
       margin-bottom: 6px;
     }
     .feed-sk { display: flex; flex-direction: column; gap: 8px; }
-
-    /* ── Loading ── */
-    .loading-state {
-      display: flex; justify-content: center; padding: 48px;
-      .material-symbols-outlined { font-size: 32px; color: var(--c-border); }
-    }
-
-    /* ── Infinite scroll ── */
-    .scroll-sentinel { height: 1px; }
 
     /* ── Empty state ── */
     .empty-state {
@@ -379,7 +392,7 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
     .sk-line--30  { width: 30%; height: 10px; }
   `],
 })
-export class HomeComponent implements OnDestroy {
+export class HomeComponent {
   readonly workoutService  = inject(WorkoutService);
   readonly sportService    = inject(SportService);
   readonly offlineService  = inject(OfflineService);
@@ -501,27 +514,21 @@ export class HomeComponent implements OnDestroy {
     this.settingsService.update({ routineHintDismissed: true });
   }
 
-  // ── Activity feed (grouped by day, infinite scroll backwards in time) ────
+  // ── Activitat recent (agrupada per dia, només els últims 30 dies) ───────
 
-  /** How many months before the current one are loaded — 0 means only the
-   *  current month (already loaded via the effectiveDate effect below). */
-  private readonly feedMonthsBack = signal(0);
-  readonly feedLoadingMore = signal(false);
-  private readonly feedSentinelRef = viewChild<ElementRef<HTMLElement>>('feedSentinel');
-  private _feedObserver: IntersectionObserver | null = null;
-
+  /** Els dies amb activitat dins la finestra recent, del més nou al més vell.
+   *
+   *  Inici ensenya què has fet últimament, no tot el que has fet mai: la
+   *  llista completa (amb cerca i filtres) és la pàgina d'Historial. */
   readonly feedDays = computed(() => {
-    const monthsBack = this.feedMonthsBack();
     // Establish reactivity on the underlying data (mirrors the calendar) so the
-    // history feed fills in as soon as a month's workouts/sports load, rather
-    // than staying empty until the user interacts with a day.
+    // feed fills in as soon as a month's workouts/sports load, rather than
+    // staying empty until the user interacts with a day.
     this.workoutService.workouts(); this.sportService.sessions(); this.sportService.sports();
-    const today      = new Date();
-    const earliest   = new Date(today.getFullYear(), today.getMonth() - monthsBack, 1);
     const days: DayFeedEntry[] = [];
+    const cursor = new Date(TODAY() + 'T12:00:00');
 
-    const cursor = new Date(today);
-    while (cursor >= earliest) {
+    for (let i = 0; i < RECENT_DAYS; i++) {
       const dateStr  = cursor.toISOString().split('T')[0];
       const done     = this.workoutService.getDoneWorkoutsForDate(dateStr);
       const planned  = this.workoutService.getPlannedForDate(dateStr);
@@ -533,30 +540,11 @@ export class HomeComponent implements OnDestroy {
     return days;
   });
 
-  /** The full activity timeline shown under "Historial". The prominent
-   *  "Avui / dia seleccionat" card above repeats whichever day is in focus,
-   *  but we deliberately DON'T strip that day from the list — otherwise the
-   *  feed goes blank whenever the only (or most recent) activity is today,
-   *  which reads as "nothing loaded". Keeping the complete log means the feed
-   *  always reflects your activity, today included. */
+  /** The recent activity timeline. The prominent "Avui / dia seleccionat" card
+   *  above repeats whichever day is in focus, but we deliberately DON'T strip
+   *  that day from the list — otherwise the feed goes blank whenever the only
+   *  (or most recent) activity is today, which reads as "nothing loaded". */
   readonly historyFeedDays = computed(() => this.feedDays());
-
-  async loadMoreFeedMonths(): Promise<void> {
-    if (this.feedLoadingMore()) return;
-    this.feedLoadingMore.set(true);
-    try {
-      const next   = this.feedMonthsBack() + 1;
-      const today  = new Date();
-      const target = new Date(today.getFullYear(), today.getMonth() - next, 1);
-      await Promise.all([
-        this.workoutService.ensureMonthLoaded(target.getFullYear(), target.getMonth()),
-        this.sportService.ensureMonthLoaded(target.getFullYear(), target.getMonth()),
-      ]);
-      this.feedMonthsBack.set(next);
-    } finally {
-      this.feedLoadingMore.set(false);
-    }
-  }
 
   constructor() {
     this.sportService.ensureLoaded();
@@ -564,27 +552,18 @@ export class HomeComponent implements OnDestroy {
     effect(() => {
       const date = this.effectiveDate();
       const [yearStr, monthStr] = date.split('-');
-      const year  = parseInt(yearStr);
-      const month = parseInt(monthStr) - 1;
-      this.workoutService.ensureMonthLoaded(year, month);
-      this.sportService.ensureMonthLoaded(year, month);
+      this._ensureMonthLoaded(parseInt(yearStr), parseInt(monthStr) - 1);
     });
 
-    // Re-attach the infinite-scroll observer whenever the feed's sentinel
-    // element (re)appears — e.g. after the empty/skeleton state resolves.
-    effect(() => {
-      const el = this.feedSentinelRef()?.nativeElement;
-      this._feedObserver?.disconnect();
-      if (!el) return;
-      this._feedObserver = new IntersectionObserver(
-        entries => { if (entries[0].isIntersecting && !this.feedLoadingMore()) this.loadMoreFeedMonths(); },
-        { rootMargin: '200px' }
-      );
-      this._feedObserver.observe(el);
-    });
+    // La finestra de 30 dies es menja el mes anterior gairebé sempre, així que
+    // es carrega d'entrada: sense això l'activitat recent es talla a l'1 de mes.
+    const earliest = new Date(TODAY() + 'T12:00:00');
+    earliest.setDate(earliest.getDate() - (RECENT_DAYS - 1));
+    this._ensureMonthLoaded(earliest.getFullYear(), earliest.getMonth());
   }
 
-  ngOnDestroy(): void {
-    this._feedObserver?.disconnect();
+  private _ensureMonthLoaded(year: number, month: number): void {
+    this.workoutService.ensureMonthLoaded(year, month);
+    this.sportService.ensureMonthLoaded(year, month);
   }
 }

@@ -33,9 +33,9 @@ describe('DayFeedCardsComponent', () => {
     await TestBed.configureTestingModule({
       imports: [DayFeedCardsComponent],
       providers: [
-        { provide: WorkoutService, useValue: { startPlannedWorkout, deleteWorkout } },
+        { provide: WorkoutService, useValue: { startPlannedWorkout, deleteWorkout, unsyncedWorkouts: signal<Workout[]>([]) } },
         { provide: SportService, useValue: { updateSession, deleteSession } },
-        { provide: UserSettingsService, useValue: { difficultyScale: signal('emoji'), bodyweightKg: signal(null) } },
+        { provide: UserSettingsService, useValue: { difficultyScale: signal('emoji'), bodyweightKg: signal(null), weightUnit: signal<'kg' | 'lb'>('kg') } },
         { provide: ExerciseService, useValue: { loadTypeOf: () => undefined, getById: () => undefined } },
         { provide: FeedbackService, useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
         { provide: ConfirmDialogService, useValue: { confirm } },
@@ -94,6 +94,77 @@ describe('DayFeedCardsComponent', () => {
     });
   });
 
+  describe('unified activity card', () => {
+    const day = {
+      date: '2024-03-05',
+      workouts: [makeWorkout({ id: 'w1', categories: ['push'], feeling: 3 as const })],
+      sports: [{
+        sport: { id: 'run', name: 'Running', icon: 'directions_run', color: '#000', subtypes: [], metricDefs: [], createdAt: new Date() },
+        session: { id: 'sess1', date: '2024-03-05', sportId: 'run', duration: 30, createdAt: new Date() },
+      }],
+    };
+
+    it('gives workouts and sports the same card shell', () => {
+      fixture.componentRef.setInput('day', day);
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelectorAll('.act-card').length).toBe(2);
+      expect(el.querySelectorAll('.ac-bar').length).toBe(2);
+      expect(el.querySelectorAll('.ac-main').length).toBe(2);
+    });
+
+    it('titles a workout with its training type, not the exercise list', () => {
+      fixture.componentRef.setInput('day', day);
+      fixture.detectChanges();
+
+      const title = (fixture.nativeElement as HTMLElement).querySelector('.ac-title') as HTMLElement;
+      expect(title.textContent?.trim()).toBe('Empenta');
+    });
+
+    it('keeps the feeling on the title row so it never wraps below the stats', () => {
+      fixture.componentRef.setInput('day', day);
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('.ac-title-row .ac-feeling')).toBeTruthy();
+      expect(el.querySelector('.ac-stats .ac-feeling')).toBeNull();
+    });
+
+    it('points a workout out of the feed by default, and expands it in place when asked to', () => {
+      fixture.componentRef.setInput('day', day);
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).querySelector('.ac-chevron')?.textContent?.trim())
+        .toBe('chevron_right');
+
+      fixture.componentRef.setInput('expandWorkouts', true);
+      fixture.detectChanges();
+
+      const row = (fixture.nativeElement as HTMLElement).querySelector('.ac-main') as HTMLElement;
+      row.click();
+      fixture.detectChanges();
+      expect(component.expandedWorkoutId()).toBe('w1');
+      expect((fixture.nativeElement as HTMLElement).querySelector('app-workout-detail')).toBeTruthy();
+
+      row.click();
+      fixture.detectChanges();
+      expect(component.expandedWorkoutId()).toBeNull();
+    });
+
+    it('still opens the workout from the expanded panel', () => {
+      const openSpy = spyOn(component.open, 'emit');
+      fixture.componentRef.setInput('day', day);
+      fixture.componentRef.setInput('expandWorkouts', true);
+      fixture.detectChanges();
+      component.handleWorkoutClick(day.workouts[0]);
+      fixture.detectChanges();
+
+      const btn = (fixture.nativeElement as HTMLElement).querySelector('.ac-open-btn') as HTMLElement;
+      btn.click();
+      expect(openSpy).toHaveBeenCalledWith('w1');
+    });
+  });
+
   describe('sport row', () => {
     const day = {
       date: '2024-03-05',
@@ -108,7 +179,7 @@ describe('DayFeedCardsComponent', () => {
       fixture.componentRef.setInput('day', day);
       fixture.detectChanges();
 
-      const row = (fixture.nativeElement as HTMLElement).querySelector('.feed-sport-row') as HTMLElement;
+      const row = (fixture.nativeElement as HTMLElement).querySelector('.ac-main') as HTMLElement;
       row.click();
       fixture.detectChanges();
       expect(component.expandedSportId()).toBe('sess1');

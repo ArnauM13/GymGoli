@@ -178,13 +178,25 @@ describe('HomeComponent', () => {
   // ── historyFeedDays() ────────────────────────────────────────────────────
 
   describe('historyFeedDays()', () => {
-    it('includes today so the feed is never empty when the only activity is today', async () => {
+    it('includes today so the feed is never empty when the only activity is today', () => {
       const getDoneWorkoutsForDate = TestBed.inject(WorkoutService).getDoneWorkoutsForDate as jasmine.Spy;
       getDoneWorkoutsForDate.and.callFake((date: string) => date === TODAY ? [makeWorkout({ id: 'today1' })] : []);
       doneWorkoutsSignal.set([makeWorkout({ id: 'today1' })]);
-      await component.loadMoreFeedMonths();
 
       expect(component.historyFeedDays().some(d => d.date === TODAY)).toBeTrue();
+    });
+
+    it('only reaches back 30 days — the rest lives on the Historial page', () => {
+      const within = (() => { const d = new Date(TODAY + 'T12:00:00'); d.setDate(d.getDate() - 29); return d.toISOString().split('T')[0]; })();
+      const older  = (() => { const d = new Date(TODAY + 'T12:00:00'); d.setDate(d.getDate() - 45); return d.toISOString().split('T')[0]; })();
+      const getDoneWorkoutsForDate = TestBed.inject(WorkoutService).getDoneWorkoutsForDate as jasmine.Spy;
+      getDoneWorkoutsForDate.and.callFake((date: string) =>
+        date === within || date === older ? [makeWorkout({ id: date })] : []);
+      doneWorkoutsSignal.set([makeWorkout({ id: within })]);
+
+      const dates = component.historyFeedDays().map(d => d.date);
+      expect(dates).toContain(within);
+      expect(dates).not.toContain(older);
     });
   });
 
