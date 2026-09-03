@@ -63,13 +63,13 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
 
     /* Els gossos van a l'esquerra i la icona d'activitat es queda on era:
      * ells diuen qui t'acompanya, la icona segueix dient de què és la barra. */
-    .ws-dogs { display: flex; align-items: center; flex-shrink: 0; }
+    /* Si hi són tots dos, es veuen sencers i separats: encavalcats semblava
+     * que només n'hi hagués un. */
+    .ws-dogs { display: flex; align-items: center; flex-shrink: 0; gap: 3px; }
 
     .ws-dog {
-      width: 20px; height: 20px; border-radius: 50%;
+      width: 19px; height: 19px; border-radius: 50%;
       object-fit: cover; display: block;
-      border: 1.5px solid var(--c-card);
-      &:not(:first-child) { margin-left: -8px; }
     }
 
     .ws-icon {
