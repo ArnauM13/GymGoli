@@ -729,3 +729,21 @@ encavalcats en comptes d'una foto de grup, que a 30px no es llegeix.
 
 Avatars: `assets/marley.png`, `assets/xoco.png` (256×256, retallats de
 `assets/bibis.png`, que segueix sent la icona de l'app).
+
+### La bafarada
+
+`<app-mascot-bubble>` és fixa a baix a la dreta, per sobre de la barra de
+navegació. Si la pantalla ja té alguna cosa fixa a baix, puja-la amb `lift`
+(píxels per sobre de la barra) en comptes de tocar-ne el CSS:
+
+```html
+<!-- a `train`, per sobre de la targeta de suggeriment (60px + marges) -->
+<app-mascot-bubble [mascot]="'marley'" [message]="..." [lift]="92"
+                   (close)="..." />
+```
+
+`MascotBubbleService` recorda què has tancat, amb la data desada al costat de
+les claus perquè tot torni a obrir-se l'endemà.
+
+**La bafarada mai substitueix la targeta.** És una capa a sobre: el que diu ha
+de seguir sent accessible a sota després de tancar-la.

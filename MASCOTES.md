@@ -70,17 +70,28 @@ sense problema: també sap estar quiet, si hi ha companyia.
 
 ## On són
 
-**Parlen** només als insights de `home`. A la resta hi són sense dir res.
+| Lloc | Qui | Com |
+| ---- | --- | --- |
+| Bafarada d'insight (`home`) | segons el tipus (taula de sota) | Surt a baix a la dreta i parla |
+| Bafarada de suggeriment (`train`) | Marley si és gym, Xoco si és esport | Surt a baix a la dreta i parla |
+| Targetes d'insight | igual que la bafarada | Avatar + emoji, sense veu pròpia |
+| Barres d'objectiu setmanal | Marley al gym, Xoco a l'esport, tots dos si l'objectiu és combinat | Avatar a l'esquerra |
+| Ratxa | tots dos | Avatar a l'esquerra |
+| Suggeriment de `train` (targeta) | qui fa la proposta | Xapa sobre la icona |
 
-| Lloc | Qui | Diu res? |
-| ---- | --- | -------- |
-| Insights de `home` | segons el tipus (taula de sota) | Sí |
-| Ratxa al resum setmanal | tots dos | No — hi són i prou |
-| Suggeriment de `train` | Marley si és gym, Xoco si és esport | No — l'eyebrow els anomena |
+### La bafarada
 
-Que al suggeriment de `train` no parlin és deliberat: allà hi vas a entrenar, no
-a llegir. L'avatar diu qui ho proposa i el motiu el segueix donant la dada
-(«Fa 5 dies · ja toca»).
+El gos surt a baix a la dreta amb bafarada de còmic i et diu una cosa curta.
+Tres regles perquè no sigui invasiva:
+
+1. **És una capa i res més.** El que diu ja surt també a la targeta de sota,
+   que no es mou ni canvia. Tancar-la no et fa perdre cap informació.
+2. **Es tanca i no torna en tot el dia.** L'endemà sí.
+3. **Una de sola.** Als insights només surt la del primer, mai una pila.
+
+Les barres d'objectiu i les targetes **no es toquen mai** per fer-los lloc:
+les icones d'activitat, els comptadors i el motiu del suggeriment segueixen
+exactament on eren. Els gossos només s'hi afegeixen al costat.
 
 - Mentre entrenes (amb un entrenament actiu obert) no hi surten enlloc.
 - La proposta de l'entrenador tampoc: aquella és la veu d'una persona real.
@@ -115,10 +126,17 @@ Decidit pel camí:
   objectius i la ratxa hi són tots dos i cap dels dos parla en primera
   persona. La dada mana i ells acompanyen.
 
+- **La bafarada no substitueix res.** Va néixer com a capa per sobre de les
+  targetes, i així es queda: si algun dia es planteja treure la targeta quan
+  surt la bafarada, la resposta és no.
+
 Encara obert:
 
 - Variants per als casos que encara en tenen una de sola.
 - Si la ratxa mereix alguna cosa més que una fila quan és molt llarga (10+
   setmanes), o si val més que es mantingui igual de discreta sempre.
 - Moments d'alegria de debò: ara mateix no hi ha res per a quan **acabes** un
-  entrenament, que és quan un gos et rebria millor.
+  entrenament, que és quan un gos et rebria millor. La bafarada ja seria el
+  lloc on dir-ho.
+- Si el gos de la bafarada hauria de canviar de cara segons el missatge
+  (content, tranquil, adormit) o si amb una de sola ja n'hi ha prou.

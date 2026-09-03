@@ -1,6 +1,6 @@
 import { Component, computed, inject, input } from '@angular/core';
 
-import { MASCOTS } from '../../../core/models/mascot.model';
+import { MASCOTS, Mascot, MascotMeta } from '../../../core/models/mascot.model';
 import { FitnessMetricsService } from '../../../core/services/fitness-metrics.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 import { WorkoutService } from '../../../core/services/workout.service';
@@ -17,6 +17,11 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
       <div class="ws-strip">
         @for (bar of weekBars(); track bar.icon) {
           <div class="ws-row" [class.ws-row--done]="bar.pct >= 100">
+            <span class="ws-dogs" aria-hidden="true">
+              @for (m of dogsOf(bar.mascot); track m.name) {
+                <img class="ws-dog" [src]="m.avatar" alt="">
+              }
+            </span>
             <span class="material-symbols-outlined ws-icon">{{ bar.icon }}</span>
             <div class="ws-track">
               <div class="ws-fill" [style.width.%]="bar.pct"
@@ -31,9 +36,9 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
         <!-- ── Ratxa: setmanes seguides assolint l'objectiu ── -->
         @if (streak(); as n) {
           <div class="ws-streak">
-            <span class="ws-streak-dogs" aria-hidden="true">
-              <img class="ws-streak-dog" [src]="marley.avatar" alt="">
-              <img class="ws-streak-dog" [src]="xoco.avatar" alt="">
+            <span class="ws-dogs" aria-hidden="true">
+              <img class="ws-dog" [src]="marley.avatar" alt="">
+              <img class="ws-dog" [src]="xoco.avatar" alt="">
             </span>
             <span class="ws-streak-text">
               <strong>{{ n }} setmanes</strong> seguides
@@ -54,6 +59,17 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
 
     .ws-row {
       display: flex; align-items: center; gap: 8px;
+    }
+
+    /* Els gossos van a l'esquerra i la icona d'activitat es queda on era:
+     * ells diuen qui t'acompanya, la icona segueix dient de què és la barra. */
+    .ws-dogs { display: flex; align-items: center; flex-shrink: 0; }
+
+    .ws-dog {
+      width: 20px; height: 20px; border-radius: 50%;
+      object-fit: cover; display: block;
+      border: 1.5px solid var(--c-card);
+      &:not(:first-child) { margin-left: -8px; }
     }
 
     .ws-icon {
@@ -88,15 +104,6 @@ const TODAY = (): string => new Date().toISOString().split('T')[0];
       padding-top: 2px;
     }
 
-    .ws-streak-dogs { display: flex; align-items: center; flex-shrink: 0; }
-
-    .ws-streak-dog {
-      width: 20px; height: 20px; border-radius: 50%;
-      object-fit: cover; display: block;
-      border: 1.5px solid var(--c-card);
-      &:not(:first-child) { margin-left: -8px; }
-    }
-
     .ws-streak-text {
       flex: 1; min-width: 0;
       font-size: 11px; font-weight: 500; color: var(--c-text-3);
@@ -117,6 +124,11 @@ export class WeeklySummaryComponent {
 
   readonly marley = MASCOTS.marley;
   readonly xoco   = MASCOTS.xoco;
+
+  /** `both` es pinta com els dos avatars encavalcats. */
+  dogsOf(mascot: Mascot): MascotMeta[] {
+    return mascot === 'both' ? [MASCOTS.marley, MASCOTS.xoco] : [MASCOTS[mascot]];
+  }
 
   /** The date whose week should be shown. Defaults to today. */
   readonly weekDate = input<string | null>(null);
@@ -149,8 +161,8 @@ export class WeeklySummaryComponent {
     const today    = TODAY();
     const doneDays = days.filter(d => d <= today);
 
-    const mk = (icon: string, done: number, target: number) => ({
-      icon, done, target: Math.max(1, target),
+    const mk = (icon: string, done: number, target: number, mascot: Mascot) => ({
+      icon, done, target: Math.max(1, target), mascot,
       pct: Math.min(100, Math.round(done / Math.max(1, target) * 100)),
     });
 
@@ -167,7 +179,9 @@ export class WeeklySummaryComponent {
         weight: 'monitor_weight',   sport: 'sports_soccer',
       };
       const icon = fitnessGoal ? (iconMap[fitnessGoal] ?? 'directions_run') : 'directions_run';
-      return [mk(icon, activeDays, total)];
+      // Objectiu combinat: la barra compta gym i esport alhora, així que hi
+      // van tots dos.
+      return [mk(icon, activeDays, total, 'both')];
     }
 
     const gymGoal   = s.weeklyGymGoal;
@@ -175,8 +189,8 @@ export class WeeklySummaryComponent {
     const gymDone   = doneDays.reduce((acc, d) => acc + this.workoutService.getDoneWorkoutsForDate(d).length, 0);
     const spDone    = doneDays.reduce((acc, d) => acc + this.sportService.getSportSessionsForDate(d).length, 0);
     const bars = [];
-    if (gymGoal)   bars.push(mk('fitness_center', gymDone, gymGoal));
-    if (sportGoal) bars.push(mk('sports_soccer',  spDone,  sportGoal));
+    if (gymGoal)   bars.push(mk('fitness_center', gymDone, gymGoal, 'marley'));
+    if (sportGoal) bars.push(mk('sports_soccer',  spDone,  sportGoal, 'xoco'));
     return bars;
   });
 }
