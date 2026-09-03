@@ -670,6 +670,9 @@ entrenaments. **Ajudants, sempre positius** — no són decoració: són la veu 
 feedback. Cada insight l'explica el gos que li toca, i això dona personalitat a
 l'app sense afegir cap pantalla nova. Viu a `core/models/mascot.model.ts`.
 
+**Les personalitats i les regles de veu són a `MASCOTES.md`.** Aquí sota hi ha
+només com es pinten.
+
 | Mascota  | Àmbit    | Veu                                                     |
 | -------- | -------- | ------------------------------------------------------- |
 | `marley` | Gimnàs   | Calmat, t'espera, mai t'apressa. Constància i descans.   |
@@ -684,6 +687,8 @@ La divisió no és inventada: segueix la que ja existeix al model de dades
 - **Cap dels dos culpabilitza mai.** L'onboarding promet «sense alarmes ni
   pressions» i els gossos hi estan subjectes. Un gos s'alegra de veure't tant
   si has entrenat com si no.
+- **Curt.** Una frase de dada i una frase de gos de dues a cinc paraules.
+  «Sortim?» i para. Si el missatge necessita explicació, no és d'ells.
 - **Ofereix, no constatis.** Un acompanyant no t'assenyala el que no has fet,
   t'ofereix el que podeu fer. El títol és una porta oberta, no un diagnòstic:
 

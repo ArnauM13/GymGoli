@@ -122,7 +122,7 @@ export class FitnessMetricsService {
         mascot: 'both',
         emoji: '🔥',
         title: 'Quina setmana!',
-        message: `Portes ${weekTotal} sessions aquesta setmana. Vas a tope i es nota!`,
+        message: `${weekTotal} sessions aquesta setmana. Es nota!`,
         color: '#e65100',
       });
     }
@@ -134,7 +134,7 @@ export class FitnessMetricsService {
         mascot: 'marley',
         emoji: '😴',
         title: 'T\'has guanyat el descans',
-        message: 'Has anat molt a tope aquests 7 dies. Avui ens quedem al sofà? El descans també és entrenar.',
+        message: '7 dies a tope. Avui toca sofà.',
         color: '#5e35b1',
       });
     }
@@ -148,10 +148,10 @@ export class FitnessMetricsService {
         let fluixaMsg: string;
         let fluixaMascot: Mascot;
         if (hasPlannedSport) {
-          fluixaMsg = `Setmana tranquil·la, però avui tens ${todayPlannedSports[0].sport.name} planificat. Vinga, que t'espero a la porta!`;
+          fluixaMsg = `Setmana tranquil·la, però avui tens ${todayPlannedSports[0].sport.name}. Sortim!`;
           fluixaMascot = 'xoco';
         } else if (hasPlannedGym) {
-          fluixaMsg = 'Setmana tranquil·la, però avui tens el gym planificat. Ves quan vulguis, que jo t\'espero.';
+          fluixaMsg = 'Setmana tranquil·la, però avui tens gym. Ves-hi.';
           fluixaMascot = 'marley';
         } else {
           fluixaMsg = _fluixaMessage(fitnessGoal);
@@ -176,7 +176,7 @@ export class FitnessMetricsService {
           mascot: 'marley',
           emoji: '🏋️',
           title: 'Gym planificat avui!',
-          message: `Fas esport i avui tens el gym planificat — la barreja perfecta. A per totes!`,
+          message: `Fas esport i avui tens gym. Bona jugada.`,
           color: '#006874',
         });
       } else {
@@ -185,7 +185,7 @@ export class FitnessMetricsService {
           mascot: 'marley',
           emoji: '🏋️',
           title: 'El gym, quan tu vulguis',
-          message: `Portes ${last7Sessions.length} sessions d'esport. Si et ve de gust tornar al gym, jo t'acompanyo.`,
+          message: `Portes ${last7Sessions.length} sessions d'esport. Tu diràs.`,
           color: '#006874',
         });
       }
@@ -201,8 +201,8 @@ export class FitnessMetricsService {
           type: 'prova_esport',
           mascot: 'xoco',
           emoji: '🏃',
-          title: `${ps.sport.name} planificat avui!`,
-          message: `Fas molt gym i avui tens ${ps.sport.name} planificat. Això sí que m'agrada!`,
+          title: `${ps.sport.name} avui!`,
+          message: `Fas molt gym i avui toca ${ps.sport.name}. Ja soc a la porta!`,
           color: ps.sport.color,
         });
       } else {
@@ -210,8 +210,8 @@ export class FitnessMetricsService {
           type: 'prova_esport',
           mascot: 'xoco',
           emoji: '🏃',
-          title: 'I si avui sortim?',
-          message: `Portes ${last7Workouts.length} entrenos de gym seguits. Si vols airejar-te, avui podríem fer ${sportName}.`,
+          title: 'Sortim?',
+          message: `Portes ${last7Workouts.length} entrenos de gym. Toca ${sportName}?`,
           color: '#2e7d32',
         });
       }
@@ -234,8 +234,8 @@ export class FitnessMetricsService {
               type: 'recupera_esport',
               mascot: 'xoco',
               emoji: '😏',
-              title: `${favSport.name} planificat avui!`,
-              message: `Fa ${ago} que no fem ${favSport.name} i avui el tens planificat. Ja tinc ganes!`,
+              title: `${favSport.name} avui!`,
+              message: `Fa ${ago} que no fem ${favSport.name}. Ja tinc ganes!`,
               color: favSport.color,
             });
           } else {
@@ -244,7 +244,7 @@ export class FitnessMetricsService {
               mascot: 'xoco',
               emoji: '😏',
               title: `Tornem al ${favSport.name}?`,
-              message: `L'últim ${favSport.name} va ser ${ago}. Quan et vingui de gust, t'espero a la porta.`,
+              message: `L'últim ${favSport.name} va ser ${ago}. Quan vulguis!`,
               color: favSport.color,
             });
           }
@@ -290,7 +290,7 @@ export class FitnessMetricsService {
             mascot: 'marley',
             emoji: '🏋️',
             title: dayLabel(minCat),
-            message: `El darrer mes has fet ${othersStr}, però ${minStr}. Ho equilibrem?`,
+            message: `El darrer mes: ${othersStr}, però ${minStr}. Ho equilibrem.`,
             color: CATEGORY_COLORS[minCat],
           });
         }
@@ -406,8 +406,8 @@ export class FitnessMetricsService {
               type: 'feeling_baixant_esport',
               mascot: 'xoco',
               emoji: '📉',
-              title: `Anem amb calma al ${sport.name}`,
-              message: `Les últimes 3 sessions de ${sport.name} t'han costat més. Si vols descansar o baixar el ritme, cap problema — jo no tinc cap pressa.`,
+              title: 'Anem amb calma',
+              message: `Les últimes 3 sessions de ${sport.name} t'han costat més. Avui, tranquils.`,
               color: sport.color,
             });
             break;
@@ -435,7 +435,7 @@ export class FitnessMetricsService {
             mascot: 'xoco',
             emoji: '🏅',
             title: `${streak} setmanes fent ${sport.name}!`,
-            message: `Portes ${streak} setmanes seguides amb ${sport.name}. Aquesta constància és el que marca la diferència. Així m'agrada!`,
+            message: `${streak} setmanes seguides amb ${sport.name}. No me n'he perdut ni una!`,
             color: sport.color,
           });
           break;
@@ -464,7 +464,7 @@ export class FitnessMetricsService {
             mascot: 'marley',
             emoji: '🎯',
             title: `${dayLabel(cat)} — planificat!`,
-            message: `Fa ${daysStr} que no fas ${CATEGORY_LABELS[cat]} i avui ho tens planificat. Moment perfecte, a per-hi!`,
+            message: `Fa ${daysStr} que no fas ${CATEGORY_LABELS[cat]} i avui ho tens planificat. Perfecte.`,
             color: CATEGORY_COLORS[cat],
           });
         } else {
@@ -532,11 +532,11 @@ export class FitnessMetricsService {
 
 function _fluixaMessage(goal: FitnessGoal | null): string {
   switch (goal) {
-    case 'strength': return 'Setmana tranquil·la fins ara. Quan vulguis reprendre el programa de força, som-hi.';
-    case 'fitness':  return 'Setmana tranquil·la fins ara. Avui és un bon dia per moure\'s una mica.';
-    case 'weight':   return 'Setmana tranquil·la fins ara. Moure\'t sovint és clau per al teu objectiu, i avui és un bon dia.';
-    case 'sport':    return 'Setmana tranquil·la fins ara. Una sessió lleugera avui ja t\'activa.';
-    default:         return 'Setmana tranquil·la fins ara. Avui és un bon dia per moure\'s una mica.';
+    case 'strength': return 'Setmana tranquil·la fins ara. El teu programa de força t\'espera.';
+    case 'fitness':  return 'Setmana tranquil·la fins ara. Avui és bon dia per moure\'s.';
+    case 'weight':   return 'Setmana tranquil·la fins ara. Moure\'t sovint és clau, i avui és bon dia.';
+    case 'sport':    return 'Setmana tranquil·la fins ara. Una sessió lleugera ja t\'activa.';
+    default:         return 'Setmana tranquil·la fins ara. Avui és bon dia per moure\'s.';
   }
 }
 

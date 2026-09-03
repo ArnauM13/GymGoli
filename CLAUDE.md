@@ -12,6 +12,14 @@ Don't reach for `mat-button` / `mat-icon-button` — use the plain styled
 buttons in `DESIGN.md`. Material is reserved for `mat-slide-toggle`,
 `mat-dialog`, `mat-snack-bar` and form controls.
 
+## Mascots
+
+**When writing any feedback copy, follow `MASCOTES.md`.** The Marley and
+Xoco personalities live there — who they are, how each one speaks, and the
+voice rules (short, offer rather than point out gaps, never guilt). It's a
+living document: their characters are meant to grow, so update it there
+rather than only in code.
+
 ## Stack
 
 - Angular 19, standalone components, signals + `computed()` + `effect()`
