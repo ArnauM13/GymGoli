@@ -73,21 +73,47 @@ sense problema: també sap estar quiet, si hi ha companyia.
 | Lloc | Qui | Com |
 | ---- | --- | --- |
 | Bafarada d'insight (`home`) | segons el tipus (taula de sota) | Surt a baix a la dreta i parla |
-| Bafarada de suggeriment (`train`) | Marley si és gym, Xoco si és esport | Surt a baix a la dreta i parla |
+| Suggeriment de `train` | Marley si és gym, Xoco si és esport | La targeta **és** la bafarada, amb el gos al costat |
 | Targetes d'insight | igual que la bafarada | Avatar + emoji, sense veu pròpia |
+| Feed del dia (`home`) | Marley als entrenaments, Xoco als esports | Xapa sobre la icona d'activitat |
 | Barres d'objectiu setmanal | Marley al gym, Xoco a l'esport, tots dos si l'objectiu és combinat | Avatar a l'esquerra |
 | Ratxa | tots dos | Avatar a l'esquerra |
-| Suggeriment de `train` (targeta) | qui fa la proposta | Xapa sobre la icona |
+
+### La icona d'activitat
+
+Quan el gos va a sobre d'una icona d'activitat, **mana la icona**: és el que
+has de reconèixer d'un cop d'ull i el gos només acompanya. Va petit i a la
+cantonada de sota, on el glif gairebé no té tinta.
+
+No es reimplementa mai: és `<app-activity-icon>`.
+
+```html
+<app-activity-icon [icon]="..." [color]="..." mascot="marley" />
+```
+
+Ho fan servir la targeta d'entrenament i la d'esport del feed d'Inici, i el
+suggeriment d'Entrenament. Va néixer perquè estava copiat a dos llocs i les
+dues còpies van acabar amb mides diferents; qualsevol lloc nou el reutilitza
+en comptes de tornar-lo a escriure.
+
+Sense `mascot` surt la icona sola (l'usa el botó de «Nou entrenament»), i
+`both` s'ignora: una activitat és de gimnàs o d'esport, mai les dues.
 
 ### La bafarada
 
 El gos surt a baix a la dreta amb bafarada de còmic i et diu una cosa curta.
 Tres regles perquè no sigui invasiva:
 
-1. **És una capa i res més.** El que diu ja surt també a la targeta de sota,
-   que no es mou ni canvia. Tancar-la no et fa perdre cap informació.
-2. **Es tanca i no torna en tot el dia.** L'endemà sí.
-3. **Una de sola.** Als insights només surt la del primer, mai una pila.
+1. **Una sola cosa a la pantalla, no tres.** Al suggeriment de `train` la
+   targeta *és* la bafarada: mateix format, amb cua cap al gos, botó de
+   tancar i el gos al costat. No hi ha una targeta a part ni un missatge
+   repetit — el primer intent en tenia tres alhora (xapa, bafarada i
+   targeta) i era massa.
+2. **Tancar-la no et fa perdre res.** En tancar-la queda la targeta de
+   sempre, que segueix sent clicable i portant al mateix lloc.
+3. **Es tanca i no torna en tot el dia.** L'endemà sí.
+4. **Un sol gos.** Quan la figura gran hi és, la xapa de la icona
+   desapareix: no ha de sortir dos cops a la mateixa targeta.
 
 Aquí surten **grans i sense cercle**, amb el cap i el pit retallats del fons
 (`figure` a `mascot.model.ts`, no `avatar`). La silueta ja diu qui és i

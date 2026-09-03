@@ -1,5 +1,6 @@
 import { Component, inject, input, output, signal } from '@angular/core';
 
+import { ActivityIconComponent } from '../activity-icon/activity-icon.component';
 import { Sport, SportMetricDef, SportSession } from '../../../core/models/sport.model';
 import { FeelingLevel, Workout } from '../../../core/models/workout.model';
 import { WorkoutService } from '../../../core/services/workout.service';
@@ -10,7 +11,7 @@ import { FeedbackService } from '../../services/feedback.service';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import {
   formatFeeling, getCatLabel, getExerciseNames, isWorkoutPlanned, sportSessionSummary,
-  workoutCardColor, workoutCategoryList, workoutPrimaryColor, workoutSetsCount, workoutWarmupSetsCount,
+  workoutCardColor, workoutCategoryList, workoutPrimaryColor, workoutPrimaryIcon, workoutSetsCount, workoutWarmupSetsCount,
   workoutVolumeFmt as workoutVolumeFmtUtil,
 } from '../../utils/workout-card.utils';
 
@@ -23,12 +24,17 @@ export interface DayFeedEntry {
 @Component({
   selector: 'app-day-feed-cards',
   standalone: true,
+  imports: [ActivityIconComponent],
   template: `
     @for (w of day()?.workouts ?? []; track w.id) {
       <div class="feed-card" [class.feed-card--planned]="isPlanned(w)"
            [style.--wc]="workoutPrimaryColor(w)"
            (click)="handleWorkoutClick(w)">
         <div class="fc-bar" [style.background]="workoutCardColor(w)"></div>
+        <!-- Tipus d'entrenament amb el Marley a sobre: es reconeix el que és
+             sense haver de llegir res. -->
+        <app-activity-icon [icon]="workoutPrimaryIcon(w)"
+                           [color]="workoutPrimaryColor(w)" mascot="marley" />
         <div class="fc-info">
           <div class="fc-badges">
             @for (cat of workoutCategoryList(w); track cat) {
@@ -90,7 +96,8 @@ export interface DayFeedEntry {
     @for (item of day()?.sports ?? []; track item.session.id) {
       <div class="feed-sport-card" [class.expanded]="expandedSportId() === item.session.id" [style.--ic]="item.sport.color">
         <button class="feed-sport-row" (click)="toggleSportExpand(item)">
-          <span class="material-symbols-outlined feed-sport-icon">{{ item.sport.icon }}</span>
+          <!-- L'esport ja tenia icona; només li faltava el Xoco. -->
+          <app-activity-icon [icon]="item.sport.icon" [color]="item.sport.color" mascot="xoco" />
           <div class="fsr-info">
             <span class="feed-sport-name">{{ item.sport.name }}</span>
             @if (sportSummary(item.session, item.sport); as meta) {
@@ -220,6 +227,7 @@ export interface DayFeedEntry {
       &:hover { background: color-mix(in srgb, var(--wc, var(--c-brand)) 9%, var(--c-card)); }
     }
     .fc-bar { width: 5px; align-self: stretch; flex-shrink: 0; }
+
     .fc-info {
       flex: 1; min-width: 0;
       display: flex; flex-direction: column; gap: 5px;
@@ -290,13 +298,9 @@ export interface DayFeedEntry {
       }
     }
     .feed-sport-row {
-      display: flex; align-items: center; gap: 12px; width: 100%;
+      display: flex; align-items: center; gap: 8px; width: 100%;
       padding: 13px 14px; border: none; background: transparent; text-align: left;
       cursor: pointer; touch-action: manipulation;
-    }
-    .feed-sport-icon {
-      font-size: 22px; color: var(--ic, var(--c-text-2)); font-variation-settings: 'FILL' 1;
-      flex-shrink: 0;
     }
     .fsr-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
     .feed-sport-name { font-size: 14px; font-weight: 700; color: var(--c-text); }
@@ -418,6 +422,8 @@ export class DayFeedCardsComponent {
 
   readonly isPlanned          = isWorkoutPlanned;
   readonly workoutPrimaryColor = workoutPrimaryColor;
+  readonly workoutPrimaryIcon  = workoutPrimaryIcon;
+
   readonly workoutCardColor    = workoutCardColor;
   readonly workoutCategoryList = workoutCategoryList;
   readonly getCatLabel         = getCatLabel;

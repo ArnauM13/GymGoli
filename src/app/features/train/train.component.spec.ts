@@ -380,4 +380,40 @@ describe('TrainComponent', () => {
       expect(sharedWorkoutService.share).toHaveBeenCalledWith(jasmine.any(String), 'mixed', w.entries);
     });
   });
+
+  // El suggeriment i la bafarada són la mateixa targeta: mentre és oberta es
+  // pinta amb el gos al costat, i en tancar-la queda la targeta de sempre.
+  describe('suggestion bubble', () => {
+    const gym   = { type: 'gym',   category: 'legs', label: 'Cames',  color: '#81c784', icon: 'directions_run', reason: 'Fa 29 dies' } as never;
+    const sport = { type: 'sport', sport: {} as never, label: 'Futbol', color: '#1E88E5', icon: 'sports_soccer', reason: 'El teu esport habitual' } as never;
+
+    beforeEach(() => localStorage.removeItem('gymgoli_mascot_bubble'));
+    afterEach(()  => localStorage.removeItem('gymgoli_mascot_bubble'));
+
+    it('the Marley proposes gym', () => {
+      expect(component.suggestionMascot(gym).figure).toContain('marley');
+    });
+
+    it('the Xoco proposes sport', () => {
+      expect(component.suggestionMascot(sport).figure).toContain('xoco');
+    });
+
+    it('uses the cut-out figure, not the round avatar, next to the card', () => {
+      expect(component.suggestionMascot(gym).figure).toContain('-full');
+    });
+
+    it('starts open so the dog shows up', () => {
+      expect(component.suggestionBubbleOpen(gym)).toBe(true);
+    });
+
+    it('closes and stays closed, leaving the plain card behind', () => {
+      component.closeSuggestionBubble(gym);
+      expect(component.suggestionBubbleOpen(gym)).toBe(false);
+    });
+
+    it('closing one suggestion does not close a different one', () => {
+      component.closeSuggestionBubble(gym);
+      expect(component.suggestionBubbleOpen(sport)).toBe(true);
+    });
+  });
 });

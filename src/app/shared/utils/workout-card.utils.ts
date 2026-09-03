@@ -1,4 +1,4 @@
-import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory, LoadType } from '../../core/models/exercise.model';
+import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, ExerciseCategory, LoadType } from '../../core/models/exercise.model';
 import { FEELING_EMOJI, FeelingLevel, Workout, setVolume } from '../../core/models/workout.model';
 import { DifficultyScale } from '../../core/models/user-settings.model';
 import { Sport } from '../../core/models/sport.model';
@@ -41,6 +41,17 @@ export function workoutPrimaryColor(w: Workout): string {
   const cats  = workoutCategories(w);
   const brand = getBrandColor();
   return cats.length ? (CATEGORY_COLORS[cats[0] as ExerciseCategory] ?? brand) : brand;
+}
+
+/**
+ * La icona del primer tipus d'entrenament, per posar-li cara a la targeta.
+ *
+ * Un entrenament pot tenir més d'un tipus i la barra de color ja els mostra
+ * tots; la icona es queda amb el primer, igual que `workoutPrimaryColor`.
+ */
+export function workoutPrimaryIcon(w: Workout): string {
+  const cats = workoutCategories(w);
+  return (cats.length && CATEGORY_ICONS[cats[0] as ExerciseCategory]) || 'fitness_center';
 }
 
 export function workoutSetsCount(w: Workout): number {
