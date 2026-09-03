@@ -232,19 +232,20 @@ export interface DayFeedEntry {
     }
     .fc-bar { width: 5px; align-self: stretch; flex-shrink: 0; }
 
-    /* Icona del tipus i el gos que toca, una mica sobreposat: el mateix
-     * format que al suggeriment d'Entrenament. */
+    /* Mana la icona del tipus: és el que has de reconèixer d'un cop d'ull.
+     * El gos és l'afegit, així que va petit i a la cantonada de sota, on el
+     * glif gairebé no té tinta. */
     .fc-icon-wrap {
-      width: 40px; flex-shrink: 0; position: relative;
+      width: 44px; flex-shrink: 0; position: relative;
       display: flex; align-items: center; justify-content: center;
     }
     .fc-icon {
-      font-size: 22px; color: var(--wc, var(--c-text-2));
+      font-size: 24px; color: var(--wc, var(--c-text-2));
       font-variation-settings: 'FILL' 1;
     }
     .fc-dog {
-      position: absolute; right: 0; bottom: -2px;
-      width: 18px; height: 18px; border-radius: 50%;
+      position: absolute; right: 0; bottom: -3px;
+      width: 16px; height: 16px; border-radius: 50%;
       object-fit: cover; display: block;
       border: 1.5px solid var(--c-card);
     }
