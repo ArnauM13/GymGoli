@@ -7,6 +7,7 @@ import { WorkoutService } from './workout.service';
 import { ExerciseCategory } from '../models/exercise.model';
 import { WorkoutEntry } from '../models/workout.model';
 import { SharedWorkout, SharedWorkoutEntry } from '../models/shared-workout.model';
+import { todayStr } from '../../shared/utils/date.utils';
 
 function toSharedWorkout(row: Record<string, unknown>): SharedWorkout {
   return {
@@ -84,7 +85,7 @@ export class SharedWorkoutService {
       });
     }
 
-    const today     = new Date().toISOString().split('T')[0];
+    const today     = todayStr();
     const category  = shared.category === 'mixed' ? undefined : shared.category;
     const workoutId = await this.workoutService.createWorkoutForDate(today, category);
     for (const entry of entries) {

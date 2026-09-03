@@ -59,7 +59,7 @@ interface NavItem {
 
     .nav-item {
       display: flex; align-items: center; justify-content: center;
-      height: 44px; padding: 0 14px; border-radius: 22px;
+      height: 44px; padding: 0 12px; border-radius: 22px;
       text-decoration: none;
       color: var(--c-text-3);
       cursor: pointer; touch-action: manipulation;
@@ -75,7 +75,7 @@ interface NavItem {
         background: var(--c-brand);
         box-shadow: 0 3px 12px rgba(var(--c-brand-rgb), 0.36);
         .nav-icon { color: white; font-variation-settings: 'FILL' 1, 'wght' 500; }
-        .nav-label { max-width: 96px; opacity: 1; margin-left: 7px; }
+        .nav-label { max-width: 88px; opacity: 1; margin-left: 6px; }
       }
     }
 
@@ -102,11 +102,12 @@ export class NavBarComponent {
   readonly navItems = computed<NavItem[]>(() => {
     const base: NavItem[] = [
       { path: '/home',     icon: 'home',           label: 'Inici' },
-      { path: '/calendar', icon: 'history',          label: 'Historial' },
+      { path: '/calendar', icon: 'history',         label: 'Historial' },
+      { path: '/charts',   icon: 'monitoring',      label: 'Progrés' },
       { path: '/settings', icon: 'account_circle', label: 'Perfil' },
     ];
     if (this.trainerService.isTrainer()) {
-      base.splice(2, 0, { path: '/trainer', icon: 'sports', label: 'Clients' });
+      base.splice(3, 0, { path: '/trainer', icon: 'sports', label: 'Clients' });
     }
     return base;
   });

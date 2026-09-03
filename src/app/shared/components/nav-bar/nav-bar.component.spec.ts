@@ -23,15 +23,15 @@ describe('NavBarComponent', () => {
 
   beforeEach(setup);
 
-  it('shows the three base tabs for a regular user', () => {
+  it('shows the four base tabs for a regular user', () => {
     const paths = component.navItems().map(i => i.path);
-    expect(paths).toEqual(['/home', '/calendar', '/settings']);
+    expect(paths).toEqual(['/home', '/calendar', '/charts', '/settings']);
   });
 
   it('inserts the Clients tab before Perfil for a trainer', () => {
     isTrainer.set(true);
     const items = component.navItems();
-    expect(items.map(i => i.path)).toEqual(['/home', '/calendar', '/trainer', '/settings']);
-    expect(items[2].label).toBe('Clients');
+    expect(items.map(i => i.path)).toEqual(['/home', '/calendar', '/charts', '/trainer', '/settings']);
+    expect(items[3].label).toBe('Clients');
   });
 });

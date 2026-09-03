@@ -1,5 +1,6 @@
 import { CATEGORY_COLORS, ExerciseCategory } from '../../core/models/exercise.model';
 import { Workout } from '../../core/models/workout.model';
+import { toDateStr } from './date.utils';
 
 export const MONTHS_CA = [
   'Gener','Febrer','Març','Abril','Maig','Juny',
@@ -22,13 +23,13 @@ export function mondayOf(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');
   const dow = d.getDay();
   d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
-  return d.toISOString().split('T')[0];
+  return toDateStr(d);
 }
 
 export function addDays(dateStr: string, days: number): string {
   const d = new Date(dateStr + 'T12:00:00');
   d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
+  return toDateStr(d);
 }
 
 /** e.g. "6 – 12 jul 2026", or "30 jun – 6 jul 2026" when the week spans two months. */

@@ -17,8 +17,9 @@ import { EMPTY_WEEKLY_PLAN, WEEKDAY_LABELS, WeeklyPlan, WeeklyPlanItem } from '.
 import { TemplateEntry, WorkoutTemplate } from '../../core/models/template.model';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
 import { addDays, weekRangeLabel } from '../../shared/utils/calendar-utils';
+import { todayStr } from '../../shared/utils/date.utils';
 
-const TODAY = (): string => new Date().toISOString().split('T')[0];
+const TODAY = (): string => todayStr();
 
 @Component({
   selector: 'app-weekly-planner',

@@ -6,8 +6,9 @@ import { UserSettingsService } from '../../../core/services/user-settings.servic
 import { WorkoutService } from '../../../core/services/workout.service';
 import { SportService } from '../../../core/services/sport.service';
 import { addDays, mondayOf } from '../../../shared/utils/calendar-utils';
+import { todayStr } from '../../../shared/utils/date.utils';
 
-const TODAY = (): string => new Date().toISOString().split('T')[0];
+const TODAY = (): string => todayStr();
 
 @Component({
   selector: 'app-weekly-summary',

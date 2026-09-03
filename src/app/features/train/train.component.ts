@@ -1,9 +1,9 @@
 import { Component, HostListener, OnDestroy, ViewChild, computed, effect, inject, signal, untracked } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { map } from 'rxjs/operators';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { filter, map } from 'rxjs/operators';
 import { FormsModule } from '@angular/forms';
 import { A11yModule } from '@angular/cdk/a11y';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { workoutCategories } from '../../shared/utils/calendar-utils';
 import { UserSettingsService } from '../../core/services/user-settings.service';
@@ -37,12 +37,12 @@ import { ExerciseSuggestionService } from '../../core/services/exercise-suggesti
 import { ExerciseSuggestion } from '../../shared/utils/exercise-suggestion.util';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { NavigationHistoryService } from '../../core/services/navigation-history.service';
+import { TodayService } from '../../core/services/today.service';
 import {
   formatFeeling, workoutCardColor, workoutPrimaryColor,
   workoutVolumeFmt as workoutVolumeFmtUtil,
 } from '../../shared/utils/workout-card.utils';
-
-const TODAY = (): string => new Date().toISOString().split('T')[0];
+import { toDateStr } from '../../shared/utils/date.utils';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 /** Accept a `?date=` deep-link only when it's a well-formed ISO date, so a
@@ -1415,6 +1415,9 @@ export class TrainComponent implements OnDestroy {
   private dialog           = inject(MatDialog);
   private feedback         = inject(FeedbackService);
   private confirmDialog    = inject(ConfirmDialogService);
+  /** El dia d'avui com a senyal: els càlculs d'"avui" es refan sols quan
+   *  passa la mitjanit amb l'app oberta. */
+  private readonly today   = inject(TodayService).today;
 
   @ViewChild('editor') editor?: WorkoutEditorComponent;
 
@@ -1422,7 +1425,7 @@ export class TrainComponent implements OnDestroy {
    *  `/train?date=YYYY-MM-DD` deep-link — e.g. "registrar" a past day from
    *  the calendar — lands straight on that day instead of flashing today. */
   readonly selectedDate    = signal<string>(
-    validDateParam(this.route.snapshot.queryParamMap.get('date')) ?? TODAY()
+    validDateParam(this.route.snapshot.queryParamMap.get('date')) ?? this.today()
   );
   readonly sportToggling   = signal(false);
   private typeService = inject(TrainingTypeService);
@@ -1475,21 +1478,21 @@ export class TrainComponent implements OnDestroy {
 
   private readonly auth = inject(AuthService);
 
-  readonly isToday = computed(() => this.selectedDate() === TODAY());
+  readonly isToday = computed(() => this.selectedDate() === this.today());
 
   /** True when registering a session for a day that has already passed —
    *  the workout is saved as `done`, not planned, and the UI reads
    *  "Registrant" rather than "Planificant". */
-  readonly isSelectedPast = computed(() => this.selectedDate() < TODAY());
+  readonly isSelectedPast = computed(() => this.selectedDate() < this.today());
 
   /** Human date for the "not today" context banner: Ahir / Demà, otherwise
    *  the capitalised weekday + day + month. */
   readonly selectedDateLabel = computed(() => {
     const sel = this.selectedDate();
     const shift = (n: number) => {
-      const d = new Date(TODAY() + 'T12:00:00');
+      const d = new Date(this.today() + 'T12:00:00');
       d.setDate(d.getDate() + n);
-      return d.toISOString().split('T')[0];
+      return toDateStr(d);
     };
     if (sel === shift(-1)) return 'Ahir';
     if (sel === shift(1))  return 'Demà';
@@ -1502,7 +1505,7 @@ export class TrainComponent implements OnDestroy {
   /** Shown regardless of what's already been done today — always suggests
    *  the next overdue category / sport. */
   readonly todaySuggestion = computed((): TodaySuggestion | null => {
-    const today = TODAY();
+    const today = this.today();
     if (this.selectedDate() !== today) return null;
 
     const goal    = this.settingsService.fitnessGoal();
@@ -1599,7 +1602,7 @@ export class TrainComponent implements OnDestroy {
     if (firstSport) this.openSessionLogger(firstSport);
   }
 
-  readonly isSelectedFuture = computed(() => this.selectedDate() > TODAY());
+  readonly isSelectedFuture = computed(() => this.selectedDate() > this.today());
 
   readonly pagePaddingBottom = computed(() =>
     '88px' // clear the active-workout menu FAB / the floating suggestion card
@@ -1638,7 +1641,7 @@ export class TrainComponent implements OnDestroy {
     // Only for a workout being trained *today*: a past session opened from the
     // calendar/history isn't being performed now, so never suggest a "next"
     // exercise for it.
-    if (w.date !== TODAY()) return [];
+    if (w.date !== this.today()) return [];
     // Read the reactive deps up-front so the computed still re-runs on their
     // changes even if the body below bails out early or throws.
     const now = this._now();
@@ -1680,7 +1683,7 @@ export class TrainComponent implements OnDestroy {
   readonly needsBodyweightHint = computed(() => {
     const w = this.activeWorkout();
     if (!w || (w.status ?? 'done') === 'planned') return false;
-    if (w.date !== TODAY()) return false;
+    if (w.date !== this.today()) return false;
     if (this.reorderMode() || this.groupingMode()) return false;
     if (this.settingsService.bodyweightKg() != null) return false;
     if (this.hintService.isDismissed('nudge-bodyweight-volume')) return false;
@@ -1723,7 +1726,7 @@ export class TrainComponent implements OnDestroy {
     const last = this.pickerLast();
     if (!last) return '';
     const diffDays = Math.round(
-      (new Date(TODAY() + 'T12:00:00').getTime() - new Date(last.date + 'T12:00:00').getTime())
+      (new Date(this.today() + 'T12:00:00').getTime() - new Date(last.date + 'T12:00:00').getTime())
       / 86_400_000
     );
     if (diffDays === 0) return 'avui';
@@ -1809,6 +1812,31 @@ export class TrainComponent implements OnDestroy {
     // selectedDate on purpose, so this effect's reset below doesn't
     // immediately close the picker/logger it just opened.
     let suppressNextDateReset = false;
+
+    // ...i entrar-hi *sense* `?date=` vol dir avui. La ruta es manté viva
+    // (AppReuseStrategy), així que sense això la pàgina es quedava clavada al
+    // dia que havies obert abans — tornaves a Inici, hi triaves avui, i
+    // Entrenament seguia pensant que eres a l'1 de setembre.
+    // Només compta quan s'hi arriba des d'una altra pàgina: els canvis de
+    // query param de la mateixa pàgina (obrir un entrenament, per exemple) no
+    // han de moure't del dia que estàs mirant.
+    let previousPath = this.router.url.split('?')[0];
+    this.router.events
+      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd), takeUntilDestroyed())
+      .subscribe(e => {
+        const path       = e.urlAfterRedirects.split('?')[0];
+        const arrivedNow = previousPath !== '/train' && path === '/train';
+        previousPath = path;
+        if (!arrivedNow) return;
+        const params = this.route.snapshot.queryParamMap;
+        if (validDateParam(params.get('date'))) return;
+        if (this.selectedDate() === this.today()) return;
+        // Si s'arriba per obrir un entrenament o un esport concret, el salt de
+        // dia és només de context: no ha de tancar el que s'acaba d'obrir.
+        if (params.get('workout') || params.get('sport')) suppressNextDateReset = true;
+        this.selectedDate.set(this.today());
+      });
+
     effect(() => {
       const date = this.selectedDate();
       const [yearStr, monthStr] = date.split('-');

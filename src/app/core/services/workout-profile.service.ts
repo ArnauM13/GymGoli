@@ -7,8 +7,9 @@ import { SportService } from './sport.service';
 import { TrainingTypeService } from './training-type.service';
 import { WorkoutService } from './workout.service';
 import { workoutCategories } from '../../shared/utils/calendar-utils';
+import { toDateStr, todayStr } from '../../shared/utils/date.utils';
 
-const TODAY = (): string => new Date().toISOString().split('T')[0];
+const TODAY = (): string => todayStr();
 
 function daysBetween(a: string, b: string): number {
   return Math.round(
@@ -19,7 +20,7 @@ function daysBetween(a: string, b: string): number {
 function offsetDate(dateStr: string, days: number): string {
   const d = new Date(dateStr + 'T12:00:00');
   d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
+  return toDateStr(d);
 }
 
 export interface CategoryProfile {

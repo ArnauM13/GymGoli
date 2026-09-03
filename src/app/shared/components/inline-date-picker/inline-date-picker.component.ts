@@ -7,6 +7,7 @@ import {
   MONTHS_CA, CalDay,
   mondayOf, addDays, catDotBackground, sportDotBackground,
 } from '../../utils/calendar-utils';
+import { todayStr } from '../../utils/date.utils';
 
 @Component({
   selector: 'app-inline-date-picker',
@@ -317,7 +318,7 @@ export class InlineDatePickerComponent {
   readonly dateSelected = output<string>();
 
   readonly DAY_NAMES = ['dl', 'dm', 'dc', 'dj', 'dv', 'ds', 'dg'];
-  readonly todayStr  = new Date().toISOString().split('T')[0];
+  readonly todayStr  = todayStr();
   readonly expanded  = signal(false);
 
   // Writable signals that auto-reset when selectedDate changes (linkedSignal)

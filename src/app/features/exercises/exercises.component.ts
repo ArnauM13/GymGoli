@@ -19,6 +19,7 @@ import { TrainingTypeService } from '../../core/services/training-type.service';
 import { AppHintService } from '../../core/services/app-hint.service';
 import { ExerciseFormDialogComponent } from '../library/components/exercise-form-dialog.component';
 import { FilterBarComponent } from '../../shared/components/filter-bar/filter-bar.component';
+import { NavigationHistoryService } from '../../core/services/navigation-history.service';
 
 @Component({
   selector: 'app-exercises',
@@ -252,6 +253,7 @@ export class ExercisesComponent {
   private feedback        = inject(FeedbackService);
   private confirmDialog   = inject(ConfirmDialogService);
   private router          = inject(Router);
+  private navHistory          = inject(NavigationHistoryService);
   private route           = inject(ActivatedRoute);
 
   /** Guards the one-shot auto-open triggered by the `?edit=<id>` query param. */
@@ -318,7 +320,10 @@ export class ExercisesComponent {
   getSubcategoryLabel(sub: string): string { return SUBCATEGORY_LABELS[sub as keyof typeof SUBCATEGORY_LABELS] ?? sub; }
   getMuscleLabel(m: string): string { return MUSCLE_LABELS[m] ?? m; }
 
-  goBack(): void { this.router.navigate(['/settings']); }
+  /** Aquestes pàgines de configuració s'obren tant des del Perfil com des
+   *  d'Entrenament: tornar sempre al Perfil et treia d'on eres. L'historial
+   *  de navegació sap d'on véns; el Perfil només és el pla B. */
+  goBack(): void { this.navHistory.goBack('/settings'); }
 
   openForm(exercise?: Exercise): void {
     const ref = this.dialog.open(ExerciseFormDialogComponent, {

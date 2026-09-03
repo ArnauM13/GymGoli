@@ -15,10 +15,10 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { DiscoveryHintComponent } from '../../shared/components/discovery-hint/discovery-hint.component';
 import { WeeklySummaryComponent } from '../train/components/weekly-summary.component';
 import { AppHintService } from '../../core/services/app-hint.service';
+import { TodayService } from '../../core/services/today.service';
 import { feedDayLabel } from '../../shared/utils/workout-card.utils';
 import { addDays, mondayOf } from '../../shared/utils/calendar-utils';
-
-const TODAY = (): string => new Date().toISOString().split('T')[0];
+import { toDateStr } from '../../shared/utils/date.utils';
 
 /** Fins on arriba "Activitat recent" a Inici. Tot el que queda més enrere
  *  viu a l'Historial, que hi té cerca, filtres i calendari. */
@@ -400,16 +400,19 @@ export class HomeComponent {
   readonly hintService     = inject(AppHintService);
   private router           = inject(Router);
   private confirmDialog    = inject(ConfirmDialogService);
+  /** El dia d'avui com a senyal, perquè "Avui" segueixi el rellotge de
+   *  l'usuari i canviï a la seva mitjanit sense recarregar. */
+  private readonly today   = inject(TodayService).today;
 
   readonly selectedDate = signal<string | null>(null);
 
   /** Monday of whichever week the calendar widget currently has in view,
    *  powering the "Planificar la setmana" quick action below the weekly goal. */
-  readonly currentWeekMonday = signal<string>(mondayOf(TODAY()));
+  readonly currentWeekMonday = signal<string>(mondayOf(this.today()));
   /** Planning only makes sense from today onward — the shortcut disappears
    *  when the week in view has already fully passed. */
   readonly canPlanViewedWeek = computed(() =>
-    addDays(this.currentWeekMonday(), 6) >= TODAY());
+    addDays(this.currentWeekMonday(), 6) >= this.today());
 
   /** Contextual nudge: the user trains both gym and sport but tracks a single
    *  combined weekly goal — suggest splitting it into separate goals. */
@@ -422,7 +425,7 @@ export class HomeComponent {
         && this.sportService.sessions().length > 0;
   });
 
-  readonly effectiveDate = computed(() => this.selectedDate() ?? TODAY());
+  readonly effectiveDate = computed(() => this.selectedDate() ?? this.today());
 
   readonly hasRoutine = computed(() => {
     const p = this.settingsService.weeklyPlan();
@@ -452,7 +455,7 @@ export class HomeComponent {
     return { date, workouts, sports };
   });
 
-  readonly previewTitle = computed(() => feedDayLabel(this.effectiveDate(), TODAY()));
+  readonly previewTitle = computed(() => feedDayLabel(this.effectiveDate(), this.today()));
 
   /** Full, human date under the day label (e.g. "Dimarts, 29 de juliol") —
    *  only the first letter is capitalised, Catalan style. */
@@ -468,12 +471,12 @@ export class HomeComponent {
     (this.previewFeedEntry()?.workouts ?? []).filter(w => (w.status ?? 'done') === 'planned').length
   );
 
-  readonly isToday = computed(() => this.effectiveDate() === TODAY());
+  readonly isToday = computed(() => this.effectiveDate() === this.today());
 
   /** A day that has already passed — the "Comença un entrenament" primary
    *  action is swapped for "Registra un entrenament", which opens the train
    *  passthrough already pinned to that day. */
-  readonly isPast = computed(() => this.effectiveDate() < TODAY());
+  readonly isPast = computed(() => this.effectiveDate() < this.today());
 
   /** Open the train page to log a forgotten workout on the selected past day
    *  (e.g. "ahir vaig jugar a padel i no ho vaig apuntar"). */
@@ -482,7 +485,7 @@ export class HomeComponent {
   }
 
   dayLabel(date: string): string {
-    return feedDayLabel(date, TODAY());
+    return feedDayLabel(date, this.today());
   }
 
   selectDate(date: string): void {
@@ -526,10 +529,10 @@ export class HomeComponent {
     // staying empty until the user interacts with a day.
     this.workoutService.workouts(); this.sportService.sessions(); this.sportService.sports();
     const days: DayFeedEntry[] = [];
-    const cursor = new Date(TODAY() + 'T12:00:00');
+    const cursor = new Date(this.today() + 'T12:00:00');
 
     for (let i = 0; i < RECENT_DAYS; i++) {
-      const dateStr  = cursor.toISOString().split('T')[0];
+      const dateStr  = toDateStr(cursor);
       const done     = this.workoutService.getDoneWorkoutsForDate(dateStr);
       const planned  = this.workoutService.getPlannedForDate(dateStr);
       const workouts = [...planned, ...done];
@@ -557,7 +560,7 @@ export class HomeComponent {
 
     // La finestra de 30 dies es menja el mes anterior gairebé sempre, així que
     // es carrega d'entrada: sense això l'activitat recent es talla a l'1 de mes.
-    const earliest = new Date(TODAY() + 'T12:00:00');
+    const earliest = new Date(this.today() + 'T12:00:00');
     earliest.setDate(earliest.getDate() - (RECENT_DAYS - 1));
     this._ensureMonthLoaded(earliest.getFullYear(), earliest.getMonth());
   }

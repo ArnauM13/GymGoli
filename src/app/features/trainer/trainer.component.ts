@@ -16,6 +16,7 @@ import {
 } from '../../core/models/user-settings.model';
 import { FeelingLevel, Workout, WorkoutEntry } from '../../core/models/workout.model';
 import { formatFeeling } from '../../shared/utils/workout-card.utils';
+import { toDateStr, todayStr } from '../../shared/utils/date.utils';
 
 
 @Component({
@@ -743,8 +744,8 @@ export class TrainerComponent implements OnInit {
     const [workouts, proposals, goals] = await Promise.all([
       this.trainerService.getClientWorkouts(
         c.clientId,
-        from.toISOString().split('T')[0],
-        to.toISOString().split('T')[0],
+        toDateStr(from),
+        toDateStr(to),
       ),
       this.trainerService.getClientProposals(c.clientId),
       this.trainerService.getClientGoals(c.clientId),
@@ -763,13 +764,13 @@ export class TrainerComponent implements OnInit {
     proposals: TrainerProposal[],
   ): { date: string; state: 'followed' | 'own' | 'missed' | 'free' | 'future' }[] {
     const result: { date: string; state: 'followed' | 'own' | 'missed' | 'free' | 'future' }[] = [];
-    const today  = new Date().toISOString().split('T')[0];
+    const today  = todayStr();
     const endD   = new Date(today + 'T00:00:00');
     const startD = new Date(endD);
     startD.setDate(startD.getDate() - 27); // 4 weeks
 
     for (const d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = toDateStr(d);
       const weekday = (d.getDay() + 6) % 7;
       const isFuture = dateStr > today;
 
@@ -866,7 +867,7 @@ export class TrainerComponent implements OnInit {
   // ── Proposals ─────────────────────────────────────────────────────────────
 
   openProposalForm(type: 'specific' | 'weekly', weekday: number | null, clientId: string): void {
-    const today = new Date().toISOString().split('T')[0];
+    const today = todayStr();
     this.proposalForm.set({
       type,
       weekday,

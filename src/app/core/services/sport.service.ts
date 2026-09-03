@@ -2,6 +2,7 @@ import { Injectable, computed, effect, inject, signal } from '@angular/core';
 
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
+import { TodayService } from './today.service';
 import { DEFAULT_SPORTS, Sport, SportMetricDef, SportSession, SportSessionStatus, SportSubtype } from '../models/sport.model';
 import { FeelingLevel, PlannedSource } from '../models/workout.model';
 
@@ -56,8 +57,10 @@ function sportSessionFromCache(raw: Record<string, unknown>): SportSession {
 export class SportService {
   private supabase = inject(SupabaseService).client;
   private auth     = inject(AuthService);
+  private today    = inject(TodayService);
 
-  private readonly _todayStr = new Date().toISOString().split('T')[0];
+  /** Igual que a WorkoutService: avui es mira, no es recorda. */
+  private get _todayStr(): string { return this.today.today(); }
 
   // ── Sport definitions ────────────────────────────────────────────────────
   private readonly _sports = signal<Sport[]>([]);

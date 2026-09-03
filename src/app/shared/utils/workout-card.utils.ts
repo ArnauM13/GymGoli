@@ -3,6 +3,7 @@ import { FEELING_EMOJI, FeelingLevel, Workout, setVolume } from '../../core/mode
 import { DifficultyScale } from '../../core/models/user-settings.model';
 import { Sport } from '../../core/models/sport.model';
 import { workoutCategories } from './calendar-utils';
+import { toDateStr } from './date.utils';
 
 export function getBrandColor(): string {
   return getComputedStyle(document.documentElement).getPropertyValue('--c-brand').trim() || '#006874';
@@ -163,7 +164,7 @@ export function feedDayLabel(date: string, today: string): string {
     // timezones ahead of UTC — otherwise "ahir" resolves to two days ago.
     const d = new Date(today + 'T12:00:00');
     d.setDate(d.getDate() - 1);
-    return d.toISOString().split('T')[0];
+    return toDateStr(d);
   })();
   if (date === yesterday) return 'Ahir';
   const label = new Date(date + 'T12:00:00')

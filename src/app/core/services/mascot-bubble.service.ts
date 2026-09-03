@@ -1,8 +1,9 @@
 import { Injectable, signal } from '@angular/core';
+import { todayStr } from '../../shared/utils/date.utils';
 
 const LS_KEY = 'gymgoli_mascot_bubble';
 
-const TODAY = (): string => new Date().toISOString().split('T')[0];
+const TODAY = (): string => todayStr();
 
 interface Stored {
   /** Dia al qual pertanyen les claus desades. Si canvia, es buida tot. */
