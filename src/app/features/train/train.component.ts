@@ -14,7 +14,7 @@ import {
   CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_MUSCLES,
   Exercise, ExerciseCategory,
 } from '../../core/models/exercise.model';
-import { MASCOTS, Mascot, MascotMeta } from '../../core/models/mascot.model';
+import { MASCOTS, MascotMeta } from '../../core/models/mascot.model';
 import { Sport, SportMetricDef } from '../../core/models/sport.model';
 import { WorkoutTemplate } from '../../core/models/template.model';
 import { FeelingLevel, Workout, WorkoutEntry, setMaxWeight } from '../../core/models/workout.model';
@@ -27,7 +27,6 @@ import { FeedbackService } from '../../shared/services/feedback.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { OfflineService } from '../../core/services/offline.service';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
-import { MascotBubbleComponent } from '../../shared/components/mascot-bubble/mascot-bubble.component';
 import { MascotBubbleService } from '../../core/services/mascot-bubble.service';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
 import { AppHintService } from '../../core/services/app-hint.service';
@@ -63,7 +62,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
 @Component({
   selector: 'app-train',
   standalone: true,
-  imports: [FormsModule, A11yModule, WorkoutEditorComponent, PageHeaderComponent, MascotBubbleComponent],
+  imports: [FormsModule, A11yModule, WorkoutEditorComponent, PageHeaderComponent],
   template: `
     <div class="page" [style.padding-bottom]="pagePaddingBottom()">
 
@@ -414,33 +413,43 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
 
     </div>
 
-    <!-- ── El gos et proposa el d'avui (capa; la targeta de sota no es mou) ── -->
+    <!-- ── Suggeriment ──────────────────────────────────────────────────
+         Una sola cosa, no tres. Mentre la bafarada és oberta, la targeta ÉS
+         la bafarada: mateix format, amb cua cap al gos, botó de tancar i el
+         Marley (o el Xoco) al costat. En tancar-la queda la targeta de
+         sempre, que segueix portant al mateix lloc. ── -->
     @if (!activeWorkout() && todaySuggestion(); as s) {
-      @if (bubbleService.isOpen(bubbleKey(s))) {
-        <app-mascot-bubble [mascot]="suggestionMascotId(s)"
-                           [message]="suggestionBubbleText(s)"
-                           [lift]="92"
-                           (close)="bubbleService.dismiss(bubbleKey(s))" />
-      }
-    }
+      <div class="suggestion-float-row" [class.sfr--with-dog]="suggestionBubbleOpen(s)">
+        <div class="sf-card-wrap">
+          <button class="suggestion-float" [style.--sc]="s.color" (click)="handleSuggestionClick(s)"
+                  [attr.aria-label]="'Entrenament suggerit: ' + s.label + '. ' + s.reason">
+            <div class="sf-bar" aria-hidden="true"></div>
+            <div class="sf-icon-wrap" aria-hidden="true">
+              <span class="material-symbols-outlined sf-icon">{{ s.icon }}</span>
+              @if (!suggestionBubbleOpen(s)) {
+                <img class="sf-dog" [src]="suggestionMascot(s).avatar" alt="">
+              }
+            </div>
+            <div class="sf-info" aria-hidden="true">
+              <span class="sf-label">{{ s.label }}</span>
+              <span class="sf-reason">{{ s.reason }}</span>
+            </div>
+            <span class="material-symbols-outlined sf-chevron" aria-hidden="true">chevron_right</span>
+          </button>
 
-    <!-- ── Suggeriment (ample complet, sobre la barra de navegació) ── -->
-    @if (!activeWorkout() && todaySuggestion(); as s) {
-      <div class="suggestion-float-row">
-        <button class="suggestion-float" [style.--sc]="s.color" (click)="handleSuggestionClick(s)"
-                [attr.aria-label]="'Entrenament suggerit: ' + s.label + '. ' + s.reason">
-          <div class="sf-bar" aria-hidden="true"></div>
-          <div class="sf-icon-wrap" aria-hidden="true">
-            <span class="material-symbols-outlined sf-icon">{{ s.icon }}</span>
-            <img class="sf-dog" [src]="suggestionMascot(s).avatar" alt="">
-          </div>
-          <div class="sf-info" aria-hidden="true">
-            <span class="sf-eyebrow">Idea del {{ suggestionMascot(s).name }}</span>
-            <span class="sf-label">{{ s.label }}</span>
-            <span class="sf-reason">{{ s.reason }}</span>
-          </div>
-          <span class="material-symbols-outlined sf-chevron" aria-hidden="true">chevron_right</span>
-        </button>
+          @if (suggestionBubbleOpen(s)) {
+            <!-- Fora del botó: dins el retallaria l'overflow de la targeta. -->
+            <span class="sf-tail" [style.--sc]="s.color" aria-hidden="true"></span>
+            <button class="sf-close" type="button" (click)="closeSuggestionBubble(s)"
+                    aria-label="Tancar el suggeriment">
+              <span class="material-symbols-outlined" aria-hidden="true">close</span>
+            </button>
+          }
+        </div>
+
+        @if (suggestionBubbleOpen(s)) {
+          <img class="sf-figure" [src]="suggestionMascot(s).figure" alt="" aria-hidden="true">
+        }
       </div>
     } @else if (!activeWorkout() && !creating()) {
       <!-- Acció principal quan no hi ha suggeriment: mateix format que el
@@ -982,7 +991,45 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
     /* ── Suggestion card: full-width bar, pinned above the nav bar ── */
     .suggestion-float-row {
       position: fixed; left: 16px; right: 16px; bottom: calc(var(--nav-height) + 16px); z-index: 90;
-      display: flex;
+      display: flex; align-items: flex-end; gap: 8px;
+    }
+
+    .sf-card-wrap { position: relative; flex: 1; min-width: 0; }
+
+    /* Amb el gos al costat, la targeta es llegeix com la seva bafarada:
+     * cantonada de baix a la dreta plana i cua apuntant-lo. */
+    .sfr--with-dog .suggestion-float { border-radius: 14px 14px 4px 14px; }
+
+    .sf-tail {
+      position: absolute; right: -6px; bottom: 12px;
+      width: 11px; height: 11px;
+      background: color-mix(in srgb, var(--sc) 8%, var(--c-card));
+      border-top: 1.5px solid color-mix(in srgb, var(--sc) 35%, var(--c-border-2));
+      border-right: 1.5px solid color-mix(in srgb, var(--sc) 35%, var(--c-border-2));
+      transform: rotate(45deg); border-radius: 0 3px 0 0;
+      pointer-events: none;
+    }
+
+    .sf-figure {
+      height: 88px; width: auto; display: block; flex-shrink: 0;
+      filter: drop-shadow(0 3px 8px var(--c-shadow-md));
+      /* El dibuix acaba a mitja pitrera; sense això la vora recta canta. */
+      mask-image: linear-gradient(to bottom, #000 84%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, #000 84%, transparent 100%);
+    }
+
+    /* A la cantonada per no robar amplada al text, i a l'esquerra perquè a la
+     * dreta hi ha el gos i el taparia. */
+    .sf-close {
+      position: absolute; top: -9px; left: -7px; z-index: 1;
+      width: 26px; height: 26px; border-radius: 50%;
+      border: 1.5px solid var(--c-border-2); background: var(--c-card);
+      color: var(--c-text-3); cursor: pointer; touch-action: manipulation;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 2px 8px var(--c-shadow);
+      .material-symbols-outlined { font-size: 15px; }
+      &:hover { color: var(--c-text-2); background: var(--c-hover); }
+      &:focus-visible { outline: 2px solid var(--c-brand); outline-offset: 1px; }
     }
     .suggestion-float {
       display: flex; align-items: center; gap: 0; width: 100%;
@@ -1496,9 +1543,7 @@ export class TrainComponent implements OnDestroy {
     const mkGym = (cat: ExerciseCategory): GymSuggestion => {
       const p = profile.gym[cat];
       const daysStr = p.daysSinceLast === 1 ? 'Fa 1 dia' : `Fa ${p.daysSinceLast} dies`;
-      const reason  = p.daysSinceLast >= 99
-        ? 'Encara no l\'has entrenat'
-        : p.overdueScore >= 1.3 ? `${daysStr} · ja toca` : daysStr;
+      const reason  = p.daysSinceLast >= 99 ? 'Encara no l\'has entrenat' : daysStr;
       return {
         type: 'gym', category: cat,
         label: CATEGORY_LABELS[cat], color: CATEGORY_COLORS[cat], icon: CATEGORY_ICONS[cat],
@@ -1531,26 +1576,21 @@ export class TrainComponent implements OnDestroy {
    * Qui proposa el suggeriment. La divisió és la de sempre: el gimnàs és cosa
    * del Marley i l'esport, del Xoco.
    */
-  suggestionMascotId(s: TodaySuggestion): Mascot {
-    return s.type === 'gym' ? 'marley' : 'xoco';
-  }
-
   suggestionMascot(s: TodaySuggestion): MascotMeta {
-    return MASCOTS[this.suggestionMascotId(s)];
+    return MASCOTS[s.type === 'gym' ? 'marley' : 'xoco'];
   }
 
-  /**
-   * El que diu la bafarada. Curt i en la seva veu: el motiu («Fa 5 dies · ja
-   * toca») el segueix donant la targeta de sota, que no es toca.
-   */
-  suggestionBubbleText(s: TodaySuggestion): string {
-    return s.type === 'gym'
-      ? `Avui et proposo ${s.label}.`
-      : `Sortim a fer ${s.label}?`;
+  /** Mentre és oberta, la targeta es pinta com la bafarada del gos. */
+  suggestionBubbleOpen(s: TodaySuggestion): boolean {
+    return this.bubbleService.isOpen(this._bubbleKey(s));
+  }
+
+  closeSuggestionBubble(s: TodaySuggestion): void {
+    this.bubbleService.dismiss(this._bubbleKey(s));
   }
 
   /** Una bafarada per suggeriment i dia: si la tanques, no torna fins demà. */
-  bubbleKey(s: TodaySuggestion): string {
+  private _bubbleKey(s: TodaySuggestion): string {
     return `train:${s.type}:${s.label}`;
   }
 
