@@ -1,6 +1,7 @@
 import { Injectable, computed, inject } from '@angular/core';
 
 import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../models/exercise.model';
+import { Mascot } from '../models/mascot.model';
 import { FitnessGoal } from '../models/user-settings.model';
 import { SportService } from './sport.service';
 import { UserSettingsService } from './user-settings.service';
@@ -26,6 +27,8 @@ export type InsightType =
 
 export interface FitnessInsight {
   type: InsightType;
+  /** Qui ho diu. L'emoji continua sent com se sent — veure `mascot.model.ts`. */
+  mascot: Mascot;
   emoji: string;
   title: string;
   message: string;
@@ -116,8 +119,9 @@ export class FitnessMetricsService {
     if (weekTotal >= 5) {
       candidates.push({
         type: 'gran_setmana',
+        mascot: 'both',
         emoji: '🔥',
-        title: 'Quin crack!',
+        title: 'Quina setmana!',
         message: `Portes ${weekTotal} sessions aquesta setmana. Vas a tope i es nota!`,
         color: '#e65100',
       });
@@ -127,9 +131,10 @@ export class FitnessMetricsService {
     else if (last7Workouts.length + last7Sessions.length >= 6) {
       candidates.push({
         type: 'descansa',
+        mascot: 'marley',
         emoji: '😴',
-        title: 'Ei, recorda el descans!',
-        message: 'Has anat molt a tope els últims 7 dies. El descans també forma part de l\'entreno!',
+        title: 'Ei, i el descans?',
+        message: 'Has anat molt a tope aquests 7 dies. Avui ens quedem al sofà? El descans també és entrenar.',
         color: '#5e35b1',
       });
     }
@@ -138,16 +143,23 @@ export class FitnessMetricsService {
     else {
       const dow = new Date(today + 'T12:00:00').getDay();
       if (weekWorkouts.length < 2 && weekSessions.length < 2 && (dow === 0 || dow >= 4)) {
+        // El gos que parla surt del que hi ha planificat avui: si toca esport
+        // ve el Xoco, si toca gym el Marley, i si no hi ha res parlen tots dos.
         let fluixaMsg: string;
+        let fluixaMascot: Mascot;
         if (hasPlannedSport) {
-          fluixaMsg = `Setmana tranquil·la fins ara, però tens ${todayPlannedSports[0].sport.name} planificat avui. A gaudir-ne!`;
+          fluixaMsg = `Setmana tranquil·la, però avui tens ${todayPlannedSports[0].sport.name} planificat. Vinga, que t'espero a la porta!`;
+          fluixaMascot = 'xoco';
         } else if (hasPlannedGym) {
-          fluixaMsg = 'Setmana tranquil·la fins ara, però tens el gym planificat avui — aprofita-ho!';
+          fluixaMsg = 'Setmana tranquil·la, però avui tens el gym planificat. Ves quan vulguis, que jo t\'espero.';
+          fluixaMascot = 'marley';
         } else {
           fluixaMsg = _fluixaMessage(fitnessGoal);
+          fluixaMascot = 'both';
         }
         candidates.push({
           type: 'setmana_fluixa',
+          mascot: fluixaMascot,
           emoji: hasPlannedGym || hasPlannedSport ? '💪' : '💤',
           title: hasPlannedGym || hasPlannedSport ? 'Avui toca!' : 'Setmana tranquil·la...',
           message: fluixaMsg,
@@ -161,17 +173,19 @@ export class FitnessMetricsService {
       if (hasPlannedGym) {
         candidates.push({
           type: 'prova_gym',
+          mascot: 'marley',
           emoji: '🏋️',
           title: 'Gym planificat avui!',
-          message: `Fas esport i avui tens el gym planificat — la combinació perfecta. A per totes!`,
+          message: `Fas esport i avui tens el gym planificat — la barreja perfecta. A per totes!`,
           color: '#006874',
         });
       } else {
         candidates.push({
           type: 'prova_gym',
+          mascot: 'marley',
           emoji: '🏋️',
-          title: 'El gym et truca!',
-          message: `Portes ${last7Sessions.length} sessions d'esport però fa dies que no trepitges el gym. Avui, sí?`,
+          title: 'Fa dies del gym...',
+          message: `Portes ${last7Sessions.length} sessions d'esport però fa dies que no trepitges el gym. Quan vulguis, hi tornem.`,
           color: '#006874',
         });
       }
@@ -185,17 +199,19 @@ export class FitnessMetricsService {
         const ps = todayPlannedSports[0];
         candidates.push({
           type: 'prova_esport',
+          mascot: 'xoco',
           emoji: '🏃',
           title: `${ps.sport.name} planificat avui!`,
-          message: `Fas molt gym i avui tens ${ps.sport.name} planificat — perfecte equilibri. Gaudeix-ho!`,
+          message: `Fas molt gym i avui tens ${ps.sport.name} planificat. Això sí que m'agrada!`,
           color: ps.sport.color,
         });
       } else {
         candidates.push({
           type: 'prova_esport',
+          mascot: 'xoco',
           emoji: '🏃',
           title: 'Molta gym, gens d\'esport!',
-          message: `Portes ${last7Workouts.length} entrenos seguits però res d\'esport. I si avui feies ${sportName}?`,
+          message: `Portes ${last7Workouts.length} entrenos seguits però res d\'esport. I si avui sortim a fer ${sportName}?`,
           color: '#2e7d32',
         });
       }
@@ -216,17 +232,19 @@ export class FitnessMetricsService {
           if (isFavPlanned) {
             candidates.push({
               type: 'recupera_esport',
+              mascot: 'xoco',
               emoji: '😏',
               title: `${favSport.name} planificat avui!`,
-              message: `Fa ${ago} que no fas ${favSport.name} i avui el tens planificat — moment perfecte per tornar-hi!`,
+              message: `Fa ${ago} que no fem ${favSport.name} i avui el tens planificat. Ja tinc ganes!`,
               color: favSport.color,
             });
           } else {
             candidates.push({
               type: 'recupera_esport',
+              mascot: 'xoco',
               emoji: '😏',
-              title: `Fa temps que no fas ${favSport.name}!`,
-              message: `L'últim cop que vas fer ${favSport.name} va ser ${ago}. T'apuntes avui?`,
+              title: `Fa temps que no fem ${favSport.name}!`,
+              message: `L'últim cop que vas fer ${favSport.name} va ser ${ago}. T'espero a la porta quan vulguis.`,
               color: favSport.color,
             });
           }
@@ -269,9 +287,10 @@ export class FitnessMetricsService {
 
           candidates.push({
             type: 'equilibra_gym',
+            mascot: 'marley',
             emoji: '🏋️',
             title: dayLabel(minCat),
-            message: `El darrer mes has fet ${othersStr}, però ${minStr}. Li fotem?`,
+            message: `El darrer mes has fet ${othersStr}, però ${minStr}. Ho equilibrem?`,
             color: CATEGORY_COLORS[minCat],
           });
         }
@@ -287,6 +306,7 @@ export class FitnessMetricsService {
         const suffix = _assolitSuffix(fitnessGoal);
         candidates.push({
           type: 'objectiu_assolit',
+          mascot: 'both',
           emoji: '🎯',
           title: 'Objectiu de la setmana, fet!',
           message: `Has fet ${weekTotal} activitats${extra}. ${suffix}`,
@@ -296,6 +316,7 @@ export class FitnessMetricsService {
         const missing = goal - weekTotal;
         candidates.push({
           type: 'anima_objectiu',
+          mascot: 'both',
           emoji: '🌟',
           title: missing === 1 ? 'Última oportunitat!' : 'Últim dia de la setmana!',
           message: missing === 1
@@ -307,6 +328,7 @@ export class FitnessMetricsService {
         const missing = goal - weekTotal;
         candidates.push({
           type: 'camino_objectiu',
+          mascot: 'both',
           emoji: '💪',
           title: 'Vas per bon camí!',
           message: missing === 1
@@ -328,6 +350,7 @@ export class FitnessMetricsService {
         if (spGoal  !== null) parts.push(`esport ${spW}/${spGoal}`);
         candidates.push({
           type: 'objectiu_assolit',
+          mascot: 'both',
           emoji: '🎯',
           title: 'Objectius de la setmana, fets!',
           message: `Has assolit tots els objectius (${parts.join(', ')}). Quin crack!`,
@@ -343,6 +366,7 @@ export class FitnessMetricsService {
         const allParts = [...doneParts, ...parts].join(', ');
         candidates.push({
           type: 'camino_objectiu',
+          mascot: 'both',
           emoji: '💪',
           title: 'Vas per bon camí!',
           message: `Setmana en curs: ${allParts}. Continua!`,
@@ -357,6 +381,7 @@ export class FitnessMetricsService {
     if (streak >= 3 && hasGoal) {
       candidates.push({
         type: 'augmenta_objectiu',
+        mascot: 'both',
         emoji: '🚀',
         title: `${streak} setmanes seguides!`,
         message: `Portes ${streak} setmanes assolint el teu objectiu. Potser és hora d'apujar-lo una mica?`,
@@ -379,9 +404,10 @@ export class FitnessMetricsService {
           if (f1 > f2 && f2 > f3) {
             candidates.push({
               type: 'feeling_baixant_esport',
+              mascot: 'xoco',
               emoji: '📉',
               title: `Sensació baixant a ${sport.name}`,
-              message: `Les últimes 3 sessions de ${sport.name} has anat de menys en menys bé. Potser necessites descansar o canviar d'intensitat?`,
+              message: `Les últimes 3 sessions de ${sport.name} has anat de menys en menys bé. Potser toca descansar o baixar el ritme — jo no tinc cap pressa.`,
               color: sport.color,
             });
             break;
@@ -406,9 +432,10 @@ export class FitnessMetricsService {
         if (streak >= 3) {
           candidates.push({
             type: 'constancia_esport',
+            mascot: 'xoco',
             emoji: '🏅',
             title: `${streak} setmanes fent ${sport.name}!`,
-            message: `Portes ${streak} setmanes consecutives amb ${sport.name}. Aquesta constància és el que marca la diferència!`,
+            message: `Portes ${streak} setmanes seguides amb ${sport.name}. Aquesta constància és el que marca la diferència. Així m'agrada!`,
             color: sport.color,
           });
           break;
@@ -434,6 +461,7 @@ export class FitnessMetricsService {
         if (isCatPlanned) {
           candidates.push({
             type: 'categoria_endarrerida',
+            mascot: 'marley',
             emoji: '🎯',
             title: `${dayLabel(cat)} — planificat!`,
             message: `Fa ${daysStr} que no fas ${CATEGORY_LABELS[cat]} i avui ho tens planificat. Moment perfecte, a per-hi!`,
@@ -442,9 +470,10 @@ export class FitnessMetricsService {
         } else {
           candidates.push({
             type: 'categoria_endarrerida',
+            mascot: 'marley',
             emoji: '📆',
             title: dayLabel(cat),
-            message: `Fa ${daysStr} que no fas ${CATEGORY_LABELS[cat]} (cicle habitual cada ${p.typicalGapDays} dies). Avui toca?`,
+            message: `Fa ${daysStr} que no fas ${CATEGORY_LABELS[cat]} (cicle habitual cada ${p.typicalGapDays} dies). Hi tornem?`,
             color: CATEGORY_COLORS[cat],
           });
         }

@@ -660,3 +660,53 @@ When in doubt, look at how it's done in:
 | `features/library/library.component.ts` | Page header, filter chips, item cards with category color bar |
 | `features/settings/settings.component.ts` | Sub-page with back button, setting row, hint banner |
 | `shared/components/fitness-insights/fitness-insights.component.ts` | Color-tinted item cards with dynamic accent |
+
+---
+
+## 13. Mascotes — Marley i Xoco
+
+L'app té dos gossos, i no són decoració: **són la veu del feedback**. Cada
+insight l'explica el gos que li toca, i això dona personalitat a l'app sense
+afegir cap pantalla nova. La definició viu a `core/models/mascot.model.ts`.
+
+| Mascota  | Àmbit    | Veu                                                     |
+| -------- | -------- | ------------------------------------------------------- |
+| `marley` | Gimnàs   | Calmat, t'espera, mai t'apressa. Constància i descans.   |
+| `xoco`   | Esport   | Enèrgic, sempre vol sortir, et porta la corretja.        |
+| `both`   | Transversal | Objectius, ratxa, resum de setmana. No parlen en primera persona: hi són com a acompanyament. |
+
+La divisió no és inventada: segueix la que ja existeix al model de dades
+(`GoalMode = 'combined' | 'separate'`).
+
+### Regles
+
+- **Cap dels dos culpabilitza mai.** L'onboarding promet «sense alarmes ni
+  pressions» i els gossos hi estan subjectes. Un gos s'alegra de veure't tant
+  si has entrenat com si no.
+- **Primera persona del plural** quan parlen d'una activitat teva: «hi
+  tornem?», «fa temps que no fem pàdel». Un gos s'hi inclou.
+- **Un gos per targeta.** Els dos junts només quan el missatge és transversal
+  o quan és la marca (icona, login, onboarding).
+- **`train` (l'entrenament d'avui) es queda net.** Cap mascota mentre entrenes.
+- **La proposta de l'entrenador tampoc.** Aquella és la veu d'una persona real.
+- **No són un codi de color.** Els esports i els tipus d'entrenament ja tenen
+  color propi i configurable (`sport.color`, `TRAINING_TYPE_COLORS`); l'avatar
+  no el substitueix mai.
+
+### Com es pinta
+
+L'avatar diu **qui parla**; l'emoji, que ja hi era, es queda com a xapa i diu
+**com se sent**. Quan el missatge és transversal, els dos avatars van
+encavalcats en comptes d'una foto de grup, que a 30px no es llegeix.
+
+```html
+<div class="ic-who" [class.ic-who--pair]="mascotsOf(insight).length > 1">
+  @for (m of mascotsOf(insight); track m.name) {
+    <img class="ic-avatar" [src]="m.avatar" [alt]="m.alt">
+  }
+  <span class="ic-emoji">{{ insight.emoji }}</span>
+</div>
+```
+
+Avatars: `assets/marley.png`, `assets/xoco.png` (256×256, retallats de
+`assets/bibis.png`, que segueix sent la icona de l'app).

@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 
-import { FitnessMetricsService } from '../../../core/services/fitness-metrics.service';
+import { MASCOTS, MascotMeta } from '../../../core/models/mascot.model';
+import { FitnessInsight, FitnessMetricsService } from '../../../core/services/fitness-metrics.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 
 @Component({
@@ -13,7 +14,12 @@ import { UserSettingsService } from '../../../core/services/user-settings.servic
           @for (insight of visibleInsights(); track insight.type) {
             <div class="insight-card" [style.--ic]="insight.color">
               <div class="ic-accent"></div>
-              <div class="ic-emoji">{{ insight.emoji }}</div>
+              <div class="ic-who" [class.ic-who--pair]="mascotsOf(insight).length > 1">
+                @for (m of mascotsOf(insight); track m.name) {
+                  <img class="ic-avatar" [src]="m.avatar" [alt]="m.alt">
+                }
+                <span class="ic-emoji">{{ insight.emoji }}</span>
+              </div>
               <div class="ic-body">
                 <span class="ic-title">{{ insight.title }}</span>
                 <span class="ic-msg">{{ insight.message }}</span>
@@ -52,9 +58,34 @@ import { UserSettingsService } from '../../../core/services/user-settings.servic
       background: var(--ic);
     }
 
+    /* Qui parla (avatar) + com se sent (emoji, com a xapa a sota a la dreta).
+     * Quan el missatge és transversal hi surten tots dos, encavalcats. */
+    .ic-who {
+      position: relative; flex-shrink: 0;
+      display: flex; align-items: center;
+      padding: 11px 10px 11px 12px;
+    }
+
+    .ic-avatar {
+      width: 38px; height: 38px; border-radius: 50%;
+      object-fit: cover; display: block;
+      background: var(--c-subtle);
+      box-shadow: 0 1px 4px var(--c-shadow);
+    }
+
+    .ic-who--pair .ic-avatar {
+      width: 30px; height: 30px;
+      border: 2px solid var(--c-card);
+      &:not(:first-child) { margin-left: -12px; }
+    }
+
     .ic-emoji {
-      font-size: 24px; line-height: 1;
-      flex-shrink: 0; padding: 13px 10px 13px 12px;
+      position: absolute; right: 2px; bottom: 4px;
+      width: 18px; height: 18px; border-radius: 50%;
+      display: grid; place-items: center;
+      font-size: 12px; line-height: 1;
+      background: var(--c-card);
+      box-shadow: 0 1px 3px var(--c-shadow);
     }
 
     .ic-body {
@@ -102,6 +133,13 @@ export class FitnessInsightsComponent {
   readonly visibleInsights = computed(() =>
     this.metricsService.insights().filter(i => !this.dismissed().has(i.type))
   );
+
+  /** `both` es pinta com els dos avatars encavalcats, no com una foto de grup. */
+  mascotsOf(insight: FitnessInsight): MascotMeta[] {
+    return insight.mascot === 'both'
+      ? [MASCOTS.marley, MASCOTS.xoco]
+      : [MASCOTS[insight.mascot]];
+  }
 
   dismiss(type: string): void {
     this.dismissed.update(s => {

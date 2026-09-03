@@ -854,4 +854,49 @@ describe('FitnessMetricsService', () => {
       expect(insight?.title).toContain('3');
     });
   });
+
+  // ── Mascotes ────────────────────────────────────────────────────────────
+  // El Marley parla del gimnàs, el Xoco de l'esport, i els missatges
+  // transversals (objectius, ratxa, resum de setmana) van a nom dels dos.
+  describe('mascot', () => {
+    it('assigns a mascot to the gym insight', () => {
+      mockSports.set([makeSport()]);
+      mockSessions.set([makeSession(d(-1)), makeSession(d(-2))]);
+      mockWorkouts.set([]);
+
+      const insight = service.insights().find(i => i.type === 'prova_gym');
+      expect(insight?.mascot).toBe('marley');
+    });
+
+    it('assigns Xoco to the sport insight', () => {
+      mockWorkouts.set([d(-1), d(-2), d(-3)].map(makeWorkout));
+      mockSports.set([makeSport()]);
+      mockSessions.set([]);
+
+      const insight = service.insights().find(i => i.type === 'prova_esport');
+      expect(insight?.mascot).toBe('xoco');
+    });
+
+    it('assigns both to a weekly-goal insight', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, metricsEnabled: true, weeklyActivityGoal: 1 });
+      mockWorkouts.set([makeWorkout(d(0))]);
+      mockSessions.set([]);
+
+      const insight = service.insights().find(i => i.type === 'objectiu_assolit');
+      expect(insight?.mascot).toBe('both');
+    });
+
+    it('every generated insight names who is speaking', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, metricsEnabled: true, weeklyActivityGoal: 1 });
+      mockWorkouts.set([d(-2), d(-1), d(0)].map(makeWorkout));
+      mockSports.set([makeSport()]);
+      mockSessions.set([makeSession(d(-2)), makeSession(d(-1))]);
+
+      const insights = service.insights();
+      expect(insights.length).toBeGreaterThan(0);
+      for (const i of insights) {
+        expect(['marley', 'xoco', 'both']).toContain(i.mascot);
+      }
+    });
+  });
 });
