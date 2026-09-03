@@ -21,10 +21,9 @@ import { MASCOTS, Mascot, MascotMeta } from '../../../core/models/mascot.model';
           <span class="material-symbols-outlined">close</span>
         </button>
       </div>
-      <span class="mb-dogs" [class.mb-dogs--pair]="dogs().length > 1" aria-hidden="true">
-        @for (d of dogs(); track d.name) {
-          <img class="mb-dog" [src]="d.avatar" alt="">
-        }
+      <span class="mb-dogs" aria-hidden="true">
+        <img class="mb-dog" [class.mb-dog--pair]="mascot() === 'both'"
+             [src]="figure().figure" alt="">
       </span>
     </div>
   `,
@@ -78,19 +77,23 @@ import { MASCOTS, Mascot, MascotMeta } from '../../../core/models/mascot.model';
       &:focus-visible { outline: 2px solid var(--c-brand); outline-offset: 1px; }
     }
 
+    /* Aquí surten grans i retallats del fons, sense cercle ni marc: la
+     * silueta ja diu qui és, i emmarcar-los només els faria petits. */
     .mb-dogs { display: flex; align-items: flex-end; flex-shrink: 0; }
 
     .mb-dog {
-      width: 56px; height: 56px; border-radius: 50%;
-      object-fit: cover; display: block;
-      border: 2.5px solid var(--c-card);
-      box-shadow: 0 4px 14px var(--c-shadow-md);
+      height: 96px; width: auto; display: block;
+      filter: drop-shadow(0 3px 8px var(--c-shadow-md));
+      /* El dibuix original acaba a mitja pitrera. Sense això, la vora recta
+       * de sota es veu com un retall; amb el degradat sembla que s'esvaeixi. */
+      mask-image: linear-gradient(to bottom, #000 84%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, #000 84%, transparent 100%);
     }
 
-    .mb-dogs--pair .mb-dog {
-      width: 44px; height: 44px;
-      &:not(:first-child) { margin-left: -16px; }
-    }
+    /* Quan hi són tots dos fem servir el dibuix on ja surten junts: encavalcar
+     * dues retallades deixa una costura al mig. Com que és més ample, baixa
+     * una mica d'alçada per ocupar el mateix. */
+    .mb-dog--pair { height: 82px; }
 
     @media (prefers-reduced-motion: reduce) {
       .mb-wrap { animation: none; }
@@ -111,9 +114,9 @@ export class MascotBubbleComponent {
 
   readonly close = output<void>();
 
-  readonly dogs = computed((): MascotMeta[] =>
-    this.mascot() === 'both'
-      ? [MASCOTS.marley, MASCOTS.xoco]
-      : [MASCOTS[this.mascot()]]
-  );
+  /**
+   * Una sola imatge sempre. Per a `both` no s'encavalquen dues retallades:
+   * es fa servir el dibuix on el Marley i el Xoco ja surten junts.
+   */
+  readonly figure = computed((): MascotMeta => MASCOTS[this.mascot()]);
 }

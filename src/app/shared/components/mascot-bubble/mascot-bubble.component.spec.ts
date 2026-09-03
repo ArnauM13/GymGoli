@@ -15,19 +15,24 @@ describe('MascotBubbleComponent', () => {
 
   it('shows only Marley', () => {
     fixture.componentRef.setInput('mascot', 'marley');
-    expect(component.dogs().length).toBe(1);
-    expect(component.dogs()[0].avatar).toContain('marley');
+    expect(component.figure().figure).toContain('marley-full');
   });
 
   it('shows only Xoco', () => {
     fixture.componentRef.setInput('mascot', 'xoco');
-    expect(component.dogs().length).toBe(1);
-    expect(component.dogs()[0].avatar).toContain('xoco');
+    expect(component.figure().figure).toContain('xoco-full');
   });
 
-  it('shows both, Marley first, for a cross-cutting message', () => {
+  it('uses the drawing where both already appear together, not two cut-outs', () => {
     fixture.componentRef.setInput('mascot', 'both');
-    expect(component.dogs().map(d => d.name)).toEqual(['Marley', 'Xoco']);
+    expect(component.figure().figure).toContain('bibis-full');
+  });
+
+  it('never uses the circular avatar here — these are the full cut-outs', () => {
+    for (const m of (['marley', 'xoco', 'both'] as const)) {
+      fixture.componentRef.setInput('mascot', m);
+      expect(component.figure().figure).toContain('-full');
+    }
   });
 
   it('renders the message inside the bubble', () => {

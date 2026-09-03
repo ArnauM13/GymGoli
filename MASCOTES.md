@@ -89,6 +89,16 @@ Tres regles perquè no sigui invasiva:
 2. **Es tanca i no torna en tot el dia.** L'endemà sí.
 3. **Una de sola.** Als insights només surt la del primer, mai una pila.
 
+Aquí surten **grans i sense cercle**, amb el cap i el pit retallats del fons
+(`figure` a `mascot.model.ts`, no `avatar`). La silueta ja diu qui és i
+emmarcar-los només els faria petits. Quan hi són tots dos es fa servir el
+dibuix on ja surten junts: encavalcar dues retallades deixa una costura al mig.
+
+Els retalls surten de `bibis.png` amb el fons tret per flood fill des de les
+vores. Els cantons on el dibuix original talla un gos (el Marley per la dreta,
+on el tapava el Xoco; el Xoco pels dos costats) van esvaïts, si no es veuen com
+un retall recte.
+
 Les barres d'objectiu i les targetes **no es toquen mai** per fer-los lloc:
 les icones d'activitat, els comptadors i el motiu del suggeriment segueixen
 exactament on eren. Els gossos només s'hi afegeixen al costat.
@@ -113,8 +123,10 @@ en tria un amb la data com a llavor: fix tot el dia, diferent l'endemà. No és
 atzar a propòsit — els insights són `computed()` i una frase que canviés a cada
 recàlcul es notaria.
 
-En tenen: `descansa`, `prova_gym`, `prova_esport`, `recupera_esport`,
-`categoria_endarrerida` i `setmana_fluixa`.
+En tenen **tots** els missatges on parla un gos: `descansa`, `prova_gym` (amb i
+sense planificar), `prova_esport` (amb i sense), `recupera_esport` (amb i
+sense), `categoria_endarrerida` (amb i sense), `setmana_fluixa` (gym i esport),
+`equilibra_gym`, `feeling_baixant_esport` i `constancia_esport`.
 
 ---
 
@@ -130,13 +142,19 @@ Decidit pel camí:
   targetes, i així es queda: si algun dia es planteja treure la targeta quan
   surt la bafarada, la resposta és no.
 
+La següent, acordada i pendent de fer:
+
+- **Acabar un entrenament queda buit.** Avui l'acabes i ja està, i és
+  justament el moment en què un gos et rebria millor. La bafarada ja seria el
+  lloc on dir-ho. És la propera gran peça.
+
 Encara obert:
 
-- Variants per als casos que encara en tenen una de sola.
 - Si la ratxa mereix alguna cosa més que una fila quan és molt llarga (10+
   setmanes), o si val més que es mantingui igual de discreta sempre.
-- Moments d'alegria de debò: ara mateix no hi ha res per a quan **acabes** un
-  entrenament, que és quan un gos et rebria millor. La bafarada ja seria el
-  lloc on dir-ho.
 - Si el gos de la bafarada hauria de canviar de cara segons el missatge
-  (content, tranquil, adormit) o si amb una de sola ja n'hi ha prou.
+  (content, tranquil, adormit) o si amb una de sola ja n'hi ha prou. Ara mateix
+  només tenim el dibuix somrient de `bibis.png`; qualsevol altra expressió vol
+  art nova.
+- Cap dels dos té cos sencer enlloc: el dibuix original és un retrat que acaba
+  a mitja pitrera. Si algun dia se'n vol un de dret o corrent, s'ha de dibuixar.

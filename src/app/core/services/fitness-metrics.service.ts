@@ -160,7 +160,11 @@ export class FitnessMetricsService {
           ], today + 'setmana_fluixa')}`;
           fluixaMascot = 'xoco';
         } else if (hasPlannedGym) {
-          fluixaMsg = 'Setmana tranquil·la, però avui tens gym. Ves-hi.';
+          fluixaMsg = `Setmana tranquil·la, però avui tens gym. ${pickVariant([
+            'Ves-hi.',
+            'Endavant.',
+            'Quan vulguis.',
+          ], today + 'setmana_fluixa_gym')}`;
           fluixaMascot = 'marley';
         } else {
           fluixaMsg = _fluixaMessage(fitnessGoal);
@@ -185,7 +189,11 @@ export class FitnessMetricsService {
           mascot: 'marley',
           emoji: '🏋️',
           title: 'Gym planificat avui!',
-          message: `Fas esport i avui tens gym. Bona jugada.`,
+          message: `Fas esport i avui tens gym. ${pickVariant([
+            'Bona jugada.',
+            'Així m\'agrada.',
+            'Ben pensat.',
+          ], today + 'prova_gym_pla')}`,
           color: '#006874',
         });
       } else {
@@ -215,7 +223,11 @@ export class FitnessMetricsService {
           mascot: 'xoco',
           emoji: '🏃',
           title: `${ps.sport.name} avui!`,
-          message: `Fas molt gym i avui toca ${ps.sport.name}. Ja soc a la porta!`,
+          message: `Fas molt gym i avui toca ${ps.sport.name}. ${pickVariant([
+            'Ja soc a la porta!',
+            'No puc estar quiet!',
+            'Quines ganes!',
+          ], today + 'prova_esport_pla')}`,
           color: ps.sport.color,
         });
       } else {
@@ -252,7 +264,11 @@ export class FitnessMetricsService {
               mascot: 'xoco',
               emoji: '😏',
               title: `${favSport.name} avui!`,
-              message: `Fa ${ago} que no fem ${favSport.name}. Ja tinc ganes!`,
+              message: `Fa ${ago} que no fem ${favSport.name}. ${pickVariant([
+                'Ja tinc ganes!',
+                'Per fi!',
+                'T\'esperava!',
+              ], today + 'recupera_esport_pla')}`,
               color: favSport.color,
             });
           } else {
@@ -311,7 +327,11 @@ export class FitnessMetricsService {
             mascot: 'marley',
             emoji: '🏋️',
             title: dayLabel(minCat),
-            message: `El darrer mes: ${othersStr}, però ${minStr}. Ho equilibrem.`,
+            message: `El darrer mes: ${othersStr}, però ${minStr}. ${pickVariant([
+              'Ho equilibrem.',
+              'Toca anivellar-ho.',
+              'Ja ho arreglarem.',
+            ], today + 'equilibra_gym')}`,
             color: CATEGORY_COLORS[minCat],
           });
         }
@@ -428,7 +448,11 @@ export class FitnessMetricsService {
               mascot: 'xoco',
               emoji: '📉',
               title: 'Anem amb calma',
-              message: `Les últimes 3 sessions de ${sport.name} t'han costat més. Avui, tranquils.`,
+              message: `Les últimes 3 sessions de ${sport.name} t'han costat més. ${pickVariant([
+                'Avui, tranquils.',
+                'Sense presses.',
+                'Jo m\'hi apunto igual.',
+              ], today + 'feeling_baixant')}`,
               color: sport.color,
             });
             break;
@@ -456,7 +480,11 @@ export class FitnessMetricsService {
             mascot: 'xoco',
             emoji: '🏅',
             title: `${streak} setmanes fent ${sport.name}!`,
-            message: `${streak} setmanes seguides amb ${sport.name}. No me n'he perdut ni una!`,
+            message: `${streak} setmanes seguides amb ${sport.name}. ${pickVariant([
+              'No me n\'he perdut ni una!',
+              'I les que vindran!',
+              'Quin equip!',
+            ], today + 'constancia_esport')}`,
             color: sport.color,
           });
           break;
@@ -485,7 +513,11 @@ export class FitnessMetricsService {
             mascot: 'marley',
             emoji: '🎯',
             title: `${dayLabel(cat)} — planificat!`,
-            message: `Fa ${daysStr} que no fas ${CATEGORY_LABELS[cat]} i avui ho tens planificat. Perfecte.`,
+            message: `Fa ${daysStr} que no fas ${CATEGORY_LABELS[cat]} i avui ho tens planificat. ${pickVariant([
+              'Perfecte.',
+              'Just a temps.',
+              'Bon dia per fer-ho.',
+            ], today + 'categoria_pla')}`,
             color: CATEGORY_COLORS[cat],
           });
         } else {

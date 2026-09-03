@@ -24,14 +24,28 @@ export type Mascot = 'marley' | 'xoco' | 'both';
 export interface MascotMeta {
   /** Nom propi, per si algun dia el copy l'ha d'anomenar. */
   name: string;
-  /** Ruta de l'avatar, relativa a l'arrel de l'app. */
+  /** Cara retallada en quadrat, per pintar-la dins d'un cercle petit. */
   avatar: string;
+  /**
+   * Cap i pit retallats del fons, amb transparència. Per quan surten grans i
+   * sense cercle: la silueta ja els identifica i el marc només els empetitiria.
+   */
+  figure: string;
   /** Text alternatiu per a lectors de pantalla. */
   alt: string;
 }
 
 export const MASCOTS: Record<Mascot, MascotMeta> = {
-  marley: { name: 'Marley',         avatar: 'assets/marley.png', alt: 'El Marley'            },
-  xoco:   { name: 'Xoco',           avatar: 'assets/xoco.png',   alt: 'El Xoco'              },
-  both:   { name: 'Marley i Xoco',  avatar: 'assets/bibis.png',  alt: 'El Marley i el Xoco'  },
+  marley: {
+    name: 'Marley', alt: 'El Marley',
+    avatar: 'assets/marley.png', figure: 'assets/marley-full.png',
+  },
+  xoco: {
+    name: 'Xoco', alt: 'El Xoco',
+    avatar: 'assets/xoco.png', figure: 'assets/xoco-full.png',
+  },
+  both: {
+    name: 'Marley i Xoco', alt: 'El Marley i el Xoco',
+    avatar: 'assets/bibis.png', figure: 'assets/bibis-full.png',
+  },
 };

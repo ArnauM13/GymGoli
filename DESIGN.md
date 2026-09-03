@@ -727,8 +727,14 @@ encavalcats en comptes d'una foto de grup, que a 30px no es llegeix.
 </div>
 ```
 
-Avatars: `assets/marley.png`, `assets/xoco.png` (256×256, retallats de
-`assets/bibis.png`, que segueix sent la icona de l'app).
+Cada mascota té dues imatges a `mascot.model.ts`, i no són intercanviables:
+
+| Camp | Fitxer | Quan |
+| ---- | ------ | ---- |
+| `avatar` | `marley.png`, `xoco.png` (256×256) | Petit i dins d'un cercle: targetes, barres, xapes |
+| `figure` | `marley-full.png`, `xoco-full.png`, `bibis-full.png` (300px d'alt, amb transparència) | Gran i sense cercle: la bafarada |
+
+Tots surten de `assets/bibis.png`, que segueix sent la icona de l'app.
 
 ### La bafarada
 
