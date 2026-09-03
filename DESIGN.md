@@ -665,9 +665,10 @@ When in doubt, look at how it's done in:
 
 ## 13. Mascotes — Marley i Xoco
 
-L'app té dos gossos, i no són decoració: **són la veu del feedback**. Cada
-insight l'explica el gos que li toca, i això dona personalitat a l'app sense
-afegir cap pantalla nova. La definició viu a `core/models/mascot.model.ts`.
+Dos acompanyants amistosos, un especialitzat en esport i l'altre en
+entrenaments. **Ajudants, sempre positius** — no són decoració: són la veu del
+feedback. Cada insight l'explica el gos que li toca, i això dona personalitat a
+l'app sense afegir cap pantalla nova. Viu a `core/models/mascot.model.ts`.
 
 | Mascota  | Àmbit    | Veu                                                     |
 | -------- | -------- | ------------------------------------------------------- |
@@ -683,6 +684,19 @@ La divisió no és inventada: segueix la que ja existeix al model de dades
 - **Cap dels dos culpabilitza mai.** L'onboarding promet «sense alarmes ni
   pressions» i els gossos hi estan subjectes. Un gos s'alegra de veure't tant
   si has entrenat com si no.
+- **Ofereix, no constatis.** Un acompanyant no t'assenyala el que no has fet,
+  t'ofereix el que podeu fer. El títol és una porta oberta, no un diagnòstic:
+
+  | No | Sí |
+  | -- | -- |
+  | «Fa dies del gym...» | «El gym, quan tu vulguis» |
+  | «Molta gym, gens d'esport!» | «I si avui sortim?» |
+  | «Fa temps que no fem Pàdel!» | «Tornem al Pàdel?» |
+  | «Sensació baixant a Pàdel» | «Anem amb calma al Pàdel» |
+  | «Última oportunitat!» | «Encara hi ets a temps!» |
+
+  Les dades (números, dies, noms d'esport) es mantenen intactes — el que canvia
+  és el marc, no la informació.
 - **Primera persona del plural** quan parlen d'una activitat teva: «hi
   tornem?», «fa temps que no fem pàdel». Un gos s'hi inclou.
 - **Un gos per targeta.** Els dos junts només quan el missatge és transversal

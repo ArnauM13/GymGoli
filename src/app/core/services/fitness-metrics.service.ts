@@ -133,7 +133,7 @@ export class FitnessMetricsService {
         type: 'descansa',
         mascot: 'marley',
         emoji: '😴',
-        title: 'Ei, i el descans?',
+        title: 'T\'has guanyat el descans',
         message: 'Has anat molt a tope aquests 7 dies. Avui ens quedem al sofà? El descans també és entrenar.',
         color: '#5e35b1',
       });
@@ -161,7 +161,7 @@ export class FitnessMetricsService {
           type: 'setmana_fluixa',
           mascot: fluixaMascot,
           emoji: hasPlannedGym || hasPlannedSport ? '💪' : '💤',
-          title: hasPlannedGym || hasPlannedSport ? 'Avui toca!' : 'Setmana tranquil·la...',
+          title: hasPlannedGym || hasPlannedSport ? 'Avui toca!' : 'Som-hi quan vulguis',
           message: fluixaMsg,
           color: '#0288d1',
         });
@@ -184,8 +184,8 @@ export class FitnessMetricsService {
           type: 'prova_gym',
           mascot: 'marley',
           emoji: '🏋️',
-          title: 'Fa dies del gym...',
-          message: `Portes ${last7Sessions.length} sessions d'esport però fa dies que no trepitges el gym. Quan vulguis, hi tornem.`,
+          title: 'El gym, quan tu vulguis',
+          message: `Portes ${last7Sessions.length} sessions d'esport. Si et ve de gust tornar al gym, jo t'acompanyo.`,
           color: '#006874',
         });
       }
@@ -210,8 +210,8 @@ export class FitnessMetricsService {
           type: 'prova_esport',
           mascot: 'xoco',
           emoji: '🏃',
-          title: 'Molta gym, gens d\'esport!',
-          message: `Portes ${last7Workouts.length} entrenos seguits però res d\'esport. I si avui sortim a fer ${sportName}?`,
+          title: 'I si avui sortim?',
+          message: `Portes ${last7Workouts.length} entrenos de gym seguits. Si vols airejar-te, avui podríem fer ${sportName}.`,
           color: '#2e7d32',
         });
       }
@@ -243,8 +243,8 @@ export class FitnessMetricsService {
               type: 'recupera_esport',
               mascot: 'xoco',
               emoji: '😏',
-              title: `Fa temps que no fem ${favSport.name}!`,
-              message: `L'últim cop que vas fer ${favSport.name} va ser ${ago}. T'espero a la porta quan vulguis.`,
+              title: `Tornem al ${favSport.name}?`,
+              message: `L'últim ${favSport.name} va ser ${ago}. Quan et vingui de gust, t'espero a la porta.`,
               color: favSport.color,
             });
           }
@@ -318,7 +318,7 @@ export class FitnessMetricsService {
           type: 'anima_objectiu',
           mascot: 'both',
           emoji: '🌟',
-          title: missing === 1 ? 'Última oportunitat!' : 'Últim dia de la setmana!',
+          title: missing === 1 ? 'Encara hi ets a temps!' : 'Últim dia de la setmana',
           message: missing === 1
             ? `Et falta 1 activitat per assolir el teu objectiu de ${goal}. Avui pots!`
             : `Portes ${weekTotal}/${goal} activitats. Encara hi ha temps avui!`,
@@ -406,8 +406,8 @@ export class FitnessMetricsService {
               type: 'feeling_baixant_esport',
               mascot: 'xoco',
               emoji: '📉',
-              title: `Sensació baixant a ${sport.name}`,
-              message: `Les últimes 3 sessions de ${sport.name} has anat de menys en menys bé. Potser toca descansar o baixar el ritme — jo no tinc cap pressa.`,
+              title: `Anem amb calma al ${sport.name}`,
+              message: `Les últimes 3 sessions de ${sport.name} t'han costat més. Si vols descansar o baixar el ritme, cap problema — jo no tinc cap pressa.`,
               color: sport.color,
             });
             break;
@@ -532,11 +532,11 @@ export class FitnessMetricsService {
 
 function _fluixaMessage(goal: FitnessGoal | null): string {
   switch (goal) {
-    case 'strength': return 'Pocs entrenos al gym aquesta setmana. Recorda el teu programa de força!';
-    case 'fitness':  return 'Poc moviment aquesta setmana. Avui seria un bon dia per entrenar, no creus?';
-    case 'weight':   return 'Moure\'t regularment és clau per al teu objectiu. Avui és un bon dia per suar!';
-    case 'sport':    return 'Poca activitat esportiva aquesta setmana. Potser una sessió lleugera avui t\'activa!';
-    default:         return 'Poc moviment aquesta setmana. Avui seria un bon dia per moure\'t una mica, no creus?';
+    case 'strength': return 'Setmana tranquil·la fins ara. Quan vulguis reprendre el programa de força, som-hi.';
+    case 'fitness':  return 'Setmana tranquil·la fins ara. Avui és un bon dia per moure\'s una mica.';
+    case 'weight':   return 'Setmana tranquil·la fins ara. Moure\'t sovint és clau per al teu objectiu, i avui és un bon dia.';
+    case 'sport':    return 'Setmana tranquil·la fins ara. Una sessió lleugera avui ja t\'activa.';
+    default:         return 'Setmana tranquil·la fins ara. Avui és un bon dia per moure\'s una mica.';
   }
 }
 
