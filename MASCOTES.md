@@ -79,22 +79,25 @@ sense problema: també sap estar quiet, si hi ha companyia.
 | Barres d'objectiu setmanal | Marley al gym, Xoco a l'esport, tots dos si l'objectiu és combinat | Avatar a l'esquerra |
 | Ratxa | tots dos | Avatar a l'esquerra |
 
-### La xapa sobre la icona
+### La icona d'activitat
 
 Quan el gos va a sobre d'una icona d'activitat, **mana la icona**: és el que
-has de reconèixer d'un cop d'ull i el gos només acompanya. Mateixos números
-als dos únics llocs on se superposen — el feed d'Inici (`.fc-dog`) i el
-suggeriment d'Entrenament (`.sf-dog`):
+has de reconèixer d'un cop d'ull i el gos només acompanya. Va petit i a la
+cantonada de sota, on el glif gairebé no té tinta.
 
-```scss
-.icon-wrap { width: 44px; position: relative; }   /* icona centrada */
-.icon      { font-size: 24px; }
-.dog       { position: absolute; right: 0; bottom: -3px; width: 16px; height: 16px; }
+No es reimplementa mai: és `<app-activity-icon>`.
+
+```html
+<app-activity-icon [icon]="..." [color]="..." mascot="marley" />
 ```
 
-Amb aquests valors el gos cau a la cantonada de sota, on el glif gairebé no
-té tinta, i li toca el cantó en comptes de menjar-se'l. Si algun dia hi ha un
-tercer lloc, els mateixos números.
+Ho fan servir la targeta d'entrenament i la d'esport del feed d'Inici, i el
+suggeriment d'Entrenament. Va néixer perquè estava copiat a dos llocs i les
+dues còpies van acabar amb mides diferents; qualsevol lloc nou el reutilitza
+en comptes de tornar-lo a escriure.
+
+Sense `mascot` surt la icona sola (l'usa el botó de «Nou entrenament»), i
+`both` s'ignora: una activitat és de gimnàs o d'esport, mai les dues.
 
 ### La bafarada
 

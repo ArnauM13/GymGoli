@@ -1,6 +1,6 @@
 import { Component, inject, input, output, signal } from '@angular/core';
 
-import { MASCOTS } from '../../../core/models/mascot.model';
+import { ActivityIconComponent } from '../activity-icon/activity-icon.component';
 import { Sport, SportMetricDef, SportSession } from '../../../core/models/sport.model';
 import { FeelingLevel, Workout } from '../../../core/models/workout.model';
 import { WorkoutService } from '../../../core/services/workout.service';
@@ -24,6 +24,7 @@ export interface DayFeedEntry {
 @Component({
   selector: 'app-day-feed-cards',
   standalone: true,
+  imports: [ActivityIconComponent],
   template: `
     @for (w of day()?.workouts ?? []; track w.id) {
       <div class="feed-card" [class.feed-card--planned]="isPlanned(w)"
@@ -32,10 +33,8 @@ export interface DayFeedEntry {
         <div class="fc-bar" [style.background]="workoutCardColor(w)"></div>
         <!-- Tipus d'entrenament amb el Marley a sobre: es reconeix el que és
              sense haver de llegir res. -->
-        <div class="fc-icon-wrap" aria-hidden="true">
-          <span class="material-symbols-outlined fc-icon">{{ workoutPrimaryIcon(w) }}</span>
-          <img class="fc-dog" [src]="marley.avatar" alt="">
-        </div>
+        <app-activity-icon [icon]="workoutPrimaryIcon(w)"
+                           [color]="workoutPrimaryColor(w)" mascot="marley" />
         <div class="fc-info">
           <div class="fc-badges">
             @for (cat of workoutCategoryList(w); track cat) {
@@ -98,10 +97,7 @@ export interface DayFeedEntry {
       <div class="feed-sport-card" [class.expanded]="expandedSportId() === item.session.id" [style.--ic]="item.sport.color">
         <button class="feed-sport-row" (click)="toggleSportExpand(item)">
           <!-- L'esport ja tenia icona; només li faltava el Xoco. -->
-          <span class="fc-icon-wrap" aria-hidden="true">
-            <span class="material-symbols-outlined feed-sport-icon">{{ item.sport.icon }}</span>
-            <img class="fc-dog" [src]="xoco.avatar" alt="">
-          </span>
+          <app-activity-icon [icon]="item.sport.icon" [color]="item.sport.color" mascot="xoco" />
           <div class="fsr-info">
             <span class="feed-sport-name">{{ item.sport.name }}</span>
             @if (sportSummary(item.session, item.sport); as meta) {
@@ -232,23 +228,6 @@ export interface DayFeedEntry {
     }
     .fc-bar { width: 5px; align-self: stretch; flex-shrink: 0; }
 
-    /* Mana la icona del tipus: és el que has de reconèixer d'un cop d'ull.
-     * El gos és l'afegit, així que va petit i a la cantonada de sota, on el
-     * glif gairebé no té tinta. */
-    .fc-icon-wrap {
-      width: 44px; flex-shrink: 0; position: relative;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .fc-icon {
-      font-size: 24px; color: var(--wc, var(--c-text-2));
-      font-variation-settings: 'FILL' 1;
-    }
-    .fc-dog {
-      position: absolute; right: 0; bottom: -3px;
-      width: 16px; height: 16px; border-radius: 50%;
-      object-fit: cover; display: block;
-      border: 1.5px solid var(--c-card);
-    }
     .fc-info {
       flex: 1; min-width: 0;
       display: flex; flex-direction: column; gap: 5px;
@@ -322,10 +301,6 @@ export interface DayFeedEntry {
       display: flex; align-items: center; gap: 8px; width: 100%;
       padding: 13px 14px; border: none; background: transparent; text-align: left;
       cursor: pointer; touch-action: manipulation;
-    }
-    .feed-sport-icon {
-      font-size: 22px; color: var(--ic, var(--c-text-2)); font-variation-settings: 'FILL' 1;
-      flex-shrink: 0;
     }
     .fsr-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
     .feed-sport-name { font-size: 14px; font-weight: 700; color: var(--c-text); }
@@ -449,9 +424,6 @@ export class DayFeedCardsComponent {
   readonly workoutPrimaryColor = workoutPrimaryColor;
   readonly workoutPrimaryIcon  = workoutPrimaryIcon;
 
-  /** El Marley acompanya el gimnàs; el Xoco, l'esport. */
-  readonly marley = MASCOTS.marley;
-  readonly xoco   = MASCOTS.xoco;
   readonly workoutCardColor    = workoutCardColor;
   readonly workoutCategoryList = workoutCategoryList;
   readonly getCatLabel         = getCatLabel;

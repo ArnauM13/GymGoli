@@ -14,7 +14,7 @@ import {
   CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, CATEGORY_MUSCLES,
   Exercise, ExerciseCategory,
 } from '../../core/models/exercise.model';
-import { MASCOTS, MascotMeta } from '../../core/models/mascot.model';
+import { MASCOTS, Mascot, MascotMeta } from '../../core/models/mascot.model';
 import { Sport, SportMetricDef } from '../../core/models/sport.model';
 import { WorkoutTemplate } from '../../core/models/template.model';
 import { FeelingLevel, Workout, WorkoutEntry, setMaxWeight } from '../../core/models/workout.model';
@@ -26,6 +26,7 @@ import { ConfirmDialogService } from '../../shared/services/confirm-dialog.servi
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { OfflineService } from '../../core/services/offline.service';
+import { ActivityIconComponent } from '../../shared/components/activity-icon/activity-icon.component';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
 import { MascotBubbleService } from '../../core/services/mascot-bubble.service';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
@@ -62,7 +63,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
 @Component({
   selector: 'app-train',
   standalone: true,
-  imports: [FormsModule, A11yModule, WorkoutEditorComponent, PageHeaderComponent],
+  imports: [FormsModule, A11yModule, WorkoutEditorComponent, PageHeaderComponent, ActivityIconComponent],
   template: `
     <div class="page" [style.padding-bottom]="pagePaddingBottom()">
 
@@ -424,12 +425,8 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
           <button class="suggestion-float" [style.--sc]="s.color" (click)="handleSuggestionClick(s)"
                   [attr.aria-label]="'Entrenament suggerit: ' + s.label + '. ' + s.reason">
             <div class="sf-bar" aria-hidden="true"></div>
-            <div class="sf-icon-wrap" aria-hidden="true">
-              <span class="material-symbols-outlined sf-icon">{{ s.icon }}</span>
-              @if (!suggestionBubbleOpen(s)) {
-                <img class="sf-dog" [src]="suggestionMascot(s).avatar" alt="">
-              }
-            </div>
+            <app-activity-icon [icon]="s.icon" [color]="s.color"
+                               [mascot]="suggestionBubbleOpen(s) ? null : suggestionMascotId(s)" />
             <div class="sf-info" aria-hidden="true">
               <span class="sf-label">{{ s.label }}</span>
               <span class="sf-reason">{{ s.reason }}</span>
@@ -458,9 +455,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
         <button class="suggestion-float suggestion-float--action" (click)="startDefaultWorkout()"
                 aria-label="Nou entrenament: comença a registrar una sessió">
           <div class="sf-bar" aria-hidden="true"></div>
-          <div class="sf-icon-wrap" aria-hidden="true">
-            <span class="material-symbols-outlined sf-icon">add_circle</span>
-          </div>
+          <app-activity-icon icon="add_circle" color="var(--c-brand)" />
           <div class="sf-info" aria-hidden="true">
             <span class="sf-eyebrow">Comença</span>
             <span class="sf-label">Nou entrenament</span>
@@ -1057,17 +1052,6 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       &:hover { box-shadow: 0 10px 32px rgba(0,0,0,0.2), 0 2px 6px rgba(0,0,0,0.1); }
     }
     .sf-bar { width: 5px; align-self: stretch; flex-shrink: 0; background: var(--sc); }
-    /* Mateix criteri que al feed d'Inici: mana la icona del tipus, que és el
-     * que has de reconèixer, i el gos va petit a la cantonada de sota, on el
-     * glif gairebé no té tinta. */
-    .sf-icon-wrap { width: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; position: relative; }
-    .sf-icon { font-size: 24px; color: var(--sc); font-variation-settings: 'FILL' 1; }
-    .sf-dog {
-      position: absolute; right: 0; bottom: -3px;
-      width: 16px; height: 16px; border-radius: 50%;
-      object-fit: cover; display: block;
-      border: 1.5px solid var(--c-card);
-    }
     .sf-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
     .sf-eyebrow {
       font-size: 9.5px; font-weight: 700; line-height: 1;
@@ -1577,8 +1561,12 @@ export class TrainComponent implements OnDestroy {
    * Qui proposa el suggeriment. La divisió és la de sempre: el gimnàs és cosa
    * del Marley i l'esport, del Xoco.
    */
+  suggestionMascotId(s: TodaySuggestion): Mascot {
+    return s.type === 'gym' ? 'marley' : 'xoco';
+  }
+
   suggestionMascot(s: TodaySuggestion): MascotMeta {
-    return MASCOTS[s.type === 'gym' ? 'marley' : 'xoco'];
+    return MASCOTS[this.suggestionMascotId(s)];
   }
 
   /** Mentre és oberta, la targeta es pinta com la bafarada del gos. */
