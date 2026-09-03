@@ -1,6 +1,6 @@
 import { Workout, WorkoutEntry } from '../../core/models/workout.model';
 import {
-  feedDayLabel, getExerciseNames, isWorkoutPlanned, workoutCardColor,
+  feedDayLabel, getExerciseNames, isWorkoutPlanned, workoutCardColor, workoutPrimaryIcon,
   workoutSetsCount, workoutVolumeFmt, workoutWarmupSetsCount,
 } from './workout-card.utils';
 
@@ -141,6 +141,25 @@ describe('workout-card.utils', () => {
       expect(result).not.toBe('Avui');
       expect(result).not.toBe('Ahir');
       expect(result.length).toBeGreaterThan(0);
+    });
+  });
+
+  // La icona li posa cara a la targeta del feed, amb el gos a sobre.
+  describe('workoutPrimaryIcon()', () => {
+    it('takes the icon of the first training type', () => {
+      expect(workoutPrimaryIcon(makeWorkout({ categories: ['legs'] }))).toBe('directions_run');
+    });
+
+    it('with several types it follows the first, like the primary colour does', () => {
+      expect(workoutPrimaryIcon(makeWorkout({ categories: ['push', 'legs'] }))).toBe('fitness_center');
+    });
+
+    it('falls back to a gym icon when the workout has no type at all', () => {
+      expect(workoutPrimaryIcon(makeWorkout())).toBe('fitness_center');
+    });
+
+    it('falls back too for a custom type that no longer exists', () => {
+      expect(workoutPrimaryIcon(makeWorkout({ categories: ['un-tipus-esborrat'] }))).toBe('fitness_center');
     });
   });
 });

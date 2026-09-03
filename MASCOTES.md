@@ -75,6 +75,7 @@ sense problema: també sap estar quiet, si hi ha companyia.
 | Bafarada d'insight (`home`) | segons el tipus (taula de sota) | Surt a baix a la dreta i parla |
 | Suggeriment de `train` | Marley si és gym, Xoco si és esport | La targeta **és** la bafarada, amb el gos al costat |
 | Targetes d'insight | igual que la bafarada | Avatar + emoji, sense veu pròpia |
+| Feed del dia (`home`) | Marley als entrenaments, Xoco als esports | Xapa sobre la icona d'activitat |
 | Barres d'objectiu setmanal | Marley al gym, Xoco a l'esport, tots dos si l'objectiu és combinat | Avatar a l'esquerra |
 | Ratxa | tots dos | Avatar a l'esquerra |
 

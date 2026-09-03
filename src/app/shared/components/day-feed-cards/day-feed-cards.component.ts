@@ -1,5 +1,6 @@
 import { Component, inject, input, output, signal } from '@angular/core';
 
+import { MASCOTS } from '../../../core/models/mascot.model';
 import { Sport, SportMetricDef, SportSession } from '../../../core/models/sport.model';
 import { FeelingLevel, Workout } from '../../../core/models/workout.model';
 import { WorkoutService } from '../../../core/services/workout.service';
@@ -10,7 +11,7 @@ import { FeedbackService } from '../../services/feedback.service';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import {
   formatFeeling, getCatLabel, getExerciseNames, isWorkoutPlanned, sportSessionSummary,
-  workoutCardColor, workoutCategoryList, workoutPrimaryColor, workoutSetsCount, workoutWarmupSetsCount,
+  workoutCardColor, workoutCategoryList, workoutPrimaryColor, workoutPrimaryIcon, workoutSetsCount, workoutWarmupSetsCount,
   workoutVolumeFmt as workoutVolumeFmtUtil,
 } from '../../utils/workout-card.utils';
 
@@ -29,6 +30,12 @@ export interface DayFeedEntry {
            [style.--wc]="workoutPrimaryColor(w)"
            (click)="handleWorkoutClick(w)">
         <div class="fc-bar" [style.background]="workoutCardColor(w)"></div>
+        <!-- Tipus d'entrenament amb el Marley a sobre: es reconeix el que és
+             sense haver de llegir res. -->
+        <div class="fc-icon-wrap" aria-hidden="true">
+          <span class="material-symbols-outlined fc-icon">{{ workoutPrimaryIcon(w) }}</span>
+          <img class="fc-dog" [src]="marley.avatar" alt="">
+        </div>
         <div class="fc-info">
           <div class="fc-badges">
             @for (cat of workoutCategoryList(w); track cat) {
@@ -90,7 +97,11 @@ export interface DayFeedEntry {
     @for (item of day()?.sports ?? []; track item.session.id) {
       <div class="feed-sport-card" [class.expanded]="expandedSportId() === item.session.id" [style.--ic]="item.sport.color">
         <button class="feed-sport-row" (click)="toggleSportExpand(item)">
-          <span class="material-symbols-outlined feed-sport-icon">{{ item.sport.icon }}</span>
+          <!-- L'esport ja tenia icona; només li faltava el Xoco. -->
+          <span class="fc-icon-wrap" aria-hidden="true">
+            <span class="material-symbols-outlined feed-sport-icon">{{ item.sport.icon }}</span>
+            <img class="fc-dog" [src]="xoco.avatar" alt="">
+          </span>
           <div class="fsr-info">
             <span class="feed-sport-name">{{ item.sport.name }}</span>
             @if (sportSummary(item.session, item.sport); as meta) {
@@ -220,6 +231,23 @@ export interface DayFeedEntry {
       &:hover { background: color-mix(in srgb, var(--wc, var(--c-brand)) 9%, var(--c-card)); }
     }
     .fc-bar { width: 5px; align-self: stretch; flex-shrink: 0; }
+
+    /* Icona del tipus i el gos que toca, una mica sobreposat: el mateix
+     * format que al suggeriment d'Entrenament. */
+    .fc-icon-wrap {
+      width: 40px; flex-shrink: 0; position: relative;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .fc-icon {
+      font-size: 22px; color: var(--wc, var(--c-text-2));
+      font-variation-settings: 'FILL' 1;
+    }
+    .fc-dog {
+      position: absolute; right: 0; bottom: -2px;
+      width: 18px; height: 18px; border-radius: 50%;
+      object-fit: cover; display: block;
+      border: 1.5px solid var(--c-card);
+    }
     .fc-info {
       flex: 1; min-width: 0;
       display: flex; flex-direction: column; gap: 5px;
@@ -290,7 +318,7 @@ export interface DayFeedEntry {
       }
     }
     .feed-sport-row {
-      display: flex; align-items: center; gap: 12px; width: 100%;
+      display: flex; align-items: center; gap: 8px; width: 100%;
       padding: 13px 14px; border: none; background: transparent; text-align: left;
       cursor: pointer; touch-action: manipulation;
     }
@@ -418,6 +446,11 @@ export class DayFeedCardsComponent {
 
   readonly isPlanned          = isWorkoutPlanned;
   readonly workoutPrimaryColor = workoutPrimaryColor;
+  readonly workoutPrimaryIcon  = workoutPrimaryIcon;
+
+  /** El Marley acompanya el gimnàs; el Xoco, l'esport. */
+  readonly marley = MASCOTS.marley;
+  readonly xoco   = MASCOTS.xoco;
   readonly workoutCardColor    = workoutCardColor;
   readonly workoutCategoryList = workoutCategoryList;
   readonly getCatLabel         = getCatLabel;
