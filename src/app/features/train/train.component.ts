@@ -1057,13 +1057,14 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       &:hover { box-shadow: 0 10px 32px rgba(0,0,0,0.2), 0 2px 6px rgba(0,0,0,0.1); }
     }
     .sf-bar { width: 5px; align-self: stretch; flex-shrink: 0; background: var(--sc); }
-    .sf-icon-wrap { width: 48px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; position: relative; }
-    .sf-icon { font-size: 23px; color: var(--sc); font-variation-settings: 'FILL' 1; }
-    /* El gos va de xapa sobre la icona de categoria: qui ho proposa sense
-     * robar-li el lloc al que es proposa. */
+    /* Mateix criteri que al feed d'Inici: mana la icona del tipus, que és el
+     * que has de reconèixer, i el gos va petit a la cantonada de sota, on el
+     * glif gairebé no té tinta. */
+    .sf-icon-wrap { width: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; position: relative; }
+    .sf-icon { font-size: 24px; color: var(--sc); font-variation-settings: 'FILL' 1; }
     .sf-dog {
-      position: absolute; right: 2px; bottom: -1px;
-      width: 18px; height: 18px; border-radius: 50%;
+      position: absolute; right: 0; bottom: -3px;
+      width: 16px; height: 16px; border-radius: 50%;
       object-fit: cover; display: block;
       border: 1.5px solid var(--c-card);
     }

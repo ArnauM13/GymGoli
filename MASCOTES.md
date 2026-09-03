@@ -79,6 +79,23 @@ sense problema: també sap estar quiet, si hi ha companyia.
 | Barres d'objectiu setmanal | Marley al gym, Xoco a l'esport, tots dos si l'objectiu és combinat | Avatar a l'esquerra |
 | Ratxa | tots dos | Avatar a l'esquerra |
 
+### La xapa sobre la icona
+
+Quan el gos va a sobre d'una icona d'activitat, **mana la icona**: és el que
+has de reconèixer d'un cop d'ull i el gos només acompanya. Mateixos números
+als dos únics llocs on se superposen — el feed d'Inici (`.fc-dog`) i el
+suggeriment d'Entrenament (`.sf-dog`):
+
+```scss
+.icon-wrap { width: 44px; position: relative; }   /* icona centrada */
+.icon      { font-size: 24px; }
+.dog       { position: absolute; right: 0; bottom: -3px; width: 16px; height: 16px; }
+```
+
+Amb aquests valors el gos cau a la cantonada de sota, on el glif gairebé no
+té tinta, i li toca el cantó en comptes de menjar-se'l. Si algun dia hi ha un
+tercer lloc, els mateixos números.
+
 ### La bafarada
 
 El gos surt a baix a la dreta amb bafarada de còmic i et diu una cosa curta.
