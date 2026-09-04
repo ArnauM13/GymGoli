@@ -2,23 +2,16 @@ import { Component, computed, inject, signal } from '@angular/core';
 
 import { MASCOTS, MascotMeta } from '../../../core/models/mascot.model';
 import { FitnessInsight, FitnessMetricsService } from '../../../core/services/fitness-metrics.service';
-import { MascotBubbleService } from '../../../core/services/mascot-bubble.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
-import { MascotBubbleComponent } from '../mascot-bubble/mascot-bubble.component';
 
 @Component({
   selector: 'app-fitness-insights',
   standalone: true,
-  imports: [MascotBubbleComponent],
   template: `
     @if (settingsService.metricsEnabled() && settingsService.loaded()) {
 
-      <!-- El gos surt a dir-t'ho a la cara. És una capa: la targeta de sota
-           es queda igual, així que tancar la bafarada no et fa perdre res. -->
-      @if (bubbleInsight(); as i) {
-        <app-mascot-bubble [mascot]="i.mascot" [message]="i.message"
-                           (close)="dismissBubble(i)" />
-      }
+      <!-- Aquí els gossos no surten a parlar: els insights es queden en
+           targetes. Les bafarades es reserven per a l'entrenament suggerit. -->
 
       @if (visibleInsights().length) {
         <div class="insights-wrap">
@@ -129,7 +122,6 @@ import { MascotBubbleComponent } from '../mascot-bubble/mascot-bubble.component'
 export class FitnessInsightsComponent {
   readonly settingsService = inject(UserSettingsService);
   private metricsService   = inject(FitnessMetricsService);
-  private bubbleService    = inject(MascotBubbleService);
 
   private static readonly _SK = 'gymgoli_dismissed_insights';
 
@@ -145,27 +137,6 @@ export class FitnessInsightsComponent {
   readonly visibleInsights = computed(() =>
     this.metricsService.insights().filter(i => !this.dismissed().has(i.type))
   );
-
-  /**
-   * El primer insight visible, mentre no n'hagis tancat la bafarada.
-   *
-   * Va lligat a `visibleInsights()` a posta: si descartes la targeta, la
-   * bafarada se'n va amb ella. Són el mateix missatge dit dos cops.
-   */
-  readonly bubbleInsight = computed((): FitnessInsight | null => {
-    const first = this.visibleInsights()[0];
-    if (!first) return null;
-    return this.bubbleService.isOpen(this._bubbleKey(first)) ? first : null;
-  });
-
-  dismissBubble(insight: FitnessInsight): void {
-    this.bubbleService.dismiss(this._bubbleKey(insight));
-  }
-
-  /** Una bafarada per insight i dia: si la tanques, no torna fins demà. */
-  private _bubbleKey(insight: FitnessInsight): string {
-    return `insight:${insight.type}`;
-  }
 
   /** `both` es pinta com els dos avatars encavalcats, no com una foto de grup. */
   mascotsOf(insight: FitnessInsight): MascotMeta[] {

@@ -1,8 +1,17 @@
 import { Workout, WorkoutEntry } from '../../core/models/workout.model';
+import { METRIC_CATALOGUE, Sport } from '../../core/models/sport.model';
 import {
-  feedDayLabel, getExerciseNames, isWorkoutPlanned, workoutCardColor, workoutPrimaryIcon,
-  workoutSetsCount, workoutVolumeFmt, workoutWarmupSetsCount,
+  feedDayLabel, getExerciseNames, isWorkoutPlanned, sportCardStats, workoutCardColor,
+  workoutPrimaryIcon, workoutSetsCount, workoutVolumeFmt, workoutWarmupSetsCount,
 } from './workout-card.utils';
+
+function makeSport(metricKeys: string[]): Sport {
+  return {
+    id: 's1', name: 'Esport', icon: 'sports', color: '#000', subtypes: [],
+    metricDefs: metricKeys.map(k => METRIC_CATALOGUE.find(m => m.key === k)!),
+    createdAt: new Date(),
+  };
+}
 
 function makeWorkout(overrides: Partial<Workout> = {}): Workout {
   return { id: '1', date: '2024-01-01', entries: [], createdAt: new Date(), ...overrides };
@@ -161,5 +170,39 @@ describe('workout-card.utils', () => {
     it('falls back too for a custom type that no longer exists', () => {
       expect(workoutPrimaryIcon(makeWorkout({ categories: ['un-tipus-esborrat'] }))).toBe('fitness_center');
     });
+  });
+});
+
+describe('sportCardStats()', () => {
+  it('keeps the duration and the most relevant metric, and no more', () => {
+    // Pàdel: el que identifica el partit és el resultat, no el tipus.
+    const sport = makeSport(['match_type', 'result', 'sets_won']);
+    const stats = sportCardStats(
+      { duration: 60, metrics: { match_type: 'partida', result: 'guanyat', sets_won: 2 } },
+      sport,
+    );
+    expect(stats.length).toBe(2);
+    expect(stats[0].text).toBe('60min');
+    expect(stats[1].text).toBe('Guanyat 🏆');
+  });
+
+  it('shows the distance when running, not the terrain', () => {
+    const sport = makeSport(['distance_km', 'pace', 'terrain']);
+    const stats = sportCardStats(
+      { duration: 30, metrics: { distance_km: 5, pace: 'moderat', terrain: 'muntanya' } },
+      sport,
+    );
+    expect(stats.map(s => s.text)).toEqual(['30min', '5km']);
+  });
+
+  it('fills both slots with metrics when there is no duration', () => {
+    const sport = makeSport(['distance_km', 'pace']);
+    const stats = sportCardStats({ metrics: { distance_km: 5, pace: 'lent' } }, sport);
+    expect(stats.map(s => s.text)).toEqual(['5km', 'Lent']);
+  });
+
+  it('leaves out metrics with no value', () => {
+    const sport = makeSport(['distance_km', 'pace']);
+    expect(sportCardStats({ duration: 20, metrics: {} }, sport).map(s => s.text)).toEqual(['20min']);
   });
 });

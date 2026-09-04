@@ -141,20 +141,6 @@ export class WorkoutService {
     this.workouts().filter(w => (w.status ?? 'done') !== 'planned')
   );
 
-  /**
-   * Workouts still queued for Supabase — created offline, or rejected by the
-   * server and waiting on a retry. They live in `localStorage` only, so any
-   * view that reads from Supabase (Historial) would show a shorter history
-   * than the ones reading the local cache (Inici) unless it merges these in.
-   * Tracks `pendingCount` so it re-evaluates as the queue fills and drains.
-   */
-  readonly unsyncedWorkouts = computed((): Workout[] => {
-    this.syncService.pendingCount();
-    return this.syncService.pendingIds()
-      .map(id => this.syncService.getSnapshot(id))
-      .filter((w): w is Workout => w !== null);
-  });
-
   readonly plannedByDate = computed(() => {
     const map = new Map<string, Workout[]>();
     for (const w of this.plannedWorkouts()) {

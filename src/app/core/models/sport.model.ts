@@ -125,6 +125,22 @@ export const METRIC_CATALOGUE: SportMetricDef[] = [
   ]},
 ];
 
+/**
+ * Quines mètriques valen la pena a la previsualització de la targeta, de més
+ * a menys rellevant.
+ *
+ * La targeta és un cop d'ull: hi caben dues xifres i prou (la durada compta
+ * com una). Un partit de pàdel es reconeix pel resultat, una sortida a córrer
+ * per la distància; el terreny o l'estil són context que ja surt en obrir la
+ * sessió. Una clau que no sigui aquí queda l'última, per ordre del propi
+ * esport.
+ */
+export const CARD_METRIC_PRIORITY: string[] = [
+  'result', 'distance_km', 'distance_m', 'goals', 'points',
+  'sets_won', 'sets_lost', 'intensity', 'pace', 'style_swim',
+  'yoga_style', 'terrain', 'environment', 'match_type',
+];
+
 function _m(key: string): SportMetricDef {
   const def = METRIC_CATALOGUE.find(m => m.key === key);
   if (!def) throw new Error(`Metric key "${key}" not found in catalogue`);
