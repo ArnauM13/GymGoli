@@ -409,14 +409,11 @@ describe('TrainComponent', () => {
     });
   });
 
-  // El suggeriment i la bafarada són la mateixa targeta: mentre és oberta es
-  // pinta amb el gos al costat, i en tancar-la queda la targeta de sempre.
+  // El suggeriment i la bafarada són la mateixa targeta: sempre es pinta amb
+  // el gos al costat, i en tancar-la no queda res al seu lloc.
   describe('suggestion bubble', () => {
     const gym   = { type: 'gym',   category: 'legs', label: 'Cames',  color: '#81c784', icon: 'directions_run', reason: 'Fa 29 dies' } as never;
     const sport = { type: 'sport', sport: {} as never, label: 'Futbol', color: '#1E88E5', icon: 'sports_soccer', reason: 'El teu esport habitual' } as never;
-
-    beforeEach(() => localStorage.removeItem('gymgoli_mascot_bubble'));
-    afterEach(()  => localStorage.removeItem('gymgoli_mascot_bubble'));
 
     it('the Marley proposes gym', () => {
       expect(component.suggestionMascot(gym).figure).toContain('marley');
@@ -430,18 +427,17 @@ describe('TrainComponent', () => {
       expect(component.suggestionMascot(gym).figure).toContain('-full');
     });
 
-    it('starts open so the dog shows up', () => {
-      expect(component.suggestionBubbleOpen(gym)).toBe(true);
+    it('starts visible so the dog shows up', () => {
+      expect(component.suggestionDismissed()).toBe(false);
     });
 
-    it('closes and stays closed, leaving the plain card behind', () => {
-      component.closeSuggestionBubble(gym);
-      expect(component.suggestionBubbleOpen(gym)).toBe(false);
-    });
-
-    it('closing one suggestion does not close a different one', () => {
-      component.closeSuggestionBubble(gym);
-      expect(component.suggestionBubbleOpen(sport)).toBe(true);
+    it('closing it leaves nothing behind — no card, no fallback action', () => {
+      component.dismissSuggestion();
+      fixture.detectChanges();
+      expect(component.suggestionDismissed()).toBe(true);
+      const host: HTMLElement = fixture.nativeElement;
+      expect(host.querySelector('.suggestion-float-row')).toBeNull();
     });
   });
+
 });

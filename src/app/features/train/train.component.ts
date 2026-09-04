@@ -28,7 +28,6 @@ import { WorkoutService } from '../../core/services/workout.service';
 import { OfflineService } from '../../core/services/offline.service';
 import { ActivityIconComponent } from '../../shared/components/activity-icon/activity-icon.component';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
-import { MascotBubbleService } from '../../core/services/mascot-bubble.service';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
 import { AppHintService } from '../../core/services/app-hint.service';
 import { ExercisePickerDialogComponent } from './components/exercise-picker-dialog.component';
@@ -415,59 +414,56 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
     </div>
 
     <!-- ── Suggeriment ──────────────────────────────────────────────────
-         Una sola cosa, no tres. Mentre la bafarada és oberta, la targeta ÉS
-         la bafarada: mateix format, amb cua cap al gos, botó de tancar i el
-         Marley (o el Xoco) al costat. En tancar-la queda la targeta de
-         sempre, que segueix portant al mateix lloc. ── -->
-    @if (!activeWorkout() && todaySuggestion(); as s) {
-      <div class="suggestion-float-row" [class.sfr--with-dog]="suggestionBubbleOpen(s)">
-        <div class="sf-card-wrap">
-          <button class="suggestion-float" [style.--sc]="s.color" (click)="handleSuggestionClick(s)"
-                  [attr.aria-label]="'Entrenament suggerit: ' + s.label + '. ' + s.reason">
-            <div class="sf-bar" aria-hidden="true"></div>
-            <app-activity-icon [icon]="s.icon" [color]="s.color"
-                               [mascot]="suggestionBubbleOpen(s) ? null : suggestionMascotId(s)" />
-            <div class="sf-info" aria-hidden="true">
-              <span class="sf-label">{{ s.label }}</span>
-              <span class="sf-reason">{{ s.reason }}</span>
-            </div>
-            <!-- El verb, dins una pastilla: amb només el chevron la targeta
-                 es llegia com una nota i no com el botó que és. -->
-            <span class="sf-go" aria-hidden="true">
-              {{ s.type === 'gym' ? 'Començar' : 'Registrar' }}
-              <span class="material-symbols-outlined">arrow_forward</span>
-            </span>
-          </button>
+         Una sola cosa, no tres: la targeta ÉS la bafarada del gos —mateix
+         format, amb cua cap a ell i botó de tancar. Si la tanques marxa tot,
+         no queda cap targeta de fons: el suggeriment torna la pròxima vegada
+         que entris a la pàgina. ── -->
+    @if (!suggestionDismissed()) {
+      @if (!activeWorkout() && todaySuggestion(); as s) {
+        <div class="suggestion-float-row sfr--with-dog">
+          <div class="sf-card-wrap">
+            <button class="suggestion-float" [style.--sc]="s.color" (click)="handleSuggestionClick(s)"
+                    [attr.aria-label]="'Entrenament suggerit: ' + s.label + '. ' + s.reason">
+              <div class="sf-bar" aria-hidden="true"></div>
+              <app-activity-icon [icon]="s.icon" [color]="s.color" />
+              <div class="sf-info" aria-hidden="true">
+                <span class="sf-label">{{ s.label }}</span>
+                <span class="sf-reason">{{ s.reason }}</span>
+              </div>
+              <!-- El verb, dins una pastilla: amb només el chevron la targeta
+                   es llegia com una nota i no com el botó que és. -->
+              <span class="sf-go" aria-hidden="true">
+                {{ s.type === 'gym' ? 'Començar' : 'Registrar' }}
+                <span class="material-symbols-outlined">arrow_forward</span>
+              </span>
+            </button>
 
-          @if (suggestionBubbleOpen(s)) {
             <!-- Fora del botó: dins el retallaria l'overflow de la targeta. -->
             <span class="sf-tail" [style.--sc]="s.color" aria-hidden="true"></span>
-            <button class="sf-close" type="button" (click)="closeSuggestionBubble(s)"
+            <button class="sf-close" type="button" (click)="dismissSuggestion()"
                     aria-label="Tancar el suggeriment">
               <span class="material-symbols-outlined" aria-hidden="true">close</span>
             </button>
-          }
-        </div>
-
-        @if (suggestionBubbleOpen(s)) {
-          <img class="sf-figure" [src]="suggestionMascot(s).figure" alt="" aria-hidden="true">
-        }
-      </div>
-    } @else if (!activeWorkout() && !creating()) {
-      <!-- Acció principal quan no hi ha suggeriment: mateixa caixa que el
-           suggeriment, però plena de marca — ha de ser l'element amb més
-           contrast de la pàgina, i el verb mana al títol. -->
-      <div class="suggestion-float-row">
-        <button class="suggestion-float suggestion-float--action" (click)="startDefaultWorkout()"
-                aria-label="Començar entrenament: registra una nova sessió">
-          <app-activity-icon icon="add_circle" color="#fff" />
-          <div class="sf-info" aria-hidden="true">
-            <span class="sf-label">Començar entrenament</span>
-            <span class="sf-reason">Registra la teva sessió</span>
           </div>
-          <span class="material-symbols-outlined sf-chevron" aria-hidden="true">arrow_forward</span>
-        </button>
-      </div>
+
+          <img class="sf-figure" [src]="suggestionMascot(s).figure" alt="" aria-hidden="true">
+        </div>
+      } @else if (!activeWorkout() && !creating()) {
+        <!-- Acció principal quan no hi ha suggeriment: mateixa caixa que el
+             suggeriment, però plena de marca — ha de ser l'element amb més
+             contrast de la pàgina, i el verb mana al títol. -->
+        <div class="suggestion-float-row">
+          <button class="suggestion-float suggestion-float--action" (click)="startDefaultWorkout()"
+                  aria-label="Començar entrenament: registra una nova sessió">
+            <app-activity-icon icon="add_circle" color="#fff" />
+            <div class="sf-info" aria-hidden="true">
+              <span class="sf-label">Començar entrenament</span>
+              <span class="sf-reason">Registra la teva sessió</span>
+            </div>
+            <span class="material-symbols-outlined sf-chevron" aria-hidden="true">arrow_forward</span>
+          </button>
+        </div>
+      }
     }
 
     <!-- ── Template picker bottom sheet ── -->
@@ -1450,7 +1446,6 @@ export class TrainComponent implements OnDestroy {
   private exerciseService  = inject(ExerciseService);
   private sharedWorkoutService = inject(SharedWorkoutService);
   private profileService   = inject(WorkoutProfileService);
-  readonly bubbleService   = inject(MascotBubbleService);
   readonly hintService     = inject(AppHintService);
   readonly router          = inject(Router);
   private route            = inject(ActivatedRoute);
@@ -1615,18 +1610,15 @@ export class TrainComponent implements OnDestroy {
     return MASCOTS[this.suggestionMascotId(s)];
   }
 
-  /** Mentre és oberta, la targeta es pinta com la bafarada del gos. */
-  suggestionBubbleOpen(s: TodaySuggestion): boolean {
-    return this.bubbleService.isOpen(this._bubbleKey(s));
-  }
+  /**
+   * Tancar la bafarada retira el suggeriment sencer: no ha de quedar cap
+   * targeta de fons ni cap acció al seu lloc. Viu només a la vista —quan
+   * tornes a entrar a la pàgina, el gos torna a proposar.
+   */
+  readonly suggestionDismissed = signal(false);
 
-  closeSuggestionBubble(s: TodaySuggestion): void {
-    this.bubbleService.dismiss(this._bubbleKey(s));
-  }
-
-  /** Una bafarada per suggeriment i dia: si la tanques, no torna fins demà. */
-  private _bubbleKey(s: TodaySuggestion): string {
-    return `train:${s.type}:${s.label}`;
+  dismissSuggestion(): void {
+    this.suggestionDismissed.set(true);
   }
 
   handleSuggestionClick(s: TodaySuggestion): void {
