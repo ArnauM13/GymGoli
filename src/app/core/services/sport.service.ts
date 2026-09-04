@@ -6,6 +6,18 @@ import { TodayService } from './today.service';
 import { DEFAULT_SPORTS, Sport, SportMetricDef, SportSession, SportSessionStatus, SportSubtype } from '../models/sport.model';
 import { FeelingLevel, PlannedSource } from '../models/workout.model';
 
+/**
+ * Una escriptura que encara no ha arribat a Supabase.
+ *
+ * Les sessions es guarden primer al dispositiu i s'envien després, així que
+ * qualsevol canvi — alta, edició o esborrat — ha de poder esperar a la cua.
+ * Abans només hi esperaven les altes: una edició feta sense cobertura petava
+ * i es perdia, i l'entrenament es veia diferent segons el mòbil des d'on
+ * miressis.
+ */
+type SportOpKind = 'insert' | 'update' | 'delete';
+interface PendingSportOp { op: SportOpKind; id: string; row: Record<string, unknown>; }
+
 // ── Row mappers ──────────────────────────────────────────────────────────────
 
 function toSport(row: Record<string, unknown>): Sport {
@@ -72,6 +84,11 @@ export class SportService {
   private readonly _monthCache = new Map<string, SportSession[]>();
   private readonly _sessions   = signal<SportSession[]>([]);
   private _allLoaded = false;
+  private _isFlushing = false;
+  private _retryTimer: ReturnType<typeof setInterval> | null = null;
+
+  /** Cada quant es reintenta la cua d'escriptures pendents. */
+  private static readonly RETRY_MS = 20_000;
   readonly isLoading = signal(false);
 
   private readonly _sportsLoaded = signal(false);
@@ -130,6 +147,8 @@ export class SportService {
 
     if (typeof window !== 'undefined') {
       window.addEventListener('online', () => this._flushPending());
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) this._flushPending(); });
+      window.addEventListener('pagehide', () => this._flushPending());
     }
   }
 
@@ -445,26 +464,20 @@ export class SportService {
       status,
       planned_source: plannedSource ?? null,
     };
-    try {
-      const { error } = await this.supabase.from('sport_sessions').insert(row);
-      if (error) throw error;
-    } catch {
-      this._queuePending(uid, row);
-    }
+    await this._pushOrQueue(uid, { op: 'insert', id, row });
   }
 
   /** Convert a planned sport session into a done one. */
   async startPlannedSession(id: string, date: string): Promise<void> {
     const uid = this._uid();
-    const { error } = await this.supabase.from('sport_sessions')
-      .update({ status: 'done' }).eq('id', id).eq('user_id', uid);
-    if (error) throw error;
 
     const key    = date.substring(0, 7);
     const bucket = this._monthCache.get(key) ?? [];
     this._monthCache.set(key, bucket.map(s => s.id === id ? { ...s, status: 'done' } : s));
     this._rebuild();
     this._writeSessionsToStorage(uid, key, this._monthCache.get(key)!);
+
+    await this._pushOrQueue(uid, { op: 'update', id, row: { status: 'done' } });
   }
 
   /** Update an existing session's data. */
@@ -473,14 +486,6 @@ export class SportService {
     data: { subtypeId?: string; duration?: number; feeling?: FeelingLevel; metrics?: Record<string, string | number>; notes?: string }
   ): Promise<void> {
     const uid = this._uid();
-    const { error } = await this.supabase.from('sport_sessions').update({
-      subtype_id: data.subtypeId ?? null,
-      duration:   data.duration  ?? null,
-      feeling:    data.feeling   ?? null,
-      metrics:    data.metrics   ?? null,
-      notes:      data.notes     ?? null,
-    }).eq('id', id).eq('user_id', uid);
-    if (error) throw error;
 
     const key    = date.substring(0, 7);
     const bucket = this._monthCache.get(key) ?? [];
@@ -490,6 +495,15 @@ export class SportService {
     ));
     this._rebuild();
     this._writeSessionsToStorage(uid, key, this._monthCache.get(key)!);
+
+    const row = {
+      subtype_id: data.subtypeId ?? null,
+      duration:   data.duration  ?? null,
+      feeling:    data.feeling   ?? null,
+      metrics:    data.metrics   ?? null,
+      notes:      data.notes     ?? null,
+    };
+    await this._pushOrQueue(uid, { op: 'update', id, row });
   }
 
   async deleteSession(id: string, date: string): Promise<void> {
@@ -508,9 +522,6 @@ export class SportService {
 
   async setSessionSubtype(sessionId: string, date: string, subtypeId: string | null): Promise<void> {
     const uid = this._uid();
-    const { error } = await this.supabase.from('sport_sessions')
-      .update({ subtype_id: subtypeId }).eq('id', sessionId).eq('user_id', uid);
-    if (error) throw error;
 
     const key    = date.substring(0, 7);
     const bucket = this._monthCache.get(key) ?? [];
@@ -519,41 +530,40 @@ export class SportService {
     ));
     this._rebuild();
     this._writeSessionsToStorage(uid, key, this._monthCache.get(key)!);
+
+    await this._pushOrQueue(uid, { op: 'update', id: sessionId, row: { subtype_id: subtypeId } });
   }
 
   // ── Private mutations ─────────────────────────────────────────────────────
 
   private async _createSession(date: string, sportId: string): Promise<void> {
     const uid = this._uid();
-    const { data, error } = await this.supabase
-      .from('sport_sessions')
-      .insert({ user_id: uid, date, sport_id: sportId })
-      .select()
-      .single();
-    if (error) throw error;
-
-    const session = toSportSession(data as Record<string, unknown>);
+    // L'id el posa el client perquè la sessió existeixi al dispositiu abans
+    // d'arribar al servidor — si no hi ha xarxa, l'alta espera a la cua.
+    const id      = crypto.randomUUID();
+    const session: SportSession = { id, date, sportId, status: 'done', createdAt: new Date() };
     const key     = date.substring(0, 7);
     const bucket  = this._monthCache.get(key) ?? [];
     this._monthCache.set(key, [...bucket, session]);
     this._rebuild();
     this._writeSessionsToStorage(uid, key, this._monthCache.get(key)!);
+
+    await this._pushOrQueue(uid, {
+      op: 'insert', id,
+      row: { id, user_id: uid, date, sport_id: sportId, status: 'done' },
+    });
   }
 
   private async _deleteSession(id: string, date: string): Promise<void> {
     const uid = this._uid();
-    const { error } = await this.supabase
-      .from('sport_sessions')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', uid);
-    if (error) throw error;
 
     const key    = date.substring(0, 7);
     const bucket = this._monthCache.get(key) ?? [];
     this._monthCache.set(key, bucket.filter(s => s.id !== id));
     this._rebuild();
     this._writeSessionsToStorage(uid, key, this._monthCache.get(key)!);
+
+    await this._pushOrQueue(uid, { op: 'delete', id, row: {} });
   }
 
   // ── localStorage cache ────────────────────────────────────────────────────
@@ -592,36 +602,119 @@ export class SportService {
 
   private _lsPendingKey(uid: string): string { return `gymgoli_sport_pending_${uid}`; }
 
-  private _readPending(uid: string): Record<string, unknown>[] {
-    try { return JSON.parse(localStorage.getItem(this._lsPendingKey(uid)) ?? '[]'); } catch { return []; }
+  /** Les entrades antigues eren files d'alta pelades, sense `op`. */
+  private _readPending(uid: string): PendingSportOp[] {
+    try {
+      const raw = JSON.parse(localStorage.getItem(this._lsPendingKey(uid)) ?? '[]') as unknown[];
+      return raw.map(e => {
+        const entry = e as Record<string, unknown>;
+        if (entry['op']) return entry as unknown as PendingSportOp;
+        return { op: 'insert' as const, id: entry['id'] as string, row: entry };
+      });
+    } catch { return []; }
   }
 
-  private _writePending(uid: string, rows: Record<string, unknown>[]): void {
-    try { localStorage.setItem(this._lsPendingKey(uid), JSON.stringify(rows)); } catch { }
+  private _writePending(uid: string, ops: PendingSportOp[]): void {
+    try { localStorage.setItem(this._lsPendingKey(uid), JSON.stringify(ops)); } catch { }
+    if (ops.length) this._armRetry(); else this._stopRetry();
   }
 
-  private _queuePending(uid: string, row: Record<string, unknown>): void {
-    const rows = this._readPending(uid);
-    rows.push(row);
-    this._writePending(uid, rows);
+  /**
+   * Mentre quedi res per enviar, es reintenta sol cada 20s.
+   *
+   * Sense això una escriptura fallida es quedava encallada amb l'app oberta
+   * fins que la tancaves i la tornaves a obrir, i mentrestant la sessió només
+   * existia en aquell dispositiu.
+   */
+  private _armRetry(): void {
+    if (this._retryTimer || typeof window === 'undefined') return;
+    this._retryTimer = setInterval(() => this._flushPending(), SportService.RETRY_MS);
+  }
+
+  private _stopRetry(): void {
+    if (!this._retryTimer) return;
+    clearInterval(this._retryTimer);
+    this._retryTimer = null;
+  }
+
+  /**
+   * Encua una escriptura, plegant-la amb el que ja hi hagi d'aquesta sessió.
+   *
+   * Una edició sobre una alta que encara no ha sortit es fon amb l'alta, i un
+   * esborrat les elimina totes dues: al servidor no li ha d'arribar el rastre
+   * de coses que mai hi van ser.
+   */
+  private _queuePending(uid: string, op: PendingSportOp): void {
+    const ops     = this._readPending(uid);
+    const pending = ops.filter(o => o.id === op.id);
+    const others  = ops.filter(o => o.id !== op.id);
+
+    if (op.op === 'delete') {
+      // Mai va arribar al servidor: prou amb oblidar-la.
+      if (pending.some(o => o.op === 'insert')) { this._writePending(uid, others); return; }
+      this._writePending(uid, [...others, op]);
+      return;
+    }
+
+    const insert = pending.find(o => o.op === 'insert');
+    if (insert) {
+      this._writePending(uid, [...others, { ...insert, row: { ...insert.row, ...op.row } }]);
+      return;
+    }
+    const update = pending.find(o => o.op === 'update');
+    if (op.op === 'update' && update) {
+      this._writePending(uid, [...others, { ...update, row: { ...update.row, ...op.row } }]);
+      return;
+    }
+    this._writePending(uid, [...ops, op]);
+  }
+
+  /** Prova d'escriure ara; si falla (sense xarxa, servidor caigut), espera a
+   *  la cua. El canvi ja és al dispositiu, així que no es perd. */
+  private async _pushOrQueue(uid: string, op: PendingSportOp): Promise<void> {
+    try {
+      await this._runOp(uid, op);
+    } catch {
+      this._queuePending(uid, op);
+    }
+  }
+
+  private async _runOp(uid: string, op: PendingSportOp): Promise<void> {
+    const table = this.supabase.from('sport_sessions');
+    if (op.op === 'insert') {
+      // `upsert` i no `insert`: un reintent d'una alta que sí que havia
+      // arribat no ha de petar per clau duplicada.
+      const { error } = await table.upsert(op.row, { onConflict: 'id' });
+      if (error) throw error;
+      return;
+    }
+    if (op.op === 'update') {
+      const { error } = await table.update(op.row).eq('id', op.id).eq('user_id', uid);
+      if (error) throw error;
+      return;
+    }
+    const { error } = await table.delete().eq('id', op.id).eq('user_id', uid);
+    if (error) throw error;
   }
 
   private async _flushPending(): Promise<void> {
+    if (this._isFlushing) return;
     const uid = this.auth.uid();
     if (!uid || typeof navigator === 'undefined' || !navigator.onLine) return;
-    const rows = this._readPending(uid);
-    if (rows.length === 0) return;
+    const ops = this._readPending(uid);
+    if (ops.length === 0) return;
 
-    const remaining: Record<string, unknown>[] = [];
-    for (const row of rows) {
+    this._isFlushing = true;
+    const remaining: PendingSportOp[] = [];
+    for (const op of ops) {
       try {
-        const { error } = await this.supabase.from('sport_sessions').insert(row);
-        if (error) throw error;
+        await this._runOp(uid, op);
       } catch {
-        remaining.push(row);
+        remaining.push(op);
       }
     }
     this._writePending(uid, remaining);
+    this._isFlushing = false;
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────

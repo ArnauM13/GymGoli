@@ -1,7 +1,7 @@
 import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, ExerciseCategory, LoadType } from '../../core/models/exercise.model';
 import { FEELING_EMOJI, FeelingLevel, Workout, setVolume } from '../../core/models/workout.model';
 import { DifficultyScale } from '../../core/models/user-settings.model';
-import { Sport } from '../../core/models/sport.model';
+import { CARD_METRIC_PRIORITY, Sport, SportMetricDef } from '../../core/models/sport.model';
 import { workoutCategories } from './calendar-utils';
 import { toDateStr } from './date.utils';
 
@@ -54,16 +54,54 @@ export function sportStatParts(
   if (session.duration) stats.push({ icon: 'timer', text: `${session.duration}min` });
   const metrics = session.metrics ?? {};
   for (const def of sport.metricDefs ?? []) {
-    const v = metrics[def.key];
-    if (v === undefined || v === null || v === '') continue;
-    if (def.type === 'select') {
-      const opt = (def.options ?? []).find(o => o.value === v);
-      stats.push({ icon: 'label', text: opt?.label ?? String(v) });
-    } else {
-      stats.push({ icon: 'insights', text: `${v}${def.unit ?? ''}` });
-    }
+    const stat = _metricStat(def, metrics[def.key]);
+    if (stat) stats.push(stat);
   }
   return stats;
+}
+
+/**
+ * Les xifres que caben a la previsualització de la targeta: dues, comptant-hi
+ * la durada.
+ *
+ * Un esport pot tenir-ne mitja dotzena i totes juntes converteixen la targeta
+ * en una fitxa tècnica. Es queden la durada i la mètrica més rellevant de
+ * l'esport (`CARD_METRIC_PRIORITY`): el resultat a pàdel o futbol, la
+ * distància a córrer o nedar. La resta surten en obrir la sessió.
+ */
+export function sportCardStats(
+  session: { duration?: number; metrics?: Record<string, string | number> },
+  sport: Sport,
+  max = 2,
+): ActivityStat[] {
+  const stats: ActivityStat[] = [];
+  if (session.duration) stats.push({ icon: 'timer', text: `${session.duration}min` });
+
+  const metrics = session.metrics ?? {};
+  const byRelevance = [...(sport.metricDefs ?? [])].sort((a, b) => _metricRank(a.key) - _metricRank(b.key));
+  for (const def of byRelevance) {
+    if (stats.length >= max) break;
+    const stat = _metricStat(def, metrics[def.key]);
+    if (stat) stats.push(stat);
+  }
+  return stats.slice(0, max);
+}
+
+/** Fora de la llista de prioritats es va al final, sense desempatar entre elles
+ *  (l'ordre del propi esport mana). */
+function _metricRank(key: string): number {
+  const i = CARD_METRIC_PRIORITY.indexOf(key);
+  return i === -1 ? CARD_METRIC_PRIORITY.length : i;
+}
+
+/** Una mètrica amb valor es converteix en xifra; sense valor, no hi és. */
+function _metricStat(def: SportMetricDef, v: string | number | undefined): ActivityStat | null {
+  if (v === undefined || v === null || v === '') return null;
+  if (def.type === 'select') {
+    const opt = (def.options ?? []).find(o => o.value === v);
+    return { icon: 'label', text: opt?.label ?? String(v) };
+  }
+  return { icon: 'insights', text: `${v}${def.unit ?? ''}` };
 }
 
 export function workoutCardColor(w: Workout): string {

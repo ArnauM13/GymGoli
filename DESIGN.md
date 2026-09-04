@@ -270,18 +270,25 @@ La targeta és la mateixa a Inici i a Historial i viu en un sol component
 L'estructura, de fora cap a dins:
 
 ```
-[barra 5px] [icona + gos] [ títol · etiquetes · sensació ]   [chevron]
-                          [ detall (exercicis / subtipus) ]
-                          [ xifres amb icona ]
+[barra 5px] [icona + gos] [ títol · subtipus · etiquetes ]  [fatiga] [chevron]
+                          [ nota, si n'hi ha              ]
+                          [ xifres amb icona (2 com a molt) ]
 ```
 
 Regles que la fan llegible:
 
 - **El títol identifica**: el tipus d'entrenament (`Empenta`, `Empenta ·
-  Tracció`) o el nom de l'esport — mai la llista d'exercicis, que va a la
-  línia de detall. Res d'una xapa de tipus tota sola en una línia.
-- **La sensació va a la fila del títol**, alineada a la dreta. A la línia de
-  xifres s'escapa a una línia pròpia quan hi ha sèries d'escalfament.
+  Tracció`) o el nom de l'esport. Res d'una xapa de tipus tota sola en una
+  línia.
+- **El subtipus va enganxat al títol** en una xapa petita (`Yoga` + `Vinyasa`):
+  és part del nom de l'activitat, no una dada més.
+- **La targeta és un cop d'ull, no una fitxa**: cap llista d'exercicis i cap
+  mètrica opcional. Dues xifres com a molt (`sportCardStats`, on la durada ja
+  compta com una); la resta viu dins l'activitat, en obrir-la.
+- **La fatiga té columna pròpia** a la dreta, entre el text i el chevron, amb
+  amplada reservada (26px) hi sigui o no: així totes les targetes s'alineen.
+- **L'alçada es reserva** (`min-height` al bloc de text) perquè una activitat
+  amb nota i una sense facin la mateixa mida.
 - **Les xifres porten icona i no es parteixen** (`white-space: nowrap` a cada
   una, separador `·` entre elles).
 - **La icona sempre a `app-activity-icon`** (38×38, gos a la cantonada), amb

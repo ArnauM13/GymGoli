@@ -33,7 +33,7 @@ describe('DayFeedCardsComponent', () => {
     await TestBed.configureTestingModule({
       imports: [DayFeedCardsComponent],
       providers: [
-        { provide: WorkoutService, useValue: { startPlannedWorkout, deleteWorkout, unsyncedWorkouts: signal<Workout[]>([]) } },
+        { provide: WorkoutService, useValue: { startPlannedWorkout, deleteWorkout } },
         { provide: SportService, useValue: { updateSession, deleteSession } },
         { provide: UserSettingsService, useValue: { difficultyScale: signal('emoji'), bodyweightKg: signal(null), weightUnit: signal<'kg' | 'lb'>('kg') } },
         { provide: ExerciseService, useValue: { loadTypeOf: () => undefined, getById: () => undefined } },
@@ -97,7 +97,10 @@ describe('DayFeedCardsComponent', () => {
   describe('unified activity card', () => {
     const day = {
       date: '2024-03-05',
-      workouts: [makeWorkout({ id: 'w1', categories: ['push'], feeling: 3 as const })],
+      workouts: [makeWorkout({
+        id: 'w1', categories: ['push'], feeling: 3 as const,
+        entries: [{ exerciseId: 'e1', exerciseName: 'Press banca', sets: [] }],
+      })],
       sports: [{
         sport: { id: 'run', name: 'Running', icon: 'directions_run', color: '#000', subtypes: [], metricDefs: [], createdAt: new Date() },
         session: { id: 'sess1', date: '2024-03-05', sportId: 'run', duration: 30, createdAt: new Date() },
@@ -122,13 +125,26 @@ describe('DayFeedCardsComponent', () => {
       expect(title.textContent?.trim()).toBe('Empenta');
     });
 
-    it('keeps the feeling on the title row so it never wraps below the stats', () => {
+    it('gives the feeling its own slot on the right, just before the chevron', () => {
+      fixture.componentRef.setInput('day', day);
+      fixture.detectChanges();
+
+      const el      = fixture.nativeElement as HTMLElement;
+      const feeling = el.querySelector('.ac-main > .ac-feeling') as HTMLElement;
+      expect(feeling).toBeTruthy();
+      expect(feeling.nextElementSibling?.classList).toContain('ac-chevron');
+      expect(el.querySelector('.ac-title-row .ac-feeling')).toBeNull();
+      expect(el.querySelector('.ac-stats .ac-feeling')).toBeNull();
+    });
+
+    it('keeps the exercise list out of the card preview', () => {
       fixture.componentRef.setInput('day', day);
       fixture.detectChanges();
 
       const el = fixture.nativeElement as HTMLElement;
-      expect(el.querySelector('.ac-title-row .ac-feeling')).toBeTruthy();
-      expect(el.querySelector('.ac-stats .ac-feeling')).toBeNull();
+      expect(el.textContent).not.toContain('Press banca');
+      // Les xifres resum sí que s'hi queden.
+      expect(el.querySelector('.ac-stats')).toBeTruthy();
     });
 
     it('points a workout out of the feed by default, and expands it in place when asked to', () => {

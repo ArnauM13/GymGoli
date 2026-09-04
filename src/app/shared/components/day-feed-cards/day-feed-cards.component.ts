@@ -1,4 +1,4 @@
-import { Component, booleanAttribute, computed, inject, input, output, signal } from '@angular/core';
+import { Component, booleanAttribute, inject, input, output, signal } from '@angular/core';
 
 import { ActivityIconComponent } from '../activity-icon/activity-icon.component';
 import { WorkoutDetailComponent } from '../workout-detail/workout-detail.component';
@@ -12,7 +12,7 @@ import { FeedbackService } from '../../services/feedback.service';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import {
   ActivityStat,
-  formatFeeling, getExerciseNames, isWorkoutPlanned, sportStatParts,
+  formatFeeling, isWorkoutPlanned, sportCardStats,
   workoutCardColor, workoutPrimaryColor, workoutPrimaryIcon, workoutSetsCount,
   workoutTypeLabel, workoutWarmupSetsCount,
   workoutVolumeFmt as workoutVolumeFmtUtil,
@@ -52,15 +52,8 @@ export interface DayFeedEntry {
               <div class="ac-title-row">
                 <span class="ac-title">{{ workoutTypeLabel(w) }}</span>
                 @if (isPlanned(w)) { <span class="ac-tag">Planificat</span> }
-                @if (isUnsynced(w.id)) {
-                  <span class="ac-tag ac-tag--unsynced" title="Encara no s'ha desat al servidor">
-                    <span class="material-symbols-outlined" aria-hidden="true">cloud_off</span>
-                    Sense sincronitzar
-                  </span>
-                }
-                @if (w.feeling) { <span class="ac-feeling">{{ emojiOf(w.feeling) }}</span> }
               </div>
-              <span class="ac-detail">{{ w.entries.length ? getExerciseNames(w) : (isPlanned(w) ? 'Pla buit' : 'Sense exercicis') }}</span>
+              @if (w.notes?.trim(); as note) { <span class="ac-detail">{{ note }}</span> }
               @if (!isPlanned(w)) {
                 <div class="ac-stats">
                   <span class="ac-stat">
@@ -89,6 +82,9 @@ export interface DayFeedEntry {
                 </div>
               }
             </div>
+            <span class="ac-feeling">
+              @if (w.feeling) { {{ emojiOf(w.feeling) }} }
+            </span>
             @if (!isPlanned(w)) {
               <span class="material-symbols-outlined ac-chevron" aria-hidden="true">
                 {{ expandWorkouts() ? (expandedWorkoutId() === w.id ? 'expand_less' : 'expand_more') : 'chevron_right' }}
@@ -133,9 +129,9 @@ export interface DayFeedEntry {
             <div class="ac-info">
               <div class="ac-title-row">
                 <span class="ac-title">{{ item.sport.name }}</span>
-                @if (item.session.feeling) { <span class="ac-feeling">{{ emojiOf(item.session.feeling) }}</span> }
+                @if (sportSubtype(item); as sub) { <span class="ac-subtype">{{ sub }}</span> }
               </div>
-              @if (sportDetail(item); as detail) { <span class="ac-detail">{{ detail }}</span> }
+              @if (item.session.notes?.trim(); as note) { <span class="ac-detail">{{ note }}</span> }
               @if (sportStats(item); as stats) {
                 @if (stats.length) {
                   <div class="ac-stats">
@@ -150,6 +146,9 @@ export interface DayFeedEntry {
                 }
               }
             </div>
+            <span class="ac-feeling">
+              @if (item.session.feeling) { {{ emojiOf(item.session.feeling) }} }
+            </span>
             <span class="material-symbols-outlined ac-chevron" aria-hidden="true">
               {{ expandedSportId() === item.session.id ? 'expand_less' : 'expand_more' }}
             </span>
@@ -285,7 +284,12 @@ export interface DayFeedEntry {
       &:focus-visible { outline: 2px solid var(--ac, var(--c-brand)); outline-offset: -3px; }
     }
 
-    .ac-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    /* L'alçada es reserva encara que la targeta porti poca cosa: totes les
+     * activitats d'un dia han de fer la mateixa mida, hi hagi nota o no. */
+    .ac-info {
+      flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center;
+      gap: 2px; min-height: 52px;
+    }
     .ac-title-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
     .ac-title {
       flex: 1; min-width: 0; font-size: 14px; font-weight: 800; line-height: 1.25;
@@ -298,11 +302,21 @@ export interface DayFeedEntry {
       font-size: 10px; font-weight: 700; letter-spacing: 0.2px; line-height: 1.5;
       .material-symbols-outlined { font-size: 12px; }
     }
-    .ac-tag--unsynced { background: rgba(255,152,0,0.15); color: #b26500; }
-    html.dark .ac-tag--unsynced { background: rgba(255,152,0,0.18); color: #ffb74d; }
-    /* La sensació viu a la fila del títol i no al costat de les xifres: allà
-       s'escapava a una línia sola quan hi havia sèries d'escalfament. */
-    .ac-feeling { flex-shrink: 0; font-size: 15px; line-height: 1.2; }
+    /* El subtipus és part de la identitat («Yoga · Vinyasa»), així que va al
+     * costat del títol i no en una línia pròpia. */
+    .ac-subtype {
+      flex-shrink: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      padding: 1px 7px; border-radius: 8px;
+      background: color-mix(in srgb, var(--ac, var(--c-brand)) 14%, transparent);
+      color: color-mix(in srgb, var(--ac, var(--c-brand)) 65%, var(--c-text));
+      font-size: 10.5px; font-weight: 700; line-height: 1.5;
+    }
+    /* La fatiga té columna pròpia a la dreta, just abans del chevron: sempre
+     * al mateix lloc, hi sigui o no, perquè les targetes s'alineïn entre elles. */
+    .ac-feeling {
+      flex-shrink: 0; width: 26px; text-align: center;
+      font-size: 15px; font-weight: 700; line-height: 1.2; color: var(--c-text-2);
+    }
     .ac-detail {
       font-size: 11.5px; font-weight: 500; color: var(--c-text-2); line-height: 1.3;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -477,21 +491,12 @@ export class DayFeedCardsComponent {
   readonly editMetrics     = signal<Record<string, string | number>>({});
   readonly editNotes       = signal('');
 
-  /** Els entrenaments que encara no han arribat a Supabase: es marquen a la
-   *  targeta perquè una sessió pendent de sincronitzar es vegi com a tal i no
-   *  sembli que s'ha perdut. */
-  private readonly unsyncedIds = computed(
-    () => new Set(this.workoutService.unsyncedWorkouts().map(w => w.id))
-  );
-  isUnsynced(id: string): boolean { return this.unsyncedIds().has(id); }
-
   readonly isPlanned          = isWorkoutPlanned;
   readonly workoutPrimaryColor = workoutPrimaryColor;
   readonly workoutPrimaryIcon  = workoutPrimaryIcon;
 
   readonly workoutCardColor    = workoutCardColor;
   readonly workoutTypeLabel    = workoutTypeLabel;
-  readonly getExerciseNames    = getExerciseNames;
   readonly workoutSetsCount    = workoutSetsCount;
   readonly workoutWarmupSetsCount = workoutWarmupSetsCount;
   /** Bodyweight-aware total volume label (folds in the user's bodyweight for
@@ -508,17 +513,14 @@ export class DayFeedCardsComponent {
     return formatFeeling(level, this.settingsService.difficultyScale());
   }
 
-  /** La línia sota el títol d'un esport: el subtipus, o la nota si no n'hi ha.
-   *  Sense cap de les dues no s'inventa text — la línia desapareix. */
-  sportDetail(item: { sport: Sport; session: SportSession }): string {
-    const sub = item.session.subtypeId
-      ? item.sport.subtypes.find(s => s.id === item.session.subtypeId)?.name
-      : null;
-    return sub ?? (item.session.notes?.trim() ?? '');
+  /** El subtipus de la sessió, per a la xapa del costat del títol. */
+  sportSubtype(item: { sport: Sport; session: SportSession }): string {
+    if (!item.session.subtypeId) return '';
+    return item.sport.subtypes.find(s => s.id === item.session.subtypeId)?.name ?? '';
   }
 
   sportStats(item: { sport: Sport; session: SportSession }): ActivityStat[] {
-    return sportStatParts(item.session, item.sport);
+    return sportCardStats(item.session, item.sport);
   }
 
   handleWorkoutClick(w: Workout): void {

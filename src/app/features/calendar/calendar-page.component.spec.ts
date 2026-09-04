@@ -53,7 +53,6 @@ describe('CalendarPageComponent', () => {
     const mockWorkoutService = {
       isLoading:            signal(false),
       workouts:             workoutsSignal,
-      unsyncedWorkouts:     signal<Workout[]>([]),
       getWorkoutForDate:    jasmine.createSpy().and.returnValue(null),
       getWorkoutsForDate:   jasmine.createSpy().and.returnValue([]),
       getDoneWorkoutsForDate: jasmine.createSpy().and.callFake((d: string) => doneByDate[d] ?? []),

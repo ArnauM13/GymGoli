@@ -1,4 +1,4 @@
-import { TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { TestBed, discardPeriodicTasks, fakeAsync, tick } from '@angular/core/testing';
 import { signal } from '@angular/core';
 
 import { SportService } from './sport.service';
@@ -25,6 +25,9 @@ describe('SportService', () => {
 
   function buildMock() {
     const insertSpy = jasmine.createSpy('insert');
+    const upsertSpy = jasmine.createSpy('upsert');
+    const updateSpy = jasmine.createSpy('update');
+    const deleteSpy = jasmine.createSpy('delete');
     const fromSpy   = jasmine.createSpy('from');
 
     const selectChain = (data: () => Record<string, unknown>[]): any => {
@@ -38,22 +41,34 @@ describe('SportService', () => {
       return chain;
     };
 
-    insertSpy.and.callFake(() => ({
+    const writeResult = () => ({
       then: (resolve: (v: { error: unknown }) => void) =>
         resolve(insertShouldFail ? { error: new Error('network error') } : { error: null }),
-    }));
+    });
+    insertSpy.and.callFake(writeResult);
+    upsertSpy.and.callFake(writeResult);
 
+    // update()/delete() acaben amb `.eq(...).eq(...)`: la cadena resol al final.
+    const eqChain = (): any => {
+      const chain: any = writeResult();
+      chain.eq = jasmine.createSpy('eq').and.callFake(() => eqChain());
+      return chain;
+    };
+    updateSpy.and.callFake(() => eqChain());
+    deleteSpy.and.callFake(() => eqChain());
+
+    const writers = { insert: insertSpy, upsert: upsertSpy, update: updateSpy, delete: deleteSpy };
     fromSpy.and.callFake((table: string) => {
       if (table === 'sports') {
-        return { select: () => selectChain(() => sportsData), insert: insertSpy };
+        return { select: () => selectChain(() => sportsData), ...writers };
       }
       if (table === 'sport_sessions') {
-        return { select: () => selectChain(() => sessionsData), insert: insertSpy };
+        return { select: () => selectChain(() => sessionsData), ...writers };
       }
-      return { select: () => selectChain(() => []), insert: insertSpy };
+      return { select: () => selectChain(() => []), ...writers };
     });
 
-    return { client: { from: fromSpy }, fromSpy, insertSpy };
+    return { client: { from: fromSpy }, fromSpy, insertSpy, upsertSpy, updateSpy, deleteSpy };
   }
 
   function setup(): void {
@@ -115,8 +130,10 @@ describe('SportService', () => {
 
       const pending = JSON.parse(localStorage.getItem(LS_PENDING_KEY('user-1'))!);
       expect(pending.length).toBe(1);
-      expect(pending[0].sport_id).toBe('running');
-      expect(pending[0].date).toBe('2024-03-08');
+      expect(pending[0].op).toBe('insert');
+      expect(pending[0].row.sport_id).toBe('running');
+      expect(pending[0].row.date).toBe('2024-03-08');
+      discardPeriodicTasks();
     }));
 
     it('tags the session with plannedSource so routine and manual plans can be retracted independently', fakeAsync(() => {
@@ -129,8 +146,8 @@ describe('SportService', () => {
 
       const session = service.plannedSessions().find(s => s.sportId === 'running');
       expect(session?.plannedSource).toBe('routine');
-      expect(supabaseMock.insertSpy).toHaveBeenCalledWith(
-        jasmine.objectContaining({ planned_source: 'routine' }));
+      expect(supabaseMock.upsertSpy).toHaveBeenCalledWith(
+        jasmine.objectContaining({ planned_source: 'routine' }), jasmine.anything());
     }));
 
     it('sends a null plannedSource when none is given', fakeAsync(() => {
@@ -141,8 +158,8 @@ describe('SportService', () => {
       void service.logSession('2024-03-06', 'running', {}, 'done');
       tick();
 
-      expect(supabaseMock.insertSpy).toHaveBeenCalledWith(
-        jasmine.objectContaining({ planned_source: null }));
+      expect(supabaseMock.upsertSpy).toHaveBeenCalledWith(
+        jasmine.objectContaining({ planned_source: null }), jasmine.anything());
     }));
   });
 
@@ -179,6 +196,70 @@ describe('SportService', () => {
 
       const pending = JSON.parse(localStorage.getItem(LS_PENDING_KEY('user-1'))!);
       expect(pending.length).toBe(1);
+      discardPeriodicTasks();
+    }));
+
+    it('queues an edit made without a connection instead of losing it', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+
+      void service.logSession('2024-03-08', 'running', {}, 'done');
+      tick();
+      const id = service.sessions().find(s => s.sportId === 'running')!.id;
+
+      insertShouldFail = true;
+      void service.updateSession(id, '2024-03-08', { duration: 45 });
+      tick();
+
+      // El canvi ja es veu al dispositiu…
+      expect(service.sessions().find(s => s.id === id)?.duration).toBe(45);
+      // …i espera a la cua per pujar quan es pugui.
+      const pending = JSON.parse(localStorage.getItem(LS_PENDING_KEY('user-1'))!);
+      expect(pending.length).toBe(1);
+      expect(pending[0].op).toBe('update');
+      expect(pending[0].row.duration).toBe(45);
+
+      insertShouldFail = false;
+      window.dispatchEvent(new Event('online'));
+      tick();
+      expect(JSON.parse(localStorage.getItem(LS_PENDING_KEY('user-1'))!).length).toBe(0);
+    }));
+
+    it('folds an edit into an alta that has not gone out yet', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+      insertShouldFail = true;
+
+      void service.logSession('2024-03-08', 'running', {}, 'done');
+      tick();
+      const id = service.sessions().find(s => s.sportId === 'running')!.id;
+
+      void service.updateSession(id, '2024-03-08', { duration: 30 });
+      tick();
+
+      const pending = JSON.parse(localStorage.getItem(LS_PENDING_KEY('user-1'))!);
+      expect(pending.length).toBe(1);
+      expect(pending[0].op).toBe('insert');
+      expect(pending[0].row.duration).toBe(30);
+      discardPeriodicTasks();
+    }));
+
+    it('drops both when a session queued for upload is deleted before going out', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+      insertShouldFail = true;
+
+      void service.logSession('2024-03-08', 'running', {}, 'done');
+      tick();
+      const id = service.sessions().find(s => s.sportId === 'running')!.id;
+
+      void service.deleteSession(id, '2024-03-08');
+      tick();
+
+      expect(JSON.parse(localStorage.getItem(LS_PENDING_KEY('user-1'))!).length).toBe(0);
     }));
   });
 });

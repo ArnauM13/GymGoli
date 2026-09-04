@@ -19,7 +19,12 @@ export class SyncService {
 
   private _backoff       = new Map<string, BackoffState>();
   private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private _retryTimer: ReturnType<typeof setInterval> | null = null;
   private _isFlushRunning = false;
+
+  /** Un entrenament no ha de quedar-se mai al mòbil: mentre hi hagi res
+   *  pendent es reintenta sol, sense esperar que l'usuari torni a obrir res. */
+  private static readonly RETRY_MS = 20_000;
 
   constructor() {
     effect(() => {
@@ -30,14 +35,19 @@ export class SyncService {
       } else {
         this.status.set('synced');
         this.pendingCount.set(0);
+        this._stopRetry();
       }
     });
 
     if (typeof window === 'undefined') return;
     window.addEventListener('online', () => this._triggerFlush());
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden && navigator.onLine && this.pendingCount() > 0) this._triggerFlush();
+      if (this.pendingCount() === 0 || !navigator.onLine) return;
+      // En amagar-se (canvi d'app al mòbil) s'envia ja, sense el debounce: si
+      // el sistema mata la pestanya, el que s'ha entrenat ja és al servidor.
+      if (document.hidden) this._flushNow(); else this._triggerFlush();
     });
+    window.addEventListener('pagehide', () => { if (this.pendingCount() > 0) this._flushNow(); });
   }
 
   // ── Public API ─────────────────────────────────────────────────────────────
@@ -62,10 +72,16 @@ export class SyncService {
     this.pendingCount.set(ids.length);
     if (this.status() === 'synced') this.status.set('pending');
 
-    if (navigator.onLine) {
-      if (this._debounceTimer) clearTimeout(this._debounceTimer);
-      this._debounceTimer = setTimeout(() => { this._debounceTimer = null; this.flush(); }, 3000);
-    }
+    this._armRetry();
+
+    if (!navigator.onLine) return;
+    // Una alta va al servidor de seguida: és el moment en què l'entrenament
+    // encara no existeix enlloc més i el que fa que es vegi des d'un altre
+    // dispositiu. Les edicions s'agrupen, que en arriben moltes seguides
+    // mentre s'omplen sèries.
+    if (isInsert) { this._flushNow(); return; }
+    if (this._debounceTimer) clearTimeout(this._debounceTimer);
+    this._debounceTimer = setTimeout(() => { this._debounceTimer = null; this.flush(); }, 1500);
   }
 
   markClean(workoutId: string): void {
@@ -80,7 +96,10 @@ export class SyncService {
     this._backoff.delete(workoutId);
 
     this.pendingCount.set(ids.length);
-    if (ids.length === 0 && !this._isFlushRunning) this.status.set('synced');
+    if (ids.length === 0) {
+      this._stopRetry();
+      if (!this._isFlushRunning) this.status.set('synced');
+    }
   }
 
   cancelDirty(workoutId: string): void {
@@ -143,6 +162,7 @@ export class SyncService {
     const remaining = this.pendingIds().length;
     this.pendingCount.set(remaining);
     this.status.set(remaining === 0 ? 'synced' : anyError ? 'error' : 'pending');
+    if (remaining > 0) this._armRetry(); else this._stopRetry();
   }
 
   // ── Private: Supabase ──────────────────────────────────────────────────────
@@ -207,9 +227,37 @@ export class SyncService {
     const count = this._loadDirtyIds(uid).length;
     this.pendingCount.set(count);
     this.status.set(count > 0 ? 'pending' : 'synced');
+    if (count > 0) this._armRetry(); else this._stopRetry();
   }
 
   private _triggerFlush(): void {
     setTimeout(() => this.flush(), 1000);
+  }
+
+  /** Envia ara mateix, saltant-se el debounce pendent. */
+  private _flushNow(): void {
+    if (this._debounceTimer) { clearTimeout(this._debounceTimer); this._debounceTimer = null; }
+    this.flush();
+  }
+
+  /**
+   * Mentre quedi res per enviar, es reintenta sol cada 20s.
+   *
+   * Abans només es reintentava en tornar la connexió o en tornar a l'app, així
+   * que un error del servidor amb l'app oberta i quieta es quedava encallat
+   * fins a la propera vegada que la tanquessis i l'obrissis.
+   */
+  private _armRetry(): void {
+    if (this._retryTimer || typeof window === 'undefined') return;
+    this._retryTimer = setInterval(() => {
+      if (this.pendingCount() === 0) { this._stopRetry(); return; }
+      if (navigator.onLine) this.flush();
+    }, SyncService.RETRY_MS);
+  }
+
+  private _stopRetry(): void {
+    if (!this._retryTimer) return;
+    clearInterval(this._retryTimer);
+    this._retryTimer = null;
   }
 }
