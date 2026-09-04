@@ -219,6 +219,45 @@ describe('HomeComponent', () => {
     });
   });
 
+  // ── dayAction() ──────────────────────────────────────────────────────────
+
+  describe('dayAction()', () => {
+    const shift = (days: number) => {
+      const d = new Date(TODAY + 'T12:00:00');
+      d.setDate(d.getDate() + days);
+      return d.toISOString().split('T')[0];
+    };
+
+    it('offers to start a workout on today', () => {
+      expect(component.dayAction().kind).toBe('today');
+      expect(component.dayAction().label).toBe('Comença un entrenament');
+    });
+
+    it('offers to log one on a past day', () => {
+      component.selectedDate.set(shift(-3));
+      expect(component.dayAction().kind).toBe('past');
+      expect(component.dayAction().label).toBe('Registra un entrenament');
+    });
+
+    it('offers to plan a future day rather than showing nothing', () => {
+      component.selectedDate.set(shift(3));
+      expect(component.dayAction().kind).toBe('future');
+      expect(component.dayAction().label).toBe('Planifica aquest dia');
+    });
+
+    it('runDayAction() opens /train with no date on today', () => {
+      component.runDayAction();
+      expect(navigateSpy).toHaveBeenCalledWith(['/train']);
+    });
+
+    it('runDayAction() pins the selected day when it is not today', () => {
+      const past = shift(-3);
+      component.selectedDate.set(past);
+      component.runDayAction();
+      expect(navigateSpy).toHaveBeenCalledWith(['/train'], { queryParams: { date: past } });
+    });
+  });
+
   // ── showRoutineHint() ────────────────────────────────────────────────────
 
   describe('showRoutineHint()', () => {
