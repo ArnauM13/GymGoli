@@ -50,6 +50,22 @@ const RECENT_DAYS = 30;
         }
       </div>
 
+      <!-- ── Acció principal del dia seleccionat ──
+           Va just sota el calendari: tries el dia i hi actues. Abans vivia
+           sota la targeta del dia, i com que aquesta creix amb l'activitat,
+           com més entrenaves més avall queia el botó. -->
+      <button class="start-workout-btn" [class.start-workout-btn--past]="isPast()"
+              (click)="runDayAction()">
+        <span class="swb-icon-wrap" aria-hidden="true">
+          <span class="material-symbols-outlined swb-icon">{{ dayAction().icon }}</span>
+        </span>
+        <span class="swb-text">
+          <span class="swb-label">{{ dayAction().label }}</span>
+          <span class="swb-sub">{{ dayAction().sub }}</span>
+        </span>
+        <span class="material-symbols-outlined swb-arrow" aria-hidden="true">arrow_forward</span>
+      </button>
+
       @if (!offlineService.isOffline() && previewFeedEntry() === null) {
         <app-fitness-insights />
       }
@@ -83,21 +99,6 @@ const RECENT_DAYS = 30;
           }
         </div>
       </div>
-
-      <!-- ── Acció principal: registrar l'entrenament del dia seleccionat,
-             just sota la secció del dia (avui o un dia passat). ── -->
-      @if (isToday()) {
-        <button class="start-workout-btn" (click)="goToTrain()">
-          <span class="material-symbols-outlined swb-icon" aria-hidden="true">add_circle</span>
-          <span class="swb-label">Comença un entrenament</span>
-        </button>
-      } @else if (isPast()) {
-        <button class="start-workout-btn start-workout-btn--past" (click)="registerPastWorkout()">
-          <span class="material-symbols-outlined swb-icon" aria-hidden="true">history</span>
-          <span class="swb-label">Registra un entrenament</span>
-        </button>
-      }
-
 
       @if (showRoutineHint()) {
         <div class="routine-hint-card">
@@ -203,19 +204,23 @@ const RECENT_DAYS = 30;
       border-top: 1px solid var(--c-border-2);
       background: var(--c-card);
     }
+    /* Acció secundària: anava plena de marca i, com que queda per sobre de
+       l'acció principal, era el primer botó que trobava l'ull. Tenyida
+       continua sent ben visible sense competir-hi. */
     .plan-week-btn {
       display: inline-flex; align-items: center; gap: 6px;
-      height: 38px; padding: 0 16px; box-sizing: border-box;
-      border: none; border-radius: 12px;
-      background: var(--c-brand); color: white;
+      height: 38px; padding: 0 14px; box-sizing: border-box;
+      border: 1.5px solid color-mix(in srgb, var(--c-brand) 45%, var(--c-border));
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--c-brand) 10%, var(--c-card));
+      color: color-mix(in srgb, var(--c-brand) 70%, var(--c-text));
       font-size: 13px; font-weight: 700;
       text-decoration: none; cursor: pointer; touch-action: manipulation; transition: background 0.15s, transform 0.1s;
-      box-shadow: 0 3px 10px color-mix(in srgb, var(--c-brand) 35%, transparent);
       .material-symbols-outlined { font-size: 17px; }
-      &:hover { background: var(--c-brand-dk); }
+      &:hover { background: color-mix(in srgb, var(--c-brand) 18%, var(--c-card)); }
       &:active { transform: scale(0.98); }
     }
-    .plan-week-arrow { color: rgba(255,255,255,0.85); }
+    .plan-week-arrow { color: color-mix(in srgb, var(--c-brand) 55%, var(--c-text-3)); }
 
     /* ── Avui / dia seleccionat: targeta destacada amb capçalera de marca ── */
     .today-card {
@@ -257,34 +262,44 @@ const RECENT_DAYS = 30;
     .today-empty-icon { font-size: 32px; color: color-mix(in srgb, var(--c-brand) 35%, var(--c-border)); }
     .today-empty-text { font-size: 13px; color: var(--c-text-3); line-height: 1.4; }
 
-    /* ── Acció principal "Comença un entrenament" ──
-       Botó sòlid i ple, sota la secció del dia seleccionat. Mateix estil que
-       "Planificar la setmana", amb el color de marca per a avui i un accent
-       càlid per als dies passats. */
+    /* ── Acció principal del dia seleccionat ──
+       Botó sòlid i ple, i l'únic d'aquest pes a la pàgina: el verb mana al
+       títol i el dia va a sota, perquè el botó digui tot sol què farà. */
     .start-workout-btn {
       --sc: var(--c-brand);
       width: calc(100% - 32px); box-sizing: border-box;
       margin: 12px 16px 0;
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      height: 54px; padding: 0 16px; border: none; border-radius: 14px;
-      background: var(--sc); color: white;
-      font-size: 15px; font-weight: 700;
+      display: flex; align-items: center; gap: 12px;
+      min-height: 66px; padding: 0 14px; border: none; border-radius: 16px;
+      background: var(--sc); color: white; text-align: left;
       cursor: pointer; touch-action: manipulation;
-      box-shadow: 0 4px 14px color-mix(in srgb, var(--sc) 38%, transparent);
+      box-shadow: 0 5px 18px color-mix(in srgb, var(--sc) 40%, transparent);
       transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
       &:hover {
         background: color-mix(in srgb, var(--sc) 88%, black);
-        box-shadow: 0 6px 18px color-mix(in srgb, var(--sc) 45%, transparent);
+        box-shadow: 0 7px 22px color-mix(in srgb, var(--sc) 48%, transparent);
       }
       &:active { transform: scale(0.98); }
       /* Millora d'accessibilitat: anell de focus visible per a teclat. */
-      &:focus-visible { outline: 2px solid var(--sc); outline-offset: 2px; }
+      &:focus-visible { outline: 2px solid var(--c-text); outline-offset: 2px; }
     }
-    /* Registrar un dia passat: mateix estil, accent càlid per distingir-lo
-       de l'acció d'avui (en verd de marca). */
-    .start-workout-btn--past { --sc: #b26a00; }
-    .swb-icon { font-size: 21px; font-variation-settings: 'FILL' 1; flex-shrink: 0; }
-    .swb-label { line-height: 1.2; }
+    /* Registrar un dia passat: accent càlid per distingir-lo de l'acció
+       d'avui. Enfosquit fins que el text blanc arriba a 4.5:1 (#b26a00 es
+       quedava a 4.2). Un dia futur es planifica, i això és marca. */
+    .start-workout-btn--past { --sc: #a06000; }
+    .swb-icon-wrap {
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      width: 40px; height: 40px; border-radius: 12px;
+      background: rgba(255,255,255,0.18);
+    }
+    .swb-icon { font-size: 23px; font-variation-settings: 'FILL' 1; }
+    .swb-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .swb-label { font-size: 16px; font-weight: 800; letter-spacing: -0.1px; line-height: 1.2; }
+    .swb-sub {
+      font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.85); line-height: 1.2;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .swb-arrow { font-size: 20px; flex-shrink: 0; color: rgba(255,255,255,0.9); }
 
     /* ── "Encara no tens cap rutina" hint ── */
     .routine-hint-card {
@@ -478,8 +493,36 @@ export class HomeComponent {
    *  passthrough already pinned to that day. */
   readonly isPast = computed(() => this.effectiveDate() < this.today());
 
+  /** L'acció del dia seleccionat: entrenar avui, registrar un dia passat o
+   *  planificar-ne un de futur.
+   *
+   *  Sempre n'hi ha una. Abans un dia futur no en tenia cap i la fila
+   *  desapareixia, que és la pitjor manera d'amagar l'acció principal:
+   *  qui toca un dia de la setmana vinent es queda sense res a prémer. */
+  readonly dayAction = computed(() => {
+    if (this.isToday()) return {
+      kind: 'today', icon: 'add_circle',
+      label: 'Comença un entrenament', sub: "Registra la sessió d'avui",
+    };
+    if (this.isPast()) return {
+      kind: 'past', icon: 'history',
+      label: 'Registra un entrenament', sub: this.todayDateLabel(),
+    };
+    return {
+      kind: 'future', icon: 'event_upcoming',
+      label: 'Planifica aquest dia', sub: this.todayDateLabel(),
+    };
+  });
+
+  runDayAction(): void {
+    if (this.isToday()) { this.goToTrain(); return; }
+    this.registerPastWorkout();
+  }
+
   /** Open the train page to log a forgotten workout on the selected past day
-   *  (e.g. "ahir vaig jugar a padel i no ho vaig apuntar"). */
+   *  (e.g. "ahir vaig jugar a padel i no ho vaig apuntar"), or to plan a
+   *  future one — the train page reads the day off the query param either
+   *  way and shows "Registrant" or "Planificant" accordingly. */
   registerPastWorkout(): void {
     this.router.navigate(['/train'], { queryParams: { date: this.effectiveDate() } });
   }

@@ -431,7 +431,12 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
               <span class="sf-label">{{ s.label }}</span>
               <span class="sf-reason">{{ s.reason }}</span>
             </div>
-            <span class="material-symbols-outlined sf-chevron" aria-hidden="true">chevron_right</span>
+            <!-- El verb, dins una pastilla: amb només el chevron la targeta
+                 es llegia com una nota i no com el botó que és. -->
+            <span class="sf-go" aria-hidden="true">
+              {{ s.type === 'gym' ? 'Començar' : 'Registrar' }}
+              <span class="material-symbols-outlined">arrow_forward</span>
+            </span>
           </button>
 
           @if (suggestionBubbleOpen(s)) {
@@ -449,19 +454,18 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
         }
       </div>
     } @else if (!activeWorkout() && !creating()) {
-      <!-- Acció principal quan no hi ha suggeriment: mateix format que el
-           suggeriment, amb els accents de marca i millores d'accessibilitat. -->
+      <!-- Acció principal quan no hi ha suggeriment: mateixa caixa que el
+           suggeriment, però plena de marca — ha de ser l'element amb més
+           contrast de la pàgina, i el verb mana al títol. -->
       <div class="suggestion-float-row">
         <button class="suggestion-float suggestion-float--action" (click)="startDefaultWorkout()"
-                aria-label="Nou entrenament: comença a registrar una sessió">
-          <div class="sf-bar" aria-hidden="true"></div>
-          <app-activity-icon icon="add_circle" color="var(--c-brand)" />
+                aria-label="Començar entrenament: registra una nova sessió">
+          <app-activity-icon icon="add_circle" color="#fff" />
           <div class="sf-info" aria-hidden="true">
-            <span class="sf-eyebrow">Comença</span>
-            <span class="sf-label">Nou entrenament</span>
+            <span class="sf-label">Començar entrenament</span>
             <span class="sf-reason">Registra la teva sessió</span>
           </div>
-          <span class="material-symbols-outlined sf-chevron" aria-hidden="true">chevron_right</span>
+          <span class="material-symbols-outlined sf-chevron" aria-hidden="true">arrow_forward</span>
         </button>
       </div>
     }
@@ -1027,8 +1031,8 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       &:focus-visible { outline: 2px solid var(--c-brand); outline-offset: 1px; }
     }
     .suggestion-float {
-      display: flex; align-items: center; gap: 0; width: 100%;
-      height: 60px; border-radius: 14px; padding: 0;
+      display: flex; align-items: center; gap: 10px; width: 100%;
+      height: 64px; border-radius: 14px; padding: 0 12px 0 0;
       border: 1.5px solid color-mix(in srgb, var(--sc) 35%, var(--c-border-2));
       background: color-mix(in srgb, var(--sc) 8%, var(--c-card));
       box-shadow: 0 4px 16px var(--c-shadow-md);
@@ -1043,21 +1047,60 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       /* Millora d'accessibilitat: anell de focus visible per a teclat. */
       &:focus-visible { outline: 2px solid var(--sc); outline-offset: 2px; }
     }
-    /* Acció principal "Nou entrenament": mateix format de targeta que el
-       suggeriment, amb l'accent de marca i una ombra més elevada perquè
-       ressalti com l'acció principal. */
+    /* Acció principal "Començar entrenament": la mateixa caixa que el
+       suggeriment, però PLENA de marca. Tintada al 8% sobre blanc competia en
+       pes amb els mosaics de tipus i la gent no la veia; plena és l'element
+       amb més contrast de la pantalla i es llegeix com un botó a la primera. */
     .suggestion-float--action {
       --sc: var(--c-brand);
-      box-shadow: 0 8px 28px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.1);
-      &:hover { box-shadow: 0 10px 32px rgba(0,0,0,0.2), 0 2px 6px rgba(0,0,0,0.1); }
+      position: relative; overflow: visible; height: 68px; padding-left: 14px;
+      border-color: var(--c-brand-dk);
+      /* El degradat només enfosqueix: aclarir la marca deixaria el text blanc
+         per sota de 4.5:1 al tema fosc. */
+      background: linear-gradient(160deg, var(--c-brand), var(--c-brand-dk));
+      box-shadow: 0 8px 28px color-mix(in srgb, var(--c-brand) 45%, transparent), 0 2px 6px rgba(0,0,0,0.12);
+      .sf-label { font-size: 16px; font-weight: 800; letter-spacing: -0.2px; color: #fff; }
+      .sf-reason { font-size: 12px; color: rgba(255,255,255,0.85); }
+      .sf-chevron { color: #fff; }
+      &:hover {
+        border-color: var(--c-brand-dk);
+        background: linear-gradient(160deg, color-mix(in srgb, white 8%, var(--c-brand)), var(--c-brand));
+        box-shadow: 0 10px 34px color-mix(in srgb, var(--c-brand) 55%, transparent), 0 2px 6px rgba(0,0,0,0.14);
+      }
+      /* L'anell de focus per defecte és del color de la targeta: sobre el
+         farcit de marca seria invisible. */
+      &:focus-visible { outline-color: var(--c-text); }
+    }
+    /* Tres batecs en carregar i prou: si la vista arriba amb el botó ja quiet,
+       l'ull se'n va als mosaics de colors i no torna. */
+    .suggestion-float--action::after {
+      content: ''; position: absolute; inset: -1px; border-radius: inherit;
+      border: 2px solid var(--c-brand); pointer-events: none; opacity: 0;
+      animation: sf-attention 1.4s ease-out 0.6s 3;
+    }
+    @keyframes sf-attention {
+      from { opacity: 0.55; transform: scale(1); }
+      to   { opacity: 0;    transform: scale(1.07); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .suggestion-float--action::after { animation: none; }
     }
     .sf-bar { width: 5px; align-self: stretch; flex-shrink: 0; background: var(--sc); }
     .sf-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-    .sf-eyebrow {
-      font-size: 9.5px; font-weight: 700; line-height: 1;
-      color: color-mix(in srgb, var(--sc) 70%, var(--c-text-3));
-      text-transform: uppercase; letter-spacing: 0.6px;
+    /* Pastilla amb el verb del suggeriment. Es tenyeix amb var(--c-card) i
+       mai amb transparent: el color ve del tipus d'entrenament i pot ser
+       qualsevol (DESIGN.md §1). */
+    .sf-go {
+      display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0;
+      padding: 6px 8px 6px 11px; border-radius: 20px;
+      border: 1.5px solid color-mix(in srgb, var(--sc) 75%, var(--c-card));
+      background: color-mix(in srgb, var(--sc) 18%, var(--c-card));
+      color: color-mix(in srgb, var(--sc) 55%, var(--c-text));
+      font-size: 11.5px; font-weight: 800; letter-spacing: 0.1px; white-space: nowrap;
+      transition: background 0.15s;
+      .material-symbols-outlined { font-size: 15px; }
     }
+    .suggestion-float:hover .sf-go { background: color-mix(in srgb, var(--sc) 28%, var(--c-card)); }
     .sf-label {
       font-size: 14px; font-weight: 700; color: var(--c-text); line-height: 1.2;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -1067,7 +1110,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       color: color-mix(in srgb, var(--sc) 65%, var(--c-text-3));
     }
-    .sf-chevron { font-size: 20px; color: var(--c-text-3); margin-right: 12px; flex-shrink: 0; }
+    .sf-chevron { font-size: 20px; color: var(--c-text-3); flex-shrink: 0; }
 
     /* ── "Nou entrenament" section card ── */
     .card-section {
