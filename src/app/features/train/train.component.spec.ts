@@ -2,7 +2,8 @@ import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { LowerCasePipe } from '@angular/common';
-import { provideRouter } from '@angular/router';
+import { NavigationEnd, Router, provideRouter } from '@angular/router';
+import { Subject } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 
 import { TrainComponent } from './train.component';
@@ -298,6 +299,33 @@ describe('TrainComponent', () => {
     it('is false for a past date', () => {
       component.selectedDate.set('2020-01-01');
       expect(component.isToday()).toBeFalse();
+    });
+  });
+
+  // ── Arribar a /train ─────────────────────────────────────────────────────
+
+  describe('arriving at /train', () => {
+    function navigateTo(url: string, id = 1): void {
+      const events = TestBed.inject(Router).events as unknown as Subject<NavigationEnd>;
+      events.next(new NavigationEnd(id, url, url));
+    }
+
+    it('lands on today when coming from another page without ?date=', () => {
+      component.selectedDate.set('2020-09-01');
+
+      navigateTo('/home', 1);
+      navigateTo('/train', 2);
+
+      expect(component.selectedDate()).toBe(TODAY);
+    });
+
+    it('stays on the day being viewed when only its own query params change', () => {
+      navigateTo('/train', 1);
+      component.selectedDate.set('2020-09-01');
+
+      navigateTo('/train?workout=w1', 2);
+
+      expect(component.selectedDate()).toBe('2020-09-01');
     });
   });
 

@@ -255,6 +255,41 @@ content in the middle, action buttons on the right.
 }
 ```
 
+
+### 4a. Activity card (`app-day-feed-cards`)
+
+Una activitat registrada — entrenament o esport — es llegeix **sempre igual**.
+La targeta és la mateixa a Inici i a Historial i viu en un sol component
+(`app-day-feed-cards`); només canvien dues coses:
+
+| | Entrenament | Esport |
+| --- | --- | --- |
+| Chevron | `chevron_right` (o `expand_more` a Historial) | `expand_more` |
+| Clic | obre l'entrenament / el desplega | desplega l'edició en línia |
+
+L'estructura, de fora cap a dins:
+
+```
+[barra 5px] [icona + gos] [ títol · etiquetes · sensació ]   [chevron]
+                          [ detall (exercicis / subtipus) ]
+                          [ xifres amb icona ]
+```
+
+Regles que la fan llegible:
+
+- **El títol identifica**: el tipus d'entrenament (`Empenta`, `Empenta ·
+  Tracció`) o el nom de l'esport — mai la llista d'exercicis, que va a la
+  línia de detall. Res d'una xapa de tipus tota sola en una línia.
+- **La sensació va a la fila del títol**, alineada a la dreta. A la línia de
+  xifres s'escapa a una línia pròpia quan hi ha sèries d'escalfament.
+- **Les xifres porten icona i no es parteixen** (`white-space: nowrap` a cada
+  una, separador `·` entre elles).
+- **La icona sempre a `app-activity-icon`** (38×38, gos a la cantonada), amb
+  el mateix marge esquerre a totes dues targetes.
+- **La barra de 5px** és absoluta (`position: absolute; left: 0; top: 0;
+  bottom: 0`) perquè acompanyi també el panell desplegat.
+
+
 ---
 
 ## 5. Buttons

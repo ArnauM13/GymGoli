@@ -4,6 +4,7 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 import { ExerciseService } from './exercise.service';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
+import { TodayService } from './today.service';
 import { SyncService } from './sync.service';
 import { FeelingLevel, PlannedSource, Workout, WorkoutEntry, WorkoutSet, WorkoutStatus, setMaxWeight } from '../models/workout.model';
 
@@ -97,11 +98,14 @@ export interface LastSessionEntry {
 @Injectable({ providedIn: 'root' })
 export class WorkoutService {
   private supabase        = inject(SupabaseService).client;
+  private today           = inject(TodayService);
   private auth            = inject(AuthService);
   private exerciseService = inject(ExerciseService);
   private syncService     = inject(SyncService);
 
-  private readonly _todayStr = new Date().toISOString().split('T')[0];
+  /** Avui, mirat cada cop: guardar-lo al constructor deixava l'app clavada al
+   *  dia d'ahir quan passava la mitjanit amb la pestanya oberta. */
+  private get _todayStr(): string { return this.today.today(); }
 
   // ── Single unified cache (all dates including today) ─────────────────────
   private readonly _monthCache = new Map<string, Workout[]>();

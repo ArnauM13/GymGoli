@@ -18,6 +18,7 @@ import {
   FitnessGoal, GoalMode, ThemeMode, WeightUnit,
   FITNESS_GOAL_EMOJIS, FITNESS_GOAL_LABELS, CATALOG_VERSION,
 } from '../../core/models/user-settings.model';
+import { todayStr } from '../../shared/utils/date.utils';
 
 @Component({
   selector: 'app-settings',
@@ -1146,7 +1147,7 @@ export class SettingsComponent {
     const url  = URL.createObjectURL(blob);
     const a    = this.doc.createElement('a');
     a.href     = url;
-    a.download = `gymgoli-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `gymgoli-${todayStr()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }

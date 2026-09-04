@@ -23,19 +23,21 @@ import { MASCOTS, Mascot } from '../../../core/models/mascot.model';
     }
   `,
   styles: [`
+    /* Quadrat: la icona i el gos han de quedar centrats dins la mateixa
+       caixa a totes les targetes, sigui d'esport o d'entrenament. */
     :host {
-      width: 44px; flex-shrink: 0; position: relative;
+      width: 38px; height: 38px; flex-shrink: 0; position: relative;
       display: flex; align-items: center; justify-content: center;
     }
 
     .ai-icon {
-      font-size: 24px; color: var(--ai-c, var(--c-text-2));
+      font-size: 28px; line-height: 1; color: var(--ai-c, var(--c-text-2));
       font-variation-settings: 'FILL' 1;
     }
 
     .ai-dog {
-      position: absolute; right: 0; bottom: -3px;
-      width: 16px; height: 16px; border-radius: 50%;
+      position: absolute; right: -3px; bottom: -3px;
+      width: 18px; height: 18px; border-radius: 50%;
       object-fit: cover; display: block;
       border: 1.5px solid var(--c-card);
     }

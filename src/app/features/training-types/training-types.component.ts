@@ -1,5 +1,4 @@
 import { Component, inject } from '@angular/core';
-import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 
 import { TrainingType } from '../../core/models/training-type.model';
@@ -8,6 +7,7 @@ import { ExerciseService } from '../../core/services/exercise.service';
 import { TrainingTypeFormDialogComponent } from '../library/components/training-type-form-dialog.component';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
+import { NavigationHistoryService } from '../../core/services/navigation-history.service';
 
 @Component({
   selector: 'app-training-types',
@@ -167,13 +167,16 @@ export class TrainingTypesComponent {
   private dialog        = inject(MatDialog);
   private feedback      = inject(FeedbackService);
   private confirmDialog = inject(ConfirmDialogService);
-  private router        = inject(Router);
+  private navHistory        = inject(NavigationHistoryService);
 
   readonly types = this.typeService.types;
 
   constructor() { this.exerciseService.ensureLoaded(); }
 
-  goBack(): void { this.router.navigate(['/settings']); }
+  /** Aquestes pàgines de configuració s'obren tant des del Perfil com des
+   *  d'Entrenament: tornar sempre al Perfil et treia d'on eres. L'historial
+   *  de navegació sap d'on véns; el Perfil només és el pla B. */
+  goBack(): void { this.navHistory.goBack('/settings'); }
 
   openForm(type?: TrainingType): void {
     const ref = this.dialog.open(TrainingTypeFormDialogComponent, {

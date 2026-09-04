@@ -4,6 +4,7 @@ import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { ExerciseCategory } from '../models/exercise.model';
 import { TemplateEntry, WorkoutTemplate } from '../models/template.model';
+import { todayStr } from '../../shared/utils/date.utils';
 
 // ── Supabase row → typed WorkoutTemplate (snake_case keys) ──────────────────
 function toTemplate(row: Record<string, unknown>): WorkoutTemplate {
@@ -142,7 +143,7 @@ export class TemplateService {
    *  transient network failure never blocks starting a workout. */
   async recordUse(id: string): Promise<void> {
     const uid = this._uid();
-    const today = new Date().toISOString().split('T')[0];
+    const today = todayStr();
     const nextCount = (this._templates().find(t => t.id === id)?.useCount ?? 0) + 1;
 
     const next = this._templates().map(t =>

@@ -32,5 +32,10 @@ rather than only in code.
 
 - Catalan UI copy
 - CSS in compact grouped lines (see `DESIGN.md` §10)
+- **Dates are always local**: build `YYYY-MM-DD` with `todayStr()` /
+  `toDateStr()` from `shared/utils/date.utils`, never
+  `new Date().toISOString()` (that's the UTC day, so the app changes day
+  hours late). For anything reactive to "today", read `TodayService.today()`
+  — it ticks at the user's local midnight.
 - Tests use `jasmine.clock().mockDate(...)` for date-dependent logic
 - Develop on a feature branch, never push to `main` directly without a PR

@@ -7,33 +7,62 @@ import { WorkoutService } from '../../core/services/workout.service';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
 import { AuthService } from '../../core/services/auth.service';
-import { UserSettingsService } from '../../core/services/user-settings.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
-import { FeelingLevel, Workout, WorkoutEntry } from '../../core/models/workout.model';
+import { Workout } from '../../core/models/workout.model';
+import { Sport, SportSession } from '../../core/models/sport.model';
 import { TrainingTypeService } from '../../core/services/training-type.service';
 import { DEFAULT_TRAINING_TYPES } from '../../core/models/training-type.model';
 
 const TODAY = new Date().toISOString().split('T')[0];
 
+function daysAgo(n: number): string {
+  const d = new Date(TODAY + 'T12:00:00');
+  d.setDate(d.getDate() - n);
+  return d.toISOString().split('T')[0];
+}
+
 function makeWorkout(overrides: Partial<Workout> = {}): Workout {
   return { id: '1', date: TODAY, entries: [], createdAt: new Date(), ...overrides };
 }
 
+function makeSport(overrides: Partial<Sport> = {}): Sport {
+  return {
+    id: 's1', name: 'Córrer', icon: 'directions_run', color: '#43A047',
+    subtypes: [], metricDefs: [], createdAt: new Date(), ...overrides,
+  };
+}
+
+function makeSession(overrides: Partial<SportSession> = {}): SportSession {
+  return { id: 'ss1', date: TODAY, sportId: 's1', createdAt: new Date(), ...overrides };
+}
+
 describe('CalendarPageComponent', () => {
   let component: CalendarPageComponent;
-  let unsynced: ReturnType<typeof signal<Workout[]>>;
+  let fixture: ReturnType<typeof TestBed.createComponent<CalendarPageComponent>>;
+  let doneByDate: Record<string, Workout[]>;
+  let plannedByDate: Record<string, Workout[]>;
+  let sportsByDate: Record<string, { sport: Sport; session: SportSession }[]>;
+  let workoutsSignal: ReturnType<typeof signal<Workout[]>>;
 
   beforeEach(async () => {
-    unsynced = signal<Workout[]>([]);
+    doneByDate    = {};
+    plannedByDate = {};
+    sportsByDate  = {};
+    workoutsSignal = signal<Workout[]>([]);
+
     const mockWorkoutService = {
-      isLoading:           signal(false),
-      unsyncedWorkouts:    unsynced,
-      getWorkoutForDate:   jasmine.createSpy().and.returnValue(null),
-      getWorkoutsForDate:  jasmine.createSpy().and.returnValue([]),
-      todayDateString:     jasmine.createSpy().and.returnValue(TODAY),
-      loadWorkoutPage:     jasmine.createSpy().and.resolveTo({ workouts: [], total: 0 }),
+      isLoading:            signal(false),
+      workouts:             workoutsSignal,
+      unsyncedWorkouts:     signal<Workout[]>([]),
+      getWorkoutForDate:    jasmine.createSpy().and.returnValue(null),
+      getWorkoutsForDate:   jasmine.createSpy().and.returnValue([]),
+      getDoneWorkoutsForDate: jasmine.createSpy().and.callFake((d: string) => doneByDate[d] ?? []),
+      getPlannedForDate:    jasmine.createSpy().and.callFake((d: string) => plannedByDate[d] ?? []),
+      todayDateString:      jasmine.createSpy().and.returnValue(TODAY),
+      ensureMonthLoaded:    jasmine.createSpy().and.resolveTo(undefined),
+      loadAllWorkouts:      jasmine.createSpy().and.resolveTo(undefined),
       createPlannedWorkout: jasmine.createSpy().and.resolveTo('w1'),
-      deleteWorkout:       jasmine.createSpy().and.resolveTo(undefined),
+      deleteWorkout:        jasmine.createSpy().and.resolveTo(undefined),
     };
 
     const mockExerciseService = {
@@ -45,13 +74,16 @@ describe('CalendarPageComponent', () => {
     };
 
     const mockSportService = {
-      sports:                        signal<any[]>([]),
-      isLoaded:                      signal(true),
-      getSportSessionsForDate:       jasmine.createSpy().and.returnValue([]),
+      sports:                         signal<Sport[]>([]),
+      sessions:                       signal<SportSession[]>([]),
+      isLoaded:                       signal(true),
+      getSportSessionsForDate:        jasmine.createSpy().and.callFake((d: string) => sportsByDate[d] ?? []),
       getPlannedSportSessionsForDate: jasmine.createSpy().and.returnValue([]),
-      logSession:                    jasmine.createSpy().and.resolveTo(undefined),
-      deleteSession:                 jasmine.createSpy().and.resolveTo(undefined),
-      ensureLoaded:                  jasmine.createSpy().and.resolveTo(undefined),
+      ensureMonthLoaded:              jasmine.createSpy().and.resolveTo(undefined),
+      loadAllSessions:                jasmine.createSpy().and.resolveTo(undefined),
+      logSession:                     jasmine.createSpy().and.resolveTo(undefined),
+      deleteSession:                  jasmine.createSpy().and.resolveTo(undefined),
+      ensureLoaded:                   jasmine.createSpy().and.resolveTo(undefined),
     };
 
     await TestBed.configureTestingModule({
@@ -62,7 +94,6 @@ describe('CalendarPageComponent', () => {
         { provide: SportService,        useValue: mockSportService },
         { provide: AuthService,         useValue: { uid: signal('user-1') } },
         { provide: TrainingTypeService, useValue: { types: signal(DEFAULT_TRAINING_TYPES) } },
-        { provide: UserSettingsService, useValue: { weightUnit: signal<'kg' | 'lb'>('kg'), difficultyScale: signal('emoji'), bodyweightKg: signal(null) } },
         { provide: FeedbackService,     useValue: { success: jasmine.createSpy(), error: jasmine.createSpy() } },
       ],
     })
@@ -71,7 +102,7 @@ describe('CalendarPageComponent', () => {
       })
       .compileComponents();
 
-    const fixture = TestBed.createComponent(CalendarPageComponent);
+    fixture = TestBed.createComponent(CalendarPageComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
@@ -80,19 +111,7 @@ describe('CalendarPageComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  // ── getFeelingEmoji() ────────────────────────────────────────────────────
-
-  describe('getFeelingEmoji()', () => {
-    it('returns 🔥 for level 1 (excellent)', () => {
-      expect(component.getFeelingEmoji(1 as FeelingLevel)).toBe('🔥');
-    });
-
-    it('returns 💀 for level 5 (very hard)', () => {
-      expect(component.getFeelingEmoji(5 as FeelingLevel)).toBe('💀');
-    });
-  });
-
-  // ── getCatColor() / getCatLabel() ────────────────────────────────────────
+  // ── Visual helpers ───────────────────────────────────────────────────────
 
   describe('getCatColor()', () => {
     it('returns the push color', () => {
@@ -100,7 +119,7 @@ describe('CalendarPageComponent', () => {
     });
 
     it('returns #bbb for an unknown category', () => {
-      expect(component.getCatColor('unknown')).toBe('#bbb');
+      expect(component.getCatColor('nope')).toBe('#bbb');
     });
   });
 
@@ -110,168 +129,46 @@ describe('CalendarPageComponent', () => {
     });
 
     it('returns the key itself for an unknown category', () => {
-      expect(component.getCatLabel('custom')).toBe('custom');
+      expect(component.getCatLabel('nope')).toBe('nope');
     });
   });
 
-  // ── totalSets() ──────────────────────────────────────────────────────────
-
-  describe('totalSets()', () => {
-    it('returns 0 for a workout with no entries', () => {
-      expect(component.totalSets(makeWorkout())).toBe(0);
-    });
-
-    it('sums all sets across entries', () => {
-      const w = makeWorkout({
-        entries: [
-          { exerciseId: 'a', exerciseName: 'A', sets: [{ weight: 60, reps: 10 }, { weight: 60, reps: 8 }] },
-          { exerciseId: 'b', exerciseName: 'B', sets: [{ weight: 80, reps: 5 }] },
-        ],
-      });
-      expect(component.totalSets(w)).toBe(3);
-    });
-  });
-
-  // ── getMaxWeight() ───────────────────────────────────────────────────────
-
-  describe('getMaxWeight()', () => {
-    it('returns 0 for an entry with no sets', () => {
-      const entry: WorkoutEntry = { exerciseId: 'x', exerciseName: 'X', sets: [] };
-      expect(component.getMaxWeight(entry)).toBe(0);
-    });
-
-    it('returns the maximum weight', () => {
-      const entry: WorkoutEntry = {
-        exerciseId: 'x', exerciseName: 'X',
-        sets: [{ weight: 40, reps: 12 }, { weight: 60, reps: 8 }, { weight: 55, reps: 6 }],
-      };
-      expect(component.getMaxWeight(entry)).toBe(60);
-    });
-  });
-
-  // ── getDay() ─────────────────────────────────────────────────────────────
-
-  describe('getDay()', () => {
-    it('returns the day number as a string', () => {
-      expect(component.getDay('2024-03-05')).toBe('5');
-    });
-  });
-
-  // ── getWorkoutStripe() ───────────────────────────────────────────────────
-
-  describe('getWorkoutStripe()', () => {
-    it('returns grey for a workout with no categories', () => {
-      expect(component.getWorkoutStripe(makeWorkout())).toBe('#e0e0e0');
-    });
-
-    it('returns the single category color', () => {
-      expect(component.getWorkoutStripe(makeWorkout({ categories: ['push'] }))).toBe('#e57373');
-    });
-
-    it('returns a linear-gradient for multiple categories', () => {
-      const result = component.getWorkoutStripe(makeWorkout({ categories: ['push', 'pull'] }));
-      expect(result).toContain('linear-gradient');
-      expect(result).toContain('#e57373');
-      expect(result).toContain('#64b5f6');
-    });
-  });
-
-  // ── toggleExpanded() ─────────────────────────────────────────────────────
-
-  describe('toggleExpanded()', () => {
-    it('sets expandedId to the given id', () => {
-      component.toggleExpanded('w1');
-      expect(component.expandedId()).toBe('w1');
-    });
-
-    it('collapses when the same id is toggled again', () => {
-      component.toggleExpanded('w1');
-      component.toggleExpanded('w1');
-      expect(component.expandedId()).toBeNull();
-    });
-
-    it('switches to a different id', () => {
-      component.toggleExpanded('w1');
-      component.toggleExpanded('w2');
-      expect(component.expandedId()).toBe('w2');
-    });
-  });
-
-  // ── getEntrySubLabel() ──────────────────────────────────────────────────
-
-  describe('getEntrySubLabel()', () => {
-    it('returns empty string when exercise is not found', () => {
-      const entry: WorkoutEntry = { exerciseId: 'unknown', exerciseName: 'X', sets: [] };
-      expect(component.getEntrySubLabel(entry)).toBe('');
-    });
-
-    it('returns the subcategory label when exercise has a subcategory', () => {
-      const mockExercise = { category: 'push', subcategory: 'chest' };
-      const exSvc = TestBed.inject(ExerciseService) as any;
-      exSvc.getById.and.returnValue(mockExercise);
-      const entry: WorkoutEntry = { exerciseId: 'chest1', exerciseName: 'Press banca', sets: [] };
-      expect(component.getEntrySubLabel(entry)).toBe('Pit');
-    });
-
-    it('returns empty string when exercise has no subcategory', () => {
-      const mockExercise = { category: 'push' };
-      const exSvc = TestBed.inject(ExerciseService) as any;
-      exSvc.getById.and.returnValue(mockExercise);
-      const entry: WorkoutEntry = { exerciseId: 'push1', exerciseName: 'Custom', sets: [] };
-      expect(component.getEntrySubLabel(entry)).toBe('');
-    });
-  });
-
-  // ── selectDate() ─────────────────────────────────────────────────────────
+  // ── selectDate() / labels ────────────────────────────────────────────────
 
   describe('selectDate()', () => {
     it('sets selectedDate', () => {
-      component.selectDate('2024-03-15');
-      expect(component.selectedDate()).toBe('2024-03-15');
+      component.selectDate('2025-01-15');
+      expect(component.selectedDate()).toBe('2025-01-15');
     });
 
     it('deselects when the same date is selected again', () => {
-      component.selectDate('2024-03-15');
-      component.selectDate('2024-03-15');
+      component.selectDate('2025-01-15');
+      component.selectDate('2025-01-15');
       expect(component.selectedDate()).toBeNull();
     });
 
-    it('expands the workout for the selected date', () => {
-      const svc = TestBed.inject(WorkoutService) as any;
-      svc.getWorkoutForDate.and.returnValue(makeWorkout({ id: 'w9', date: '2024-03-15' }));
+    it('loads the month of a day picked outside the loaded window', () => {
+      const ensure = TestBed.inject(WorkoutService).ensureMonthLoaded as jasmine.Spy;
+      ensure.calls.reset();
       component.selectDate('2024-03-15');
-      expect(component.expandedId()).toBe('w9');
-    });
-
-    it('clears the expanded workout when deselecting', () => {
-      component.expandedId.set('w9');
-      component.selectDate('2024-03-15');
-      component.selectDate('2024-03-15');
-      expect(component.expandedId()).toBeNull();
+      fixture.detectChanges();
+      expect(ensure).toHaveBeenCalledWith(2024, 2);
     });
   });
 
-  // ── selectedDateLabel() ──────────────────────────────────────────────────
-
   describe('selectedDateLabel()', () => {
-    const noonShift = (iso: string, days: number): string => {
-      const d = new Date(iso + 'T12:00:00');
-      d.setDate(d.getDate() + days);
-      return d.toISOString().split('T')[0];
-    };
-
     it('labels today as "Avui"', () => {
-      component.selectedDate.set(TODAY);
+      component.selectDate(TODAY);
       expect(component.selectedDateLabel()).toBe('Avui');
     });
 
     it('labels the immediately previous day as "Ahir"', () => {
-      component.selectedDate.set(noonShift(TODAY, -1));
+      component.selectDate(daysAgo(1));
       expect(component.selectedDateLabel()).toBe('Ahir');
     });
 
     it('does not mislabel two days ago as "Ahir"', () => {
-      component.selectedDate.set(noonShift(TODAY, -2));
+      component.selectDate(daysAgo(2));
       expect(component.selectedDateLabel()).not.toBe('Ahir');
     });
   });
@@ -289,7 +186,7 @@ describe('CalendarPageComponent', () => {
     });
 
     it('is true when a date is selected', () => {
-      component.selectedDate.set('2024-03-15');
+      component.selectDate(TODAY);
       expect(component.hasActiveFilter()).toBeTrue();
     });
 
@@ -300,75 +197,102 @@ describe('CalendarPageComponent', () => {
     });
   });
 
-  // ── items() + pagination state ───────────────────────────────────────────
+  // ── feedDays() ───────────────────────────────────────────────────────────
 
-  describe('items()', () => {
-    it('starts as an empty array', () => {
-      expect(component.items()).toEqual([]);
+  describe('feedDays()', () => {
+    it('groups workouts and sports of the loaded window by day', () => {
+      doneByDate[TODAY]      = [makeWorkout({ id: 'w-today' })];
+      sportsByDate[daysAgo(1)] = [{ sport: makeSport(), session: makeSession({ date: daysAgo(1) }) }];
+      workoutsSignal.set([makeWorkout({ id: 'w-today' })]);
+
+      const days = component.feedDays();
+      expect(days.map(d => d.date)).toEqual([TODAY, daysAgo(1)]);
+      expect(days[0].workouts.length).toBe(1);
+      expect(days[1].sports.length).toBe(1);
     });
 
-    // Historial reads from Supabase while Inici reads the local month cache, so
-    // a workout still queued for sync used to show on Inici and never here.
-    it('merges in workouts that are still queued for sync', () => {
-      unsynced.set([makeWorkout({ id: 'local-1', date: '2024-03-10' })]);
-      expect(component.items().map(w => w.id)).toEqual(['local-1']);
-      expect(component.isUnsynced('local-1')).toBeTrue();
+    it('shows only the picked day once one is selected', () => {
+      doneByDate[TODAY]        = [makeWorkout({ id: 'w-today' })];
+      doneByDate[daysAgo(2)]   = [makeWorkout({ id: 'w-old', date: daysAgo(2) })];
+      workoutsSignal.set([makeWorkout({ id: 'w-today' })]);
+
+      component.selectDate(daysAgo(2));
+      expect(component.feedDays().map(d => d.date)).toEqual([daysAgo(2)]);
     });
 
-    it('leaves out queued workouts that do not match the active filters', () => {
-      unsynced.set([makeWorkout({ id: 'local-1', date: '2024-03-10', categories: ['push'] })]);
-      component.filterCat.set('legs');
-      expect(component.items()).toEqual([]);
-    });
+    it('keeps the oldest day first when the sort is flipped', () => {
+      doneByDate[TODAY]      = [makeWorkout({ id: 'w-today' })];
+      doneByDate[daysAgo(1)] = [makeWorkout({ id: 'w-yest', date: daysAgo(1) })];
+      workoutsSignal.set([makeWorkout({ id: 'w-today' })]);
 
-    it('leaves out queued workouts that are only planned', () => {
-      unsynced.set([makeWorkout({ id: 'local-1', date: '2024-03-10', status: 'planned' })]);
-      expect(component.items()).toEqual([]);
-    });
-
-    it('sorts merged workouts by date, newest first by default', () => {
-      unsynced.set([
-        makeWorkout({ id: 'older', date: '2024-03-10' }),
-        makeWorkout({ id: 'newer', date: '2024-03-14' }),
-      ]);
-      expect(component.items().map(w => w.id)).toEqual(['newer', 'older']);
-    });
-
-    it('follows the ascending sort when it is toggled', () => {
-      unsynced.set([
-        makeWorkout({ id: 'older', date: '2024-03-10' }),
-        makeWorkout({ id: 'newer', date: '2024-03-14' }),
-      ]);
       component.sortDesc.set(false);
-      expect(component.items().map(w => w.id)).toEqual(['older', 'newer']);
+      expect(component.feedDays().map(d => d.date)).toEqual([daysAgo(1), TODAY]);
     });
 
-    it('keeps the search filter applied to queued workouts', () => {
-      unsynced.set([makeWorkout({
-        id: 'local-1', date: '2024-03-10',
-        entries: [{ exerciseId: 'a', exerciseName: 'Press banca', sets: [] }],
-      })]);
-      component.searchQuery.set('press');
-      expect(component.items().map(w => w.id)).toEqual(['local-1']);
-      component.searchQuery.set('dominades');
-      expect(component.items()).toEqual([]);
+    it('filters workouts by the active training type', () => {
+      doneByDate[TODAY] = [
+        makeWorkout({ id: 'w-push', categories: ['push'] }),
+        makeWorkout({ id: 'w-pull', categories: ['pull'] }),
+      ];
+      workoutsSignal.set(doneByDate[TODAY]);
+
+      component.filterCat.set('push');
+      const days = component.feedDays();
+      expect(days.length).toBe(1);
+      expect(days[0].workouts.map(w => w.id)).toEqual(['w-push']);
+    });
+
+    it('hides sports while a training-type filter is active', () => {
+      sportsByDate[TODAY] = [{ sport: makeSport(), session: makeSession() }];
+      component.filterCat.set('push');
+      expect(component.feedDays().length).toBe(0);
+    });
+
+    it('matches the search against exercise names', () => {
+      doneByDate[TODAY] = [
+        makeWorkout({ id: 'w-bench', entries: [{ exerciseId: 'e1', exerciseName: 'Press banca', sets: [] }] }),
+        makeWorkout({ id: 'w-squat', entries: [{ exerciseId: 'e2', exerciseName: 'Sentadella', sets: [] }] }),
+      ];
+      workoutsSignal.set(doneByDate[TODAY]);
+
+      component.searchQuery.set('banca');
+      expect(component.feedDays()[0].workouts.map(w => w.id)).toEqual(['w-bench']);
+    });
+
+    it('matches the search against the sport name too', () => {
+      sportsByDate[TODAY] = [{ sport: makeSport(), session: makeSession() }];
+      component.searchQuery.set('córrer');
+      expect(component.feedDays()[0].sports.length).toBe(1);
     });
   });
 
-  describe('hasMore()', () => {
-    it('is false when items equals total (both zero)', () => {
-      expect(component.hasMore()).toBeFalse();
-    });
+  // ── Loading ──────────────────────────────────────────────────────────────
 
-    // Locally-queued workouts aren't paginated, so they must not make the list
-    // look "complete" while server pages are still outstanding.
-    it('ignores merged local workouts', () => {
-      unsynced.set([makeWorkout({ id: 'local-1' })]);
-      expect(component.hasMore()).toBeFalse();
+  describe('loadMoreMonths()', () => {
+    it('loads one more month of workouts and sports', async () => {
+      const wEnsure = TestBed.inject(WorkoutService).ensureMonthLoaded as jasmine.Spy;
+      const sEnsure = TestBed.inject(SportService).ensureMonthLoaded as jasmine.Spy;
+      wEnsure.calls.reset(); sEnsure.calls.reset();
+
+      await component.loadMoreMonths();
+
+      const today  = new Date(TODAY + 'T12:00:00');
+      const target = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      expect(wEnsure).toHaveBeenCalledWith(target.getFullYear(), target.getMonth());
+      expect(sEnsure).toHaveBeenCalledWith(target.getFullYear(), target.getMonth());
     });
   });
 
-  // ── calendarOpen signal ──────────────────────────────────────────────────
+  describe('searching', () => {
+    it('pulls the whole history in so the search is not limited to loaded months', () => {
+      const loadAll = TestBed.inject(WorkoutService).loadAllWorkouts as jasmine.Spy;
+      component.searchQuery.set('banca');
+      fixture.detectChanges();
+      expect(loadAll).toHaveBeenCalled();
+    });
+  });
+
+  // ── Calendar toggle ──────────────────────────────────────────────────────
 
   describe('calendarOpen signal', () => {
     it('defaults to collapsed (calendar is an optional date filter)', () => {

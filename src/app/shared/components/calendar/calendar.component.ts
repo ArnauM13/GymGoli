@@ -4,6 +4,8 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { Workout } from '../../../core/models/workout.model';
 import { SportService } from '../../../core/services/sport.service';
+import { TodayService } from '../../../core/services/today.service';
+import { todayStr } from '../../utils/date.utils';
 import { CATEGORY_COLORS, ExerciseCategory } from '../../../core/models/exercise.model';
 import {
   MONTHS_CA, CalDay,
@@ -159,7 +161,7 @@ import {
       <!-- ── Footer ── -->
       @if (isDialog) {
         <div class="cal-footer">
-          <button class="cal-select-today" (click)="selectDay(todayStr)">Avui</button>
+          <button class="cal-select-today" (click)="selectDay(todayStr())">Avui</button>
         </div>
       }
 
@@ -369,6 +371,7 @@ import {
 })
 export class CalendarComponent {
   private workoutService = inject(WorkoutService);
+  private todayService   = inject(TodayService);
   private sportService   = inject(SportService);
   private dialogRef      = inject(MatDialogRef<CalendarComponent>, { optional: true });
   private dialogData     = inject<{ selectedDate?: string; initialView?: 'week' | 'month' }>(MAT_DIALOG_DATA, { optional: true });
@@ -391,14 +394,16 @@ export class CalendarComponent {
   readonly calMonth = signal(new Date().getMonth());
 
   // ── Week state ────────────────────────────────────────────────────────────
-  readonly weekStart = signal<string>(mondayOf(new Date().toISOString().split('T')[0]));
+  readonly weekStart = signal<string>(mondayOf(todayStr()));
 
   readonly dayNames = ['dl', 'dm', 'dc', 'dj', 'dv', 'ds', 'dg'];
   readonly isLoading = computed(() =>
     this.workoutService.isLoading() || !this.sportService.isLoaded()
   );
   readonly isDialog  = !!this.dialogRef;
-  readonly todayStr  = new Date().toISOString().split('T')[0];
+  /** Reactiu a posta: amb l'app oberta a mitjanit, el dia marcat com a "avui"
+   *  ha de saltar sol al dia nou. */
+  readonly todayStr  = this.todayService.today;
 
   constructor() {
     const initialView = this.dialogData?.initialView;
@@ -454,7 +459,7 @@ export class CalendarComponent {
       return this.calYear() < now.getFullYear() ||
         (this.calYear() === now.getFullYear() && this.calMonth() < now.getMonth());
     }
-    return addDays(this.weekStart(), 6) < this.todayStr;
+    return addDays(this.weekStart(), 6) < this.todayStr();
   });
 
   readonly isShowingCurrent = computed(() => {
@@ -463,7 +468,7 @@ export class CalendarComponent {
       return this.calYear() === now.getFullYear() && this.calMonth() === now.getMonth();
     }
     const sunday = addDays(this.weekStart(), 6);
-    return this.weekStart() <= this.todayStr && this.todayStr <= sunday;
+    return this.weekStart() <= this.todayStr() && this.todayStr() <= sunday;
   });
 
   navigateBack(): void {
@@ -490,7 +495,7 @@ export class CalendarComponent {
     const now = new Date();
     this.calYear.set(now.getFullYear());
     this.calMonth.set(now.getMonth());
-    this.weekStart.set(mondayOf(this.todayStr));
+    this.weekStart.set(mondayOf(this.todayStr()));
   }
 
   toggleView(): void {

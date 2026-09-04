@@ -8,6 +8,7 @@ import { WeeklyPlan } from '../models/weekly-plan.model';
 import { WorkoutEntry } from '../models/workout.model';
 import { ExerciseCategory } from '../models/exercise.model';
 import { TemplateEntry } from '../models/template.model';
+import { todayStr } from '../../shared/utils/date.utils';
 
 export const WEEKS_SINGLE    = 1;
 /** ~3 months — the routine is materialized this far ahead once, when saved
@@ -23,7 +24,7 @@ export const WEEKS_RECURRING = 13;
  */
 export type PlanSource = 'routine' | 'manual';
 
-const TODAY = (): string => new Date().toISOString().split('T')[0];
+const TODAY = (): string => todayStr();
 
 /**
  * Materializes a weekly plan template into real planned workouts / sport

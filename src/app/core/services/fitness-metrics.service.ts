@@ -9,6 +9,7 @@ import { UserSettingsService } from './user-settings.service';
 import { WorkoutService } from './workout.service';
 import { WorkoutProfileService } from './workout-profile.service';
 import { TrainingTypeService } from './training-type.service';
+import { toDateStr, todayStr } from '../../shared/utils/date.utils';
 
 export type InsightType =
   | 'setmana_fluixa'
@@ -36,7 +37,7 @@ export interface FitnessInsight {
   color: string;
 }
 
-const TODAY = (): string => new Date().toISOString().split('T')[0];
+const TODAY = (): string => todayStr();
 
 // "Push day?" / "Pull day?" / "Leg day?" — gym-culture shorthand the user
 // already uses. Custom types fall back to their own name.
@@ -54,13 +55,13 @@ function mondayOfWeek(dateStr: string): string {
   const d   = new Date(dateStr + 'T12:00:00');
   const day = d.getDay();
   d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
-  return d.toISOString().split('T')[0];
+  return toDateStr(d);
 }
 
 function offsetDate(dateStr: string, days: number): string {
   const d = new Date(dateStr + 'T12:00:00');
   d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
+  return toDateStr(d);
 }
 
 function daysBetween(a: string, b: string): number {

@@ -1,5 +1,4 @@
 import { Component, inject } from '@angular/core';
-import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 
 import { Sport } from '../../core/models/sport.model';
@@ -7,6 +6,7 @@ import { SportService } from '../../core/services/sport.service';
 import { SportFormDialogComponent } from '../library/components/sport-form-dialog.component';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
+import { NavigationHistoryService } from '../../core/services/navigation-history.service';
 
 @Component({
   selector: 'app-sports-config',
@@ -158,11 +158,14 @@ export class SportsConfigComponent {
   private dialog       = inject(MatDialog);
   private feedback     = inject(FeedbackService);
   private confirmDialog = inject(ConfirmDialogService);
-  private router       = inject(Router);
+  private navHistory       = inject(NavigationHistoryService);
 
   readonly sports = this.sportService.sports;
 
-  goBack(): void { this.router.navigate(['/settings']); }
+  /** Aquestes pàgines de configuració s'obren tant des del Perfil com des
+   *  d'Entrenament: tornar sempre al Perfil et treia d'on eres. L'historial
+   *  de navegació sap d'on véns; el Perfil només és el pla B. */
+  goBack(): void { this.navHistory.goBack('/settings'); }
 
   openForm(sport?: Sport): void {
     const ref = this.dialog.open(SportFormDialogComponent, {

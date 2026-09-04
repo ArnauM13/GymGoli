@@ -1,6 +1,7 @@
-import { Component, inject, input, output, signal } from '@angular/core';
+import { Component, booleanAttribute, computed, inject, input, output, signal } from '@angular/core';
 
 import { ActivityIconComponent } from '../activity-icon/activity-icon.component';
+import { WorkoutDetailComponent } from '../workout-detail/workout-detail.component';
 import { Sport, SportMetricDef, SportSession } from '../../../core/models/sport.model';
 import { FeelingLevel, Workout } from '../../../core/models/workout.model';
 import { WorkoutService } from '../../../core/services/workout.service';
@@ -10,8 +11,10 @@ import { ExerciseService } from '../../../core/services/exercise.service';
 import { FeedbackService } from '../../services/feedback.service';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import {
-  formatFeeling, getCatLabel, getExerciseNames, isWorkoutPlanned, sportSessionSummary,
-  workoutCardColor, workoutCategoryList, workoutPrimaryColor, workoutPrimaryIcon, workoutSetsCount, workoutWarmupSetsCount,
+  ActivityStat,
+  formatFeeling, getExerciseNames, isWorkoutPlanned, sportStatParts,
+  workoutCardColor, workoutPrimaryColor, workoutPrimaryIcon, workoutSetsCount,
+  workoutTypeLabel, workoutWarmupSetsCount,
   workoutVolumeFmt as workoutVolumeFmtUtil,
 } from '../../utils/workout-card.utils';
 
@@ -21,93 +24,137 @@ export interface DayFeedEntry {
   sports: { sport: Sport; session: SportSession }[];
 }
 
+/**
+ * L'activitat d'un dia: entrenaments i esports, amb la mateixa targeta.
+ *
+ * Les dues activitats es llegeixen igual — barra de color, icona amb el gos,
+ * títol que diu què és, detall i xifres — i només canvia el chevron i què
+ * passa quan la toques: un entrenament s'obre (o es desplega a l'Historial),
+ * un esport es desplega per editar-lo aquí mateix.
+ */
 @Component({
   selector: 'app-day-feed-cards',
   standalone: true,
-  imports: [ActivityIconComponent],
+  imports: [ActivityIconComponent, WorkoutDetailComponent],
   template: `
     @for (w of day()?.workouts ?? []; track w.id) {
-      <div class="feed-card" [class.feed-card--planned]="isPlanned(w)"
-           [style.--wc]="workoutPrimaryColor(w)"
-           (click)="handleWorkoutClick(w)">
-        <div class="fc-bar" [style.background]="workoutCardColor(w)"></div>
-        <!-- Tipus d'entrenament amb el Marley a sobre: es reconeix el que és
-             sense haver de llegir res. -->
-        <app-activity-icon [icon]="workoutPrimaryIcon(w)"
-                           [color]="workoutPrimaryColor(w)" mascot="marley" />
-        <div class="fc-info">
-          <div class="fc-badges">
-            @for (cat of workoutCategoryList(w); track cat) {
-              <span class="fc-badge fc-badge--{{ cat }}">{{ getCatLabel(cat) }}</span>
-            }
-            @if (isPlanned(w)) {
-              <span class="fc-badge fc-badge--planned">Planificat</span>
-            }
-          </div>
-          <span class="fc-exercises">{{ w.entries.length ? getExerciseNames(w) : 'Pla buit' }}</span>
-          @if (!isPlanned(w)) {
-            <div class="fc-stats">
-              <span class="fc-stat">
-                <span class="material-symbols-outlined">fitness_center</span>
-                <strong>{{ w.entries.length }}</strong> exerc
-              </span>
-              @if (workoutSetsCount(w) || workoutWarmupSetsCount(w)) {
-                <span class="fc-stat-sep">·</span>
-                <span class="fc-stat">
-                  <span class="material-symbols-outlined">repeat</span>
-                  <strong>{{ workoutSetsCount(w) }}</strong> sèr
-                  @if (workoutWarmupSetsCount(w); as warm) {
-                    <span class="fc-stat-warmup">
-                      +{{ warm }}<span class="material-symbols-outlined">local_fire_department</span>
+      <div class="act-card" [class.act-card--planned]="isPlanned(w)"
+           [class.expanded]="expandedWorkoutId() === w.id"
+           [style.--ac]="workoutPrimaryColor(w)">
+        <span class="ac-bar" [style.background]="workoutCardColor(w)" aria-hidden="true"></span>
+
+        <div class="ac-head">
+          <button class="ac-main" (click)="handleWorkoutClick(w)"
+                  [attr.aria-expanded]="expandWorkouts() && !isPlanned(w) ? expandedWorkoutId() === w.id : null">
+            <app-activity-icon [icon]="workoutPrimaryIcon(w)"
+                               [color]="workoutPrimaryColor(w)" mascot="marley" />
+            <div class="ac-info">
+              <div class="ac-title-row">
+                <span class="ac-title">{{ workoutTypeLabel(w) }}</span>
+                @if (isPlanned(w)) { <span class="ac-tag">Planificat</span> }
+                @if (isUnsynced(w.id)) {
+                  <span class="ac-tag ac-tag--unsynced" title="Encara no s'ha desat al servidor">
+                    <span class="material-symbols-outlined" aria-hidden="true">cloud_off</span>
+                    Sense sincronitzar
+                  </span>
+                }
+                @if (w.feeling) { <span class="ac-feeling">{{ emojiOf(w.feeling) }}</span> }
+              </div>
+              <span class="ac-detail">{{ w.entries.length ? getExerciseNames(w) : (isPlanned(w) ? 'Pla buit' : 'Sense exercicis') }}</span>
+              @if (!isPlanned(w)) {
+                <div class="ac-stats">
+                  <span class="ac-stat">
+                    <span class="material-symbols-outlined" aria-hidden="true">fitness_center</span>
+                    <strong>{{ w.entries.length }}</strong> exerc
+                  </span>
+                  @if (workoutSetsCount(w) || workoutWarmupSetsCount(w)) {
+                    <span class="ac-stat-sep" aria-hidden="true">·</span>
+                    <span class="ac-stat">
+                      <span class="material-symbols-outlined" aria-hidden="true">repeat</span>
+                      <strong>{{ workoutSetsCount(w) }}</strong> sèr
+                      @if (workoutWarmupSetsCount(w); as warm) {
+                        <span class="ac-stat-warmup">
+                          +{{ warm }}<span class="material-symbols-outlined" aria-hidden="true">local_fire_department</span>
+                        </span>
+                      }
                     </span>
                   }
-                </span>
+                  @if (workoutVolumeFmt(w); as vol) {
+                    <span class="ac-stat-sep" aria-hidden="true">·</span>
+                    <span class="ac-stat ac-stat--vol">
+                      <span class="material-symbols-outlined" aria-hidden="true">weight</span>
+                      <strong>{{ vol }}</strong>
+                    </span>
+                  }
+                </div>
               }
-              @if (workoutVolumeFmt(w); as vol) {
-                <span class="fc-stat-sep">·</span>
-                <span class="fc-stat fc-stat--vol">
-                  <span class="material-symbols-outlined">weight</span>
-                  <strong>{{ vol }}</strong>
-                </span>
-              }
-              @if (w.feeling) {
-                <span class="fc-stat-sep">·</span>
-                <span class="fc-stat">{{ emojiOf(w.feeling) }}</span>
-              }
+            </div>
+            @if (!isPlanned(w)) {
+              <span class="material-symbols-outlined ac-chevron" aria-hidden="true">
+                {{ expandWorkouts() ? (expandedWorkoutId() === w.id ? 'expand_less' : 'expand_more') : 'chevron_right' }}
+              </span>
+            }
+          </button>
+
+          @if (isPlanned(w)) {
+            <div class="ac-actions">
+              <button class="ac-act ac-act--del" (click)="deletePlan(w)"
+                      aria-label="Eliminar planificació">
+                <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+              </button>
+              <button class="ac-act ac-act--start" (click)="startPlan(w)" aria-label="Comença">
+                <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
+              </button>
             </div>
           }
         </div>
-        @if (isPlanned(w)) {
-          <div class="fc-plan-actions">
-            <button class="fc-plan-del" (click)="$event.stopPropagation(); deletePlan(w)"
-                    title="Eliminar planificació" aria-label="Eliminar planificació">
-              <span class="material-symbols-outlined">delete</span>
-            </button>
-            <button class="fc-start" (click)="$event.stopPropagation(); startPlan(w)"
-                    title="Comença" aria-label="Comença">
-              <span class="material-symbols-outlined">play_arrow</span>
+
+        @if (expandWorkouts() && expandedWorkoutId() === w.id && !isPlanned(w)) {
+          <app-workout-detail [workout]="w" />
+          <div class="ac-detail-actions">
+            <button class="ac-open-btn" (click)="open.emit(w.id)">
+              <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>
+              Obrir entrenament
             </button>
           </div>
-        } @else {
-          <span class="material-symbols-outlined fc-chevron">chevron_right</span>
         }
       </div>
     }
+
     @for (item of day()?.sports ?? []; track item.session.id) {
-      <div class="feed-sport-card" [class.expanded]="expandedSportId() === item.session.id" [style.--ic]="item.sport.color">
-        <button class="feed-sport-row" (click)="toggleSportExpand(item)">
-          <!-- L'esport ja tenia icona; només li faltava el Xoco. -->
-          <app-activity-icon [icon]="item.sport.icon" [color]="item.sport.color" mascot="xoco" />
-          <div class="fsr-info">
-            <span class="feed-sport-name">{{ item.sport.name }}</span>
-            @if (sportSummary(item.session, item.sport); as meta) {
-              <span class="feed-sport-meta">{{ meta }}</span>
-            }
-          </div>
-          <span class="material-symbols-outlined fsr-chevron">
-            {{ expandedSportId() === item.session.id ? 'expand_less' : 'expand_more' }}
-          </span>
-        </button>
+      <div class="act-card" [class.expanded]="expandedSportId() === item.session.id"
+           [style.--ac]="item.sport.color">
+        <span class="ac-bar" [style.background]="item.sport.color" aria-hidden="true"></span>
+
+        <div class="ac-head">
+          <button class="ac-main" (click)="toggleSportExpand(item)"
+                  [attr.aria-expanded]="expandedSportId() === item.session.id">
+            <app-activity-icon [icon]="item.sport.icon" [color]="item.sport.color" mascot="xoco" />
+            <div class="ac-info">
+              <div class="ac-title-row">
+                <span class="ac-title">{{ item.sport.name }}</span>
+                @if (item.session.feeling) { <span class="ac-feeling">{{ emojiOf(item.session.feeling) }}</span> }
+              </div>
+              @if (sportDetail(item); as detail) { <span class="ac-detail">{{ detail }}</span> }
+              @if (sportStats(item); as stats) {
+                @if (stats.length) {
+                  <div class="ac-stats">
+                    @for (stat of stats; track stat.text; let i = $index) {
+                      @if (i > 0) { <span class="ac-stat-sep" aria-hidden="true">·</span> }
+                      <span class="ac-stat">
+                        <span class="material-symbols-outlined" aria-hidden="true">{{ stat.icon }}</span>
+                        <strong>{{ stat.text }}</strong>
+                      </span>
+                    }
+                  </div>
+                }
+              }
+            </div>
+            <span class="material-symbols-outlined ac-chevron" aria-hidden="true">
+              {{ expandedSportId() === item.session.id ? 'expand_less' : 'expand_more' }}
+            </span>
+          </button>
+        </div>
 
         @if (expandedSportId() === item.session.id) {
           <div class="sport-detail">
@@ -191,7 +238,7 @@ export interface DayFeedEntry {
             <div class="sd-actions">
               <button class="sd-delete-btn" [disabled]="editSaving()" (click)="deleteSportEdit(item)"
                       aria-label="Eliminar" title="Eliminar">
-                <span class="material-symbols-outlined">delete</span>
+                <span class="material-symbols-outlined" aria-hidden="true">delete</span>
               </button>
               <div class="sd-main-actions">
                 <button class="sd-cancel" (click)="collapseSport()">Cancel·lar</button>
@@ -204,108 +251,114 @@ export interface DayFeedEntry {
     }
   `,
   styles: [`
-    /* ── Feed workout cards (bigger, richer than the compact .workout-card) ── */
-    .feed-card {
-      display: flex; align-items: center;
-      margin-bottom: 8px;
-      border: 1.5px solid color-mix(in srgb, var(--wc, var(--c-border-2)) 38%, var(--c-border-2));
-      border-radius: 16px;
-      background: color-mix(in srgb, var(--wc, var(--c-card)) 6%, var(--c-card));
-      box-shadow: 0 2px 8px var(--c-shadow); overflow: hidden;
-      cursor: pointer; touch-action: manipulation;
+    /* ── Targeta d'activitat (la mateixa per a entrenaments i esports) ── */
+    .act-card {
+      position: relative; margin-bottom: 7px;
+      border: 1.5px solid color-mix(in srgb, var(--ac, var(--c-border-2)) 34%, var(--c-border-2));
+      border-radius: 14px; overflow: hidden;
+      background: color-mix(in srgb, var(--ac, var(--c-card)) 6%, var(--c-card));
+      box-shadow: 0 2px 8px var(--c-shadow);
       transition: box-shadow 0.15s, border-color 0.15s, background 0.15s;
       &:hover {
         box-shadow: 0 3px 12px var(--c-shadow-md);
-        background: color-mix(in srgb, var(--wc, var(--c-card)) 10%, var(--c-card));
-        border-color: color-mix(in srgb, var(--wc, var(--c-border)) 45%, var(--c-border));
+        background: color-mix(in srgb, var(--ac, var(--c-card)) 10%, var(--c-card));
+        border-color: color-mix(in srgb, var(--ac, var(--c-border)) 45%, var(--c-border));
+      }
+      &.expanded {
+        box-shadow: 0 4px 16px var(--c-shadow-md);
+        border-color: color-mix(in srgb, var(--ac, var(--c-border)) 55%, var(--c-border));
       }
     }
-    .feed-card--planned {
+    .act-card--planned {
       border-style: dashed;
-      border-color: color-mix(in srgb, var(--wc, var(--c-brand)) 55%, var(--c-border-2));
-      background: color-mix(in srgb, var(--wc, var(--c-brand)) 5%, var(--c-card));
-      &:hover { background: color-mix(in srgb, var(--wc, var(--c-brand)) 9%, var(--c-card)); }
+      border-color: color-mix(in srgb, var(--ac, var(--c-brand)) 55%, var(--c-border-2));
+      background: color-mix(in srgb, var(--ac, var(--c-brand)) 5%, var(--c-card));
+      &:hover { background: color-mix(in srgb, var(--ac, var(--c-brand)) 9%, var(--c-card)); }
     }
-    .fc-bar { width: 5px; align-self: stretch; flex-shrink: 0; }
+    .ac-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 5px; }
 
-    .fc-info {
-      flex: 1; min-width: 0;
-      display: flex; flex-direction: column; gap: 5px;
-      padding: 13px 12px;
+    .ac-head { display: flex; align-items: stretch; }
+    .ac-main {
+      display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0;
+      padding: 9px 6px 9px 15px; border: none; background: transparent; text-align: left;
+      cursor: pointer; touch-action: manipulation;
+      &:focus-visible { outline: 2px solid var(--ac, var(--c-brand)); outline-offset: -3px; }
     }
-    .fc-badges { display: flex; flex-wrap: wrap; gap: 4px; }
-    .fc-badge {
-      display: inline-block; padding: 2px 8px; border-radius: 8px;
-      font-size: 10px; font-weight: 700; letter-spacing: 0.2px; line-height: 1.4;
+
+    .ac-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .ac-title-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .ac-title {
+      flex: 1; min-width: 0; font-size: 14px; font-weight: 800; line-height: 1.25;
+      color: var(--c-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .fc-badge--push { background: rgba(229,115,115,0.15); color: #b71c1c; }
-    .fc-badge--pull { background: rgba(100,181,246,0.15); color: #0d47a1; }
-    .fc-badge--legs { background: rgba(129,199,132,0.15); color: #1b5e20; }
-    html.dark .fc-badge--push { background: rgba(229,115,115,0.18); color: #ef9a9a; }
-    html.dark .fc-badge--pull { background: rgba(100,181,246,0.18); color: #90caf9; }
-    html.dark .fc-badge--legs { background: rgba(129,199,132,0.18); color: #a5d6a7; }
-    .fc-badge--planned { background: rgba(var(--c-brand-rgb), 0.12); color: var(--c-brand); }
-    .fc-exercises {
-      font-size: 14px; font-weight: 700; color: var(--c-text);
+    .ac-tag {
+      display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0;
+      padding: 1px 7px; border-radius: 8px;
+      background: rgba(var(--c-brand-rgb), 0.12); color: var(--c-brand);
+      font-size: 10px; font-weight: 700; letter-spacing: 0.2px; line-height: 1.5;
+      .material-symbols-outlined { font-size: 12px; }
+    }
+    .ac-tag--unsynced { background: rgba(255,152,0,0.15); color: #b26500; }
+    html.dark .ac-tag--unsynced { background: rgba(255,152,0,0.18); color: #ffb74d; }
+    /* La sensació viu a la fila del títol i no al costat de les xifres: allà
+       s'escapava a una línia sola quan hi havia sèries d'escalfament. */
+    .ac-feeling { flex-shrink: 0; font-size: 15px; line-height: 1.2; }
+    .ac-detail {
+      font-size: 11.5px; font-weight: 500; color: var(--c-text-2); line-height: 1.3;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .fc-stats {
-      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-      font-size: 12px; color: var(--c-text-2); font-weight: 500;
+    .ac-stats {
+      display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+      margin-top: 1px; font-size: 11.5px; font-weight: 500; color: var(--c-text-3);
     }
-    .fc-stat {
-      display: inline-flex; align-items: center; gap: 3px;
-      .material-symbols-outlined { font-size: 14px; color: color-mix(in srgb, var(--wc, var(--c-text-3)) 60%, var(--c-text-3)); }
+    .ac-stat {
+      display: inline-flex; align-items: center; gap: 3px; white-space: nowrap;
+      .material-symbols-outlined { font-size: 13px; color: color-mix(in srgb, var(--ac, var(--c-text-3)) 60%, var(--c-text-3)); }
       strong { font-weight: 700; color: var(--c-text-2); }
     }
-    .fc-stat-warmup {
+    .ac-stat-warmup {
       display: inline-flex; align-items: center; gap: 1px; margin-left: 1px; color: #ff9800;
-      .material-symbols-outlined { font-size: 13px; color: #ff9800; font-variation-settings: 'FILL' 1, 'wght' 400; }
+      .material-symbols-outlined { font-size: 12px; color: #ff9800; font-variation-settings: 'FILL' 1, 'wght' 400; }
     }
-    .fc-stat-sep { color: var(--c-border); }
-    .fc-stat--vol strong { color: var(--wc, var(--c-brand)); }
-    .fc-chevron { font-size: 22px; color: var(--c-text-3); flex-shrink: 0; margin-right: 8px; }
-    .fc-plan-actions {
-      display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-right: 10px;
+    .ac-stat-sep { color: var(--c-border); }
+    .ac-stat--vol strong { color: var(--ac, var(--c-brand)); }
+    .ac-chevron {
+      flex-shrink: 0; margin-right: 6px; font-size: 21px; color: var(--c-text-3);
+      transition: color 0.2s;
+      .act-card.expanded & { color: color-mix(in srgb, var(--ac, var(--c-brand)) 70%, var(--c-text-2)); }
     }
-    .fc-plan-del {
-      width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
-      border: 1.5px solid var(--c-border-2); background: var(--c-card); color: var(--c-text-3);
-      display: flex; align-items: center; justify-content: center;
+
+    .ac-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding-right: 9px; }
+    .ac-act {
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      width: 36px; height: 36px; border-radius: 10px;
       cursor: pointer; touch-action: manipulation; transition: all 0.15s;
       .material-symbols-outlined { font-size: 18px; }
+    }
+    .ac-act--del {
+      border: 1.5px solid var(--c-border-2); background: var(--c-card); color: var(--c-text-3);
       &:hover { background: rgba(239,83,80,0.1); color: #ef5350; border-color: rgba(239,83,80,0.3); }
     }
-    .fc-start {
-      width: 38px; height: 38px; border: none; border-radius: 10px; flex-shrink: 0;
-      background: var(--c-brand); color: white;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
+    .ac-act--start {
+      border: none; background: var(--c-brand); color: white;
       .material-symbols-outlined { font-size: 20px; }
       &:hover { background: var(--c-brand-dk); }
     }
 
-    .feed-sport-card {
-      margin-bottom: 8px;
-      border: 1.5px solid var(--c-border-2); border-radius: 16px;
-      background: color-mix(in srgb, var(--ic, var(--c-card)) 5%, var(--c-card));
-      overflow: hidden;
-      transition: box-shadow 0.15s, border-color 0.15s, background 0.15s;
-      &:hover, &.expanded {
-        box-shadow: 0 3px 12px var(--c-shadow-md);
-        background: color-mix(in srgb, var(--ic, var(--c-card)) 10%, var(--c-card));
-        border-color: color-mix(in srgb, var(--ic, var(--c-border)) 45%, var(--c-border));
-      }
+    .ac-detail-actions {
+      display: flex; justify-content: flex-end;
+      padding: 0 12px 10px; background: var(--c-card);
     }
-    .feed-sport-row {
-      display: flex; align-items: center; gap: 8px; width: 100%;
-      padding: 13px 14px; border: none; background: transparent; text-align: left;
-      cursor: pointer; touch-action: manipulation;
+    .ac-open-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      height: 34px; padding: 0 13px; border-radius: 10px;
+      border: 1.5px solid color-mix(in srgb, var(--ac, var(--c-brand)) 45%, var(--c-border-2));
+      background: color-mix(in srgb, var(--ac, var(--c-card)) 10%, var(--c-card));
+      color: var(--c-text-2); font-size: 12.5px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 17px; }
+      &:hover { background: color-mix(in srgb, var(--ac, var(--c-card)) 15%, var(--c-card)); color: var(--c-text); }
     }
-    .fsr-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-    .feed-sport-name { font-size: 14px; font-weight: 700; color: var(--c-text); }
-    .feed-sport-meta { font-size: 12px; color: var(--c-text-3); }
-    .fsr-chevron { font-size: 22px; color: var(--c-text-3); flex-shrink: 0; }
 
     /* ── Sport session inline edit panel ── */
     .sport-detail {
@@ -407,12 +460,16 @@ export class DayFeedCardsComponent {
   private confirmDialog   = inject(ConfirmDialogService);
 
   readonly day  = input<DayFeedEntry | null>(null);
+  /** A l'Historial l'entrenament es desplega aquí mateix amb el desglossament
+   *  de sèries; a Inici la targeta porta directament a l'entrenament. */
+  readonly expandWorkouts = input(false, { transform: booleanAttribute });
   readonly open = output<string>();
 
   readonly durationPresets: number[] = [30, 45, 60, 90];
   readonly feelingLevels: FeelingLevel[] = [1, 2, 3, 4, 5];
 
-  readonly expandedSportId = signal<string | null>(null);
+  readonly expandedSportId   = signal<string | null>(null);
+  readonly expandedWorkoutId = signal<string | null>(null);
   readonly editSaving      = signal(false);
   readonly editDuration    = signal(60);
   readonly editSubtype     = signal<string | null>(null);
@@ -420,13 +477,20 @@ export class DayFeedCardsComponent {
   readonly editMetrics     = signal<Record<string, string | number>>({});
   readonly editNotes       = signal('');
 
+  /** Els entrenaments que encara no han arribat a Supabase: es marquen a la
+   *  targeta perquè una sessió pendent de sincronitzar es vegi com a tal i no
+   *  sembli que s'ha perdut. */
+  private readonly unsyncedIds = computed(
+    () => new Set(this.workoutService.unsyncedWorkouts().map(w => w.id))
+  );
+  isUnsynced(id: string): boolean { return this.unsyncedIds().has(id); }
+
   readonly isPlanned          = isWorkoutPlanned;
   readonly workoutPrimaryColor = workoutPrimaryColor;
   readonly workoutPrimaryIcon  = workoutPrimaryIcon;
 
   readonly workoutCardColor    = workoutCardColor;
-  readonly workoutCategoryList = workoutCategoryList;
-  readonly getCatLabel         = getCatLabel;
+  readonly workoutTypeLabel    = workoutTypeLabel;
   readonly getExerciseNames    = getExerciseNames;
   readonly workoutSetsCount    = workoutSetsCount;
   readonly workoutWarmupSetsCount = workoutWarmupSetsCount;
@@ -444,13 +508,26 @@ export class DayFeedCardsComponent {
     return formatFeeling(level, this.settingsService.difficultyScale());
   }
 
-  sportSummary(sub: { duration?: number; feeling?: FeelingLevel; subtypeId?: string }, sport: Sport): string {
-    return sportSessionSummary(sub, sport, this.settingsService.difficultyScale());
+  /** La línia sota el títol d'un esport: el subtipus, o la nota si no n'hi ha.
+   *  Sense cap de les dues no s'inventa text — la línia desapareix. */
+  sportDetail(item: { sport: Sport; session: SportSession }): string {
+    const sub = item.session.subtypeId
+      ? item.sport.subtypes.find(s => s.id === item.session.subtypeId)?.name
+      : null;
+    return sub ?? (item.session.notes?.trim() ?? '');
+  }
+
+  sportStats(item: { sport: Sport; session: SportSession }): ActivityStat[] {
+    return sportStatParts(item.session, item.sport);
   }
 
   handleWorkoutClick(w: Workout): void {
-    if (this.isPlanned(w)) this.startPlan(w);
-    else this.open.emit(w.id);
+    if (this.isPlanned(w)) { this.startPlan(w); return; }
+    if (this.expandWorkouts()) {
+      this.expandedWorkoutId.update(id => id === w.id ? null : w.id);
+      return;
+    }
+    this.open.emit(w.id);
   }
 
   async startPlan(w: Workout): Promise<void> {

@@ -3,6 +3,7 @@ import { FEELING_EMOJI, FeelingLevel, Workout, setVolume } from '../../core/mode
 import { DifficultyScale } from '../../core/models/user-settings.model';
 import { Sport } from '../../core/models/sport.model';
 import { workoutCategories } from './calendar-utils';
+import { toDateStr } from './date.utils';
 
 export function getBrandColor(): string {
   return getComputedStyle(document.documentElement).getPropertyValue('--c-brand').trim() || '#006874';
@@ -25,6 +26,44 @@ export function getExerciseNames(w: Workout): string {
   if (names.length === 0) return '—';
   if (names.length <= 3) return names.join(' · ');
   return names.slice(0, 3).join(' · ') + ` +${names.length - 3}`;
+}
+
+/**
+ * El nom del tipus d'entrenament ("Empenta", "Empenta · Tracció").
+ *
+ * És el que identifica una sessió d'un cop d'ull, així que mana com a títol
+ * de la targeta: abans el tipus anava en una xapa tota sola i el títol era la
+ * llista d'exercicis retallada, que no deia gaire.
+ */
+export function workoutTypeLabel(w: Workout): string {
+  const cats = workoutCategories(w);
+  if (!cats.length) return 'Entrenament';
+  return cats.map(c => getCatLabel(c)).join(' · ');
+}
+
+/** Una xifra d'una targeta d'activitat: el glif i el valor curt. */
+export interface ActivityStat { icon: string; text: string; }
+
+/** Les xifres d'una sessió d'esport: durada i mètriques, com les sèries i el
+ *  volum ho són per a un entrenament. */
+export function sportStatParts(
+  session: { duration?: number; metrics?: Record<string, string | number> },
+  sport: Sport,
+): ActivityStat[] {
+  const stats: ActivityStat[] = [];
+  if (session.duration) stats.push({ icon: 'timer', text: `${session.duration}min` });
+  const metrics = session.metrics ?? {};
+  for (const def of sport.metricDefs ?? []) {
+    const v = metrics[def.key];
+    if (v === undefined || v === null || v === '') continue;
+    if (def.type === 'select') {
+      const opt = (def.options ?? []).find(o => o.value === v);
+      stats.push({ icon: 'label', text: opt?.label ?? String(v) });
+    } else {
+      stats.push({ icon: 'insights', text: `${v}${def.unit ?? ''}` });
+    }
+  }
+  return stats;
 }
 
 export function workoutCardColor(w: Workout): string {
@@ -125,7 +164,7 @@ export function feedDayLabel(date: string, today: string): string {
     // timezones ahead of UTC — otherwise "ahir" resolves to two days ago.
     const d = new Date(today + 'T12:00:00');
     d.setDate(d.getDate() - 1);
-    return d.toISOString().split('T')[0];
+    return toDateStr(d);
   })();
   if (date === yesterday) return 'Ahir';
   const label = new Date(date + 'T12:00:00')
