@@ -66,7 +66,10 @@ const RECENT_DAYS = 30;
         <span class="material-symbols-outlined swb-arrow" aria-hidden="true">arrow_forward</span>
       </button>
 
-      @if (!offlineService.isOffline() && previewFeedEntry() === null) {
+      <!-- Els insights són tendències de setmanes, no del dia seleccionat:
+           per això ja no depenen que el dia estigui buit. Offline sí que en
+           silencia, perquè les dades poden estar a mitges. -->
+      @if (!offlineService.isOffline()) {
         <app-fitness-insights />
       }
 

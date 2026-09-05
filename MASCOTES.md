@@ -138,10 +138,22 @@ exactament on eren. Els gossos només s'hi afegeixen al costat.
 
 | Insight | Qui |
 | ------- | --- |
-| `prova_gym`, `equilibra_gym`, `categoria_endarrerida`, `descansa` | Marley |
-| `prova_esport`, `recupera_esport`, `constancia_esport`, `feeling_baixant_esport` | Xoco |
-| `setmana_fluixa` | el gos del que hi ha planificat avui |
-| objectius, ratxa, resum de setmana | tots dos |
+| `carrega_alta`, `volum_gym`, `equilibri_gym` | Marley |
+| `progres`, `esforc_creixent` | el gos de l'àmbit: Marley si la dada és de gym, Xoco si és d'esport |
+| objectius (`ratxa_en_joc`, `objectiu_a_l_alca`, `objectiu_desajustat`, `compliment_objectiu`), `sense_activitat`, `tendencia_volum`, `patro_setmanal`, ratxa, resum de setmana | tots dos |
+
+Els insights són **tendències**, no consells del dia: el «què faig avui» el diu
+el suggeriment de `train` i el «com va la setmana», les barres d'objectiu. Per
+això la majoria són transversals i porten els dos gossos: parlen de mesos, no
+d'una activitat concreta. I n'hi cap **un de sol** a la pantalla — dos alhora
+feien que no es llegís cap.
+
+La targeta té tres línies i l'ordre importa: **títol** (la porta oberta),
+**dada** (la xifra, que és el motiu pel qual la targeta existeix) i
+**missatge** (el gos, curt). Si la xifra no hi és, l'insight no s'ha de fer.
+
+Tancar-lo el silencia **el dia d'avui i prou**, com la bafarada. L'endemà
+torna si encara és cert.
 
 ---
 
@@ -153,10 +165,11 @@ en tria un amb la data com a llavor: fix tot el dia, diferent l'endemà. No és
 atzar a propòsit — els insights són `computed()` i una frase que canviés a cada
 recàlcul es notaria.
 
-En tenen **tots** els missatges on parla un gos: `descansa`, `prova_gym` (amb i
-sense planificar), `prova_esport` (amb i sense), `recupera_esport` (amb i
-sense), `categoria_endarrerida` (amb i sense), `setmana_fluixa` (gym i esport),
-`equilibra_gym`, `feeling_baixant_esport` i `constancia_esport`.
+En tenen els missatges on parla un gos: `carrega_alta`, `sense_activitat`,
+`esforc_creixent`, `equilibri_gym`, `progres` (gym i esport) i el final de
+`ratxa_en_joc`. Els que són pura dada — `compliment_objectiu`,
+`tendencia_volum`, `volum_gym`, `patro_setmanal` — no en porten: allà la xifra
+ja diu prou i una frase de gos només hi faria nosa.
 
 ---
 

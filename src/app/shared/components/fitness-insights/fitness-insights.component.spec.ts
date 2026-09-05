@@ -1,10 +1,16 @@
-import { NO_ERRORS_SCHEMA } from '@angular/core';
+import { NO_ERRORS_SCHEMA, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
 
 import { FitnessInsightsComponent } from './fitness-insights.component';
-import { FitnessInsight, FitnessMetricsService } from '../../../core/services/fitness-metrics.service';
+import { FitnessInsight, FitnessMetricsService, INSIGHT_LEVEL } from '../../../core/services/fitness-metrics.service';
+import { TodayService } from '../../../core/services/today.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
+
+const TODAY     = '2025-04-23';
+const YESTERDAY = '2025-04-22';
+
+const DISMISS_KEY = 'gymgoli_insight_dismissed';
+const SHOWN_KEY   = 'gymgoli_insight_shown';
 
 function makeInsight(type: string, overrides: Partial<FitnessInsight> = {}): FitnessInsight {
   return {
@@ -12,8 +18,12 @@ function makeInsight(type: string, overrides: Partial<FitnessInsight> = {}): Fit
     mascot: 'both',
     emoji: '🔥',
     title: `Title for ${type}`,
+    stat: `Stat for ${type}`,
     message: `Message for ${type}`,
     color: '#006874',
+    level: INSIGHT_LEVEL.tendencia,
+    strength: 10,
+    cooldownDays: 0,
     ...overrides,
   };
 }
@@ -23,25 +33,18 @@ describe('FitnessInsightsComponent', () => {
   let mockEnabled:  ReturnType<typeof signal<boolean>>;
   let mockLoaded:   ReturnType<typeof signal<boolean>>;
   let mockInsights: ReturnType<typeof signal<FitnessInsight[]>>;
+  let mockToday:    ReturnType<typeof signal<string>>;
+  let fixture:      ReturnType<typeof TestBed.createComponent<FitnessInsightsComponent>>;
 
-  beforeEach(() => sessionStorage.removeItem('gymgoli_dismissed_insights'));
-
-  beforeEach(async () => {
-    mockEnabled  = signal(true);
-    mockLoaded   = signal(true);
-    mockInsights = signal<FitnessInsight[]>([]);
-
+  /** El component llegeix `localStorage` en construir-se: sembra-hi el que
+   *  calgui abans de cridar-la. */
+  async function build(): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [FitnessInsightsComponent],
       providers: [
-        {
-          provide: UserSettingsService,
-          useValue: { metricsEnabled: mockEnabled, loaded: mockLoaded },
-        },
-        {
-          provide: FitnessMetricsService,
-          useValue: { insights: mockInsights },
-        },
+        { provide: UserSettingsService, useValue: { metricsEnabled: mockEnabled, loaded: mockLoaded } },
+        { provide: FitnessMetricsService, useValue: { insights: mockInsights } },
+        { provide: TodayService, useValue: { today: mockToday } },
       ],
     })
       .overrideComponent(FitnessInsightsComponent, {
@@ -49,120 +52,153 @@ describe('FitnessInsightsComponent', () => {
       })
       .compileComponents();
 
-    const fixture = TestBed.createComponent(FitnessInsightsComponent);
+    fixture = TestBed.createComponent(FitnessInsightsComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
+  }
+
+  beforeEach(() => {
+    localStorage.removeItem(DISMISS_KEY);
+    localStorage.removeItem(SHOWN_KEY);
+    TestBed.resetTestingModule();
+
+    mockEnabled  = signal(true);
+    mockLoaded   = signal(true);
+    mockInsights = signal<FitnessInsight[]>([]);
+    mockToday    = signal(TODAY);
   });
 
-  it('should create', () => {
-    expect(component).toBeTruthy();
+  afterEach(() => {
+    localStorage.removeItem(DISMISS_KEY);
+    localStorage.removeItem(SHOWN_KEY);
   });
 
-  // ── visibleInsights() ────────────────────────────────────────────────────
+  // ── Un i prou ────────────────────────────────────────────────────────────
 
-  describe('visibleInsights()', () => {
-    it('returns all insights when none are dismissed', () => {
-      mockInsights.set([makeInsight('gran_setmana'), makeInsight('recupera_esport')]);
-      expect(component.visibleInsights().length).toBe(2);
-    });
+  it('shows the first candidate and nothing else', async () => {
+    await build();
+    mockInsights.set([makeInsight('tendencia_volum'), makeInsight('equilibri_gym')]);
 
-    it('returns empty array when there are no insights', () => {
-      mockInsights.set([]);
-      expect(component.visibleInsights()).toEqual([]);
-    });
-
-    it('excludes a dismissed insight', () => {
-      mockInsights.set([makeInsight('gran_setmana'), makeInsight('recupera_esport')]);
-
-      component.dismiss('gran_setmana');
-
-      expect(component.visibleInsights().length).toBe(1);
-      expect(component.visibleInsights()[0].type).toBe('recupera_esport');
-    });
-
-    it('excludes all dismissed insights', () => {
-      mockInsights.set([makeInsight('gran_setmana'), makeInsight('recupera_esport')]);
-
-      component.dismiss('gran_setmana');
-      component.dismiss('recupera_esport');
-
-      expect(component.visibleInsights()).toEqual([]);
-    });
-
-    it('preserves insight order after dismissals', () => {
-      mockInsights.set([
-        makeInsight('setmana_fluixa'),
-        makeInsight('gran_setmana'),
-        makeInsight('prova_esport'),
-      ]);
-
-      component.dismiss('gran_setmana');
-
-      const types = component.visibleInsights().map(i => i.type);
-      expect(types).toEqual(['setmana_fluixa', 'prova_esport']);
-    });
-
-    it('reacts reactively when insights signal changes', () => {
-      mockInsights.set([]);
-      expect(component.visibleInsights().length).toBe(0);
-
-      mockInsights.set([makeInsight('gran_setmana')]);
-      expect(component.visibleInsights().length).toBe(1);
-    });
+    expect(component.insight()!.type).toBe('tendencia_volum');
   });
 
-  // ── dismiss() ────────────────────────────────────────────────────────────
+  it('shows nothing when there are no candidates', async () => {
+    await build();
+    expect(component.insight()).toBeNull();
+  });
+
+  it('shows nothing while insights are off or settings are still loading', async () => {
+    await build();
+    mockInsights.set([makeInsight('tendencia_volum')]);
+
+    mockEnabled.set(false);
+    expect(component.insight()).toBeNull();
+
+    mockEnabled.set(true);
+    mockLoaded.set(false);
+    expect(component.insight()).toBeNull();
+  });
+
+  // ── Tancar = silenciar només avui ────────────────────────────────────────
 
   describe('dismiss()', () => {
-    it('dismissing a non-present type does not affect remaining insights', () => {
-      mockInsights.set([makeInsight('gran_setmana')]);
-      component.dismiss('prova_esport');
-      expect(component.visibleInsights().length).toBe(1);
+    it('hides the insight and falls through to the next candidate', async () => {
+      await build();
+      mockInsights.set([makeInsight('tendencia_volum'), makeInsight('equilibri_gym')]);
+
+      component.dismiss('tendencia_volum');
+
+      expect(component.insight()!.type).toBe('equilibri_gym');
     });
 
-    it('dismissing the same type twice does not cause errors', () => {
-      mockInsights.set([makeInsight('gran_setmana')]);
-      component.dismiss('gran_setmana');
-      component.dismiss('gran_setmana');
-      expect(component.visibleInsights()).toEqual([]);
+    it('stores the dismissal under today\'s date', async () => {
+      await build();
+      mockInsights.set([makeInsight('tendencia_volum')]);
+
+      component.dismiss('tendencia_volum');
+
+      expect(JSON.parse(localStorage.getItem(DISMISS_KEY)!)).toEqual({ tendencia_volum: TODAY });
     });
 
-    it('dismissals persist if insights signal emits the same types again', () => {
-      mockInsights.set([makeInsight('gran_setmana')]);
-      component.dismiss('gran_setmana');
+    it('lets a dismissed insight come back the next day', async () => {
+      localStorage.setItem(DISMISS_KEY, JSON.stringify({ tendencia_volum: YESTERDAY }));
+      await build();
+      mockInsights.set([makeInsight('tendencia_volum')]);
 
-      // signal emits same value again
-      mockInsights.set([makeInsight('gran_setmana')]);
-      expect(component.visibleInsights()).toEqual([]);
+      expect(component.insight()!.type).toBe('tendencia_volum');
+    });
+
+    it('keeps it hidden for the rest of the same day', async () => {
+      localStorage.setItem(DISMISS_KEY, JSON.stringify({ tendencia_volum: TODAY }));
+      await build();
+      mockInsights.set([makeInsight('tendencia_volum')]);
+
+      expect(component.insight()).toBeNull();
     });
   });
 
-  describe('mascotsOf', () => {
-    it('returns only Marley for a gym insight', () => {
-      const avatars = component.mascotsOf(makeInsight('prova_gym', { mascot: 'marley' }));
-      expect(avatars.length).toBe(1);
-      expect(avatars[0].avatar).toContain('marley');
+  // ── Descans dels estats lents ────────────────────────────────────────────
+
+  describe('cooldown', () => {
+    it('skips a slow insight seen inside its rest window', async () => {
+      localStorage.setItem(SHOWN_KEY, JSON.stringify({ patro_setmanal: YESTERDAY }));
+      await build();
+      mockInsights.set([
+        makeInsight('patro_setmanal', { cooldownDays: 14 }),
+        makeInsight('equilibri_gym'),
+      ]);
+
+      expect(component.insight()!.type).toBe('equilibri_gym');
     });
 
-    it('returns only Xoco for a sport insight', () => {
-      const avatars = component.mascotsOf(makeInsight('prova_esport', { mascot: 'xoco' }));
-      expect(avatars.length).toBe(1);
-      expect(avatars[0].avatar).toContain('xoco');
+    it('brings it back once the rest window is over', async () => {
+      localStorage.setItem(SHOWN_KEY, JSON.stringify({ patro_setmanal: '2025-04-01' }));
+      await build();
+      mockInsights.set([makeInsight('patro_setmanal', { cooldownDays: 14 })]);
+
+      expect(component.insight()!.type).toBe('patro_setmanal');
     });
 
-    it('returns both avatars, Marley first, for a cross-cutting insight', () => {
-      const avatars = component.mascotsOf(makeInsight('objectiu_assolit', { mascot: 'both' }));
-      expect(avatars.length).toBe(2);
-      expect(avatars[0].name).toBe('Marley');
-      expect(avatars[1].name).toBe('Xoco');
+    it('never rests an event insight', async () => {
+      localStorage.setItem(SHOWN_KEY, JSON.stringify({ ratxa_en_joc: YESTERDAY }));
+      await build();
+      mockInsights.set([makeInsight('ratxa_en_joc', { cooldownDays: 0 })]);
+
+      expect(component.insight()!.type).toBe('ratxa_en_joc');
     });
 
-    it('every avatar carries alt text', () => {
-      for (const m of (['marley', 'xoco', 'both'] as const)) {
-        for (const meta of component.mascotsOf(makeInsight('gran_setmana', { mascot: m }))) {
-          expect(meta.alt).toBeTruthy();
-        }
-      }
+    it('keeps today\'s insight all day, even a slow one', async () => {
+      localStorage.setItem(SHOWN_KEY, JSON.stringify({ patro_setmanal: TODAY }));
+      await build();
+      mockInsights.set([makeInsight('patro_setmanal', { cooldownDays: 14 })]);
+
+      expect(component.insight()!.type).toBe('patro_setmanal');
+    });
+
+    it('records what it showed, so tomorrow it can rest', async () => {
+      await build();
+      mockInsights.set([makeInsight('patro_setmanal', { cooldownDays: 14 })]);
+      // Pintar-lo és el que en deixa constància, via `effect`.
+      fixture.detectChanges();
+      expect(component.insight()!.type).toBe('patro_setmanal');
+
+      expect(JSON.parse(localStorage.getItem(SHOWN_KEY)!)).toEqual({ patro_setmanal: TODAY });
+    });
+  });
+
+  // ── Mascotes ─────────────────────────────────────────────────────────────
+
+  describe('mascotsOf()', () => {
+    it('pairs both dogs for a transversal insight', async () => {
+      await build();
+      expect(component.mascotsOf(makeInsight('tendencia_volum', { mascot: 'both' })).length).toBe(2);
+    });
+
+    it('returns a single dog otherwise', async () => {
+      await build();
+      const marley = component.mascotsOf(makeInsight('equilibri_gym', { mascot: 'marley' }));
+      expect(marley.length).toBe(1);
+      expect(marley[0]).toBe(component.mascotsOf(makeInsight('volum_gym', { mascot: 'marley' }))[0]);
     });
   });
 });
