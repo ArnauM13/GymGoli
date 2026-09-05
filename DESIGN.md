@@ -270,18 +270,23 @@ La targeta és la mateixa a Inici i a Historial i viu en un sol component
 L'estructura, de fora cap a dins:
 
 ```
-[barra 5px] [icona + gos] [ títol · subtipus · etiquetes ]  [fatiga] [chevron]
-                          [ nota, si n'hi ha              ]
-                          [ xifres amb icona (2 com a molt) ]
+[barra 5px] [icona + gos] [ títol · subtipus · etiquetes · nota ]  [fatiga] [chevron]
+                          [ xifres amb icona (2 com a molt)     ]
 ```
 
 Regles que la fan llegible:
 
+- **Dues línies com a màxim, sempre**: identitat a dalt i xifres a sota. La
+  nota no obre una tercera línia —va al costat del títol i és la primera que
+  cedeix amplada— i la fila de xifres no embolcalla (`flex-wrap: nowrap`).
 - **El títol identifica**: el tipus d'entrenament (`Empenta`, `Empenta ·
   Tracció`) o el nom de l'esport. Res d'una xapa de tipus tota sola en una
   línia.
 - **El subtipus va enganxat al títol** en una xapa petita (`Yoga` + `Vinyasa`):
   és part del nom de l'activitat, no una dada més.
+- **Les targetes respiren**: `gap` de 7px entre les dues línies, 13px de
+  padding vertical i 10px entre targetes. Apilades, l'aire és el que deixa
+  distingir-les d'un cop d'ull.
 - **La targeta és un cop d'ull, no una fitxa**: cap llista d'exercicis i cap
   mètrica opcional. Dues xifres com a molt (`sportCardStats`, on la durada ja
   compta com una); la resta viu dins l'activitat, en obrir-la.
@@ -290,7 +295,8 @@ Regles que la fan llegible:
 - **L'alçada es reserva** (`min-height` al bloc de text) perquè una activitat
   amb nota i una sense facin la mateixa mida.
 - **Les xifres porten icona i no es parteixen** (`white-space: nowrap` a cada
-  una, separador `·` entre elles).
+  una, separador `·` entre elles). El volum és opcional (`hideVolume`): a
+  Activitat recent, on les targetes s'apilen, no hi surt.
 - **La icona sempre a `app-activity-icon`** (38×38, gos a la cantonada), amb
   el mateix marge esquerre a totes dues targetes.
 - **La barra de 5px** és absoluta (`position: absolute; left: 0; top: 0;

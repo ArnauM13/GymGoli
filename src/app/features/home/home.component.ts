@@ -172,7 +172,7 @@ const RECENT_DAYS = 30;
           @for (day of historyFeedDays(); track day.date) {
             <div class="feed-day">
               <div class="feed-day-header">{{ dayLabel(day.date) }}</div>
-              <app-day-feed-cards [day]="day" (open)="goToWorkout($event)" />
+              <app-day-feed-cards [day]="day" hideVolume (open)="goToWorkout($event)" />
             </div>
           }
         }
