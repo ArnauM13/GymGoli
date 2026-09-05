@@ -278,15 +278,16 @@ export interface DayFeedEntry {
 
     .ac-head { display: flex; align-items: stretch; }
     .ac-main {
-      display: flex; align-items: center; gap: 13px; flex: 1; min-width: 0;
-      padding: 13px 8px 13px 16px; border: none; background: transparent; text-align: left;
+      display: flex; align-items: center; gap: 11px; flex: 1; min-width: 0;
+      padding: 13px 6px 13px 14px; border: none; background: transparent; text-align: left;
       cursor: pointer; touch-action: manipulation;
       &:focus-visible { outline: 2px solid var(--ac, var(--c-brand)); outline-offset: -3px; }
     }
 
-    /* Dues línies i mai una tercera: identitat a dalt (títol, subtipus i
-     * nota) i xifres a sota. L'alçada es reserva encara que la targeta porti
-     * poca cosa, perquè totes les activitats d'un dia facin la mateixa mida. */
+    /* Identitat a dalt (títol, subtipus i nota) i xifres a sota. L'alçada
+     * mínima es reserva encara que la targeta porti poca cosa, perquè totes
+     * les activitats d'un dia facin la mateixa mida; només creix si les
+     * xifres no caben en una línia. */
     .ac-info {
       flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center;
       gap: 7px; min-height: 46px;
@@ -315,7 +316,7 @@ export interface DayFeedEntry {
     /* La fatiga té columna pròpia a la dreta, just abans del chevron: sempre
      * al mateix lloc, hi sigui o no, perquè les targetes s'alineïn entre elles. */
     .ac-feeling {
-      flex-shrink: 0; width: 26px; text-align: center;
+      flex-shrink: 0; width: 22px; text-align: center;
       font-size: 15px; font-weight: 700; line-height: 1.2; color: var(--c-text-2);
     }
     /* La nota va al costat del títol, no a sota: és el subtítol de
@@ -325,26 +326,28 @@ export interface DayFeedEntry {
       font-size: 11.5px; font-weight: 500; color: var(--c-text-2); line-height: 1.3;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    /* Sense embolcallar: una fila de xifres que envaeix una tercera línia
-     * trencaria l'alçada de totes les targetes del dia. */
+    /* Xifres juntes: el mateix aire que a la barra d'entrenament, prou
+     * estret perquè les tres d'un entrenament (exercicis, sèries i volum)
+     * càpiguen d'una tirada. Si un esport en porta més, embolcallen a la
+     * línia següent en comptes de quedar tallades a mitges. */
     .ac-stats {
-      display: flex; align-items: center; gap: 8px; flex-wrap: nowrap;
-      min-width: 0; overflow: hidden;
-      font-size: 11.5px; font-weight: 500; color: var(--c-text-3);
+      display: flex; align-items: center; column-gap: 4px; row-gap: 2px; flex-wrap: wrap;
+      min-width: 0;
+      font-size: 11px; font-weight: 500; color: var(--c-text-3);
     }
     .ac-stat {
-      display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; white-space: nowrap;
-      .material-symbols-outlined { font-size: 13px; color: color-mix(in srgb, var(--ac, var(--c-text-3)) 60%, var(--c-text-3)); }
+      display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0; white-space: nowrap;
+      .material-symbols-outlined { font-size: 11px; color: color-mix(in srgb, var(--ac, var(--c-text-3)) 60%, var(--c-text-3)); }
       strong { font-weight: 700; color: var(--c-text-2); }
     }
     .ac-stat-warmup {
       display: inline-flex; align-items: center; gap: 1px; margin-left: 1px; color: #ff9800;
-      .material-symbols-outlined { font-size: 12px; color: #ff9800; font-variation-settings: 'FILL' 1, 'wght' 400; }
+      .material-symbols-outlined { font-size: 11px; color: #ff9800; font-variation-settings: 'FILL' 1, 'wght' 400; }
     }
     .ac-stat-sep { flex-shrink: 0; color: var(--c-border); }
     .ac-stat--vol strong { color: var(--ac, var(--c-brand)); }
     .ac-chevron {
-      flex-shrink: 0; margin-right: 6px; font-size: 21px; color: var(--c-text-3);
+      flex-shrink: 0; margin-right: 4px; font-size: 20px; color: var(--c-text-3);
       transition: color 0.2s;
       .act-card.expanded & { color: color-mix(in srgb, var(--ac, var(--c-brand)) 70%, var(--c-text-2)); }
     }
