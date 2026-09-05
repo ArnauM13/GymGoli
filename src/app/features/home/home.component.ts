@@ -172,7 +172,7 @@ const RECENT_DAYS = 30;
           @for (day of historyFeedDays(); track day.date) {
             <div class="feed-day">
               <div class="feed-day-header">{{ dayLabel(day.date) }}</div>
-              <app-day-feed-cards [day]="day" (open)="goToWorkout($event)" />
+              <app-day-feed-cards [day]="day" hideVolume (open)="goToWorkout($event)" />
             </div>
           }
         }
@@ -267,6 +267,7 @@ const RECENT_DAYS = 30;
        títol i el dia va a sota, perquè el botó digui tot sol què farà. */
     .start-workout-btn {
       --sc: var(--c-brand);
+      position: relative;
       width: calc(100% - 32px); box-sizing: border-box;
       margin: 12px 16px 0;
       display: flex; align-items: center; gap: 12px;
@@ -282,6 +283,21 @@ const RECENT_DAYS = 30;
       &:active { transform: scale(0.98); }
       /* Millora d'accessibilitat: anell de focus visible per a teclat. */
       &:focus-visible { outline: 2px solid var(--c-text); outline-offset: 2px; }
+    }
+    /* Tres batecs en carregar i prou: si la pàgina arriba amb el botó ja
+       quiet, l'ull se'n va al calendari i a les targetes i no hi torna.
+       L'anell agafa el color del botó, que canvia si el dia és passat. */
+    .start-workout-btn::after {
+      content: ''; position: absolute; inset: -1px; border-radius: inherit;
+      border: 2px solid var(--sc); pointer-events: none; opacity: 0;
+      animation: swb-attention 1.4s ease-out 0.6s 3;
+    }
+    @keyframes swb-attention {
+      from { opacity: 0.55; transform: scale(1); }
+      to   { opacity: 0;    transform: scale(1.07); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .start-workout-btn::after { animation: none; }
     }
     /* Registrar un dia passat: accent càlid per distingir-lo de l'acció
        d'avui. Enfosquit fins que el text blanc arriba a 4.5:1 (#b26a00 es

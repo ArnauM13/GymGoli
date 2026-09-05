@@ -270,18 +270,23 @@ La targeta és la mateixa a Inici i a Historial i viu en un sol component
 L'estructura, de fora cap a dins:
 
 ```
-[barra 5px] [icona + gos] [ títol · subtipus · etiquetes ]  [fatiga] [chevron]
-                          [ nota, si n'hi ha              ]
-                          [ xifres amb icona (2 com a molt) ]
+[barra 5px] [icona + gos] [ títol · subtipus · etiquetes · nota ]  [fatiga] [chevron]
+                          [ xifres amb icona (2 com a molt)     ]
 ```
 
 Regles que la fan llegible:
 
+- **Dues línies com a màxim, sempre**: identitat a dalt i xifres a sota. La
+  nota no obre una tercera línia —va al costat del títol i és la primera que
+  cedeix amplada— i la fila de xifres no embolcalla (`flex-wrap: nowrap`).
 - **El títol identifica**: el tipus d'entrenament (`Empenta`, `Empenta ·
   Tracció`) o el nom de l'esport. Res d'una xapa de tipus tota sola en una
   línia.
 - **El subtipus va enganxat al títol** en una xapa petita (`Yoga` + `Vinyasa`):
   és part del nom de l'activitat, no una dada més.
+- **Les targetes respiren**: `gap` de 7px entre les dues línies, 13px de
+  padding vertical i 10px entre targetes. Apilades, l'aire és el que deixa
+  distingir-les d'un cop d'ull.
 - **La targeta és un cop d'ull, no una fitxa**: cap llista d'exercicis i cap
   mètrica opcional. Dues xifres com a molt (`sportCardStats`, on la durada ja
   compta com una); la resta viu dins l'activitat, en obrir-la.
@@ -290,7 +295,8 @@ Regles que la fan llegible:
 - **L'alçada es reserva** (`min-height` al bloc de text) perquè una activitat
   amb nota i una sense facin la mateixa mida.
 - **Les xifres porten icona i no es parteixen** (`white-space: nowrap` a cada
-  una, separador `·` entre elles).
+  una, separador `·` entre elles). El volum és opcional (`hideVolume`): a
+  Activitat recent, on les targetes s'apilen, no hi surt.
 - **La icona sempre a `app-activity-icon`** (38×38, gos a la cantonada), amb
   el mateix marge esquerre a totes dues targetes.
 - **La barra de 5px** és absoluta (`position: absolute; left: 0; top: 0;
@@ -481,6 +487,22 @@ animation: ic-in 0.25s cubic-bezier(0.34, 1.4, 0.64, 1) both;
   to   { transform: translateY(0);    opacity: 1; }
 }
 animation: bar-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+/* Primary-action attention pulse — three beats on load, then still.
+   Only ever on THE main action of a page (Inici's day action); the button
+   needs `position: relative` and the ring takes its colour. */
+@keyframes swb-attention {
+  from { opacity: 0.55; transform: scale(1); }
+  to   { opacity: 0;    transform: scale(1.07); }
+}
+.start-workout-btn::after {
+  content: ''; position: absolute; inset: -1px; border-radius: inherit;
+  border: 2px solid var(--sc); pointer-events: none; opacity: 0;
+  animation: swb-attention 1.4s ease-out 0.6s 3;
+}
+@media (prefers-reduced-motion: reduce) {
+  .start-workout-btn::after { animation: none; }
+}
 
 /* Skeleton shimmer */
 @keyframes sk-shimmer {

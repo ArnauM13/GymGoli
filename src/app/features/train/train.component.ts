@@ -418,52 +418,35 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
          format, amb cua cap a ell i botó de tancar. Si la tanques marxa tot,
          no queda cap targeta de fons: el suggeriment torna la pròxima vegada
          que entris a la pàgina. ── -->
-    @if (!suggestionDismissed()) {
-      @if (!activeWorkout() && todaySuggestion(); as s) {
-        <div class="suggestion-float-row sfr--with-dog">
-          <div class="sf-card-wrap">
-            <button class="suggestion-float" [style.--sc]="s.color" (click)="handleSuggestionClick(s)"
-                    [attr.aria-label]="'Entrenament suggerit: ' + s.label + '. ' + s.reason">
-              <div class="sf-bar" aria-hidden="true"></div>
-              <app-activity-icon [icon]="s.icon" [color]="s.color" />
-              <div class="sf-info" aria-hidden="true">
-                <span class="sf-label">{{ s.label }}</span>
-                <span class="sf-reason">{{ s.reason }}</span>
-              </div>
-              <!-- El verb, dins una pastilla: amb només el chevron la targeta
-                   es llegia com una nota i no com el botó que és. -->
-              <span class="sf-go" aria-hidden="true">
-                {{ s.type === 'gym' ? 'Començar' : 'Registrar' }}
-                <span class="material-symbols-outlined">arrow_forward</span>
-              </span>
-            </button>
-
-            <!-- Fora del botó: dins el retallaria l'overflow de la targeta. -->
-            <span class="sf-tail" [style.--sc]="s.color" aria-hidden="true"></span>
-            <button class="sf-close" type="button" (click)="dismissSuggestion()"
-                    aria-label="Tancar el suggeriment">
-              <span class="material-symbols-outlined" aria-hidden="true">close</span>
-            </button>
-          </div>
-
-          <img class="sf-figure" [src]="suggestionMascot(s).figure" alt="" aria-hidden="true">
-        </div>
-      } @else if (!activeWorkout() && !creating()) {
-        <!-- Acció principal quan no hi ha suggeriment: mateixa caixa que el
-             suggeriment, però plena de marca — ha de ser l'element amb més
-             contrast de la pàgina, i el verb mana al títol. -->
-        <div class="suggestion-float-row">
-          <button class="suggestion-float suggestion-float--action" (click)="startDefaultWorkout()"
-                  aria-label="Començar entrenament: registra una nova sessió">
-            <app-activity-icon icon="add_circle" color="#fff" />
+    @if (!suggestionDismissed() && !activeWorkout() && todaySuggestion(); as s) {
+      <div class="suggestion-float-row sfr--with-dog">
+        <div class="sf-card-wrap">
+          <button class="suggestion-float" [style.--sc]="s.color" (click)="handleSuggestionClick(s)"
+                  [attr.aria-label]="'Entrenament suggerit: ' + s.label + '. ' + s.reason">
+            <div class="sf-bar" aria-hidden="true"></div>
+            <app-activity-icon [icon]="s.icon" [color]="s.color" />
             <div class="sf-info" aria-hidden="true">
-              <span class="sf-label">Començar entrenament</span>
-              <span class="sf-reason">Registra la teva sessió</span>
+              <span class="sf-label">{{ s.label }}</span>
+              <span class="sf-reason">{{ s.reason }}</span>
             </div>
-            <span class="material-symbols-outlined sf-chevron" aria-hidden="true">arrow_forward</span>
+            <!-- El verb, dins una pastilla: amb només el chevron la targeta
+                 es llegia com una nota i no com el botó que és. -->
+            <span class="sf-go" aria-hidden="true">
+              {{ s.type === 'gym' ? 'Començar' : 'Registrar' }}
+              <span class="material-symbols-outlined">arrow_forward</span>
+            </span>
+          </button>
+
+          <!-- Fora del botó: dins el retallaria l'overflow de la targeta. -->
+          <span class="sf-tail" [style.--sc]="s.color" aria-hidden="true"></span>
+          <button class="sf-close" type="button" (click)="dismissSuggestion()"
+                  aria-label="Tancar el suggeriment">
+            <span class="material-symbols-outlined" aria-hidden="true">close</span>
           </button>
         </div>
-      }
+
+        <img class="sf-figure" [src]="suggestionMascot(s).figure" alt="" aria-hidden="true">
+      </div>
     }
 
     <!-- ── Template picker bottom sheet ── -->
@@ -1043,44 +1026,6 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       /* Millora d'accessibilitat: anell de focus visible per a teclat. */
       &:focus-visible { outline: 2px solid var(--sc); outline-offset: 2px; }
     }
-    /* Acció principal "Començar entrenament": la mateixa caixa que el
-       suggeriment, però PLENA de marca. Tintada al 8% sobre blanc competia en
-       pes amb els mosaics de tipus i la gent no la veia; plena és l'element
-       amb més contrast de la pantalla i es llegeix com un botó a la primera. */
-    .suggestion-float--action {
-      --sc: var(--c-brand);
-      position: relative; overflow: visible; height: 68px; padding-left: 14px;
-      border-color: var(--c-brand-dk);
-      /* El degradat només enfosqueix: aclarir la marca deixaria el text blanc
-         per sota de 4.5:1 al tema fosc. */
-      background: linear-gradient(160deg, var(--c-brand), var(--c-brand-dk));
-      box-shadow: 0 8px 28px color-mix(in srgb, var(--c-brand) 45%, transparent), 0 2px 6px rgba(0,0,0,0.12);
-      .sf-label { font-size: 16px; font-weight: 800; letter-spacing: -0.2px; color: #fff; }
-      .sf-reason { font-size: 12px; color: rgba(255,255,255,0.85); }
-      .sf-chevron { color: #fff; }
-      &:hover {
-        border-color: var(--c-brand-dk);
-        background: linear-gradient(160deg, color-mix(in srgb, white 8%, var(--c-brand)), var(--c-brand));
-        box-shadow: 0 10px 34px color-mix(in srgb, var(--c-brand) 55%, transparent), 0 2px 6px rgba(0,0,0,0.14);
-      }
-      /* L'anell de focus per defecte és del color de la targeta: sobre el
-         farcit de marca seria invisible. */
-      &:focus-visible { outline-color: var(--c-text); }
-    }
-    /* Tres batecs en carregar i prou: si la vista arriba amb el botó ja quiet,
-       l'ull se'n va als mosaics de colors i no torna. */
-    .suggestion-float--action::after {
-      content: ''; position: absolute; inset: -1px; border-radius: inherit;
-      border: 2px solid var(--c-brand); pointer-events: none; opacity: 0;
-      animation: sf-attention 1.4s ease-out 0.6s 3;
-    }
-    @keyframes sf-attention {
-      from { opacity: 0.55; transform: scale(1); }
-      to   { opacity: 0;    transform: scale(1.07); }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .suggestion-float--action::after { animation: none; }
-    }
     .sf-bar { width: 5px; align-self: stretch; flex-shrink: 0; background: var(--sc); }
     .sf-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
     /* Pastilla amb el verb del suggeriment. Es tenyeix amb var(--c-card) i
@@ -1106,7 +1051,6 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       color: color-mix(in srgb, var(--sc) 65%, var(--c-text-3));
     }
-    .sf-chevron { font-size: 20px; color: var(--c-text-3); flex-shrink: 0; }
 
     /* ── "Nou entrenament" section card ── */
     .card-section {
@@ -1628,21 +1572,10 @@ export class TrainComponent implements OnDestroy {
     else this.openSessionLogger(s.sport);
   }
 
-  /** Primary "Nou entrenament" action (shown when there's no suggestion):
-   *  opens the type picker for the first configured gym type so the user can
-   *  start (empty / repeat last / template) in one tap. Falls back to the
-   *  first sport when no gym types exist. */
-  startDefaultWorkout(): void {
-    const firstType = this.workoutTypes()[0];
-    if (firstType) { this.selectType(firstType.value); return; }
-    const firstSport = this.sportService.sports()[0];
-    if (firstSport) this.openSessionLogger(firstSport);
-  }
-
   readonly isSelectedFuture = computed(() => this.selectedDate() > this.today());
 
   readonly pagePaddingBottom = computed(() =>
-    '88px' // clear the active-workout menu FAB / the floating suggestion card
+    '88px' // clear the active-workout menu FAB / the dog's suggestion card
   );
 
   /** Searches across every already-loaded month (not just `selectedDate`),

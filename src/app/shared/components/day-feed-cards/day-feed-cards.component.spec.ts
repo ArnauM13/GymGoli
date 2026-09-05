@@ -147,6 +147,44 @@ describe('DayFeedCardsComponent', () => {
       expect(el.querySelector('.ac-stats')).toBeTruthy();
     });
 
+    it('posa la nota al costat del títol, mai en una línia pròpia', () => {
+      const withNote = {
+        ...day,
+        workouts: [makeWorkout({ id: 'w1', categories: ['push'], notes: 'Bon dia' })],
+        sports: [{
+          ...day.sports[0],
+          session: { ...day.sports[0].session, notes: 'Fluix' },
+        }],
+      };
+      fixture.componentRef.setInput('day', withNote);
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      const notes = Array.from(el.querySelectorAll('.ac-detail'));
+      expect(notes.length).toBe(2);
+      // Dins la fila del títol: així la targeta no passa mai de dues línies
+      // (identitat a dalt, xifres a sota).
+      for (const note of notes) expect(note.parentElement?.classList).toContain('ac-title-row');
+    });
+
+    it('amaga el volum quan se li demana, i el manté per defecte', () => {
+      const withVolume = {
+        ...day,
+        workouts: [makeWorkout({
+          id: 'w1', categories: ['push'],
+          entries: [{ exerciseId: 'e1', exerciseName: 'Press banca', sets: [{ reps: 10, weight: 50 }] }],
+        })],
+        sports: [],
+      };
+      fixture.componentRef.setInput('day', withVolume);
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).querySelector('.ac-stat--vol')).toBeTruthy();
+
+      fixture.componentRef.setInput('hideVolume', true);
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).querySelector('.ac-stat--vol')).toBeNull();
+    });
+
     it('points a workout out of the feed by default, and expands it in place when asked to', () => {
       fixture.componentRef.setInput('day', day);
       fixture.detectChanges();

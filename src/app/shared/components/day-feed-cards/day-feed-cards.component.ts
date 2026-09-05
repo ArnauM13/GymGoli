@@ -52,8 +52,8 @@ export interface DayFeedEntry {
               <div class="ac-title-row">
                 <span class="ac-title">{{ workoutTypeLabel(w) }}</span>
                 @if (isPlanned(w)) { <span class="ac-tag">Planificat</span> }
+                @if (w.notes?.trim(); as note) { <span class="ac-detail">{{ note }}</span> }
               </div>
-              @if (w.notes?.trim(); as note) { <span class="ac-detail">{{ note }}</span> }
               @if (!isPlanned(w)) {
                 <div class="ac-stats">
                   <span class="ac-stat">
@@ -72,7 +72,7 @@ export interface DayFeedEntry {
                       }
                     </span>
                   }
-                  @if (workoutVolumeFmt(w); as vol) {
+                  @if (!hideVolume() && workoutVolumeFmt(w); as vol) {
                     <span class="ac-stat-sep" aria-hidden="true">·</span>
                     <span class="ac-stat ac-stat--vol">
                       <span class="material-symbols-outlined" aria-hidden="true">weight</span>
@@ -130,8 +130,8 @@ export interface DayFeedEntry {
               <div class="ac-title-row">
                 <span class="ac-title">{{ item.sport.name }}</span>
                 @if (sportSubtype(item); as sub) { <span class="ac-subtype">{{ sub }}</span> }
+                @if (item.session.notes?.trim(); as note) { <span class="ac-detail">{{ note }}</span> }
               </div>
-              @if (item.session.notes?.trim(); as note) { <span class="ac-detail">{{ note }}</span> }
               @if (sportStats(item); as stats) {
                 @if (stats.length) {
                   <div class="ac-stats">
@@ -252,7 +252,7 @@ export interface DayFeedEntry {
   styles: [`
     /* ── Targeta d'activitat (la mateixa per a entrenaments i esports) ── */
     .act-card {
-      position: relative; margin-bottom: 7px;
+      position: relative; margin-bottom: 10px;
       border: 1.5px solid color-mix(in srgb, var(--ac, var(--c-border-2)) 34%, var(--c-border-2));
       border-radius: 14px; overflow: hidden;
       background: color-mix(in srgb, var(--ac, var(--c-card)) 6%, var(--c-card));
@@ -278,21 +278,22 @@ export interface DayFeedEntry {
 
     .ac-head { display: flex; align-items: stretch; }
     .ac-main {
-      display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0;
-      padding: 9px 6px 9px 15px; border: none; background: transparent; text-align: left;
+      display: flex; align-items: center; gap: 13px; flex: 1; min-width: 0;
+      padding: 13px 8px 13px 16px; border: none; background: transparent; text-align: left;
       cursor: pointer; touch-action: manipulation;
       &:focus-visible { outline: 2px solid var(--ac, var(--c-brand)); outline-offset: -3px; }
     }
 
-    /* L'alçada es reserva encara que la targeta porti poca cosa: totes les
-     * activitats d'un dia han de fer la mateixa mida, hi hagi nota o no. */
+    /* Dues línies i mai una tercera: identitat a dalt (títol, subtipus i
+     * nota) i xifres a sota. L'alçada es reserva encara que la targeta porti
+     * poca cosa, perquè totes les activitats d'un dia facin la mateixa mida. */
     .ac-info {
       flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center;
-      gap: 2px; min-height: 52px;
+      gap: 7px; min-height: 46px;
     }
-    .ac-title-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .ac-title-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
     .ac-title {
-      flex: 1; min-width: 0; font-size: 14px; font-weight: 800; line-height: 1.25;
+      flex: 0 1 auto; min-width: 0; font-size: 14px; font-weight: 800; line-height: 1.25;
       color: var(--c-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .ac-tag {
@@ -317,16 +318,22 @@ export interface DayFeedEntry {
       flex-shrink: 0; width: 26px; text-align: center;
       font-size: 15px; font-weight: 700; line-height: 1.2; color: var(--c-text-2);
     }
+    /* La nota va al costat del títol, no a sota: és el subtítol de
+     * l'activitat i és la primera que cedeix amplada quan no hi cap tot. */
     .ac-detail {
+      flex: 1 1 auto; min-width: 0;
       font-size: 11.5px; font-weight: 500; color: var(--c-text-2); line-height: 1.3;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
+    /* Sense embolcallar: una fila de xifres que envaeix una tercera línia
+     * trencaria l'alçada de totes les targetes del dia. */
     .ac-stats {
-      display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
-      margin-top: 1px; font-size: 11.5px; font-weight: 500; color: var(--c-text-3);
+      display: flex; align-items: center; gap: 8px; flex-wrap: nowrap;
+      min-width: 0; overflow: hidden;
+      font-size: 11.5px; font-weight: 500; color: var(--c-text-3);
     }
     .ac-stat {
-      display: inline-flex; align-items: center; gap: 3px; white-space: nowrap;
+      display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; white-space: nowrap;
       .material-symbols-outlined { font-size: 13px; color: color-mix(in srgb, var(--ac, var(--c-text-3)) 60%, var(--c-text-3)); }
       strong { font-weight: 700; color: var(--c-text-2); }
     }
@@ -334,7 +341,7 @@ export interface DayFeedEntry {
       display: inline-flex; align-items: center; gap: 1px; margin-left: 1px; color: #ff9800;
       .material-symbols-outlined { font-size: 12px; color: #ff9800; font-variation-settings: 'FILL' 1, 'wght' 400; }
     }
-    .ac-stat-sep { color: var(--c-border); }
+    .ac-stat-sep { flex-shrink: 0; color: var(--c-border); }
     .ac-stat--vol strong { color: var(--ac, var(--c-brand)); }
     .ac-chevron {
       flex-shrink: 0; margin-right: 6px; font-size: 21px; color: var(--c-text-3);
@@ -477,6 +484,10 @@ export class DayFeedCardsComponent {
   /** A l'Historial l'entrenament es desplega aquí mateix amb el desglossament
    *  de sèries; a Inici la targeta porta directament a l'entrenament. */
   readonly expandWorkouts = input(false, { transform: booleanAttribute });
+  /** El volum és la xifra que menys es mira d'un cop d'ull i la que més
+   *  amplada es menja; a Activitat recent, on les targetes s'apilen, se
+   *  n'amaga. A la targeta del dia i a l'Historial s'hi queda. */
+  readonly hideVolume = input(false, { transform: booleanAttribute });
   readonly open = output<string>();
 
   readonly durationPresets: number[] = [30, 45, 60, 90];
