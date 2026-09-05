@@ -791,6 +791,22 @@ encavalcats en comptes d'una foto de grup, que a 30px no es llegeix.
 </div>
 ```
 
+El cos de la targeta té tres línies fixes, i la del mig és la important: la
+xifra va per sobre del missatge i amb el color del text principal, perquè és
+el motiu pel qual la targeta existeix.
+
+```html
+<div class="ic-body">
+  <span class="ic-title">{{ ins.title }}</span>   <!-- 13px/800, tenyit amb --ic -->
+  <span class="ic-stat">{{ ins.stat }}</span>     <!-- 12.5px/700, --c-text     -->
+  <span class="ic-msg">{{ ins.message }}</span>   <!-- 12px/500, --c-text-2     -->
+</div>
+```
+
+**Només n'hi cap una a la pantalla.** El component tria el primer candidat que
+avui es pot ensenyar i para; la resta de dies, l'Inici va del calendari
+directe a la targeta del dia.
+
 Cada mascota té dues imatges a `mascot.model.ts`, i no són intercanviables:
 
 | Camp | Fitxer | Quan |

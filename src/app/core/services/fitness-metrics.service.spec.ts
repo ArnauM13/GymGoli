@@ -1,47 +1,72 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 
-import { FitnessMetricsService } from './fitness-metrics.service';
-import { WorkoutService } from './workout.service';
+import { FitnessMetricsService, InsightType } from './fitness-metrics.service';
+import { ExerciseService } from './exercise.service';
 import { SportService } from './sport.service';
-import { UserSettingsService } from './user-settings.service';
-import { WorkoutProfileService } from './workout-profile.service';
-import { DEFAULT_USER_SETTINGS, UserSettings } from '../models/user-settings.model';
-import { Workout } from '../models/workout.model';
-import { Sport, SportSession } from '../models/sport.model';
+import { TodayService } from './today.service';
 import { TrainingTypeService } from './training-type.service';
+import { UserSettingsService } from './user-settings.service';
+import { WorkoutService } from './workout.service';
+import { DEFAULT_USER_SETTINGS, UserSettings } from '../models/user-settings.model';
 import { DEFAULT_TRAINING_TYPES } from '../models/training-type.model';
+import { FeelingLevel, Workout, WorkoutEntry } from '../models/workout.model';
+import { Sport, SportSession } from '../models/sport.model';
 
-const NEUTRAL_CAT = { daysSinceLast: 2, typicalGapDays: 4, overdueScore: 0.5 };
-const NEUTRAL_PROFILE = {
-  gym: { push: NEUTRAL_CAT, pull: NEUTRAL_CAT, legs: NEUTRAL_CAT },
-  favoriteSport: null, recentSport: null, minRecovery: 2,
-};
-
-// Fixed Wednesday so all date-relative assertions are deterministic
+// Dimecres fix perquè tota assercions relativa a la data sigui determinista.
 const MOCK_DATE = '2025-04-23';
+const THURSDAY  = '2025-04-24';
+const TUESDAY   = '2025-04-22';
 
-/** Returns a date string N days offset from MOCK_DATE (negative = past). */
+/** Data amb N dies de diferència respecte a `MOCK_DATE` (negatiu = passat). */
 function d(offset: number): string {
   const base = new Date(MOCK_DATE + 'T12:00:00');
   base.setDate(base.getDate() + offset);
   return base.toISOString().split('T')[0];
 }
 
-function makeWorkout(date: string): Workout {
-  return { id: date, date, entries: [], createdAt: new Date() };
+/** Dilluns de la setmana que queda N setmanes enrere (0 = la setmana en curs). */
+function monday(weeksBack: number): string {
+  const base = new Date(MOCK_DATE + 'T12:00:00');
+  base.setDate(base.getDate() - base.getDay() + 1 - weeksBack * 7);
+  return base.toISOString().split('T')[0];
+}
+
+/** `count` dies consecutius a partir del dilluns de la setmana indicada. */
+function weekDates(weeksBack: number, count: number): string[] {
+  const start = new Date(monday(weeksBack) + 'T12:00:00');
+  return Array.from({ length: count }, (_, i) => {
+    const day = new Date(start);
+    day.setDate(day.getDate() + i);
+    return day.toISOString().split('T')[0];
+  });
+}
+
+/** `perWeek` activitats per setmana, per a les setmanes `from`..`to` (enrere). */
+function spread(from: number, to: number, perWeek: number): string[] {
+  const out: string[] = [];
+  for (let w = from; w <= to; w++) out.push(...weekDates(w, perWeek));
+  return out;
+}
+
+function makeWorkout(date: string, extra: Partial<Workout> = {}): Workout {
+  return { id: date + Math.random(), date, entries: [], createdAt: new Date(), ...extra };
 }
 
 function makeWorkoutWithCats(date: string, cats: string[]): Workout {
-  return { id: date, date, entries: [], categories: cats, createdAt: new Date() };
+  return makeWorkout(date, { categories: cats });
 }
 
-function makeSport(id = 's1', color = '#43A047'): Sport {
-  return { id, name: 'Futbol', icon: 'sports_soccer', color, subtypes: [], metricDefs: [], createdAt: new Date() };
+function entry(name: string, weight: number, reps = 8): WorkoutEntry {
+  return { exerciseId: name, exerciseName: name, sets: [{ weight, reps }] };
 }
 
-function makeSession(date: string, sportId = 's1'): SportSession {
-  return { id: date + sportId, date, sportId, createdAt: new Date() };
+function makeSport(id = 's1', name = 'Futbol', color = '#43A047'): Sport {
+  return { id, name, icon: 'sports_soccer', color, subtypes: [], metricDefs: [], createdAt: new Date() };
+}
+
+function makeSession(date: string, sportId = 's1', extra: Partial<SportSession> = {}): SportSession {
+  return { id: date + sportId + Math.random(), date, sportId, createdAt: new Date(), ...extra };
 }
 
 describe('FitnessMetricsService', () => {
@@ -50,853 +75,538 @@ describe('FitnessMetricsService', () => {
   let mockSessions: ReturnType<typeof signal<SportSession[]>>;
   let mockSports:   ReturnType<typeof signal<Sport[]>>;
   let mockSettings: ReturnType<typeof signal<UserSettings>>;
+  let mockToday:    ReturnType<typeof signal<string>>;
+
+  const types = (): InsightType[] => service.insights().map(i => i.type);
+  const find  = (t: InsightType) => service.insights().find(i => i.type === t);
 
   beforeEach(() => {
-    jasmine.clock().install();
-    jasmine.clock().mockDate(new Date(MOCK_DATE + 'T12:00:00'));
-
     mockWorkouts = signal<Workout[]>([]);
     mockSessions = signal<SportSession[]>([]);
     mockSports   = signal<Sport[]>([]);
     mockSettings = signal<UserSettings>({ ...DEFAULT_USER_SETTINGS });
+    mockToday    = signal(MOCK_DATE);
 
     TestBed.configureTestingModule({
       providers: [
         FitnessMetricsService,
-        { provide: WorkoutService,        useValue: { doneWorkouts: mockWorkouts, getPlannedForDate: jasmine.createSpy().and.returnValue([]) } },
-        { provide: SportService,          useValue: { sessions: mockSessions, sports: mockSports, getPlannedSportSessionsForDate: jasmine.createSpy().and.returnValue([]) } },
-        { provide: UserSettingsService,   useValue: { settings: mockSettings, fitnessGoal: signal(null) } },
+        { provide: WorkoutService,      useValue: { doneWorkouts: mockWorkouts } },
+        { provide: SportService,        useValue: { sessions: mockSessions, sports: mockSports } },
+        { provide: UserSettingsService, useValue: { settings: mockSettings, bodyweightKg: signal(null) } },
         { provide: TrainingTypeService, useValue: { types: signal(DEFAULT_TRAINING_TYPES) } },
-        { provide: WorkoutProfileService, useValue: { profile: signal(NEUTRAL_PROFILE) } },
+        { provide: ExerciseService,     useValue: { loadTypeOf: () => undefined, bodyweightFactorOf: () => undefined } },
+        { provide: TodayService,        useValue: { today: mockToday } },
       ],
     });
 
     service = TestBed.inject(FitnessMetricsService);
   });
 
-  afterEach(() => jasmine.clock().uninstall());
+  /** Objectiu combinat de `n` activitats per setmana. */
+  function withGoal(n: number): void {
+    mockSettings.set({ ...DEFAULT_USER_SETTINGS, goalMode: 'combined', weeklyActivityGoal: n });
+  }
 
-  // ── Base case ────────────────────────────────────────────────────────────
+  // ── Base ─────────────────────────────────────────────────────────────────
 
-  it('returns no insights on Monday with no data (start of week)', () => {
-    // Monday Apr 21 — before the mid-week threshold, so setmana_fluixa doesn't trigger
-    jasmine.clock().mockDate(new Date('2025-04-21T12:00:00'));
+  it('returns no insights with no data at all', () => {
     expect(service.insights()).toEqual([]);
   });
 
-  it('returns at most 2 insights', () => {
-    // Trigger gran_setmana + recupera_esport simultaneously
+  it('returns no insights when there is a goal but no history', () => {
+    withGoal(3);
+    expect(service.insights()).toEqual([]);
+  });
+
+  it('never looks at what is planned for today — insights are trends only', () => {
+    // El servei ja no injecta WorkoutProfileService ni demana res planificat:
+    // si algun dia hi torna, aquest test peta per provider desconegut.
+    withGoal(2);
+    mockWorkouts.set(spread(1, 8, 2).map(dd => makeWorkout(dd)));
+    expect(() => service.insights()).not.toThrow();
+  });
+
+  it('gives every insight a stat line, a level and a cooldown', () => {
+    withGoal(2);
+    mockWorkouts.set(spread(1, 12, 4).map(dd => makeWorkout(dd)));
     mockSports.set([makeSport()]);
-    mockWorkouts.set([d(-2), d(-1), d(0)].map(makeWorkout));
-    // 2 sessions this week (contributes to gran_setmana count)
-    // + 1 old session (triggers recupera_esport if it becomes the "last")
-    mockSessions.set([makeSession(d(-2)), makeSession(d(-1)), makeSession(d(-10))]);
+    mockSessions.set(spread(1, 8, 1).map(dd => makeSession(dd)));
 
-    expect(service.insights().length).toBeLessThanOrEqual(2);
+    const all = service.insights();
+    expect(all.length).toBeGreaterThan(0);
+    for (const i of all) {
+      expect(i.stat).toBeTruthy();
+      expect(i.level).toBeGreaterThanOrEqual(1);
+      expect(i.cooldownDays).toBeGreaterThanOrEqual(0);
+    }
   });
 
-  // ── gran_setmana ─────────────────────────────────────────────────────────
+  it('sorts by level first and by signal strength within a level', () => {
+    withGoal(2);
+    mockWorkouts.set(spread(1, 12, 4).map(dd => makeWorkout(dd)));
 
-  describe('gran_setmana', () => {
-    it('triggers when 5+ activities exist this week', () => {
-      // Mon Apr 21 = d(-2), Tue Apr 22 = d(-1), Wed Apr 23 = d(0)
-      mockWorkouts.set([d(-2), d(-1), d(0)].map(makeWorkout));
-      mockSports.set([makeSport()]);
-      // 2 sport sessions this week → total = 3 workouts + 2 sessions = 5
-      mockSessions.set([makeSession(d(-2)), makeSession(d(-1))]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).toContain('gran_setmana');
-    });
-
-    it('does NOT trigger with only 4 weekly activities', () => {
-      mockWorkouts.set([d(-2), d(-1), d(0)].map(makeWorkout));
-      mockSports.set([makeSport()]);
-      mockSessions.set([makeSession(d(-2))]); // 3 workouts + 1 session = 4
-
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('gran_setmana');
-    });
-
-    it('returns a motivating emoji and title', () => {
-      mockWorkouts.set([d(-2), d(-1), d(0)].map(makeWorkout));
-      mockSports.set([makeSport()]);
-      mockSessions.set([makeSession(d(-2)), makeSession(d(-1))]);
-
-      const insight = service.insights().find(i => i.type === 'gran_setmana');
-      expect(insight?.emoji).toBeTruthy();
-      expect(insight?.title).toBeTruthy();
-      expect(insight?.message).toContain('5');
-    });
+    const all = service.insights();
+    for (let i = 1; i < all.length; i++) {
+      const prev = all[i - 1], cur = all[i];
+      expect(prev.level).toBeLessThanOrEqual(cur.level);
+      if (prev.level === cur.level) expect(prev.strength).toBeGreaterThanOrEqual(cur.strength);
+    }
   });
 
-  // ── descansa ─────────────────────────────────────────────────────────────
+  // ── Nivell 1 · Objectiu ──────────────────────────────────────────────────
 
-  describe('descansa', () => {
-    it('triggers when 6+ activities exist in the last 7 days', () => {
-      // d(-6)=Apr17 … d(-1)=Apr22, all within last 7 days (threshold >Apr16)
-      mockWorkouts.set([-6, -5, -4, -3, -2, -1].map(d).map(makeWorkout));
-      mockSessions.set([]);
-      mockSports.set([]);
+  describe('ratxa_en_joc', () => {
+    /** 3 setmanes tancades complint i la setmana en curs a mitges. */
+    function streakAtRisk(): void {
+      withGoal(3);
+      mockWorkouts.set([
+        ...spread(1, 3, 3).map(dd => makeWorkout(dd)),
+        makeWorkout(monday(0)),
+      ]);
+    }
 
-      const types = service.insights().map(i => i.type);
-      expect(types).toContain('descansa');
+    it('triggers late in the week when a streak is about to break', () => {
+      streakAtRisk();
+      mockToday.set(THURSDAY);
+
+      expect(types()).toContain('ratxa_en_joc');
+      expect(find('ratxa_en_joc')!.title).toBe('3 setmanes seguides');
+      expect(find('ratxa_en_joc')!.stat).toContain('et falten 2');
     });
 
-    it('does NOT trigger for exactly 5 activities in last 7 days', () => {
-      mockWorkouts.set([-5, -4, -3, -2, -1].map(d).map(makeWorkout));
-      mockSessions.set([]);
-      mockSports.set([]);
+    it('stays quiet early in the week — there is still time', () => {
+      streakAtRisk();
+      mockToday.set(TUESDAY);
 
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('descansa');
+      expect(types()).not.toContain('ratxa_en_joc');
     });
 
-    it('is mutually exclusive with gran_setmana (gran_setmana wins)', () => {
-      // 6 workouts in last 7 days AND 5+ this week → gran_setmana should win
-      mockWorkouts.set([-2, -1, 0].map(d).map(makeWorkout));
-      mockSports.set([makeSport()]);
-      mockSessions.set([makeSession(d(-2)), makeSession(d(-1)), makeSession(d(-3))]);
-      // weekTotal ≥ 5, last7 ≥ 6
+    it('stays quiet when the week is already met', () => {
+      withGoal(3);
+      mockWorkouts.set([
+        ...spread(1, 3, 3).map(dd => makeWorkout(dd)),
+        ...weekDates(0, 3).map(dd => makeWorkout(dd)),
+      ]);
+      mockToday.set(THURSDAY);
 
-      const types = service.insights().map(i => i.type);
-      expect(types).toContain('gran_setmana');
-      expect(types).not.toContain('descansa');
-    });
-  });
-
-  // ── setmana_fluixa ───────────────────────────────────────────────────────
-
-  describe('setmana_fluixa', () => {
-    it('triggers on Thursday with 0 gym workouts and 0 sport sessions', () => {
-      jasmine.clock().mockDate(new Date('2025-04-24T12:00:00')); // Thursday, dow=4
-      mockWorkouts.set([]);
-      mockSessions.set([]);
-      mockSports.set([]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).toContain('setmana_fluixa');
+      expect(types()).not.toContain('ratxa_en_joc');
     });
 
-    it('does NOT trigger when 2+ gym workouts exist this week', () => {
-      mockWorkouts.set([makeWorkout(d(-1)), makeWorkout(d(-2))]);
-      mockSessions.set([]);
-      mockSports.set([]);
+    it('needs at least two closed weeks of streak', () => {
+      withGoal(3);
+      mockWorkouts.set(weekDates(1, 3).map(dd => makeWorkout(dd)));
+      mockToday.set(THURSDAY);
 
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('setmana_fluixa');
+      expect(types()).not.toContain('ratxa_en_joc');
     });
 
-    it('does NOT trigger when 2+ sport sessions exist this week', () => {
-      mockWorkouts.set([]);
-      mockSessions.set([makeSession(d(-1)), makeSession(d(-2))]);
-      mockSports.set([makeSport()]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('setmana_fluixa');
-    });
-
-    it('does NOT trigger when gran_setmana or descansa are active', () => {
-      mockWorkouts.set([-6, -5, -4, -3, -2, -1].map(d).map(makeWorkout));
-      mockSessions.set([]);
-      mockSports.set([]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('setmana_fluixa');
+    it('is the only insight allowed to look at the current week', () => {
+      streakAtRisk();
+      mockToday.set(THURSDAY);
+      expect(find('ratxa_en_joc')!.cooldownDays).toBe(0);
     });
   });
 
-  // ── prova_gym ────────────────────────────────────────────────────────────
+  describe('objectiu_a_l_alca', () => {
+    it('suggests raising the goal when there is a full activity of margin', () => {
+      withGoal(2);
+      mockWorkouts.set(spread(1, 5, 4).map(dd => makeWorkout(dd)));
 
-  describe('prova_gym', () => {
-    it('triggers when 2+ sport sessions and 0 gym workouts in last 7 days', () => {
-      mockWorkouts.set([]);
-      mockSessions.set([makeSession(d(-1)), makeSession(d(-3))]);
-      mockSports.set([makeSport()]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).toContain('prova_gym');
+      const ins = find('objectiu_a_l_alca');
+      expect(ins).toBeTruthy();
+      expect(ins!.stat).toContain('4,0 activitats/setmana');
+      expect(ins!.message).toContain('4');
     });
 
-    it('does NOT trigger when there are gym workouts in last 7 days', () => {
-      mockWorkouts.set([makeWorkout(d(-1))]);
-      mockSessions.set([makeSession(d(-1)), makeSession(d(-3))]);
-      mockSports.set([makeSport()]);
+    it('stays quiet when the user is only just meeting the goal', () => {
+      withGoal(3);
+      mockWorkouts.set(spread(1, 5, 3).map(dd => makeWorkout(dd)));
 
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('prova_gym');
-    });
-
-    it('does NOT trigger with only 1 sport session in last 7 days', () => {
-      mockWorkouts.set([]);
-      mockSessions.set([makeSession(d(-2))]);
-      mockSports.set([makeSport()]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('prova_gym');
-    });
-
-    it('message mentions the session count', () => {
-      mockWorkouts.set([]);
-      mockSessions.set([makeSession(d(-1)), makeSession(d(-3)), makeSession(d(-5))]);
-      mockSports.set([makeSport()]);
-
-      const insight = service.insights().find(i => i.type === 'prova_gym');
-      expect(insight?.message).toContain('3');
-    });
-
-    it('has higher priority than setmana_fluixa', () => {
-      // 0 gym workouts, 2 sport sessions → prova_gym should come before setmana_fluixa
-      // but setmana_fluixa won't fire because weekSessions >= 2
-      mockWorkouts.set([]);
-      mockSessions.set([makeSession(d(-1)), makeSession(d(-2))]);
-      mockSports.set([makeSport()]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).toContain('prova_gym');
-      expect(types).not.toContain('setmana_fluixa');
+      expect(types()).not.toContain('objectiu_a_l_alca');
     });
   });
 
-  // ── prova_esport ─────────────────────────────────────────────────────────
+  describe('objectiu_desajustat', () => {
+    it('proposes a smaller goal when 6 weeks say it is out of reach', () => {
+      withGoal(5);
+      mockWorkouts.set(spread(1, 6, 2).map(dd => makeWorkout(dd)));
 
-  describe('prova_esport', () => {
-    it('triggers when 3+ gym workouts and 0 sport sessions in last 7 days', () => {
-      mockWorkouts.set([-1, -2, -3].map(d).map(makeWorkout));
-      mockSports.set([makeSport()]);
-      mockSessions.set([]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).toContain('prova_esport');
+      const ins = find('objectiu_desajustat');
+      expect(ins).toBeTruthy();
+      expect(ins!.stat).toContain('0 de les últimes 6 setmanes');
+      expect(ins!.message).toContain('2 en comptes de 5');
     });
 
-    it('does NOT trigger when sport sessions exist in last 7 days', () => {
-      mockWorkouts.set([-1, -2, -3].map(d).map(makeWorkout));
-      mockSports.set([makeSport()]);
-      mockSessions.set([makeSession(d(-1))]);
+    it('stays quiet when the goal is met often enough', () => {
+      withGoal(2);
+      mockWorkouts.set(spread(1, 6, 2).map(dd => makeWorkout(dd)));
 
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('prova_esport');
+      expect(types()).not.toContain('objectiu_desajustat');
     });
 
-    it('does NOT trigger with fewer than 3 gym workouts in last 7 days', () => {
-      mockWorkouts.set([makeWorkout(d(-1)), makeWorkout(d(-2))]);
-      mockSports.set([makeSport()]);
-      mockSessions.set([]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('prova_esport');
-    });
-
-    it('does NOT trigger when no sports are defined', () => {
-      mockWorkouts.set([-1, -2, -3].map(d).map(makeWorkout));
-      mockSports.set([]);
-      mockSessions.set([]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('prova_esport');
-    });
-
-    it('mentions the favorite sport by name in the message', () => {
-      mockWorkouts.set([-1, -2, -3].map(d).map(makeWorkout));
-      mockSports.set([makeSport()]);
-      mockSessions.set([]);
-
-      const insight = service.insights().find(i => i.type === 'prova_esport');
-      expect(insight?.message).toContain('Futbol');
+    it('stays quiet when the suggested goal would not be any smaller', () => {
+      withGoal(2);
+      mockWorkouts.set(spread(1, 6, 1).map(dd => makeWorkout(dd)));
+      // Mitjana 1 → suggeriment 1 < 2, però només 1 activitat/setmana amb
+      // objectiu 2 sí que és desajustat: aquí comprovem el cas límit contrari.
+      expect(find('objectiu_desajustat')!.message).toContain('1 en comptes de 2');
     });
   });
 
-  // ── recupera_esport ──────────────────────────────────────────────────────
+  describe('compliment_objectiu', () => {
+    it('compares the last 6 closed weeks with the 6 before them', () => {
+      withGoal(2);
+      // 6 setmanes recents complint, 6 anteriors no.
+      mockWorkouts.set([
+        ...spread(1, 6, 2).map(dd => makeWorkout(dd)),
+        ...spread(7, 12, 1).map(dd => makeWorkout(dd)),
+      ]);
 
-  describe('recupera_esport', () => {
-    it('triggers when favorite sport was last done 7+ days ago', () => {
-      mockSports.set([makeSport()]);
-      mockSessions.set([makeSession(d(-8))]);
-      mockWorkouts.set([]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).toContain('recupera_esport');
+      const ins = find('compliment_objectiu');
+      expect(ins).toBeTruthy();
+      expect(ins!.title).toBe('Cada cop més regular');
+      expect(ins!.stat).toBe('6 de 6 assolides · les 6 anteriors, 0');
+      expect(ins!.cooldownDays).toBe(14);
     });
 
-    it('does NOT trigger when favorite sport was done within the last 7 days', () => {
-      mockSports.set([makeSport()]);
-      mockSessions.set([makeSession(d(-5))]);
-      mockWorkouts.set([]);
+    it('stays quiet when every one of the 12 weeks was met', () => {
+      withGoal(1);
+      mockWorkouts.set(spread(1, 12, 2).map(dd => makeWorkout(dd)));
 
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('recupera_esport');
+      expect(types()).not.toContain('compliment_objectiu');
+    });
+  });
+
+  it('does not judge 6 or 12 weeks of history a new user does not have', () => {
+    // Tres setmanes registrades: els buckets anteriors existeixen, però són
+    // setmanes en què l'usuari encara no hi era.
+    withGoal(5);
+    mockWorkouts.set(spread(1, 3, 2).map(dd => makeWorkout(dd)));
+
+    expect(types()).not.toContain('objectiu_desajustat');
+    expect(types()).not.toContain('compliment_objectiu');
+  });
+
+  it('produces no goal insights at all without a weekly goal', () => {
+    mockWorkouts.set(spread(1, 12, 4).map(dd => makeWorkout(dd)));
+
+    expect(types()).not.toContain('ratxa_en_joc');
+    expect(types()).not.toContain('objectiu_a_l_alca');
+    expect(types()).not.toContain('objectiu_desajustat');
+    expect(types()).not.toContain('compliment_objectiu');
+  });
+
+  // ── Nivell 2 · Ruptura ───────────────────────────────────────────────────
+
+  describe('sense_activitat', () => {
+    it('triggers after 10 quiet days when the user had a real habit', () => {
+      // 8 setmanes a 3 per setmana, i res des de fa 12 dies.
+      mockWorkouts.set(spread(2, 9, 3).map(dd => makeWorkout(dd)).filter(w => w.date <= d(-12)));
+
+      const ins = find('sense_activitat');
+      expect(ins).toBeTruthy();
+      expect(ins!.stat).toContain('dies des de l\'última');
+      expect(ins!.cooldownDays).toBe(0);
     });
 
-    it('does NOT trigger when no sports are defined', () => {
-      mockSports.set([]);
-      mockSessions.set([]);
-      mockWorkouts.set([]);
+    it('stays quiet for someone who never had a rhythm to miss', () => {
+      mockWorkouts.set([makeWorkout(d(-20)), makeWorkout(d(-40))]);
 
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('recupera_esport');
+      expect(types()).not.toContain('sense_activitat');
     });
 
-    it('uses the sport with the most sessions as favorite', () => {
-      const padel   = makeSport('s2', '#FB8C00');
-      padel.name    = 'Pàdel';
-      const futbol  = makeSport('s1', '#43A047');
-      mockSports.set([futbol, padel]);
-      // Pàdel has 3 sessions (more = favorite), Futbol only 1
+    it('stays quiet while the gap is under 10 days', () => {
+      mockWorkouts.set(spread(1, 8, 3).map(dd => makeWorkout(dd)));
+
+      expect(types()).not.toContain('sense_activitat');
+    });
+  });
+
+  describe('carrega_alta', () => {
+    it('triggers when the last 7 days are well above the 8-week average', () => {
+      mockWorkouts.set([
+        ...spread(2, 9, 2).map(dd => makeWorkout(dd)),
+        ...[6, 5, 4, 3, 2, 1].map(n => makeWorkout(d(-n))),
+      ]);
+
+      const ins = find('carrega_alta');
+      expect(ins).toBeTruthy();
+      expect(ins!.stat).toContain('6 sessions en 7 dies');
+      expect(ins!.mascot).toBe('marley');
+    });
+
+    it('stays quiet when a busy week is the user\'s normal', () => {
+      mockWorkouts.set(spread(0, 9, 5).map(dd => makeWorkout(dd)));
+
+      expect(types()).not.toContain('carrega_alta');
+    });
+  });
+
+  // ── Nivell 3 · Progrés ───────────────────────────────────────────────────
+
+  describe('progres', () => {
+    it('reports a real load increase on a single exercise', () => {
+      mockWorkouts.set([
+        makeWorkout(d(-50), { entries: [entry('Press de banca', 60)] }),
+        makeWorkout(d(-35), { entries: [entry('Press de banca', 65)] }),
+        makeWorkout(d(-20), { entries: [entry('Press de banca', 70)] }),
+        makeWorkout(d(-5),  { entries: [entry('Press de banca', 75)] }),
+      ]);
+
+      const ins = find('progres');
+      expect(ins).toBeTruthy();
+      expect(ins!.title).toBe('Puges al press de banca');
+      expect(ins!.stat).toContain('60 → 75 kg');
+      expect(ins!.stat).toContain('+25%');
+      expect(ins!.mascot).toBe('marley');
+    });
+
+    it('ignores warm-up sets when reading the top weight', () => {
+      mockWorkouts.set([
+        makeWorkout(d(-50), { entries: [{ exerciseId: 'Sentadilla', exerciseName: 'Sentadilla', sets: [{ weight: 100, reps: 5, warmup: true }, { weight: 60, reps: 8 }] }] }),
+        makeWorkout(d(-35), { entries: [entry('Sentadilla', 62)] }),
+        makeWorkout(d(-20), { entries: [entry('Sentadilla', 63)] }),
+        makeWorkout(d(-5),  { entries: [entry('Sentadilla', 64)] }),
+      ]);
+
+      expect(find('progres')!.stat).toContain('60 → 64 kg');
+    });
+
+    it('needs four sessions of the same exercise', () => {
+      mockWorkouts.set([
+        makeWorkout(d(-30), { entries: [entry('Press de banca', 60)] }),
+        makeWorkout(d(-10), { entries: [entry('Press de banca', 80)] }),
+      ]);
+
+      expect(types()).not.toContain('progres');
+    });
+
+    it('reports longer sport sessions too', () => {
+      mockSports.set([makeSport('s1', 'Córrer')]);
       mockSessions.set([
-        makeSession(d(-10), 's2'),
-        makeSession(d(-20), 's2'),
-        makeSession(d(-30), 's2'),
-        makeSession(d(-50), 's1'),
+        makeSession(d(-50), 's1', { duration: 30 }),
+        makeSession(d(-35), 's1', { duration: 32 }),
+        makeSession(d(-20), 's1', { duration: 42 }),
+        makeSession(d(-5),  's1', { duration: 44 }),
       ]);
-      mockWorkouts.set([]);
 
-      const insight = service.insights().find(i => i.type === 'recupera_esport');
-      expect(insight?.message).toContain('Pàdel');
+      const ins = find('progres');
+      expect(ins).toBeTruthy();
+      expect(ins!.title).toBe('Aguantes més al córrer');
+      expect(ins!.stat).toContain('31 → 43 min');
+      expect(ins!.mascot).toBe('xoco');
     });
 
-    it('mentions the sport name and elapsed time in the message', () => {
+    it('shows only one progress insight, the biggest relative gain', () => {
+      mockWorkouts.set([-50, -35, -20, -5].map(n => makeWorkout(d(n), { entries: [entry('Press de banca', 60 + (n + 50) / 3)] })));
+      mockSports.set([makeSport('s1', 'Córrer')]);
+      mockSessions.set([
+        makeSession(d(-50), 's1', { duration: 30 }),
+        makeSession(d(-35), 's1', { duration: 32 }),
+        makeSession(d(-20), 's1', { duration: 60 }),
+        makeSession(d(-5),  's1', { duration: 62 }),
+      ]);
+
+      expect(types().filter(t => t === 'progres').length).toBe(1);
+      expect(find('progres')!.mascot).toBe('xoco');
+    });
+  });
+
+  describe('volum_gym', () => {
+    it('spots more tonnage moved with the same number of workouts', () => {
+      const older  = weekDates(7, 3).concat(weekDates(6, 3));
+      const recent = weekDates(3, 3).concat(weekDates(2, 3));
+      mockWorkouts.set([
+        ...older.map(dd => makeWorkout(dd, { entries: [entry('Press', 50)] })),
+        ...recent.map(dd => makeWorkout(dd, { entries: [entry('Press', 70)] })),
+      ]);
+
+      const ins = find('volum_gym');
+      expect(ins).toBeTruthy();
+      expect(ins!.title).toBe('Estàs movent més pes');
+      expect(ins!.message).toContain('mateixos entrenos');
+    });
+
+    it('stays quiet under six workouts in a window', () => {
+      mockWorkouts.set([
+        ...weekDates(6, 2).map(dd => makeWorkout(dd, { entries: [entry('Press', 50)] })),
+        ...weekDates(2, 2).map(dd => makeWorkout(dd, { entries: [entry('Press', 90)] })),
+      ]);
+
+      expect(types()).not.toContain('volum_gym');
+    });
+  });
+
+  // ── Nivell 4 · Tendència ─────────────────────────────────────────────────
+
+  describe('tendencia_volum', () => {
+    it('compares the last four weeks with the four before them', () => {
+      // Finestres de 28 dies comptats des d'avui, no setmanes de calendari.
+      mockWorkouts.set([
+        ...[30, 35, 40, 45].map(n => makeWorkout(d(-n))),
+        ...Array.from({ length: 12 }, (_, i) => makeWorkout(d(-(i + 1)))),
+      ]);
+
+      const ins = find('tendencia_volum');
+      expect(ins).toBeTruthy();
+      expect(ins!.title).toBe('Puges de ritme');
+      expect(ins!.stat).toBe('3,0 activitats/setmana · abans 1,0');
+    });
+
+    it('frames a quieter month without any pressure', () => {
+      mockWorkouts.set([
+        ...Array.from({ length: 12 }, (_, i) => makeWorkout(d(-(i + 29)))),
+        ...[1, 5, 9, 13].map(n => makeWorkout(d(-n))),
+      ]);
+
+      const ins = find('tendencia_volum');
+      expect(ins!.title).toBe('Mes més tranquil');
+      expect(ins!.message).toContain('Cap pressa');
+    });
+
+    it('stays quiet on a change under 25%', () => {
+      mockWorkouts.set([
+        ...Array.from({ length: 12 }, (_, i) => makeWorkout(d(-(i + 29)))),
+        ...Array.from({ length: 12 }, (_, i) => makeWorkout(d(-(i + 1)))),
+      ]);
+
+      expect(types()).not.toContain('tendencia_volum');
+    });
+  });
+
+  describe('esforc_creixent', () => {
+    it('spots a sport getting harder over the last four sessions', () => {
+      mockSports.set([makeSport('s1', 'Pàdel')]);
+      mockSessions.set([
+        makeSession(d(-40), 's1', { feeling: 2 as FeelingLevel }),
+        makeSession(d(-30), 's1', { feeling: 2 as FeelingLevel }),
+        makeSession(d(-20), 's1', { feeling: 4 as FeelingLevel }),
+        makeSession(d(-10), 's1', { feeling: 4 as FeelingLevel }),
+      ]);
+
+      const ins = find('esforc_creixent');
+      expect(ins).toBeTruthy();
+      expect(ins!.title).toBe('Anem amb calma al pàdel');
+      expect(ins!.stat).toBe('Les últimes 4 sessions: Bé → Dur');
+      expect(ins!.mascot).toBe('xoco');
+    });
+
+    it('works on gym workouts too', () => {
+      mockWorkouts.set([
+        makeWorkout(d(-40), { feeling: 1 as FeelingLevel }),
+        makeWorkout(d(-30), { feeling: 2 as FeelingLevel }),
+        makeWorkout(d(-20), { feeling: 4 as FeelingLevel }),
+        makeWorkout(d(-10), { feeling: 4 as FeelingLevel }),
+      ]);
+
+      const ins = find('esforc_creixent');
+      expect(ins).toBeTruthy();
+      expect(ins!.mascot).toBe('marley');
+    });
+
+    it('stays quiet when the effort is steady', () => {
       mockSports.set([makeSport()]);
-      mockSessions.set([makeSession(d(-10))]);
-      mockWorkouts.set([]);
+      mockSessions.set([-40, -30, -20, -10].map(n => makeSession(d(n), 's1', { feeling: 3 as FeelingLevel })));
 
-      const insight = service.insights().find(i => i.type === 'recupera_esport');
-      expect(insight?.message).toContain('Futbol');
-      expect(insight?.message).toBeTruthy();
-    });
-
-    it('uses the sport color for the insight color', () => {
-      mockSports.set([makeSport('s1', '#43A047')]);
-      mockSessions.set([makeSession(d(-8))]);
-      mockWorkouts.set([]);
-
-      const insight = service.insights().find(i => i.type === 'recupera_esport');
-      expect(insight?.color).toBe('#43A047');
+      expect(types()).not.toContain('esforc_creixent');
     });
   });
 
-  // ── equilibra_gym ─────────────────────────────────────────────────────────
+  // ── Nivell 5 · Patró ─────────────────────────────────────────────────────
 
-  describe('equilibra_gym', () => {
-    it('triggers when there is a gap of 2+ between most and least done category', () => {
-      mockSessions.set([]);
-      mockSports.set([]);
-      mockWorkouts.set([
-        makeWorkoutWithCats(d(-1),  ['push']),
-        makeWorkoutWithCats(d(-3),  ['push']),
-        makeWorkoutWithCats(d(-5),  ['push']),
-        makeWorkoutWithCats(d(-7),  ['pull']),
-      ]);
+  describe('patro_setmanal', () => {
+    it('names the two days that carry most of the training', () => {
+      // 12 setmanes entrenant dimarts i dijous.
+      const dates: string[] = [];
+      for (let w = 1; w <= 12; w++) {
+        const week = weekDates(w, 7);
+        dates.push(week[1], week[3]);
+      }
+      mockWorkouts.set(dates.map(dd => makeWorkout(dd)));
 
-      const types = service.insights().map(i => i.type);
-      expect(types).toContain('equilibra_gym');
+      const ins = find('patro_setmanal');
+      expect(ins).toBeTruthy();
+      expect(ins!.stat).toContain('dimarts');
+      expect(ins!.stat).toContain('dijous');
+      expect(ins!.message).toContain('caps de setmana');
+      expect(ins!.cooldownDays).toBe(14);
     });
 
-    it('does NOT trigger when gap between categories is less than 2', () => {
-      mockSessions.set([]);
-      mockSports.set([]);
-      // push=2, pull=1, legs=1 → gap = max(2) - min(1) = 1 < 2
-      mockWorkouts.set([
-        makeWorkoutWithCats(d(-1), ['push']),
-        makeWorkoutWithCats(d(-2), ['pull']),
-        makeWorkoutWithCats(d(-3), ['push']),
-        makeWorkoutWithCats(d(-4), ['legs']),
-      ]);
+    it('stays quiet when training is spread across the week', () => {
+      const dates: string[] = [];
+      for (let w = 1; w <= 12; w++) dates.push(...weekDates(w, 5));
+      mockWorkouts.set(dates.map(dd => makeWorkout(dd)));
 
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('equilibra_gym');
+      expect(types()).not.toContain('patro_setmanal');
     });
 
-    it('does NOT trigger with fewer than 3 workouts in last 28 days', () => {
-      mockSessions.set([]);
-      mockSports.set([]);
-      mockWorkouts.set([
-        makeWorkoutWithCats(d(-1), ['push']),
-        makeWorkoutWithCats(d(-2), ['pull']),
-      ]);
+    it('stays quiet under 12 activities in 12 weeks', () => {
+      mockWorkouts.set(spread(1, 4, 2).map(dd => makeWorkout(dd)));
 
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('equilibra_gym');
-    });
-
-    it('does NOT trigger when only one category is used', () => {
-      mockSessions.set([]);
-      mockSports.set([]);
-      mockWorkouts.set([
-        makeWorkoutWithCats(d(-1), ['push']),
-        makeWorkoutWithCats(d(-2), ['push']),
-        makeWorkoutWithCats(d(-3), ['push']),
-        makeWorkoutWithCats(d(-4), ['push']),
-      ]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('equilibra_gym');
-    });
-
-    it('title matches the least done category (DAY_LABEL)', () => {
-      mockSessions.set([]);
-      mockSports.set([]);
-      mockWorkouts.set([
-        makeWorkoutWithCats(d(-1), ['push']),
-        makeWorkoutWithCats(d(-3), ['push']),
-        makeWorkoutWithCats(d(-5), ['push']),
-        makeWorkoutWithCats(d(-7), ['pull']),
-      ]);
-
-      const insight = service.insights().find(i => i.type === 'equilibra_gym');
-      // legs has 0 — least done; pull and push have counts but legs wins as min
-      // Actually: push=3, pull=1, legs=0 → legs is min with 0
-      expect(insight?.title).toMatch(/Leg day\?/i);
-    });
-
-    it('message includes counts for the non-neglected categories', () => {
-      mockSessions.set([]);
-      mockSports.set([]);
-      mockWorkouts.set([
-        makeWorkoutWithCats(d(-1),  ['push']),
-        makeWorkoutWithCats(d(-3),  ['push']),
-        makeWorkoutWithCats(d(-5),  ['push']),
-        makeWorkoutWithCats(d(-7),  ['pull']),
-        makeWorkoutWithCats(d(-9),  ['pull']),
-        makeWorkoutWithCats(d(-11), ['legs']),
-      ]);
-
-      const insight = service.insights().find(i => i.type === 'equilibra_gym');
-      // push=3 pull=2 legs=1 → legs is min, gap = 3-1 = 2 → triggers
-      expect(insight?.message).toContain('3');
-    });
-
-    it('ignores workouts older than 28 days', () => {
-      mockSessions.set([]);
-      mockSports.set([]);
-      mockWorkouts.set([
-        makeWorkoutWithCats(d(-1),  ['push']),
-        makeWorkoutWithCats(d(-3),  ['push']),
-        makeWorkoutWithCats(d(-5),  ['push']),
-        makeWorkoutWithCats(d(-29), ['legs']), // outside the 28-day window
-        makeWorkoutWithCats(d(-30), ['legs']),
-      ]);
-
-      const insight = service.insights().find(i => i.type === 'equilibra_gym');
-      // Only push(3) in window; legs outside — only 1 active cat → should NOT trigger
-      expect(insight).toBeUndefined();
+      expect(types()).not.toContain('patro_setmanal');
     });
   });
 
-  // ── objectiu_assolit ─────────────────────────────────────────────────────
+  describe('equilibri_gym', () => {
+    it('points at the training type left behind over 8 weeks', () => {
+      mockWorkouts.set([
+        ...weekDates(6, 4).map(dd => makeWorkoutWithCats(dd, ['push'])),
+        ...weekDates(4, 4).map(dd => makeWorkoutWithCats(dd, ['pull'])),
+        ...weekDates(2, 1).map(dd => makeWorkoutWithCats(dd, ['legs'])),
+      ]);
 
-  describe('objectiu_assolit', () => {
-    it('triggers when weekTotal equals the goal', () => {
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 3 });
-      mockWorkouts.set([d(-2), d(-1), d(0)].map(makeWorkout));
-      mockSessions.set([]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).toContain('objectiu_assolit');
+      const ins = find('equilibri_gym');
+      expect(ins).toBeTruthy();
+      expect(ins!.title).toBe('Leg day?');
+      expect(ins!.stat).toContain('4 empenta');
+      expect(ins!.stat).toContain('1 cames');
+      expect(ins!.stat).toContain('8 setmanes');
     });
 
-    it('triggers when weekTotal exceeds the goal', () => {
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 2 });
-      mockWorkouts.set([d(-2), d(-1), d(0)].map(makeWorkout));
-      mockSessions.set([]);
+    it('stays quiet when the types are balanced', () => {
+      mockWorkouts.set([
+        ...weekDates(6, 3).map(dd => makeWorkoutWithCats(dd, ['push'])),
+        ...weekDates(4, 3).map(dd => makeWorkoutWithCats(dd, ['pull'])),
+        ...weekDates(2, 3).map(dd => makeWorkoutWithCats(dd, ['legs'])),
+      ]);
 
-      const types = service.insights().map(i => i.type);
-      expect(types).toContain('objectiu_assolit');
-    });
-
-    it('does NOT trigger when weekTotal is below the goal', () => {
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 5 });
-      mockWorkouts.set([d(-1), d(0)].map(makeWorkout));
-      mockSessions.set([]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('objectiu_assolit');
-    });
-
-    it('does NOT trigger when no goal is set', () => {
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: null });
-      mockWorkouts.set([d(-2), d(-1), d(0)].map(makeWorkout));
-      mockSessions.set([]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('objectiu_assolit');
-    });
-
-    it('message mentions the activity count', () => {
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 3 });
-      mockWorkouts.set([d(-2), d(-1), d(0)].map(makeWorkout));
-
-      const insight = service.insights().find(i => i.type === 'objectiu_assolit');
-      expect(insight?.message).toContain('3');
-    });
-
-    it('has higher priority than gran_setmana', () => {
-      // 5+ activities + goal met → objectiu_assolit must appear first
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 3 });
-      mockWorkouts.set([d(-2), d(-1), d(0)].map(makeWorkout));
-      mockSessions.set([makeSession(d(-2)), makeSession(d(-1))]);
-
-      const insights = service.insights();
-      expect(insights[0].type).toBe('objectiu_assolit');
-    });
-  });
-
-  // ── camino_objectiu ──────────────────────────────────────────────────────
-
-  describe('camino_objectiu', () => {
-    // camino_objectiu fires on dow >= 4 (Thursday+), not Wednesday
-
-    it('triggers on Thursday with some progress toward goal', () => {
-      jasmine.clock().mockDate(new Date('2025-04-24T12:00:00')); // Thursday, dow=4
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 4 });
-      mockWorkouts.set([makeWorkout(d(-1))]);  // 1 workout this week, goal is 4
-      mockSessions.set([]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).toContain('camino_objectiu');
-    });
-
-    it('does NOT trigger when goal is not set', () => {
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: null });
-      mockWorkouts.set([makeWorkout(d(-1))]);
-      mockSessions.set([]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('camino_objectiu');
-    });
-
-    it('does NOT trigger when weekTotal is 0 (no progress yet)', () => {
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 4 });
-      mockWorkouts.set([]);
-      mockSessions.set([]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('camino_objectiu');
-    });
-
-    it('does NOT trigger when goal is already met', () => {
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 2 });
-      mockWorkouts.set([d(-2), d(-1)].map(makeWorkout));
-      mockSessions.set([]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('camino_objectiu');
-    });
-
-    it('message includes current and goal counts', () => {
-      jasmine.clock().mockDate(new Date('2025-04-24T12:00:00')); // Thursday, dow=4
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 4 });
-      mockWorkouts.set([makeWorkout(d(-1))]);
-
-      const insight = service.insights().find(i => i.type === 'camino_objectiu');
-      expect(insight?.message).toContain('1');
-      expect(insight?.message).toContain('4');
-    });
-  });
-
-  // ── anima_objectiu ───────────────────────────────────────────────────────
-
-  describe('anima_objectiu', () => {
-    // anima_objectiu fires on Sunday (dow=0)
-
-    it('triggers on Sunday when goal not yet met', () => {
-      // Move to Sunday Apr 27
-      jasmine.clock().mockDate(new Date('2025-04-27T12:00:00'));
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 3 });
-      // Monday Apr 21 is the start of that week
-      mockWorkouts.set([makeWorkout('2025-04-22'), makeWorkout('2025-04-24')]);
-      mockSessions.set([]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).toContain('anima_objectiu');
-    });
-
-    it('does NOT trigger on Sunday when goal is already met', () => {
-      jasmine.clock().mockDate(new Date('2025-04-27T12:00:00'));
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 2 });
-      mockWorkouts.set([makeWorkout('2025-04-22'), makeWorkout('2025-04-24')]);
-      mockSessions.set([]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('anima_objectiu');
-    });
-
-    it('does NOT trigger when no goal is set', () => {
-      jasmine.clock().mockDate(new Date('2025-04-27T12:00:00'));
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: null });
-      mockWorkouts.set([makeWorkout('2025-04-22')]);
-      mockSessions.set([]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('anima_objectiu');
-    });
-
-    it('message mentions missing count', () => {
-      jasmine.clock().mockDate(new Date('2025-04-27T12:00:00'));
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 3 });
-      mockWorkouts.set([makeWorkout('2025-04-22')]);
-      mockSessions.set([]);
-
-      const insight = service.insights().find(i => i.type === 'anima_objectiu');
-      // 1 workout, goal 3 → missing 2
-      expect(insight?.message).toContain('1');
-      expect(insight?.message).toContain('3');
+      expect(types()).not.toContain('equilibri_gym');
     });
   });
 
   // ── goalStreak ───────────────────────────────────────────────────────────
-  // MOCK_DATE is Wednesday 2025-04-23. Week starts Monday 2025-04-21.
 
-  describe('goalStreak', () => {
-    it('returns 0 when no goal is set', () => {
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: null });
+  describe('goalStreak()', () => {
+    it('is zero without a goal', () => {
+      mockWorkouts.set(spread(0, 4, 5).map(dd => makeWorkout(dd)));
       expect(service.goalStreak()).toBe(0);
     });
 
-    it('returns 0 when current week has no activity', () => {
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 3 });
-      mockWorkouts.set([]);
-      mockSessions.set([]);
-      expect(service.goalStreak()).toBe(0);
+    it('counts consecutive met weeks including the current one', () => {
+      withGoal(2);
+      mockWorkouts.set(spread(0, 3, 2).map(dd => makeWorkout(dd)));
+      expect(service.goalStreak()).toBe(4);
     });
 
-    it('returns 0 when current week has activity but below goal', () => {
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 3 });
-      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]); // 2 < 3
-      mockSessions.set([]);
-      expect(service.goalStreak()).toBe(0);
-    });
-
-    it('returns 1 when current week meets the goal', () => {
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 3 });
-      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1)), makeWorkout(d(-2))]);
-      mockSessions.set([]);
-      expect(service.goalStreak()).toBe(1);
-    });
-
-    it('counts sport sessions toward the streak', () => {
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 2 });
-      mockWorkouts.set([makeWorkout(d(0))]);
-      mockSessions.set([makeSession(d(-1))]);
-      expect(service.goalStreak()).toBe(1);
-    });
-
-    it('returns 2 when current and previous week both met the goal', () => {
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 2 });
-      // Current week (Apr 21–23): 2 workouts
+    it('stops at the first week that fell short', () => {
+      withGoal(2);
       mockWorkouts.set([
-        makeWorkout(d(0)),   // Apr 23 (Wed)
-        makeWorkout(d(-1)),  // Apr 22 (Tue)
-        // Previous week (Apr 14–20): 3 workouts
-        makeWorkout(d(-7)),  // Apr 16
-        makeWorkout(d(-8)),  // Apr 15
-        makeWorkout(d(-9)),  // Apr 14
+        ...spread(0, 2, 2).map(dd => makeWorkout(dd)),
+        ...weekDates(3, 1).map(dd => makeWorkout(dd)),
+        ...spread(4, 6, 2).map(dd => makeWorkout(dd)),
       ]);
-      mockSessions.set([]);
-      expect(service.goalStreak()).toBe(2);
+      expect(service.goalStreak()).toBe(3);
     });
 
-    it('stops counting when a week did not meet the goal', () => {
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: 2 });
-      // Current week: met (2 workouts)
-      // Previous week: not met (1 workout)
-      // 2 weeks ago: met (but streak already broken)
-      mockWorkouts.set([
-        makeWorkout(d(0)),    // current week
-        makeWorkout(d(-1)),   // current week
-        makeWorkout(d(-8)),   // previous week: only 1
-        makeWorkout(d(-14)),  // 2 weeks ago
-        makeWorkout(d(-15)),  // 2 weeks ago
-      ]);
-      mockSessions.set([]);
-      expect(service.goalStreak()).toBe(1);
-    });
-
-    // ── Separate mode ─────────────────────────────────────────────────────
-
-    it('returns 0 in separate mode when no sub-goal is set', () => {
+    it('handles separate gym and sport goals', () => {
       mockSettings.set({
-        ...DEFAULT_USER_SETTINGS, goalMode: 'separate',
-        weeklyGymGoal: null, weeklySportGoal: null,
+        ...DEFAULT_USER_SETTINGS, goalMode: 'separate', weeklyGymGoal: 2, weeklySportGoal: 1,
       });
-      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]);
-      mockSessions.set([makeSession(d(0))]);
-      expect(service.goalStreak()).toBe(0);
-    });
-
-    it('counts streak when only gym goal is set and met', () => {
-      mockSettings.set({
-        ...DEFAULT_USER_SETTINGS, goalMode: 'separate',
-        weeklyGymGoal: 2, weeklySportGoal: null,
-      });
-      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]);
-      mockSessions.set([]);
-      expect(service.goalStreak()).toBe(1);
-    });
-
-    it('counts streak when only sport goal is set and met', () => {
-      mockSettings.set({
-        ...DEFAULT_USER_SETTINGS, goalMode: 'separate',
-        weeklyGymGoal: null, weeklySportGoal: 1,
-      });
-      mockWorkouts.set([]);
-      mockSessions.set([makeSession(d(0))]);
-      expect(service.goalStreak()).toBe(1);
-    });
-
-    it('requires both sub-goals to be met when both are set', () => {
-      mockSettings.set({
-        ...DEFAULT_USER_SETTINGS, goalMode: 'separate',
-        weeklyGymGoal: 2, weeklySportGoal: 1,
-      });
-      // gym met (2) but sport not met (0)
-      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]);
-      mockSessions.set([]);
-      expect(service.goalStreak()).toBe(0);
-    });
-
-    it('returns 1 when both separate goals are met this week', () => {
-      mockSettings.set({
-        ...DEFAULT_USER_SETTINGS, goalMode: 'separate',
-        weeklyGymGoal: 2, weeklySportGoal: 1,
-      });
-      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]);
-      mockSessions.set([makeSession(d(0))]);
-      expect(service.goalStreak()).toBe(1);
-    });
-  });
-
-  // ── objectiu_assolit (separate mode) ─────────────────────────────────────
-
-  describe('objectiu_assolit (separate mode)', () => {
-    it('triggers when both separate goals are met', () => {
-      mockSettings.set({
-        ...DEFAULT_USER_SETTINGS, goalMode: 'separate',
-        weeklyGymGoal: 2, weeklySportGoal: 1,
-      });
-      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]);
-      mockSessions.set([makeSession(d(0))]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).toContain('objectiu_assolit');
-    });
-
-    it('does NOT trigger when gym goal is not met in separate mode', () => {
-      mockSettings.set({
-        ...DEFAULT_USER_SETTINGS, goalMode: 'separate',
-        weeklyGymGoal: 3, weeklySportGoal: 1,
-      });
-      mockWorkouts.set([makeWorkout(d(0))]); // only 1 workout, need 3
-      mockSessions.set([makeSession(d(0))]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('objectiu_assolit');
-    });
-
-    it('triggers when only gym goal is set and met in separate mode', () => {
-      mockSettings.set({
-        ...DEFAULT_USER_SETTINGS, goalMode: 'separate',
-        weeklyGymGoal: 2, weeklySportGoal: null,
-      });
-      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]);
-      mockSessions.set([]);
-
-      const types = service.insights().map(i => i.type);
-      expect(types).toContain('objectiu_assolit');
-    });
-  });
-
-  // ── augmenta_objectiu ─────────────────────────────────────────────────────
-
-  describe('augmenta_objectiu', () => {
-    beforeEach(() => jasmine.clock().mockDate(new Date(MOCK_DATE + 'T12:00:00')));
-
-    function weekWorkouts(weekOffset: number): Workout[] {
-      const monday = d(-(weekOffset * 7) - (new Date(MOCK_DATE + 'T12:00:00').getDay() === 0 ? 6 : new Date(MOCK_DATE + 'T12:00:00').getDay() - 1));
-      return [makeWorkout(monday), makeWorkout(d(-(weekOffset * 7)))];
-    }
-
-    it('does not appear when streak < 3', () => {
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, metricsEnabled: true, weeklyActivityGoal: 2 });
-      // Only 1 week met
-      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]);
-      mockSessions.set([]);
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('augmenta_objectiu');
-    });
-
-    it('does not appear when no goal is set', () => {
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, metricsEnabled: true, weeklyActivityGoal: null });
-      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-1))]);
-      mockSessions.set([]);
-      const types = service.insights().map(i => i.type);
-      expect(types).not.toContain('augmenta_objectiu');
-    });
-
-    it('appears when streak >= 3 with a combined goal', () => {
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, metricsEnabled: true, weeklyActivityGoal: 1 });
-      // 3 weeks each with 1+ workout
-      mockWorkouts.set([
-        makeWorkout(d(0)),       // this week
-        makeWorkout(d(-7)),      // last week
-        makeWorkout(d(-14)),     // 2 weeks ago
-      ]);
-      mockSessions.set([]);
-      const types = service.insights().map(i => i.type);
-      expect(types).toContain('augmenta_objectiu');
-    });
-
-    it('insight message mentions the streak count', () => {
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, metricsEnabled: true, weeklyActivityGoal: 1 });
-      mockWorkouts.set([makeWorkout(d(0)), makeWorkout(d(-7)), makeWorkout(d(-14))]);
-      mockSessions.set([]);
-      const insight = service.insights().find(i => i.type === 'augmenta_objectiu');
-      expect(insight?.title).toContain('3');
-    });
-  });
-
-  // ── Mascotes ────────────────────────────────────────────────────────────
-  // El Marley parla del gimnàs, el Xoco de l'esport, i els missatges
-  // transversals (objectius, ratxa, resum de setmana) van a nom dels dos.
-  describe('mascot', () => {
-    it('assigns a mascot to the gym insight', () => {
       mockSports.set([makeSport()]);
-      mockSessions.set([makeSession(d(-1)), makeSession(d(-2))]);
-      mockWorkouts.set([]);
+      mockWorkouts.set(spread(0, 2, 2).map(dd => makeWorkout(dd)));
+      mockSessions.set(spread(0, 2, 1).map(dd => makeSession(dd)));
 
-      const insight = service.insights().find(i => i.type === 'prova_gym');
-      expect(insight?.mascot).toBe('marley');
-    });
-
-    it('assigns Xoco to the sport insight', () => {
-      mockWorkouts.set([d(-1), d(-2), d(-3)].map(makeWorkout));
-      mockSports.set([makeSport()]);
-      mockSessions.set([]);
-
-      const insight = service.insights().find(i => i.type === 'prova_esport');
-      expect(insight?.mascot).toBe('xoco');
-    });
-
-    it('assigns both to a weekly-goal insight', () => {
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, metricsEnabled: true, weeklyActivityGoal: 1 });
-      mockWorkouts.set([makeWorkout(d(0))]);
-      mockSessions.set([]);
-
-      const insight = service.insights().find(i => i.type === 'objectiu_assolit');
-      expect(insight?.mascot).toBe('both');
-    });
-
-    it('every generated insight names who is speaking', () => {
-      mockSettings.set({ ...DEFAULT_USER_SETTINGS, metricsEnabled: true, weeklyActivityGoal: 1 });
-      mockWorkouts.set([d(-2), d(-1), d(0)].map(makeWorkout));
-      mockSports.set([makeSport()]);
-      mockSessions.set([makeSession(d(-2)), makeSession(d(-1))]);
-
-      const insights = service.insights();
-      expect(insights.length).toBeGreaterThan(0);
-      for (const i of insights) {
-        expect(['marley', 'xoco', 'both']).toContain(i.mascot);
-      }
+      expect(service.goalStreak()).toBe(3);
     });
   });
 });
