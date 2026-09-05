@@ -482,6 +482,22 @@ animation: ic-in 0.25s cubic-bezier(0.34, 1.4, 0.64, 1) both;
 }
 animation: bar-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 
+/* Primary-action attention pulse — three beats on load, then still.
+   Only ever on THE main action of a page (Inici's day action); the button
+   needs `position: relative` and the ring takes its colour. */
+@keyframes swb-attention {
+  from { opacity: 0.55; transform: scale(1); }
+  to   { opacity: 0;    transform: scale(1.07); }
+}
+.start-workout-btn::after {
+  content: ''; position: absolute; inset: -1px; border-radius: inherit;
+  border: 2px solid var(--sc); pointer-events: none; opacity: 0;
+  animation: swb-attention 1.4s ease-out 0.6s 3;
+}
+@media (prefers-reduced-motion: reduce) {
+  .start-workout-btn::after { animation: none; }
+}
+
 /* Skeleton shimmer */
 @keyframes sk-shimmer {
   from { background-position: -300px 0; }
