@@ -163,6 +163,61 @@ describe('SportService', () => {
     }));
   });
 
+  describe('updateSession()', () => {
+    it('registra un pla passat quan se li dona l\'estat "done"', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+
+      void service.logSession('2024-03-06', 'running', {}, 'planned', 'routine');
+      tick();
+      const id = service.plannedSessions().find(s => s.sportId === 'running')!.id;
+
+      void service.updateSession(id, '2024-03-06', { duration: 60 }, 'done');
+      tick();
+
+      expect(service.plannedSessions().some(s => s.id === id)).toBeFalse();
+      expect(service.sessions().find(s => s.id === id)?.duration).toBe(60);
+      expect(supabaseMock.updateSpy).toHaveBeenCalledWith(
+        jasmine.objectContaining({ status: 'done' }));
+    }));
+
+    it('no toca l\'estat quan no se li passa', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+
+      void service.logSession('2024-03-06', 'running', {}, 'planned', 'routine');
+      tick();
+      const id = service.plannedSessions().find(s => s.sportId === 'running')!.id;
+
+      void service.updateSession(id, '2024-03-06', { duration: 45 });
+      tick();
+
+      expect(service.plannedSessions().find(s => s.id === id)?.duration).toBe(45);
+      expect(supabaseMock.updateSpy).toHaveBeenCalledWith(
+        jasmine.objectContaining({ duration: 45 }));
+      expect(supabaseMock.updateSpy.calls.mostRecent().args[0] as Record<string, unknown>)
+        .not.toEqual(jasmine.objectContaining({ status: jasmine.anything() }));
+    }));
+  });
+
+  describe('ensureMonthLoaded()', () => {
+    it('conserva una sessió registrada mentre el mes s\'estava carregant', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+
+      // El mes de febrer encara no s'ha carregat mai: la consulta surt…
+      void service.ensureMonthLoaded(2024, 1);
+      // …i l'usuari registra un esport d'aquell mes abans que torni.
+      void service.logSession('2024-02-14', 'running', { duration: 60 }, 'done');
+      tick();
+
+      expect(service.sessions().some(s => s.date === '2024-02-14')).toBeTrue();
+    }));
+  });
+
   describe('offline sync queue', () => {
     it('retries and clears a pending session once back online', fakeAsync(() => {
       uid.set('user-1');

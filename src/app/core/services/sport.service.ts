@@ -319,6 +319,10 @@ export class SportService {
       const lastDay = new Date(year, month + 1, 0).getDate();
       const end     = `${key}-${String(lastDay).padStart(2, '0')}`;
 
+      // Què hi havia abans de demanar-ho: el que aparegui mentre la consulta
+      // viatja s'ha registrat ara mateix i encara no pot sortir a la resposta.
+      const known = new Set((this._monthCache.get(key) ?? []).map(s => s.id));
+
       const { data } = await this.supabase
         .from('sport_sessions')
         .select('*')
@@ -327,10 +331,16 @@ export class SportService {
         .lte('date', end)
         .order('date', { ascending: false });
 
-      const fetched = (data ?? []).map(r => toSportSession(r as Record<string, unknown>));
-      this._monthCache.set(key, fetched);
+      const fetched    = (data ?? []).map(r => toSportSession(r as Record<string, unknown>));
+      const fetchedIds = new Set(fetched.map(s => s.id));
+      // Registrar un esport d'un mes que s'estava carregant feia desaparèixer
+      // la sessió de la pantalla: la resposta arribava després i s'ho enduia
+      // tot. Ara les altes fetes mentrestant es conserven.
+      const justAdded = (this._monthCache.get(key) ?? [])
+        .filter(s => !known.has(s.id) && !fetchedIds.has(s.id));
+      this._monthCache.set(key, [...fetched, ...justAdded]);
       this._rebuild();
-      this._writeSessionsToStorage(uid, key, fetched);
+      this._writeSessionsToStorage(uid, key, this._monthCache.get(key)!);
     } catch {
       // Network failure — keep whatever we have from localStorage/local state
     } finally {
@@ -480,29 +490,42 @@ export class SportService {
     await this._pushOrQueue(uid, { op: 'update', id, row: { status: 'done' } });
   }
 
-  /** Update an existing session's data. */
+  /**
+   * Update an existing session's data.
+   *
+   * `status` només es toca quan qui edita ho demana: omplir les dades d'un
+   * pàdel que tenies planificat i que ja has jugat és registrar-lo, i si
+   * l'estat es quedava a 'planned' la sessió no comptava enlloc — ni al
+   * calendari ni a les estadístiques — per molt que la guardessis.
+   */
   async updateSession(
     id: string, date: string,
-    data: { subtypeId?: string; duration?: number; feeling?: FeelingLevel; metrics?: Record<string, string | number>; notes?: string }
+    data: { subtypeId?: string; duration?: number; feeling?: FeelingLevel; metrics?: Record<string, string | number>; notes?: string },
+    status?: SportSessionStatus,
   ): Promise<void> {
     const uid = this._uid();
 
     const key    = date.substring(0, 7);
     const bucket = this._monthCache.get(key) ?? [];
     this._monthCache.set(key, bucket.map(s => s.id === id
-      ? { ...s, subtypeId: data.subtypeId, duration: data.duration, feeling: data.feeling, metrics: data.metrics, notes: data.notes }
+      ? {
+          ...s, subtypeId: data.subtypeId, duration: data.duration,
+          feeling: data.feeling, metrics: data.metrics, notes: data.notes,
+          status: status ?? s.status,
+        }
       : s
     ));
     this._rebuild();
     this._writeSessionsToStorage(uid, key, this._monthCache.get(key)!);
 
-    const row = {
+    const row: Record<string, unknown> = {
       subtype_id: data.subtypeId ?? null,
       duration:   data.duration  ?? null,
       feeling:    data.feeling   ?? null,
       metrics:    data.metrics   ?? null,
       notes:      data.notes     ?? null,
     };
+    if (status) row['status'] = status;
     await this._pushOrQueue(uid, { op: 'update', id, row });
   }
 

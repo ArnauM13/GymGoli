@@ -15,6 +15,12 @@ import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../../core/models/weekly-plan.mod
 
 const TODAY = new Date().toISOString().split('T')[0];
 
+function daysAgo(n: number): string {
+  const d = new Date(TODAY + 'T12:00:00');
+  d.setDate(d.getDate() - n);
+  return d.toISOString().split('T')[0];
+}
+
 function makeWorkout(overrides: Partial<Workout> = {}): Workout {
   return { id: '1', date: TODAY, entries: [], createdAt: new Date(), ...overrides };
 }
@@ -178,12 +184,30 @@ describe('HomeComponent', () => {
   // ── historyFeedDays() ────────────────────────────────────────────────────
 
   describe('historyFeedDays()', () => {
-    it('includes today so the feed is never empty when the only activity is today', () => {
+    it('deixa fora avui: la targeta de dalt ja l\'ensenya', () => {
+      const yesterday = daysAgo(1);
       const getDoneWorkoutsForDate = TestBed.inject(WorkoutService).getDoneWorkoutsForDate as jasmine.Spy;
-      getDoneWorkoutsForDate.and.callFake((date: string) => date === TODAY ? [makeWorkout({ id: 'today1' })] : []);
+      getDoneWorkoutsForDate.and.callFake((date: string) =>
+        date === TODAY || date === yesterday ? [makeWorkout({ id: date })] : []);
       doneWorkoutsSignal.set([makeWorkout({ id: 'today1' })]);
 
-      expect(component.historyFeedDays().some(d => d.date === TODAY)).toBeTrue();
+      const dates = component.historyFeedDays().map(d => d.date);
+      expect(dates).not.toContain(TODAY);
+      expect(dates).toContain(yesterday);
+    });
+
+    it('deixa fora el dia seleccionat, que és el que mostra la targeta', () => {
+      const yesterday = daysAgo(1);
+      const getDoneWorkoutsForDate = TestBed.inject(WorkoutService).getDoneWorkoutsForDate as jasmine.Spy;
+      getDoneWorkoutsForDate.and.callFake((date: string) =>
+        date === TODAY || date === yesterday ? [makeWorkout({ id: date })] : []);
+      doneWorkoutsSignal.set([makeWorkout({ id: 'today1' })]);
+
+      component.selectDate(yesterday);
+
+      const dates = component.historyFeedDays().map(d => d.date);
+      expect(dates).not.toContain(yesterday);
+      expect(dates).toContain(TODAY);
     });
 
     it('only reaches back 30 days — the rest lives on the Historial page', () => {

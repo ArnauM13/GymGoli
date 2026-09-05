@@ -586,11 +586,15 @@ export class HomeComponent {
     return days;
   });
 
-  /** The recent activity timeline. The prominent "Avui / dia seleccionat" card
-   *  above repeats whichever day is in focus, but we deliberately DON'T strip
-   *  that day from the list — otherwise the feed goes blank whenever the only
-   *  (or most recent) activity is today, which reads as "nothing loaded". */
-  readonly historyFeedDays = computed(() => this.feedDays());
+  /** La línia de temps recent, sense el dia que la targeta de dalt ja ensenya.
+   *
+   *  "Avui" i "Activitat recent" quedaven una sota l'altra amb les mateixes
+   *  targetes: l'entrenament d'avui es veia dues vegades a la mateixa
+   *  pantalla. Aquí hi ha el que has fet *abans*, i si encara no hi ha res
+   *  l'estat buit ja ho diu. */
+  readonly historyFeedDays = computed(() =>
+    this.feedDays().filter(d => d.date !== this.effectiveDate())
+  );
 
   constructor() {
     this.sportService.ensureLoaded();
