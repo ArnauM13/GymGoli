@@ -15,7 +15,7 @@ import {
   Exercise, ExerciseCategory,
 } from '../../core/models/exercise.model';
 import { MASCOTS, Mascot, MascotMeta } from '../../core/models/mascot.model';
-import { Sport, SportMetricDef } from '../../core/models/sport.model';
+import { Sport, SportMetricDef, SportSessionStatus } from '../../core/models/sport.model';
 import { WorkoutTemplate } from '../../core/models/template.model';
 import { FeelingLevel, Workout, WorkoutEntry, setMaxWeight } from '../../core/models/workout.model';
 import { TemplateService } from '../../core/services/template.service';
@@ -1486,6 +1486,8 @@ export class TrainComponent implements OnDestroy {
   readonly activeWorkoutId = signal<string | null>(this.route.snapshot.queryParamMap.get('workout'));
   readonly loggerSport     = signal<Sport | null>(null);
   readonly loggerSessionId = signal<string | null>(null);
+  /** Estat de la sessió que s'està editant, si ja existia. */
+  readonly loggerSessionStatus = signal<SportSessionStatus | null>(null);
   readonly loggerDuration  = signal<number>(60);
   readonly loggerSubtype   = signal<string | null>(null);
   readonly loggerFeeling   = signal<FeelingLevel | null>(null);
@@ -2254,6 +2256,7 @@ export class TrainComponent implements OnDestroy {
     this.pickerCat.set(null);
     this.loggerSport.set(sport);
     this.loggerSessionId.set(existing?.id ?? null);
+    this.loggerSessionStatus.set(existing?.status ?? null);
     this.loggerDuration.set(existing?.duration ?? 60);
     this.loggerSubtype.set(existing?.subtypeId ?? null);
     this.loggerFeeling.set(existing?.feeling ?? null);
@@ -2318,7 +2321,11 @@ export class TrainComponent implements OnDestroy {
       };
       const existingId = this.loggerSessionId();
       if (existingId) {
-        await this.sportService.updateSession(existingId, date, data);
+        // Guardar un pla d'un dia que ja ha passat és registrar-lo: si es
+        // quedava 'planned' la sessió no sortia enlloc i semblava que el
+        // botó no hagués fet res.
+        const promote = this.loggerSessionStatus() === 'planned' && !this.isSelectedFuture();
+        await this.sportService.updateSession(existingId, date, data, promote ? 'done' : undefined);
       } else {
         await this.sportService.logSession(
           date, sport.id, data,
