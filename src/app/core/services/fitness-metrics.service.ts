@@ -1,6 +1,7 @@
 import { Injectable, computed, inject } from '@angular/core';
 
 import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../models/exercise.model';
+import { FitnessInsight, INSIGHT_LEVEL } from '../models/insight.model';
 import { Mascot } from '../models/mascot.model';
 import { pickVariant } from '../models/mascot.voice';
 import { Sport, SportSession } from '../models/sport.model';
@@ -12,7 +13,21 @@ import { TrainingTypeService } from './training-type.service';
 import { UserSettingsService } from './user-settings.service';
 import { WorkoutService } from './workout.service';
 import { workoutVolume } from '../../shared/utils/workout-card.utils';
-import { toDateStr } from '../../shared/utils/date.utils';
+import { daysBetween, offsetDate, toDateStr } from '../../shared/utils/date.utils';
+import {
+  dateRange,
+  fmt1,
+  fmtKg,
+  fmtWeight,
+  itemBars,
+  longDate,
+  outOfTen,
+  plural,
+  rollingWeekBars,
+  shortDate,
+  weekBars,
+  weeklyChangePhrase,
+} from '../../shared/utils/insight-copy.utils';
 
 /**
  * Els insights d'Inici són **tendències**, no consells del dia.
@@ -25,58 +40,9 @@ import { toDateStr } from '../../shared/utils/date.utils';
  *
  * Per això cap insight mira "avui" — l'única excepció és `ratxa_en_joc`, que
  * és deliberada: és el que empeny quan hi ha una ratxa a punt de trencar-se.
+ *
+ * La forma que tenen (tipus, nivells, detall) viu a `models/insight.model.ts`.
  */
-export type InsightType =
-  // Objectiu — el que hi ha en joc més enllà de la setmana en curs
-  | 'ratxa_en_joc'
-  | 'objectiu_a_l_alca'
-  | 'objectiu_desajustat'
-  | 'compliment_objectiu'
-  // Ruptura — un canvi prou gran per voler saber-lo ara
-  | 'sense_activitat'
-  | 'carrega_alta'
-  // Progrés — millores mesurables que no es veuen des d'una targeta
-  | 'progres'
-  | 'volum_gym'
-  // Tendència — cap on va el ritme
-  | 'tendencia_volum'
-  | 'esforc_creixent'
-  // Patró — com és realment la teva rutina
-  | 'patro_setmanal'
-  | 'equilibri_gym';
-
-/** Nivells de prioritat. Guanya sempre el nivell més baix. */
-export const INSIGHT_LEVEL = {
-  objectiu:  1,
-  ruptura:   2,
-  progres:   3,
-  tendencia: 4,
-  patro:     5,
-} as const;
-
-export interface FitnessInsight {
-  type: InsightType;
-  /** Qui ho diu. L'emoji continua sent com se sent — veure `mascot.model.ts`. */
-  mascot: Mascot;
-  emoji: string;
-  title: string;
-  /** La línia de xifres. És el que fa que l'insight aporti per si sol. */
-  stat: string;
-  message: string;
-  color: string;
-  /** 1–5, veure `INSIGHT_LEVEL`. Ordena abans que res. */
-  level: number;
-  /** Desempat dins d'un nivell: com de fort és el senyal en aquestes dades. */
-  strength: number;
-  /**
-   * Dies que ha d'esperar per tornar a sortir un cop mostrat. Els estats lents
-   * (un patró de 12 setmanes) no canvien d'un dia per l'altre i cansarien;
-   * els esdeveniments (una ratxa en joc) poden sortir cada dia, que per això
-   * es poden tancar.
-   */
-  cooldownDays: number;
-}
-
 // ── Utilitats de calendari ───────────────────────────────────────────────────
 
 function mondayOfWeek(dateStr: string): string {
@@ -86,44 +52,13 @@ function mondayOfWeek(dateStr: string): string {
   return toDateStr(d);
 }
 
-function offsetDate(dateStr: string, days: number): string {
-  const d = new Date(dateStr + 'T12:00:00');
-  d.setDate(d.getDate() + days);
-  return toDateStr(d);
-}
-
-function daysBetween(a: string, b: string): number {
-  return Math.round(
-    (new Date(b + 'T12:00:00').getTime() - new Date(a + 'T12:00:00').getTime()) / 86_400_000
-  );
-}
-
 function dayOfWeek(dateStr: string): number {
   return new Date(dateStr + 'T12:00:00').getDay();
 }
 
 const DAY_NAMES = ['diumenge', 'dilluns', 'dimarts', 'dimecres', 'dijous', 'divendres', 'dissabte'];
-
-// ── Format ───────────────────────────────────────────────────────────────────
-
-/** Un decimal amb coma, com mana el català. */
-function fmt1(n: number): string {
-  return n.toFixed(1).replace('.', ',');
-}
-
-/** Percentatge de diferència entre dos valors, sempre positiu. */
-function pctDiff(now: number, before: number): number {
-  return before > 0 ? Math.round(Math.abs(now - before) / before * 100) : 0;
-}
-
-function fmtKg(kg: number): string {
-  return kg >= 1000 ? `${fmt1(kg / 1000)} t` : `${Math.round(kg)} kg`;
-}
-
-/** 70 i 72,5 kg, però mai 70,0. */
-function fmtWeight(kg: number): string {
-  return Number.isInteger(kg) ? `${kg}` : fmt1(kg);
-}
+/** Els mateixos dies quan només hi caben dues lletres (sota una barra). */
+const DAY_SHORT = ['dg', 'dl', 'dt', 'dc', 'dj', 'dv', 'ds'];
 
 // "Push day?" / "Pull day?" / "Leg day?" — gym-culture shorthand the user
 // already uses. Custom types fall back to their own name.
@@ -176,7 +111,11 @@ function goalMissing(w: WeekStat, g: GoalCfg): number {
   return g.combined !== null ? Math.max(0, g.combined - w.total) : 0;
 }
 
-/** `3/4 aquesta setmana` o `gym 1/2 · esport 0/1`, segons el mode. */
+/**
+ * `3/4` o `gym 1/2 · esport 0/1`, segons el mode. Sense dir de quina setmana:
+ * el període el posa la frase que l'envolta, que és qui sap si parla de la
+ * setmana en curs o d'una altra.
+ */
 function goalProgressStr(w: WeekStat, g: GoalCfg): string {
   if (g.mode === 'separate') {
     const parts: string[] = [];
@@ -184,7 +123,16 @@ function goalProgressStr(w: WeekStat, g: GoalCfg): string {
     if (g.sport !== null) parts.push(`esport ${w.sport}/${g.sport}`);
     return parts.join(' · ');
   }
-  return `${w.total}/${g.combined} aquesta setmana`;
+  return `${w.total}/${g.combined}`;
+}
+
+/**
+ * Com de gran és un canvi, per ordenar candidats. És un tant per cent, i per
+ * això es queda **dins**: a la interfície els canvis es diuen amb les dues
+ * xifres reals, mai amb un percentatge.
+ */
+function changeScore(now: number, before: number): number {
+  return before > 0 ? Math.round(Math.abs(now - before) / before * 100) : 0;
 }
 
 function mean(nums: number[]): number {
@@ -322,6 +270,14 @@ export class FitnessMetricsService {
     return { first, days: first ? daysBetween(first, today) : 0 };
   }
 
+  /**
+   * La ratlla de l'objectiu al gràfic. Sense objectiu no hi ha ratlla: una
+   * línia sense nom seria una decoració que l'usuari hauria d'endevinar.
+   */
+  private _goalLine(g: GoalCfg): { value: number; label: string } | undefined {
+    return g.total > 0 ? { value: g.total, label: `objectiu ${g.total}` } : undefined;
+  }
+
   // ── Nivell 1 · Objectiu ────────────────────────────────────────────────────
 
   private _goalInsights(
@@ -349,12 +305,14 @@ export class FitnessMetricsService {
     // que es pot mantenir avui és el que empeny de debò.
     if (lateWeek && closedStreak >= 2 && !goalMet(weeks[0], g)) {
       const missing = goalMissing(weeks[0], g);
+      // La ratxa pot ser més llarga que les setmanes que tenim a mà.
+      const streakFrom = weeks[Math.min(closedStreak, weeks.length - 1)];
       out.push({
         type: 'ratxa_en_joc',
         mascot: 'both',
         emoji: '🔥',
         title: `${closedStreak} setmanes seguides`,
-        stat: `${goalProgressStr(weeks[0], g)} · et ${missing === 1 ? 'falta 1' : `falten ${missing}`}`,
+        stat: `Aquesta setmana, ${goalProgressStr(weeks[0], g)}`,
         message: missing === 1
           ? `Amb una més la mantens. ${pickVariant(['Hi som a temps.', 'Encara hi ets.', 'Tu diràs.'], today + 'ratxa_en_joc')}`
           : `Amb ${missing} més la mantens. Queden dies.`,
@@ -362,6 +320,27 @@ export class FitnessMetricsService {
         level,
         strength: 70 + closedStreak * 4 - missing * 3,
         cooldownDays: 0,
+        detail: {
+          headline: `Has arribat a l'objectiu ${closedStreak} setmanes seguides. Aquesta encara és oberta.`,
+          chart: {
+            caption: 'Activitats per setmana',
+            range: dateRange(weeks[7].monday, today),
+            bars: weekBars(weeks.slice(0, 8), { lastIsCurrent: true, highlight: (_w, i, n) => i === n - 1 }),
+            reference: this._goalLine(g),
+          },
+          facts: [
+            {
+              label: 'Setmanes seguides', value: plural(closedStreak, 'setmana', 'setmanes'),
+              note: dateRange(streakFrom.monday, weeks[1].end),
+            },
+            {
+              label: 'Aquesta setmana', value: goalProgressStr(weeks[0], g),
+              note: dateRange(weeks[0].monday, today),
+            },
+            { label: 'Per mantenir-la', value: plural(missing, 'activitat', 'activitats') },
+          ],
+          meaning: 'La ratxa són les setmanes seguides en què has arribat a l\'objectiu. La d\'ara encara té dies per davant, i si no surt, la següent comença de zero sense més.',
+        },
       });
     }
 
@@ -375,12 +354,30 @@ export class FitnessMetricsService {
         mascot: 'both',
         emoji: '🚀',
         title: `${closedStreak} setmanes complint`,
-        stat: `${fmt1(avg4)} activitats/setmana de mitjana · objectiu ${g.total}`,
-        message: `Et sobra marge. L'apugem a ${suggested}?`,
+        stat: `Les últimes 4 setmanes, ${fmt1(avg4)} activitats per setmana`,
+        message: `L'objectiu és ${g.total}. L'apugem a ${suggested}?`,
         color: '#43a047',
         level,
         strength: 45 + Math.round((avg4 - g.total) * 8),
         cooldownDays: 7,
+        detail: {
+          headline: `Les últimes 4 setmanes has passat de l'objectiu cada vegada.`,
+          chart: {
+            caption: 'Activitats per setmana',
+            range: dateRange(closed[7].monday, closed[0].end),
+            bars: weekBars(closed.slice(0, 8), { highlight: (_w, i, n) => i >= n - 4 }),
+            reference: this._goalLine(g),
+          },
+          facts: [
+            {
+              label: 'Les últimes 4 setmanes', value: `${fmt1(avg4)} activitats de mitjana`,
+              note: dateRange(last4[3].monday, last4[0].end),
+            },
+            { label: 'Objectiu actual', value: `${g.total} per setmana` },
+            { label: 'Proposta',        value: `${suggested} per setmana` },
+          ],
+          meaning: 'Un objectiu que no costa deixa de dir res. Pujar-lo el torna a fer una fita, i sempre el pots tornar a baixar des d\'Ajustos.',
+        },
       });
     }
 
@@ -391,18 +388,39 @@ export class FitnessMetricsService {
     const met6    = last6.filter(w => goalMet(w, g)).length;
     const avg6    = mean(last6.map(w => w.total));
     const suggest = Math.max(1, Math.round(avg6));
+    const sixWeeks = last6.length ? dateRange(last6[last6.length - 1].monday, last6[0].end) : '';
     if (has6Weeks && met6 <= 2 && avg6 > 0 && g.total > 0 && suggest < g.total) {
       out.push({
         type: 'objectiu_desajustat',
         mascot: 'both',
         emoji: '🎯',
         title: 'Un objectiu més teu',
-        stat: `${met6} de les últimes 6 setmanes · ${fmt1(avg6)} activitats/setmana`,
+        stat: `Assolit ${met6} de les últimes 6 setmanes`,
         message: `Amb ${suggest} en comptes de ${g.total} el faries gairebé cada setmana.`,
         color: '#0288d1',
         level,
         strength: 35 + Math.round((g.total - avg6) * 4),
         cooldownDays: 14,
+        detail: {
+          headline: met6 === 0
+            ? 'De les últimes 6 setmanes, l\'objectiu no ha sortit cap vegada.'
+            : `De les últimes 6 setmanes, l'objectiu ha sortit ${met6 === 1 ? 'una vegada' : `${met6} vegades`}.`,
+          chart: {
+            caption: 'Activitats per setmana',
+            range: sixWeeks,
+            // Aquí la història és la ratlla, no cap setmana: la marcada és
+            // l'última, perquè el número escrit sigui el més recent.
+            bars: weekBars(last6, { highlight: (_w, i, n) => i === n - 1 }),
+            reference: this._goalLine(g),
+          },
+          facts: [
+            { label: 'Setmanes assolides', value: `${met6} de 6`, note: sixWeeks },
+            { label: 'El que fas', value: `${fmt1(avg6)} activitats per setmana`, note: sixWeeks },
+            { label: 'Objectiu actual', value: `${g.total} per setmana` },
+            { label: 'Proposta',        value: `${suggest} per setmana` },
+          ],
+          meaning: 'Un objectiu que gairebé mai es toca acaba sent soroll. Un de més petit que compleixis de debò empeny més que un de gran sempre a mitges.',
+        },
       });
     }
 
@@ -412,6 +430,7 @@ export class FitnessMetricsService {
     const met12  = last12.filter(w => goalMet(w, g)).length;
     const recent6 = met6;
     const older6  = closed.slice(6, 12).filter(w => goalMet(w, g)).length;
+    const twelveWeeks = last12.length ? dateRange(last12[last12.length - 1].monday, last12[0].end) : '';
     if (has12Weeks && met12 > 0 && met12 < 12) {
       const improving = recent6 > older6;
       out.push({
@@ -419,14 +438,37 @@ export class FitnessMetricsService {
         mascot: 'both',
         emoji: '📊',
         title: improving ? 'Cada cop més regular' : `${met12} de 12 setmanes`,
-        stat: `${recent6} de 6 assolides · les 6 anteriors, ${older6}`,
+        stat: `Les últimes 6 setmanes, ${recent6} assolides`,
         message: improving
-          ? 'La regularitat és el que acaba comptant.'
-          : `Un ${Math.round(met12 / 12 * 100)}% de compliment en tres mesos.`,
+          ? `Les 6 anteriors, ${older6}. La regularitat és el que acaba comptant.`
+          : `En total, ${met12} de les últimes 12 setmanes.`,
         color: '#006874',
         level,
         strength: 20 + Math.abs(recent6 - older6) * 3,
         cooldownDays: 14,
+        detail: {
+          headline: 'Les últimes 12 setmanes, una a una. Les de color són les que van arribar a l\'objectiu.',
+          chart: {
+            caption: 'Activitats per setmana',
+            range: twelveWeeks,
+            bars: weekBars(last12, { highlight: w => goalMet(w, g) }),
+            reference: this._goalLine(g),
+          },
+          facts: [
+            {
+              label: 'Últimes 6 setmanes', value: `${recent6} assolides`,
+              note: dateRange(closed[5].monday, closed[0].end),
+            },
+            {
+              label: 'Les 6 anteriors', value: `${older6} assolides`,
+              note: dateRange(closed[11].monday, closed[6].end),
+            },
+            { label: 'En total', value: `${met12} de 12`, note: twelveWeeks },
+          ],
+          meaning: improving
+            ? 'Cada cop hi arribes més sovint. Tres mesos ensenyen el fons que una setmana sola amaga.'
+            : 'Tres mesos ensenyen el fons: hi ha setmanes que surten i setmanes que no, i el conjunt diu més que qualsevol d\'elles.',
+        },
       });
     }
 
@@ -468,7 +510,7 @@ export class FitnessMetricsService {
             mascot: 'both',
             emoji: '🐾',
             title: 'Hi tornem quan vulguis',
-            stat: `${gap} dies des de l'última · abans ${fmt1(priorAvg)} per setmana`,
+            stat: `Fa ${gap} dies de l'última activitat`,
             message: pickVariant([
               'Quan vulguis.',
               'Ja saps on som.',
@@ -478,6 +520,23 @@ export class FitnessMetricsService {
             level,
             strength: 90 + Math.min(30, gap),
             cooldownDays: 0,
+            detail: {
+              headline: `L'última activitat que tens registrada és del ${longDate(lastDate)}.`,
+              chart: {
+                caption: 'Activitats cada 7 dies',
+                range: dateRange(offsetDate(today, -55), today),
+                bars: rollingWeekBars(today, allDates, 8),
+              },
+              facts: [
+                { label: 'Última activitat',    value: longDate(lastDate) },
+                { label: 'Dies des de llavors', value: plural(gap, 'dia', 'dies') },
+                {
+                  label: 'El ritme que portaves', value: `${fmt1(priorAvg)} activitats per setmana`,
+                  note: dateRange(offsetDate(from, 1), lastDate),
+                },
+              ],
+              meaning: 'Això no és cap avís: és el que hi ha apuntat, i prou. Quan hi tornis, la primera activitat ja compta com sempre.',
+            },
           });
         }
       }
@@ -498,7 +557,7 @@ export class FitnessMetricsService {
         mascot: 'marley',
         emoji: '😴',
         title: 'T\'has guanyat el descans',
-        stat: `${last7} sessions en 7 dies · la teva mitjana és ${fmt1(avg8)}`,
+        stat: `${last7} sessions en els últims 7 dies`,
         message: pickVariant([
           'Avui toca sofà.',
           'Avui, sofà.',
@@ -508,6 +567,27 @@ export class FitnessMetricsService {
         level,
         strength: 50 + Math.round((last7 / avg8) * 10),
         cooldownDays: 3,
+        detail: {
+          headline: `Els últims 7 dies portes ${last7} sessions. El teu ritme habitual és ${fmt1(avg8)} per setmana.`,
+          chart: {
+            caption: 'Activitats cada 7 dies',
+            range: dateRange(offsetDate(today, -(7 * (lived.length + 1)) + 1), today),
+            bars: rollingWeekBars(today, allDates, lived.length + 1, { highlight: (_x, i, n) => i === n - 1 }),
+            reference: { value: avg8, label: 'el teu ritme' },
+          },
+          facts: [
+            {
+              label: 'Últims 7 dies', value: plural(last7, 'sessió', 'sessions'),
+              note: dateRange(offsetDate(today, -6), today),
+            },
+            {
+              label: 'El teu ritme', value: `${fmt1(avg8)} per setmana`,
+              note: dateRange(lived[lived.length - 1].monday, lived[0].end),
+            },
+            { label: 'Setmanes comptades', value: plural(lived.length, 'setmana', 'setmanes') },
+          ],
+          meaning: 'El descans no frena res: és quan el cos es queda el que has fet. No cal parar, però un dia tranquil hi cabria de sobres.',
+        },
       });
     }
 
@@ -579,7 +659,9 @@ export class FitnessMetricsService {
       if (gain < 0.05 || current - baseline < 1) continue;
       if (best && gain <= best.gain) continue;
 
-      const weeks = Math.max(1, Math.round(daysBetween(points[0].date, points[points.length - 1].date) / 7));
+      const last  = points[points.length - 1];
+      const shown = points.slice(-8);
+      const weeks = Math.max(1, Math.round(daysBetween(points[0].date, last.date) / 7));
       best = {
         gain,
         insight: {
@@ -587,7 +669,7 @@ export class FitnessMetricsService {
           mascot: 'marley',
           emoji: '💪',
           title: `Puges al ${rec.name.toLowerCase()}`,
-          stat: `${fmtWeight(baseline)} → ${fmtWeight(current)} kg en ${weeks} setmanes (+${Math.round(gain * 100)}%)`,
+          stat: `De ${fmtWeight(baseline)} a ${fmtWeight(current)} kg en ${weeks} setmanes`,
           message: `${points.length} sessions registrades. ${pickVariant([
             'Bona jugada.',
             'Així m\'agrada.',
@@ -597,6 +679,25 @@ export class FitnessMetricsService {
           level: INSIGHT_LEVEL.progres,
           strength: 0,
           cooldownDays: 7,
+          detail: {
+            headline: `El pes que has aixecat al ${rec.name.toLowerCase()}, sessió per sessió.`,
+            chart: {
+              caption: 'Pes més alt de cada sessió',
+              range: dateRange(shown[0].date, last.date),
+              bars: itemBars(
+                shown,
+                p => ({ label: shortDate(p.date), value: p.kg, display: `${fmtWeight(p.kg)} kg` }),
+                { highlight: (_p, i, n) => i === n - 1 },
+              ),
+            },
+            facts: [
+              { label: 'Al principi', value: `${fmtWeight(baseline)} kg`, note: longDate(points[0].date) },
+              { label: 'Ara',         value: `${fmtWeight(current)} kg`,  note: longDate(last.date) },
+              { label: 'Sessions',    value: plural(points.length, 'sessió', 'sessions'),
+                note: dateRange(points[0].date, last.date) },
+            ],
+            meaning: 'Compta el pes més alt de cada sessió, sense els escalfaments. Pujar a poc a poc és exactament com ha d\'anar.',
+          },
         },
       };
     }
@@ -623,6 +724,10 @@ export class FitnessMetricsService {
       if (gain < 0.15 || newAvg - oldAvg < 5) continue;
       if (best && gain <= best.gain) continue;
 
+      const first  = mine[0].date;
+      const lastDay = mine[mine.length - 1].date;
+      const weeks   = Math.max(1, Math.round(daysBetween(first, lastDay) / 7));
+      const shown   = mine.slice(-8);
       best = {
         gain,
         insight: {
@@ -630,7 +735,7 @@ export class FitnessMetricsService {
           mascot: 'xoco',
           emoji: '🏃',
           title: `Aguantes més al ${sport.name.toLowerCase()}`,
-          stat: `${Math.round(oldAvg)} → ${Math.round(newAvg)} min de mitjana (+${Math.round(gain * 100)}%)`,
+          stat: `De ${Math.round(oldAvg)} a ${Math.round(newAvg)} min per sessió en ${weeks} setmanes`,
           message: `${mine.length} sessions comparades. ${pickVariant([
             'Es nota!',
             'Quines ganes!',
@@ -640,6 +745,30 @@ export class FitnessMetricsService {
           level: INSIGHT_LEVEL.progres,
           strength: 0,
           cooldownDays: 7,
+          detail: {
+            headline: `Cada sessió de ${sport.name.toLowerCase()} dels últims dos mesos, i el que va durar.`,
+            chart: {
+              caption: 'Minuts de cada sessió',
+              range: dateRange(shown[0].date, lastDay),
+              bars: itemBars(
+                shown,
+                x => ({ label: shortDate(x.date), value: x.duration as number, display: `${x.duration} min` }),
+                { highlight: (_x, i, n) => i >= n - 2 },
+              ),
+            },
+            facts: [
+              {
+                label: 'Les primeres sessions', value: `${Math.round(oldAvg)} min de mitjana`,
+                note: dateRange(first, mine[half - 1].date),
+              },
+              {
+                label: 'Les últimes', value: `${Math.round(newAvg)} min de mitjana`,
+                note: dateRange(mine[mine.length - half].date, lastDay),
+              },
+              { label: 'Sessions comparades', value: plural(mine.length, 'sessió', 'sessions') },
+            ],
+            meaning: 'Aguantar més estona és la millora que abans es nota i la que menys es veu: no surt a cap marcador.',
+          },
         },
       };
     }
@@ -672,23 +801,59 @@ export class FitnessMetricsService {
     const delta = (vNow - vPrev) / vPrev;
     if (Math.abs(delta) < 0.15) return null;
 
-    const pct       = pctDiff(vNow, vPrev);
+    const score     = changeScore(vNow, vPrev);
     const sameCount = Math.abs(now.length - prev.length) <= Math.max(1, prev.length * 0.15);
     const up        = delta > 0;
+
+    // Vuit finestres de 7 dies acabades avui: les quatre últimes són "aquest
+    // mes" i les altres quatre, "el passat". Així el gràfic suma exactament
+    // les xifres del text.
+    const weekly = [7, 6, 5, 4, 3, 2, 1, 0].map(i => ({
+      i,
+      start: offsetDate(today, -(7 * (i + 1))),
+      end:   offsetDate(today, -(7 * i)),
+    })).map(w => ({
+      ...w,
+      kg: workouts
+        .filter(x => x.date > w.start && x.date <= w.end)
+        .reduce((sum, x) => sum + workoutVolume(x, ctx), 0),
+    }));
 
     return {
       type: 'volum_gym',
       mascot: 'marley',
       emoji: up ? '🏋️' : '🍃',
       title: up ? 'Estàs movent més pes' : 'Mes més suau al gym',
-      stat: `${fmtKg(vNow)} aquest mes · un ${pct}% ${up ? 'més' : 'menys'} que l'anterior`,
+      stat: `${fmtKg(vNow)} aquest mes`,
       message: sameCount
-        ? `Amb els mateixos entrenos (${now.length} contra ${prev.length}). ${up ? 'Has pujat intensitat.' : 'Menys càrrega, més recuperació.'}`
-        : `${now.length} entrenos contra ${prev.length} el mes anterior.`,
+        ? `Amb els mateixos entrenos que el mes passat. ${up ? 'Has pujat intensitat.' : 'Menys càrrega, més recuperació.'}`
+        : `${now.length} entrenos, contra ${prev.length} el mes passat.`,
       color: '#00695c',
       level: INSIGHT_LEVEL.progres,
-      strength: 30 + pct,
+      strength: 30 + score,
       cooldownDays: 7,
+      detail: {
+        headline: `Aquest mes has mogut ${fmtKg(vNow)} en total; el mes passat, ${fmtKg(vPrev)}.`,
+        chart: {
+          caption: 'Pes mogut cada 7 dies',
+          range: dateRange(offsetDate(from56, 1), today),
+          bars: itemBars(
+            weekly,
+            w => ({
+              label: w.i === 0 ? 'ara' : shortDate(offsetDate(w.start, 1)),
+              value: w.kg,
+              display: fmtKg(w.kg),
+            }),
+            { muted: w => w.i >= 4, highlight: (_w, i, n) => i === n - 1 },
+          ),
+        },
+        facts: [
+          { label: 'Aquest mes',    value: fmtKg(vNow), note: dateRange(offsetDate(from28, 1), today) },
+          { label: 'El mes passat', value: fmtKg(vPrev), note: dateRange(offsetDate(from56, 1), from28) },
+          { label: 'Entrenos',      value: `${now.length} contra ${prev.length}` },
+        ],
+        meaning: 'El pes mogut és la suma de totes les sèries: el pes de cada una multiplicat per les repeticions. Serveix per veure la feina total, que el nombre d\'entrenos sol no diu.',
+      },
     };
   }
 
@@ -713,20 +878,44 @@ export class FitnessMetricsService {
       const delta = (now - prev) / prev;
       if (Math.abs(delta) >= 0.25) {
         const up  = delta > 0;
-        const pct = pctDiff(now, prev);
         out.push({
           type: 'tendencia_volum',
           mascot: 'both',
           emoji: up ? '📈' : '🌙',
           title: up ? 'Puges de ritme' : 'Mes més tranquil',
-          stat: `${fmt1(now / 4)} activitats/setmana · abans ${fmt1(prev / 4)}`,
+          stat: `Aquest mes, ${fmt1(now / 4)} activitats per setmana`,
           message: up
-            ? `Un ${pct}% més que el mes passat.`
-            : `Un ${pct}% menys que el mes passat. Cap pressa.`,
+            ? `El mes passat en feies ${fmt1(prev / 4)}.`
+            : `El mes passat en feies ${fmt1(prev / 4)}. Cap pressa.`,
           color: up ? '#0288d1' : '#78909c',
           level,
-          strength: 30 + pct,
+          strength: 30 + changeScore(now, prev),
           cooldownDays: 7,
+          detail: {
+            headline: `Aquest mes portes ${plural(now, 'activitat', 'activitats')}; el mes passat en vas fer ${prev}.`,
+            chart: {
+              caption: 'Activitats cada 7 dies',
+              range: dateRange(offsetDate(from56, 1), today),
+              bars: rollingWeekBars(today, allDates, 8, {
+                muted: (_x, i) => i < 4,
+                highlight: (_x, i, n) => i === n - 1,
+              }),
+            },
+            facts: [
+              {
+                label: 'Aquest mes', value: plural(now, 'activitat', 'activitats'),
+                note: dateRange(offsetDate(from28, 1), today),
+              },
+              {
+                label: 'El mes passat', value: plural(prev, 'activitat', 'activitats'),
+                note: dateRange(offsetDate(from56, 1), from28),
+              },
+              { label: 'Diferència', value: weeklyChangePhrase(now / 4, prev / 4) },
+            ],
+            meaning: up
+              ? 'Compara els últims 28 dies amb els 28 d\'abans. Pujar de ritme va bé mentre el descans hi càpiga.'
+              : 'Compara els últims 28 dies amb els 28 d\'abans. Un mes més tranquil no desfà res del que portes.',
+          },
         });
       }
     }
@@ -743,28 +932,31 @@ export class FitnessMetricsService {
   ): FitnessInsight | null {
     const from8 = offsetDate(today, -56);
 
-    type Series = { label: string | null; mascot: Mascot; color: string; feelings: FeelingLevel[] };
+    type Point  = { date: string; feeling: FeelingLevel };
+    type Series = { label: string | null; mascot: Mascot; color: string; points: Point[] };
     const series: Series[] = [];
 
-    const gymFeelings = workouts
+    const gymPoints = workouts
       .filter(w => w.date > from8 && w.date <= today && w.feeling != null)
       .sort((a, b) => a.date.localeCompare(b.date))
-      .map(w => w.feeling as FeelingLevel);
-    series.push({ label: null, mascot: 'marley', color: '#006874', feelings: gymFeelings });
+      .map((w): Point => ({ date: w.date, feeling: w.feeling as FeelingLevel }));
+    series.push({ label: null, mascot: 'marley', color: '#006874', points: gymPoints });
 
     for (const sport of sports) {
-      const feelings = sessions
+      const points = sessions
         .filter(s => s.sportId === sport.id && s.date > from8 && s.date <= today && s.feeling != null)
         .sort((a, b) => a.date.localeCompare(b.date))
-        .map(s => s.feeling as FeelingLevel);
-      series.push({ label: sport.name, mascot: 'xoco', color: sport.color, feelings });
+        .map((s): Point => ({ date: s.date, feeling: s.feeling as FeelingLevel }));
+      series.push({ label: sport.name, mascot: 'xoco', color: sport.color, points });
     }
 
     let best: { delta: number; insight: FitnessInsight } | null = null;
 
     for (const s of series) {
-      if (s.feelings.length < 4) continue;
-      const last4 = s.feelings.slice(-4);
+      if (s.points.length < 4) continue;
+      const recent4 = s.points.slice(-4);
+      const shown   = s.points.slice(-8);
+      const last4   = recent4.map(p => p.feeling);
       // Feeling alt = més fatigant, així que pujar vol dir que costa més.
       const older = mean(last4.slice(0, 2));
       const newer = mean(last4.slice(2));
@@ -781,7 +973,7 @@ export class FitnessMetricsService {
           mascot: s.mascot,
           emoji: '📉',
           title: s.label ? `Anem amb calma al ${s.label.toLowerCase()}` : 'Anem amb calma',
-          stat: `Les últimes 4 sessions: ${from} → ${to}`,
+          stat: `Les últimes 4 sessions: de ${from} a ${to}`,
           message: pickVariant([
             'Avui, tranquils.',
             'Sense presses.',
@@ -791,6 +983,34 @@ export class FitnessMetricsService {
           level: INSIGHT_LEVEL.tendencia,
           strength: 20 + Math.round(delta * 10),
           cooldownDays: 7,
+          detail: {
+            headline: `Com t'has trobat ${s.label ? `al ${s.label.toLowerCase()}` : 'als entrenos'}, sessió per sessió. Les últimes costen més que les d'abans.`,
+            chart: {
+              caption: 'Com t\'has trobat (com més alta, més dura)',
+              range: dateRange(shown[0].date, shown[shown.length - 1].date),
+              bars: itemBars(
+                shown,
+                p => ({
+                  label: shortDate(p.date),
+                  value: p.feeling,
+                  display: FEELING_LABEL[p.feeling],
+                }),
+                { highlight: (_p, i, n) => i >= n - 2 },
+              ),
+            },
+            facts: [
+              {
+                label: 'Les dues d\'abans', value: from,
+                note: dateRange(recent4[0].date, recent4[1].date),
+              },
+              {
+                label: 'Les dues últimes', value: to,
+                note: dateRange(recent4[2].date, recent4[3].date),
+              },
+              { label: 'Sessions dibuixades', value: plural(shown.length, 'sessió', 'sessions') },
+            ],
+            meaning: 'És la sensació que apuntes tu en acabar, no cap mesura. Quan puja acostuma a ser son, feina o poc descans — no pas que hagis perdut forma.',
+          },
         },
       };
     }
@@ -830,14 +1050,33 @@ export class FitnessMetricsService {
           mascot: 'both',
           emoji: '📅',
           title: 'El teu patró de setmana',
-          stat: `${Math.round(share * 100)}% de l'activitat, ${DAY_NAMES[top2[0].day]} i ${DAY_NAMES[top2[1].day]}`,
+          stat: `${outOfTen(share)} activitats, ${DAY_NAMES[top2[0].day]} i ${DAY_NAMES[top2[1].day]}`,
           message: weekend / dates.length <= 0.15
-            ? `Els caps de setmana te'ls deixes lliures: ${weekend} de ${dates.length}.`
+            ? `En 12 setmanes, els caps de setmana lliures: ${weekend} de ${dates.length}.`
             : `Sobre ${dates.length} activitats de les últimes 12 setmanes.`,
           color: '#455a64',
           level,
           strength: 10 + Math.round(share * 10),
           cooldownDays: 14,
+          detail: {
+            headline: `De les ${dates.length} activitats de les últimes 12 setmanes, ${top2[0].count + top2[1].count} van caure ${DAY_NAMES[top2[0].day]} o ${DAY_NAMES[top2[1].day]}.`,
+            chart: {
+              caption: 'Activitats per dia de la setmana',
+              range: dateRange(offsetDate(from12, 1), today),
+              bars: itemBars(
+                [1, 2, 3, 4, 5, 6, 0],
+                day => ({ label: DAY_SHORT[day], value: counts[day] }),
+                { highlight: day => day === top2[0].day || day === top2[1].day },
+              ),
+            },
+            facts: [
+              { label: 'El teu dia fort', value: `${DAY_NAMES[top2[0].day]} · ${plural(top2[0].count, 'activitat', 'activitats')}` },
+              { label: 'El segon',        value: `${DAY_NAMES[top2[1].day]} · ${plural(top2[1].count, 'activitat', 'activitats')}` },
+              { label: 'Caps de setmana', value: `${weekend} de ${dates.length}` },
+              { label: 'Activitats comptades', value: plural(dates.length, 'activitat', 'activitats') },
+            ],
+            meaning: 'No és cap consell: és el teu calendari de debò. Va bé saber quins dies pots comptar quan planifiquis la setmana.',
+          },
         });
       }
     }
@@ -873,8 +1112,8 @@ export class FitnessMetricsService {
             mascot: 'marley',
             emoji: '⚖️',
             title: dayLabel(min),
-            stat: `${breakdown} — 8 setmanes`,
-            message: `${CATEGORY_LABELS[min]} es queda enrere. ${pickVariant([
+            stat: `${CATEGORY_LABELS[min]}: ${plural(counts[min], 'entreno', 'entrenos')} en 8 setmanes`,
+            message: `${CATEGORY_LABELS[top]} en porta ${counts[top]}. ${pickVariant([
               'Ho equilibrem.',
               'Toca anivellar-ho.',
               'Ja ho arreglarem.',
@@ -882,6 +1121,29 @@ export class FitnessMetricsService {
             color: CATEGORY_COLORS[min],
             level,
             strength: 10 + Math.min(20, Math.round(ratio * 3)),
+            detail: {
+              headline: `Els entrenos de gimnàs de les últimes 8 setmanes, repartits per tipus.`,
+              chart: {
+                caption: 'Entrenos per tipus',
+                range: dateRange(offsetDate(from8, 1), today),
+                bars: itemBars(
+                  ranked,
+                  c => ({
+                    label: CATEGORY_LABELS[c],
+                    value: counts[c],
+                    color: CATEGORY_COLORS[c],
+                  }),
+                  { highlight: c => c === min },
+                ),
+              },
+              facts: [
+                { label: 'El que més fas', value: `${CATEGORY_LABELS[top]} · ${plural(counts[top], 'entreno', 'entrenos')}` },
+                { label: 'El que menys',   value: `${CATEGORY_LABELS[min]} · ${plural(counts[min], 'entreno', 'entrenos')}` },
+                { label: 'Repartiment',    value: breakdown },
+                { label: 'Entrenos comptats', value: plural(recent.length, 'entreno', 'entrenos') },
+              ],
+              meaning: `Anivellar-ho no és cap norma: és el que evita arrossegar una part enrere mentre les altres pugen. ${CATEGORY_LABELS[min]} és la que fa més temps que espera.`,
+            },
             cooldownDays: 7,
           });
         }

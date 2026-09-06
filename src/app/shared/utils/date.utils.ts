@@ -26,3 +26,20 @@ export function nextMidnight(from: Date = new Date()): Date {
   d.setHours(24, 0, 0, 0);
   return d;
 }
+
+/** La mateixa data desplaçada `days` dies, `YYYY-MM-DD`. */
+export function offsetDate(dateStr: string, days: number): string {
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() + days);
+  return toDateStr(d);
+}
+
+/**
+ * Dies de `a` a `b`. Es compara al migdia a propòsit: així un canvi d'hora
+ * enmig no converteix 7 dies en 6,96 i el `round` no s'hi juga res.
+ */
+export function daysBetween(a: string, b: string): number {
+  return Math.round(
+    (new Date(b + 'T12:00:00').getTime() - new Date(a + 'T12:00:00').getTime()) / 86_400_000
+  );
+}

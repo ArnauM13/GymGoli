@@ -65,6 +65,13 @@ sense problema: també sap estar quiet, si hi ha companyia.
    intactes: el que canvia és el marc, no la informació.
 6. **Els missatges transversals** (objectius, ratxa, resum de setmana) porten
    menys gos i més dada. Si tot parla amb corretges i sofàs, la broma es gasta.
+7. **L'explicació no és seva.** Al detall d'un insight ("per què t'ho diem")
+   hi ha dades i frases planes, no gos: cap percentatge, cap paraula
+   d'entrenador i cap deure. Ells posen la cara a la capçalera i callen.
+8. **Cap xifra sense el seu quan.** «2,8 per setmana» no vol dir res si no es
+   diu de quan és. A la targeta, el període va dit en paraules («aquest
+   mes»); al detall, amb dates. I si per dir-ho bé calen dues xifres i dos
+   períodes, a la targeta n'hi va una: la resta s'obre.
 
 ---
 
@@ -74,6 +81,7 @@ sense problema: també sap estar quiet, si hi ha companyia.
 | ---- | --- | --- |
 | Suggeriment de `train` | Marley si és gym, Xoco si és esport | La targeta **és** la bafarada, amb el gos al costat |
 | Targetes d'insight (`home`) | segons el tipus (taula de sota) | Avatar + emoji, sense veu pròpia |
+| Detall d'un insight (full que puja des de la targeta) | el mateix que la targeta | Avatar gran a la capçalera, **sense veu**: allà s'explica la dada |
 | Feed del dia (`home`) | Marley als entrenaments, Xoco als esports | Xapa sobre la icona d'activitat |
 | Barres d'objectiu setmanal | Marley al gym, Xoco a l'esport, tots dos si l'objectiu és combinat | Avatar a l'esquerra |
 | Ratxa | tots dos | Avatar a l'esquerra |

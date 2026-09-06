@@ -1,7 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 
-import { FitnessMetricsService, InsightType } from './fitness-metrics.service';
+import { FitnessMetricsService } from './fitness-metrics.service';
+import { FitnessInsight, INSIGHT_LEVEL, InsightType } from '../models/insight.model';
 import { ExerciseService } from './exercise.service';
 import { SportService } from './sport.service';
 import { TodayService } from './today.service';
@@ -17,6 +18,13 @@ import { Sport, SportSession } from '../models/sport.model';
 const MOCK_DATE = '2025-04-23';
 const THURSDAY  = '2025-04-24';
 const TUESDAY   = '2025-04-22';
+
+/** Els dotze tipus, per comprovar que cap es queda sense explicació. */
+const ALL_TYPES: InsightType[] = [
+  'ratxa_en_joc', 'objectiu_a_l_alca', 'objectiu_desajustat', 'compliment_objectiu',
+  'sense_activitat', 'carrega_alta', 'progres', 'volum_gym',
+  'tendencia_volum', 'esforc_creixent', 'patro_setmanal', 'equilibri_gym',
+];
 
 /** Data amb N dies de diferència respecte a `MOCK_DATE` (negatiu = passat). */
 function d(offset: number): string {
@@ -171,7 +179,8 @@ describe('FitnessMetricsService', () => {
 
       expect(types()).toContain('ratxa_en_joc');
       expect(find('ratxa_en_joc')!.title).toBe('3 setmanes seguides');
-      expect(find('ratxa_en_joc')!.stat).toContain('et falten 2');
+      expect(find('ratxa_en_joc')!.stat).toBe('Aquesta setmana, 1/3');
+      expect(find('ratxa_en_joc')!.message).toContain('Amb 2 més');
     });
 
     it('stays quiet early in the week — there is still time', () => {
@@ -214,7 +223,7 @@ describe('FitnessMetricsService', () => {
 
       const ins = find('objectiu_a_l_alca');
       expect(ins).toBeTruthy();
-      expect(ins!.stat).toContain('4,0 activitats/setmana');
+      expect(ins!.stat).toContain('4,0 activitats per setmana');
       expect(ins!.message).toContain('4');
     });
 
@@ -265,7 +274,8 @@ describe('FitnessMetricsService', () => {
       const ins = find('compliment_objectiu');
       expect(ins).toBeTruthy();
       expect(ins!.title).toBe('Cada cop més regular');
-      expect(ins!.stat).toBe('6 de 6 assolides · les 6 anteriors, 0');
+      expect(ins!.stat).toBe('Les últimes 6 setmanes, 6 assolides');
+      expect(ins!.message).toContain('Les 6 anteriors, 0');
       expect(ins!.cooldownDays).toBe(14);
     });
 
@@ -320,7 +330,7 @@ describe('FitnessMetricsService', () => {
 
       const ins = find('sense_activitat');
       expect(ins).toBeTruthy();
-      expect(ins!.stat).toContain('dies des de l\'última');
+      expect(ins!.stat).toContain('de l\'última activitat');
       expect(ins!.cooldownDays).toBe(0);
     });
 
@@ -367,7 +377,7 @@ describe('FitnessMetricsService', () => {
 
       const ins = find('carrega_alta');
       expect(ins).toBeTruthy();
-      expect(ins!.stat).toContain('6 sessions en 7 dies');
+      expect(ins!.stat).toBe('6 sessions en els últims 7 dies');
       expect(ins!.mascot).toBe('marley');
     });
 
@@ -405,8 +415,7 @@ describe('FitnessMetricsService', () => {
       const ins = find('progres');
       expect(ins).toBeTruthy();
       expect(ins!.title).toBe('Puges al press de banca');
-      expect(ins!.stat).toContain('60 → 75 kg');
-      expect(ins!.stat).toContain('+25%');
+      expect(ins!.stat).toContain('De 60 a 75 kg');
       expect(ins!.mascot).toBe('marley');
     });
 
@@ -418,7 +427,7 @@ describe('FitnessMetricsService', () => {
         makeWorkout(d(-5),  { entries: [entry('Sentadilla', 64)] }),
       ]);
 
-      expect(find('progres')!.stat).toContain('60 → 64 kg');
+      expect(find('progres')!.stat).toContain('De 60 a 64 kg');
     });
 
     it('needs four sessions of the same exercise', () => {
@@ -442,7 +451,7 @@ describe('FitnessMetricsService', () => {
       const ins = find('progres');
       expect(ins).toBeTruthy();
       expect(ins!.title).toBe('Aguantes més al córrer');
-      expect(ins!.stat).toContain('31 → 43 min');
+      expect(ins!.stat).toContain('De 31 a 43 min');
       expect(ins!.mascot).toBe('xoco');
     });
 
@@ -502,7 +511,8 @@ describe('FitnessMetricsService', () => {
       const ins = find('tendencia_volum');
       expect(ins).toBeTruthy();
       expect(ins!.title).toBe('Puges de ritme');
-      expect(ins!.stat).toBe('3,0 activitats/setmana · abans 1,0');
+      expect(ins!.stat).toBe('Aquest mes, 3,0 activitats per setmana');
+      expect(ins!.message).toBe('El mes passat en feies 1,0.');
     });
 
     it('frames a quieter month without any pressure', () => {
@@ -552,7 +562,7 @@ describe('FitnessMetricsService', () => {
       const ins = find('esforc_creixent');
       expect(ins).toBeTruthy();
       expect(ins!.title).toBe('Anem amb calma al pàdel');
-      expect(ins!.stat).toBe('Les últimes 4 sessions: Bé → Dur');
+      expect(ins!.stat).toBe('Les últimes 4 sessions: de Bé a Dur');
       expect(ins!.mascot).toBe('xoco');
     });
 
@@ -636,9 +646,11 @@ describe('FitnessMetricsService', () => {
       const ins = find('equilibri_gym');
       expect(ins).toBeTruthy();
       expect(ins!.title).toBe('Leg day?');
-      expect(ins!.stat).toContain('4 empenta');
-      expect(ins!.stat).toContain('1 cames');
-      expect(ins!.stat).toContain('8 setmanes');
+      expect(ins!.stat).toBe('Cames: 1 entreno en 8 setmanes');
+      expect(ins!.message).toContain('Empenta en porta 4');
+      // El desglossament sencer ja no cap a la targeta: viu al detall.
+      expect(ins!.detail.facts.find(f => f.label === 'Repartiment')!.value)
+        .toContain('4 empenta');
     });
 
     it('stays quiet when the types are balanced', () => {
@@ -658,6 +670,290 @@ describe('FitnessMetricsService', () => {
       ]);
 
       expect(types()).not.toContain('equilibri_gym');
+    });
+  });
+
+  /**
+   * Escenaris que, tots junts, disparen els dotze tipus d'insight. Cada un
+   * ve del test del seu tipus: aquí no es comprova què surt, sinó que el que
+   * surt es pugui explicar.
+   */
+  const SCENARIOS: { name: string; setup: () => void }[] = [
+    {
+      name: 'ratxa_en_joc',
+      setup: () => {
+        withGoal(3);
+        mockWorkouts.set([...spread(1, 3, 3).map(dd => makeWorkout(dd)), makeWorkout(monday(0))]);
+        mockToday.set(THURSDAY);
+      },
+    },
+    {
+      name: 'objectiu_a_l_alca',
+      setup: () => { withGoal(2); mockWorkouts.set(spread(1, 5, 4).map(dd => makeWorkout(dd))); },
+    },
+    {
+      name: 'objectiu_desajustat',
+      setup: () => { withGoal(5); mockWorkouts.set(spread(1, 6, 2).map(dd => makeWorkout(dd))); },
+    },
+    {
+      name: 'compliment_objectiu',
+      setup: () => {
+        withGoal(2);
+        mockWorkouts.set([
+          ...spread(1, 6, 2).map(dd => makeWorkout(dd)),
+          ...spread(7, 12, 1).map(dd => makeWorkout(dd)),
+        ]);
+      },
+    },
+    {
+      name: 'sense_activitat',
+      setup: () => {
+        mockWorkouts.set(spread(2, 9, 3).map(dd => makeWorkout(dd)).filter(w => w.date <= d(-12)));
+      },
+    },
+    {
+      name: 'carrega_alta',
+      setup: () => {
+        mockWorkouts.set([
+          ...spread(2, 9, 2).map(dd => makeWorkout(dd)),
+          ...[6, 5, 4, 3, 2, 1].map(n => makeWorkout(d(-n))),
+        ]);
+      },
+    },
+    {
+      name: 'progres (gimnàs)',
+      setup: () => {
+        mockWorkouts.set([
+          makeWorkout(d(-50), { entries: [entry('Press de banca', 60)] }),
+          makeWorkout(d(-35), { entries: [entry('Press de banca', 65)] }),
+          makeWorkout(d(-20), { entries: [entry('Press de banca', 70)] }),
+          makeWorkout(d(-5),  { entries: [entry('Press de banca', 75)] }),
+        ]);
+      },
+    },
+    {
+      name: 'progres (esport)',
+      setup: () => {
+        mockSports.set([makeSport('s1', 'Córrer')]);
+        mockSessions.set([
+          makeSession(d(-50), 's1', { duration: 30 }),
+          makeSession(d(-35), 's1', { duration: 32 }),
+          makeSession(d(-20), 's1', { duration: 42 }),
+          makeSession(d(-5),  's1', { duration: 44 }),
+        ]);
+      },
+    },
+    {
+      name: 'volum_gym',
+      setup: () => {
+        const older  = weekDates(7, 3).concat(weekDates(6, 3));
+        const recent = weekDates(3, 3).concat(weekDates(2, 3));
+        mockWorkouts.set([
+          ...older.map(dd => makeWorkout(dd, { entries: [entry('Press', 50)] })),
+          ...recent.map(dd => makeWorkout(dd, { entries: [entry('Press', 70)] })),
+        ]);
+      },
+    },
+    {
+      name: 'tendencia_volum',
+      setup: () => {
+        mockWorkouts.set([
+          makeWorkout(d(-80)),
+          ...[30, 35, 40, 45].map(n => makeWorkout(d(-n))),
+          ...Array.from({ length: 12 }, (_, i) => makeWorkout(d(-(i + 1)))),
+        ]);
+      },
+    },
+    {
+      name: 'esforc_creixent',
+      setup: () => {
+        mockSports.set([makeSport('s1', 'Pàdel')]);
+        mockSessions.set([
+          makeSession(d(-40), 's1', { feeling: 2 as FeelingLevel }),
+          makeSession(d(-30), 's1', { feeling: 2 as FeelingLevel }),
+          makeSession(d(-20), 's1', { feeling: 4 as FeelingLevel }),
+          makeSession(d(-10), 's1', { feeling: 4 as FeelingLevel }),
+        ]);
+      },
+    },
+    {
+      name: 'patro_setmanal',
+      setup: () => {
+        const dates: string[] = [];
+        for (let w = 1; w <= 12; w++) {
+          const week = weekDates(w, 7);
+          dates.push(week[1], week[3]);
+        }
+        mockWorkouts.set(dates.map(dd => makeWorkout(dd)));
+      },
+    },
+    {
+      name: 'equilibri_gym',
+      setup: () => {
+        mockWorkouts.set([
+          ...weekDates(6, 4).map(dd => makeWorkoutWithCats(dd, ['push'])),
+          ...weekDates(4, 4).map(dd => makeWorkoutWithCats(dd, ['pull'])),
+          ...weekDates(2, 1).map(dd => makeWorkoutWithCats(dd, ['legs'])),
+        ]);
+      },
+    },
+  ];
+
+  /** Tot el que els escenaris arriben a produir, sense repetits per tipus. */
+  function everyInsight(): FitnessInsight[] {
+    const out: FitnessInsight[] = [];
+    for (const s of SCENARIOS) {
+      mockWorkouts.set([]);
+      mockSessions.set([]);
+      mockSports.set([]);
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS });
+      mockToday.set(MOCK_DATE);
+      s.setup();
+      out.push(...service.insights());
+    }
+    return out;
+  }
+
+  // ── La targeta ───────────────────────────────────────────────────────────
+
+  describe('la targeta', () => {
+    it('diu sempre de quan parla', () => {
+      // Cap xifra flotant: «2,8 per setmana» sense dir de quan no és res.
+      const PERIOD = /setmana|setmanes|dies|dia |mes|sessió|sessions|avui|ara/i;
+      for (const i of everyInsight()) {
+        expect(PERIOD.test(`${i.stat} ${i.message}`)).toBe(true, `${i.type}: ${i.stat} · ${i.message}`);
+      }
+    });
+
+    it('es queda en un titular: una xifra i una frase curta', () => {
+      // Tot el que no hi cap té lloc al detall, que per això s'obre.
+      for (const i of everyInsight()) {
+        expect(i.stat.length).toBeLessThanOrEqual(52, `${i.type}: ${i.stat}`);
+        expect(i.message.length).toBeLessThanOrEqual(90, `${i.type}: ${i.message}`);
+      }
+    });
+  });
+
+  // ── El detall ────────────────────────────────────────────────────────────
+
+  describe('el detall', () => {
+    it('cobreix els dotze tipus entre tots els escenaris', () => {
+      const seen = new Set(everyInsight().map(i => i.type));
+      for (const t of ALL_TYPES) expect(seen.has(t)).toBe(true, `falta ${t}`);
+    });
+
+    it('dona a cada insight un gràfic, xifres i una explicació', () => {
+      for (const i of everyInsight()) {
+        expect(i.detail.headline.length).toBeGreaterThan(10);
+        expect(i.detail.meaning.length).toBeGreaterThan(10);
+        expect(i.detail.chart.caption).toBeTruthy();
+        expect(i.detail.chart.bars.length).toBeGreaterThan(1);
+        expect(i.detail.facts.length).toBeGreaterThanOrEqual(2);
+        expect(i.detail.facts.length).toBeLessThanOrEqual(4);
+        for (const f of i.detail.facts) {
+          expect(f.label).toBeTruthy();
+          expect(f.value).toBeTruthy();
+        }
+        // Un gràfic pla no explica res: alguna barra ha de tenir valor.
+        expect(i.detail.chart.bars.some(b => b.value > 0)).toBe(true, i.type);
+      }
+    });
+
+    it('no diu mai res en percentatges', () => {
+      // «Has augmentat un 1000%» no vol dir res per a ningú: les xifres es
+      // diuen senceres i comparades («3 per setmana, abans 1»).
+      for (const i of everyInsight()) {
+        const text = [
+          i.title, i.stat, i.message,
+          i.detail.headline, i.detail.meaning, i.detail.chart.caption,
+          ...i.detail.facts.flatMap(f => [f.label, f.value]),
+          ...i.detail.chart.bars.map(b => b.display ?? ''),
+        ].join(' | ');
+        expect(text).not.toContain('%');
+      }
+    });
+
+    it('destaca al gràfic la barra de la qual parla', () => {
+      for (const i of everyInsight()) {
+        if (i.type === 'sense_activitat') continue; // aquí el que parla és el buit
+        expect(i.detail.chart.bars.some(b => b.highlight)).toBe(true, i.type);
+      }
+    });
+
+    it('posa la línia de l\'objectiu als insights d\'objectiu', () => {
+      for (const i of everyInsight()) {
+        if (i.level !== INSIGHT_LEVEL.objectiu) continue;
+        expect(i.detail.chart.reference).toBeTruthy();
+        expect(i.detail.chart.reference!.label).toContain('objectiu');
+      }
+    });
+
+    it('diu de quan és cada gràfic, amb dates', () => {
+      // Una barra sense període fa endevinar de quan parla, que és just el
+      // que aquest full ha d'evitar.
+      for (const i of everyInsight()) {
+        expect(i.detail.chart.range).toContain('–');
+        expect(i.detail.chart.range.length).toBeGreaterThan(10);
+      }
+    });
+
+    it('data cada xifra que es compara amb una altra', () => {
+      const comparing = ['tendencia_volum', 'volum_gym', 'compliment_objectiu', 'carrega_alta'];
+      for (const i of everyInsight()) {
+        if (!comparing.includes(i.type)) continue;
+        const dated = i.detail.facts.filter(f => f.note);
+        expect(dated.length).toBeGreaterThanOrEqual(2, i.type);
+        for (const f of dated) expect(f.note).toContain('–');
+      }
+    });
+
+    it('el «abans» de tendencia_volum té nom i dates', () => {
+      // El cas que ho va motivar: «3,0 per setmana · abans 0,3» no deia mai
+      // quan era aquell abans.
+      mockWorkouts.set([
+        makeWorkout(d(-80)),
+        ...[30, 35, 40, 45].map(n => makeWorkout(d(-n))),
+        ...Array.from({ length: 12 }, (_, i) => makeWorkout(d(-(i + 1)))),
+      ]);
+
+      const ins = find('tendencia_volum')!;
+      expect(ins.stat).not.toContain('abans');
+      expect(ins.stat).toContain('Aquest mes');
+      expect(ins.message).toContain('El mes passat');
+
+      const prev = ins.detail.facts.find(f => f.label === 'El mes passat')!;
+      expect(prev.note).toContain('–');
+    });
+
+    it('el gràfic de tendencia_volum suma exactament el que diu el text', () => {
+      mockWorkouts.set([
+        makeWorkout(d(-80)),
+        ...[30, 35, 40, 45].map(n => makeWorkout(d(-n))),
+        ...Array.from({ length: 12 }, (_, i) => makeWorkout(d(-(i + 1)))),
+      ]);
+
+      const ins  = find('tendencia_volum')!;
+      const bars = ins.detail.chart.bars;
+      expect(bars.length).toBe(8);
+      // Les quatre últimes finestres de 7 dies són "aquest mes": 12 activitats.
+      expect(bars.slice(4).reduce((sum, b) => sum + b.value, 0)).toBe(12);
+      expect(bars.slice(0, 4).reduce((sum, b) => sum + b.value, 0)).toBe(4);
+      expect(bars.slice(0, 4).every(b => b.muted)).toBe(true);
+      expect(bars[7].label).toBe('ara');
+    });
+
+    it('explica el progrés amb una barra per sessió', () => {
+      mockWorkouts.set([
+        makeWorkout(d(-50), { entries: [entry('Press de banca', 60)] }),
+        makeWorkout(d(-35), { entries: [entry('Press de banca', 65)] }),
+        makeWorkout(d(-20), { entries: [entry('Press de banca', 70)] }),
+        makeWorkout(d(-5),  { entries: [entry('Press de banca', 75)] }),
+      ]);
+
+      const chart = find('progres')!.detail.chart;
+      expect(chart.bars.map(b => b.value)).toEqual([60, 65, 70, 75]);
+      expect(chart.bars[3].display).toBe('75 kg');
+      expect(chart.bars[3].highlight).toBe(true);
     });
   });
 
