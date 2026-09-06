@@ -191,6 +191,29 @@ function mean(nums: number[]): number {
   return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 0;
 }
 
+// ── Història de l'usuari ─────────────────────────────────────────────────────
+
+/**
+ * Quant passat té l'usuari perquè el puguem comparar amb ell mateix.
+ *
+ * L'ancoratge és la **primera activitat registrada**, no la data d'alta: qui
+ * importa tres mesos d'històric el primer dia ja té passat, i qui es va
+ * registrar fa un any però comença avui, no.
+ */
+interface History {
+  /** Primera activitat registrada, o `null` si encara no n'hi ha cap. */
+  first: string | null;
+  /** Dies des d'aquella primera activitat. 0 si no n'hi ha cap. */
+  days: number;
+}
+
+/**
+ * Per sota d'això no hi ha res contra què comparar: algú que acaba d'arribar
+ * no té "el ritme d'abans" ni "la seva mitjana", i qualsevol xifra que en
+ * surti ve de dividir per setmanes que no ha viscut.
+ */
+const MIN_HISTORY_DAYS = 28;
+
 @Injectable({ providedIn: 'root' })
 export class FitnessMetricsService {
   private workoutService      = inject(WorkoutService);
@@ -207,6 +230,10 @@ export class FitnessMetricsService {
    *
    * Qui decideix quin es veu és el component: només en pinta un, i ha de
    * saltar-se els que s'han tancat avui o encara són en període de descans.
+   *
+   * Cap candidat pot comparar l'usuari amb setmanes en què encara no hi era:
+   * la `History` diu des de quan hi ha passat i cada família s'hi mesura
+   * abans de parlar. Veure `History` i `MIN_HISTORY_DAYS`.
    */
   readonly insights = computed((): FitnessInsight[] => {
     const today = this.todayService.today();
@@ -218,14 +245,14 @@ export class FitnessMetricsService {
 
     const weeks = this._weekStats(today, workouts, sessions, 14);
 
-    const first = this._firstActivity(workouts, sessions);
+    const hist = this._history(today, workouts, sessions);
 
     const candidates: FitnessInsight[] = [
-      ...this._goalInsights(today, weeks, goal, first),
-      ...this._breakInsights(today, workouts, sessions, weeks),
+      ...this._goalInsights(today, weeks, goal, hist),
+      ...this._breakInsights(today, workouts, sessions, weeks, hist),
       ...this._progressInsights(today, workouts, sessions, sports),
-      ...this._trendInsights(today, workouts, sessions, sports),
-      ...this._patternInsights(today, workouts, sessions),
+      ...this._trendInsights(today, workouts, sessions, sports, hist),
+      ...this._patternInsights(today, workouts, sessions, hist),
     ];
 
     return candidates.sort((a, b) => a.level - b.level || b.strength - a.strength);
@@ -287,24 +314,26 @@ export class FitnessMetricsService {
     return out;
   }
 
-  /** Data de la primera activitat registrada, o `null` si no n'hi ha cap. */
-  private _firstActivity(workouts: Workout[], sessions: SportSession[]): string | null {
-    const dates = [...workouts.map(w => w.date), ...sessions.map(s => s.date)];
-    return dates.length ? dates.reduce((min, d) => (d < min ? d : min)) : null;
+  /** Des de quan hi ha alguna cosa a mirar. Veure `History`. */
+  private _history(today: string, workouts: Workout[], sessions: SportSession[]): History {
+    const dates = [...workouts.map(w => w.date), ...sessions.map(s => s.date)]
+      .filter(d => d <= today);
+    const first = dates.length ? dates.reduce((min, d) => (d < min ? d : min)) : null;
+    return { first, days: first ? daysBetween(first, today) : 0 };
   }
 
   // ── Nivell 1 · Objectiu ────────────────────────────────────────────────────
 
   private _goalInsights(
-    today: string, weeks: WeekStat[], g: GoalCfg, first: string | null,
+    today: string, weeks: WeekStat[], g: GoalCfg, hist: History,
   ): FitnessInsight[] {
-    if (!g.has || !first) return [];
+    if (!g.has || !hist.first) return [];
 
     // Sense prou història no es pot parlar de 6 ni de 12 setmanes: els buckets
     // existeixen sempre, però les setmanes anteriors a la primera activitat no
     // són setmanes fluixes, és que l'usuari encara no hi era.
-    const has6Weeks  = first <= offsetDate(today, -42);
-    const has12Weeks = first <= offsetDate(today, -84);
+    const has6Weeks  = hist.days >= 42;
+    const has12Weeks = hist.days >= 84;
 
     const out: FitnessInsight[] = [];
     const level = INSIGHT_LEVEL.objectiu;
@@ -407,7 +436,7 @@ export class FitnessMetricsService {
   // ── Nivell 2 · Ruptura ─────────────────────────────────────────────────────
 
   private _breakInsights(
-    today: string, workouts: Workout[], sessions: SportSession[], weeks: WeekStat[],
+    today: string, workouts: Workout[], sessions: SportSession[], weeks: WeekStat[], hist: History,
   ): FitnessInsight[] {
     const out: FitnessInsight[] = [];
     const level = INSIGHT_LEVEL.ruptura;
@@ -417,14 +446,22 @@ export class FitnessMetricsService {
       .filter(d => d <= today);
     const lastDate = allDates.length ? allDates.reduce((max, d) => (d > max ? d : max)) : null;
 
-    if (lastDate) {
+    // Qui fa quatre dies que hi és no té cap absència: no ha deixat de fer res,
+    // encara no ha començat. Dir-li "fa 20 dies que no véns" seria parlar-li
+    // d'un hàbit que mai va arribar a tenir.
+    if (lastDate && hist.days >= MIN_HISTORY_DAYS) {
       const gap = daysBetween(lastDate, today);
       if (gap >= 10) {
         // El ritme que portava abans de parar: si mai va tenir-ne, no hi ha
-        // res a trobar a faltar.
-        const from      = offsetDate(lastDate, -56);
+        // res a trobar a faltar. La finestra no pot ser més llarga que la seva
+        // història (dividir per 8 setmanes qui només n'ha viscut 4 li rebaixa
+        // a la meitat un ritme que sí que existia), ni tan curta que quatre
+        // dies seguits semblin un hàbit.
+        const active     = daysBetween(hist.first ?? lastDate, lastDate);
+        const span       = Math.min(56, Math.max(MIN_HISTORY_DAYS, active));
+        const from       = offsetDate(lastDate, -span);
         const priorCount = allDates.filter(d => d > from && d <= lastDate).length;
-        const priorAvg   = priorCount / 8;
+        const priorAvg   = priorCount / (span / 7);
         if (priorAvg >= 2) {
           out.push({
             type: 'sense_activitat',
@@ -447,10 +484,15 @@ export class FitnessMetricsService {
     }
 
     // ── Càrrega alta ─────────────────────────────────────────────────────────
+    // La mitjana de referència només pot comptar setmanes senceres que
+    // l'usuari hagi viscut. Si no, la primera setmana forta d'algú acabat
+    // d'arribar sempre surt "molt per sobre de la seva mitjana", perquè la
+    // mitjana la fan setmanes buides d'abans que existís.
     const weekAgo = offsetDate(today, -7);
     const last7   = allDates.filter(d => d > weekAgo && d <= today).length;
-    const avg8    = mean(weeks.slice(1, 9).map(w => w.total));
-    if (last7 >= 5 && avg8 >= 1 && last7 >= avg8 * 1.6) {
+    const lived   = weeks.slice(1, 9).filter(w => hist.first !== null && w.monday >= hist.first);
+    const avg8    = mean(lived.map(w => w.total));
+    if (lived.length >= 4 && last7 >= 5 && avg8 >= 1 && last7 >= avg8 * 1.6) {
       out.push({
         type: 'carrega_alta',
         mascot: 'marley',
@@ -653,7 +695,7 @@ export class FitnessMetricsService {
   // ── Nivell 4 · Tendència ───────────────────────────────────────────────────
 
   private _trendInsights(
-    today: string, workouts: Workout[], sessions: SportSession[], sports: Sport[],
+    today: string, workouts: Workout[], sessions: SportSession[], sports: Sport[], hist: History,
   ): FitnessInsight[] {
     const out: FitnessInsight[] = [];
     const level = INSIGHT_LEVEL.tendencia;
@@ -665,7 +707,9 @@ export class FitnessMetricsService {
     const now    = allDates.filter(d => d > from28 && d <= today).length;
     const prev   = allDates.filter(d => d > from56 && d <= from28).length;
 
-    if (now + prev >= 8 && prev > 0) {
+    // "Un 300% més que el mes passat" quan el mes passat encara no hi eres no
+    // és una tendència: cal haver viscut els dos mesos que es comparen.
+    if (hist.days >= 56 && now + prev >= 8 && prev > 0) {
       const delta = (now - prev) / prev;
       if (Math.abs(delta) >= 0.25) {
         const up  = delta > 0;
@@ -756,16 +800,20 @@ export class FitnessMetricsService {
 
   // ── Nivell 5 · Patró ───────────────────────────────────────────────────────
 
-  private _patternInsights(today: string, workouts: Workout[], sessions: SportSession[]): FitnessInsight[] {
+  private _patternInsights(
+    today: string, workouts: Workout[], sessions: SportSession[], hist: History,
+  ): FitnessInsight[] {
     const out: FitnessInsight[] = [];
     const level = INSIGHT_LEVEL.patro;
 
     // ── Quins dies entrenes de debò ──────────────────────────────────────────
+    // Parla de 12 setmanes, així que en calen 12: dues setmanes d'estrena no
+    // són un patró, són com ha anat la setmana.
     const from12 = offsetDate(today, -84);
     const dates  = [...workouts.map(w => w.date), ...sessions.map(s => s.date)]
       .filter(d => d > from12 && d <= today);
 
-    if (dates.length >= 12) {
+    if (hist.days >= 84 && dates.length >= 12) {
       const counts = new Array(7).fill(0) as number[];
       for (const d of dates) counts[dayOfWeek(d)]++;
 
@@ -799,7 +847,10 @@ export class FitnessMetricsService {
     const recent  = workouts.filter(w => w.date > from8 && w.date <= today);
     const gymCats = this.trainingTypeService.types().map(t => t.id);
 
-    if (recent.length >= 6 && gymCats.length >= 2) {
+    // Aquí sí que hi cap aviat — són els seus entrenos, comptats — però no el
+    // primer dia: amb menys d'un mes, el que sembla un desequilibri encara és
+    // l'ordre en què ha començat.
+    if (hist.days >= MIN_HISTORY_DAYS && recent.length >= 6 && gymCats.length >= 2) {
       const counts: Record<ExerciseCategory, number> = Object.fromEntries(gymCats.map(c => [c, 0]));
       for (const w of recent) {
         const cats = w.categories?.length ? w.categories : (w.category ? [w.category] : []);
