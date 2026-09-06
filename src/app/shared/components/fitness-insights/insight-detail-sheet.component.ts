@@ -49,6 +49,9 @@ import { MASCOTS, MascotMeta } from '../../../core/models/mascot.model';
       <!-- ── El gràfic ── -->
       <div class="ids-chart">
         <span class="ids-caption">{{ chart().caption }}</span>
+        <!-- De quan parla. Un gràfic sense dates fa endevinar el període, i
+             endevinar és el contrari del que ve a fer aquest full. -->
+        <span class="ids-range">{{ chart().range }}</span>
 
         <div class="ids-plot" role="img" [attr.aria-label]="chartLabel()">
           <div class="ids-cols">
@@ -83,7 +86,10 @@ import { MASCOTS, MascotMeta } from '../../../core/models/mascot.model';
       <dl class="ids-facts">
         @for (f of detail().facts; track f.label) {
           <div class="ids-fact">
-            <dt>{{ f.label }}</dt>
+            <dt>
+              {{ f.label }}
+              @if (f.note) { <span class="ids-note">{{ f.note }}</span> }
+            </dt>
             <dd>{{ f.value }}</dd>
           </div>
         }
@@ -142,9 +148,14 @@ import { MASCOTS, MascotMeta } from '../../../core/models/mascot.model';
      * barra de la qual parlem, perquè un número a cada barra no es llegeix. */
     .ids-chart { margin-bottom: 16px; }
     .ids-caption {
-      display: block; margin-bottom: 8px;
+      display: block;
       font-size: 11px; font-weight: 700; color: var(--c-text-3);
       text-transform: uppercase; letter-spacing: 0.4px;
+    }
+    .ids-range {
+      display: block; margin: 2px 0 8px;
+      font-size: 11px; font-weight: 600; color: var(--c-text-3);
+      &:empty { display: none; }
     }
 
     .ids-plot { padding-top: 16px; }
@@ -207,14 +218,25 @@ import { MASCOTS, MascotMeta } from '../../../core/models/mascot.model';
       display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
       padding: 8px 0;
       &:not(:last-child) { border-bottom: 1px solid var(--c-border-2); }
-      dt { font-size: 12px; font-weight: 600; color: var(--c-text-3); }
+      /* El nom es queda l'espai que sobra: si no, un valor llarg li parteix
+         la paraula per la meitat i la fila deixa de llegir-se. */
+      dt {
+        flex: 1; min-width: 0;
+        font-size: 12px; font-weight: 600; color: var(--c-text-3);
+        display: flex; flex-direction: column; gap: 1px;
+      }
       dd {
+        flex-shrink: 0; max-width: 58%;
         margin: 0; font-size: 12.5px; font-weight: 700; color: var(--c-text);
         text-align: right;
       }
     }
 
     /* ── Què vol dir ── */
+    /* Les dates de cada xifra: hi són sempre que la xifra es compari amb una
+       altra, i es llegeixen per sota del seu nom. */
+    .ids-note { font-size: 10.5px; font-weight: 500; opacity: 0.85; }
+
     .ids-meaning {
       display: flex; align-items: flex-start; gap: 9px;
       padding: 11px 12px; border-radius: 14px;
@@ -279,7 +301,7 @@ export class InsightDetailSheetComponent {
   chartLabel(): string {
     const c = this.chart();
     const bars = c.bars.map((b: InsightBar) => `${b.label}: ${b.display ?? b.value}`).join(', ');
-    return `${c.caption}. ${bars}.${c.reference ? ` Referència: ${c.reference.label}.` : ''}`;
+    return `${c.caption}, ${c.range}. ${bars}.${c.reference ? ` Referència: ${c.reference.label}.` : ''}`;
   }
 
   @HostListener('document:keydown.escape')

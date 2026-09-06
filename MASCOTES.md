@@ -68,6 +68,10 @@ sense problema: també sap estar quiet, si hi ha companyia.
 7. **L'explicació no és seva.** Al detall d'un insight ("per què t'ho diem")
    hi ha dades i frases planes, no gos: cap percentatge, cap paraula
    d'entrenador i cap deure. Ells posen la cara a la capçalera i callen.
+8. **Cap xifra sense el seu quan.** «2,8 per setmana» no vol dir res si no es
+   diu de quan és. A la targeta, el període va dit en paraules («aquest
+   mes»); al detall, amb dates. I si per dir-ho bé calen dues xifres i dos
+   períodes, a la targeta n'hi va una: la resta s'obre.
 
 ---
 

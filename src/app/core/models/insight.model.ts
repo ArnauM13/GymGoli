@@ -61,6 +61,12 @@ export interface InsightBar {
 export interface InsightChart {
   /** Què hi ha a les barres, en pla: «Activitats per setmana». */
   caption: string;
+  /**
+   * Quin tros de calendari s'hi veu, amb dates: `26 de febrer – 23 d'abril`.
+   * Obligatori a la pràctica — un gràfic sense dates fa endevinar de quan
+   * parla, que és exactament el que el detall ha d'evitar.
+   */
+  range: string;
   bars: InsightBar[];
   /** Línia horitzontal de referència, típicament l'objectiu setmanal. */
   reference?: { value: number; label: string };
@@ -70,6 +76,8 @@ export interface InsightChart {
 export interface InsightFact {
   label: string;
   value: string;
+  /** De quan és, amb dates. Tota xifra comparada n'ha de portar. */
+  note?: string;
 }
 
 /**
@@ -78,6 +86,11 @@ export interface InsightFact {
  * Regla de llenguatge: aquí **no hi ha percentatges ni jerga**. Un usuari no
  * ha de traduir «+180% de volum» a res; ha de veure dues xifres seves i una
  * frase que les lligui. Si una dada no es pot dir en pla, no hi va.
+ *
+ * Regla de precisió: **cap xifra sense el seu quan**. La targeta en diu una i
+ * amb el període dit en paraules («aquest mes»); aquí les dates hi són
+ * escrites (`range` del gràfic, `note` de cada fet), perquè «abans» no vol
+ * dir res si no es diu abans de què.
  */
 export interface InsightDetail {
   /** Una frase: què hem mirat i què hi hem vist. */
@@ -89,6 +102,13 @@ export interface InsightDetail {
   meaning: string;
 }
 
+/**
+ * Una targeta d'insight.
+ *
+ * A la targeta hi cap **una sola xifra amb el seu període** (`stat`) i una
+ * frase (`message`). Tota comparació, desglossament i data exacta viu al
+ * `detail`: la targeta és el titular, no el reportatge.
+ */
 export interface FitnessInsight {
   type: InsightType;
   /** Qui ho diu. L'emoji continua sent com se sent — veure `mascot.model.ts`. */

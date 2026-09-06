@@ -551,12 +551,21 @@ nav pill (inset side margins, all four corners rounded) and slide up from below.
 - Floating cards that aren't full sheets (rest timer, confirm bars) sit above
   the nav with `bottom: calc(var(--nav-height) + N)` — never a hardcoded px.
 
-### Insight detail sheet & mini chart
+### Insight card & detail sheet
 
-Tapping an insight card on `home` opens `app-insight-detail-sheet`: the same
-floating sheet shell, with the card's own hue passed down as `--ic`. Its
-layout is fixed — header (avatar + title + stat), one-line headline, chart,
-a bordered list of figures, and a tinted "what it means" block.
+The card on `home` is a **headline**: one figure with the period it belongs
+to (`stat`) and one short sentence (`message`). Every number on it says its
+own *when* — "aquest mes", "els últims 7 dies", "de les últimes 6 setmanes";
+a bare "3,0 per setmana · abans 1,0" is a bug, because "abans" names nothing.
+If a comparison needs two different periods, only one goes on the card and
+the pair moves into the sheet.
+
+Tapping it opens `app-insight-detail-sheet`: the same floating sheet shell,
+with the card's own hue passed down as `--ic`. Its layout is fixed — header
+(avatar + title + stat), one-line headline, chart, a bordered list of
+figures, and a tinted "what it means" block. Here the periods are written
+with dates: `chart.range` under the caption (`26 de febrer – 23 d'abril`)
+and a `note` under any figure that is being compared with another.
 
 The chart is plain CSS, no chart library:
 

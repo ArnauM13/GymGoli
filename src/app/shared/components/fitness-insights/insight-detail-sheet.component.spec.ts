@@ -34,8 +34,9 @@ describe('InsightDetailSheetComponent', () => {
   let fixture: ReturnType<typeof TestBed.createComponent<InsightDetailSheetComponent>>;
   let component: InsightDetailSheetComponent;
 
-  /** Munta el full amb un gràfic concret. */
-  function build(chart: InsightChart): void {
+  /** Munta el full amb un gràfic concret; el període, si no es diu, ja hi és. */
+  function build(partial: Omit<InsightChart, 'range'> & { range?: string }): void {
+    const chart: InsightChart = { range: '3 de març – 23 d\'abril', ...partial };
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       imports: [InsightDetailSheetComponent],

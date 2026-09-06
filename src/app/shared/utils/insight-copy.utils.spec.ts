@@ -1,4 +1,5 @@
 import {
+  dateRange,
   fmt1,
   fmtKg,
   fmtWeight,
@@ -65,17 +66,21 @@ describe('insight-copy.utils', () => {
   describe('weeklyChangePhrase()', () => {
     it('compta activitats i no percentatges', () => {
       // El cas que ho va motivar: 1 → 3 sortia com «un 200% més».
-      expect(weeklyChangePhrase(3, 1)).toBe('2 activitats més cada setmana.');
-      expect(weeklyChangePhrase(1, 3)).toBe('2 activitats menys cada setmana.');
+      expect(weeklyChangePhrase(3, 1)).toBe('2 activitats més cada setmana');
+      expect(weeklyChangePhrase(1, 3)).toBe('2 activitats menys cada setmana');
     });
 
     it('no posa número a una diferència que no es nota', () => {
-      expect(weeklyChangePhrase(3.3, 2.9)).toBe('Una mica més cada setmana.');
-      expect(weeklyChangePhrase(2.9, 3.3)).toBe('Una mica menys cada setmana.');
+      expect(weeklyChangePhrase(3.3, 2.9)).toBe('una mica més cada setmana');
+      expect(weeklyChangePhrase(2.9, 3.3)).toBe('una mica menys cada setmana');
     });
 
     it('concorda el singular', () => {
-      expect(weeklyChangePhrase(3, 2)).toBe('1 activitat més cada setmana.');
+      expect(weeklyChangePhrase(3, 2)).toBe('1 activitat més cada setmana');
+    });
+
+    it('es pot encastar en una frase, que per això no porta punt', () => {
+      expect(weeklyChangePhrase(3, 1).endsWith('.')).toBe(false);
     });
   });
 
@@ -85,6 +90,14 @@ describe('insight-copy.utils', () => {
     it('donen la data curta per sota una barra i la llarga per a una frase', () => {
       expect(shortDate('2025-03-03')).toBe('3/3');
       expect(longDate('2025-03-03')).toBe('3 de març');
+    });
+  });
+
+  describe('dateRange()', () => {
+    it('diu de quan a quan, sense preposicions que es puguin dir malament', () => {
+      // «del 1 d'abril» seria incorrecte i «de l'1 d'abril» obliga a saber
+      // apostrofar: amb el guionet cap data pot sortir mal escrita.
+      expect(dateRange('2025-02-26', '2025-04-01')).toBe('26 de febrer – 1 d\u2019abril');
     });
   });
 

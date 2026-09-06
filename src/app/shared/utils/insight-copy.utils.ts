@@ -47,11 +47,10 @@ export function outOfTen(share: number): string {
  * «una mica més» ja ho diu tot i no fa pensar.
  */
 export function weeklyChangePhrase(nowPerWeek: number, prevPerWeek: number): string {
-  const diff  = Math.abs(nowPerWeek - prevPerWeek);
-  const up    = nowPerWeek >= prevPerWeek;
-  const dir   = up ? 'més' : 'menys';
-  if (diff < 0.5) return `Una mica ${dir} cada setmana.`;
-  return `${plural(Math.round(diff), 'activitat', 'activitats')} ${dir} cada setmana.`;
+  const diff = Math.abs(nowPerWeek - prevPerWeek);
+  const dir  = nowPerWeek >= prevPerWeek ? 'més' : 'menys';
+  if (diff < 0.5) return `una mica ${dir} cada setmana`;
+  return `${plural(Math.round(diff), 'activitat', 'activitats')} ${dir} cada setmana`;
 }
 
 // ── Dates curtes ─────────────────────────────────────────────────────────────
@@ -66,6 +65,17 @@ export function shortDate(dateStr: string): string {
 export function longDate(dateStr: string): string {
   return new Date(dateStr + 'T12:00:00')
     .toLocaleDateString('ca-ES', { day: 'numeric', month: 'long' });
+}
+
+/**
+ * El tros de calendari del qual parlem: `26 de febrer – 23 d'abril`.
+ *
+ * Sense preposició davant del dia a propòsit: «del 1 d'abril» és incorrecte i
+ * «de l'1 d'abril» obliga a saber quan apostrofar. Amb el guionet, cap data
+ * es pot dir malament.
+ */
+export function dateRange(from: string, to: string): string {
+  return `${longDate(from)} – ${longDate(to)}`;
 }
 
 // ── Barres ───────────────────────────────────────────────────────────────────

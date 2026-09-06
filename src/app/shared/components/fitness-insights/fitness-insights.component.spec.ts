@@ -27,7 +27,11 @@ function makeInsight(type: string, overrides: Partial<FitnessInsight> = {}): Fit
     cooldownDays: 0,
     detail: {
       headline: `Headline for ${type}`,
-      chart: { caption: 'Activitats per setmana', bars: [{ label: 'dl', value: 2 }] },
+      chart: {
+        caption: 'Activitats per setmana',
+        range: '3 de març – 23 d\'abril',
+        bars: [{ label: 'dl', value: 2 }],
+      },
       facts: [{ label: 'Fact', value: '2' }],
       meaning: `Meaning for ${type}`,
     },
