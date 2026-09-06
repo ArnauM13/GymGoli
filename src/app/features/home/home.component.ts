@@ -147,47 +147,56 @@ const RECENT_DAYS = 30;
       }
 
       <!-- ── Activitat recent (últims 30 dies) ── -->
-      <div class="card-section history-card">
-        <div class="section-header">
-          <span class="material-symbols-outlined section-icon" aria-hidden="true">history</span>
-          <h2 class="section-title">Activitat recent</h2>
-          <span class="section-hint">30 dies</span>
-        </div>
+      <!-- Plegada de sèrie, com les seccions del Perfil: Inici s'obre amb el
+           dia d'avui a la vista, no amb un mes de scroll a sota. -->
+      <div class="card-section history-card" [class.history-card--open]="historyOpen()">
+        <h2 class="section-heading">
+          <button class="section-header" (click)="toggleHistory()" [attr.aria-expanded]="historyOpen()">
+            <span class="material-symbols-outlined section-icon" aria-hidden="true">history</span>
+            <span class="section-title">Activitat recent</span>
+            <span class="section-hint">30 dies</span>
+            <span class="material-symbols-outlined section-chevron" aria-hidden="true">expand_more</span>
+          </button>
+        </h2>
 
-        @if ((workoutService.isLoading() || !sportService.sportsLoaded()) && historyFeedDays().length === 0) {
-          <div class="feed-sk">
-            @for (_ of [1,2,3]; track $index) {
-              <div class="sk-card-ph">
-                <div class="sk sk-card-bar"></div>
-                <div class="sk-card-body">
-                  <div class="sk sk-line sk-line--55"></div>
-                  <div class="sk sk-line sk-line--30"></div>
-                </div>
+        @if (historyOpen()) {
+          <div class="history-body">
+            @if ((workoutService.isLoading() || !sportService.sportsLoaded()) && historyFeedDays().length === 0) {
+              <div class="feed-sk">
+                @for (_ of [1,2,3]; track $index) {
+                  <div class="sk-card-ph">
+                    <div class="sk sk-card-bar"></div>
+                    <div class="sk-card-body">
+                      <div class="sk sk-line sk-line--55"></div>
+                      <div class="sk sk-line sk-line--30"></div>
+                    </div>
+                  </div>
+                }
               </div>
+            } @else if (historyFeedDays().length === 0) {
+              <div class="empty-state">
+                <span class="material-symbols-outlined empty-icon">fitness_center</span>
+                <h2>Encara no hi ha res</h2>
+                <p>Els teus entrenaments anteriors apareixeran aquí.</p>
+              </div>
+            } @else {
+              @for (day of historyFeedDays(); track day.date) {
+                <div class="feed-day">
+                  <div class="feed-day-header">{{ dayLabel(day.date) }}</div>
+                  <app-day-feed-cards [day]="day" hideVolume (open)="goToWorkout($event)" />
+                </div>
+              }
             }
-          </div>
-        } @else if (historyFeedDays().length === 0) {
-          <div class="empty-state">
-            <span class="material-symbols-outlined empty-icon">fitness_center</span>
-            <h2>Encara no hi ha res</h2>
-            <p>Els teus entrenaments anteriors apareixeran aquí.</p>
-          </div>
-        } @else {
-          @for (day of historyFeedDays(); track day.date) {
-            <div class="feed-day">
-              <div class="feed-day-header">{{ dayLabel(day.date) }}</div>
-              <app-day-feed-cards [day]="day" hideVolume (open)="goToWorkout($event)" />
-            </div>
-          }
-        }
 
-        <!-- Inici només ensenya el que és recent; tot el que hi ha abans viu
-             a l'Historial, que té cerca, filtres i calendari. -->
-        <a class="history-all-link" routerLink="/calendar">
-          <span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>
-          Veure tot l'historial
-          <span class="material-symbols-outlined hal-arrow" aria-hidden="true">chevron_right</span>
-        </a>
+            <!-- Inici només ensenya el que és recent; tot el que hi ha abans viu
+                 a l'Historial, que té cerca, filtres i calendari. -->
+            <a class="history-all-link" routerLink="/calendar">
+              <span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>
+              Veure tot l'historial
+              <span class="material-symbols-outlined hal-arrow" aria-hidden="true">chevron_right</span>
+            </a>
+          </div>
+        }
       </div>
 
     </div>
@@ -363,13 +372,40 @@ const RECENT_DAYS = 30;
       border-radius: 18px;
       box-shadow: 0 2px 10px var(--c-shadow);
     }
-    .section-header { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; }
+    /* Plegada és una sola fila: el coixí ha de quedar igual a dalt i a baix. */
+    .history-card:not(.history-card--open) { padding-bottom: 14px; }
+    /* La capçalera és el botó que plega la targeta. Sense canvi de fons: en
+       tàctil el gris del :hover es queda enganxat a la secció acabada d'obrir;
+       el xebró ja diu si està oberta. */
+    .section-heading { margin: 0; }
+    .section-header {
+      display: flex; align-items: center; gap: 7px;
+      width: 100%; padding: 0; border: none; background: none;
+      text-align: left; font: inherit;
+      cursor: pointer; touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
     .section-icon  { font-size: 18px; color: var(--c-text-3); font-variation-settings: 'FILL' 0, 'wght' 300; }
     .section-title { margin: 0; flex: 1; font-size: 14px; font-weight: 700; color: var(--c-text-2); letter-spacing: 0.2px; }
     .section-hint {
       flex-shrink: 0; padding: 2px 8px; border-radius: 999px;
       background: var(--c-subtle); color: var(--c-text-3);
       font-size: 10.5px; font-weight: 700; letter-spacing: 0.2px;
+    }
+    .section-chevron {
+      font-size: 20px; color: var(--c-text-3); flex-shrink: 0;
+      transition: transform 0.2s;
+    }
+    .history-card--open .section-chevron { transform: rotate(180deg); }
+
+    .history-body { padding-top: 12px; animation: section-open 0.18s ease-out; }
+    @keyframes section-open {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .history-body { animation: none; }
+      .section-chevron { transition: none; }
     }
 
     .history-all-link {
@@ -607,6 +643,13 @@ export class HomeComponent {
     }
     return days;
   });
+
+  /** "Activitat recent" arrenca plegada: Inici és per al dia d'avui, i el mes
+   *  anterior només s'obre si el vas a buscar. No es recorda entre visites —
+   *  igual que les seccions del Perfil, cada entrada torna a la portada. */
+  readonly historyOpen = signal(false);
+
+  toggleHistory(): void { this.historyOpen.update(v => !v); }
 
   /** La línia de temps recent, sense el dia que la targeta de dalt ja ensenya.
    *

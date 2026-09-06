@@ -224,6 +224,21 @@ describe('HomeComponent', () => {
     });
   });
 
+  // ── "Activitat recent" plegada ───────────────────────────────────────────
+
+  describe('historyOpen()', () => {
+    it('arrenca plegada: Inici s\'obre pel dia d\'avui', () => {
+      expect(component.historyOpen()).toBeFalse();
+    });
+
+    it('toggleHistory() l\'obre i la torna a plegar', () => {
+      component.toggleHistory();
+      expect(component.historyOpen()).toBeTrue();
+      component.toggleHistory();
+      expect(component.historyOpen()).toBeFalse();
+    });
+  });
+
   // ── navigation ───────────────────────────────────────────────────────────
 
   describe('navigation', () => {
