@@ -2,7 +2,8 @@ import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
+import { BehaviorSubject } from 'rxjs';
 
 import { SettingsComponent } from './settings.component';
 import { UserSettingsService } from '../../core/services/user-settings.service';
@@ -20,7 +21,7 @@ import { DEFAULT_TRAINING_TYPES } from '../../core/models/training-type.model';
 describe('SettingsComponent', () => {
   let component: SettingsComponent;
   let fixture: ComponentFixture<SettingsComponent>;
-  let mockTourStop: ReturnType<typeof signal<{ route: string } | null>>;
+  let mockQueryParams: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
   let mockStartTour: jasmine.Spy;
   let mockEnabled:       ReturnType<typeof signal<boolean>>;
   let mockThemeMode:     ReturnType<typeof signal<'light' | 'dark' | 'system'>>;
@@ -50,8 +51,8 @@ describe('SettingsComponent', () => {
     mockDeleteAccount = jasmine.createSpy('deleteAccount').and.returnValue(Promise.resolve());
     mockNavigate   = jasmine.createSpy('navigate').and.returnValue(Promise.resolve(true));
     mockFeedbackError = jasmine.createSpy('error');
-    mockTourStop   = signal<{ route: string } | null>(null);
-    mockStartTour  = jasmine.createSpy('start');
+    mockQueryParams = new BehaviorSubject(convertToParamMap({}));
+    mockStartTour   = jasmine.createSpy('start');
 
     await TestBed.configureTestingModule({
       imports: [SettingsComponent],
@@ -157,7 +158,14 @@ describe('SettingsComponent', () => {
         },
         {
           provide: OnboardingTourService,
-          useValue: { stop: mockTourStop, total: 9, start: mockStartTour },
+          useValue: { stop: signal(null), total: 9, start: mockStartTour },
+        },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            queryParamMap: mockQueryParams,
+            snapshot: { get queryParamMap() { return mockQueryParams.value; } },
+          },
         },
       ],
     })
@@ -644,23 +652,57 @@ describe('SettingsComponent', () => {
     });
   });
 
-  // ── El tour i la secció «Configuració» ───────────────────────────────────
+  // ── Enllaços directes a una secció (?section=…) ──────────────────────────
 
-  describe('guided tour', () => {
-    it('opens Configuració while the tour stands on a Perfil stop', () => {
-      expect(component.isOpen('config')).toBe(false);
-      mockTourStop.set({ route: '/settings' });
+  describe('?section=', () => {
+    it('opens the section the URL asks for', () => {
+      expect(component.isOpen('advanced')).toBe(false);
+      mockQueryParams.next(convertToParamMap({ section: 'advanced' }));
       fixture.detectChanges();
-      expect(component.isOpen('config')).toBe(true);
+      expect(component.isOpen('advanced')).toBe(true);
     });
 
-    it('leaves the sections alone for a stop on another screen', () => {
-      mockTourStop.set({ route: '/home' });
+    it('ignores an unknown section id', () => {
+      mockQueryParams.next(convertToParamMap({ section: 'nope' }));
       fixture.detectChanges();
-      expect(component.isOpen('config')).toBe(false);
+      for (const id of ['goal', 'config', 'app-prefs', 'advanced', 'onboarding', 'account'] as const) {
+        expect(component.isOpen(id)).withContext(id).toBe(false);
+      }
     });
 
-    it('startTour() hands over to the tour service', () => {
+    it('writes the section the user opens back to the URL, replacing history', () => {
+      component.toggleSection('goal');
+      expect(mockNavigate).toHaveBeenCalledWith([], jasmine.objectContaining({
+        queryParams: { section: 'goal' },
+        replaceUrl: true,
+      }));
+    });
+
+    it('carries the most recently opened section', () => {
+      component.toggleSection('goal');
+      component.toggleSection('config');
+      const [, extras] = mockNavigate.calls.mostRecent().args as [unknown[], { queryParams: unknown }];
+      expect(extras.queryParams).toEqual({ section: 'config' });
+    });
+
+    it('falls back to a still-open section when one closes', () => {
+      component.toggleSection('goal');
+      component.toggleSection('config');
+      component.toggleSection('config');
+      const [, extras] = mockNavigate.calls.mostRecent().args as [unknown[], { queryParams: unknown }];
+      expect(extras.queryParams).toEqual({ section: 'goal' });
+    });
+
+    it('clears the param once nothing is open', () => {
+      component.toggleSection('goal');
+      component.toggleSection('goal');
+      const [, extras] = mockNavigate.calls.mostRecent().args as [unknown[], { queryParams: unknown }];
+      expect(extras.queryParams).toEqual({ section: null });
+    });
+  });
+
+  describe('startTour()', () => {
+    it('hands over to the tour service', () => {
       component.startTour();
       expect(mockStartTour).toHaveBeenCalled();
     });

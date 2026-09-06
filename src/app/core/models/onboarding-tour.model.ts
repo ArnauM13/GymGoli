@@ -48,9 +48,10 @@ export interface TourStop {
  * es fa llarg s'abandona a la meitat — que és pitjor que un de curt.
  *
  * Les parades del Perfil (`cfg-*`) assenyalen files que viuen dins d'una
- * secció plegable. `SettingsComponent` obre «Configuració» sola mentre el
- * tour hi passa: si algú mou aquestes files a una altra secció, allà s'ha
- * d'actualitzar quina s'obre, o el tour parlarà d'una cosa que no es veu.
+ * secció plegable, i per això naveguen amb `?section=config`: el Perfil obre
+ * la secció que li demana la URL. Si algú mou aquestes files a una altra
+ * secció, aquí s'ha de canviar el `queryParams`, o el tour parlarà d'una cosa
+ * que no es veu.
  */
 export const TOUR_STOPS: TourStop[] = [
   {
@@ -90,6 +91,7 @@ export const TOUR_STOPS: TourStop[] = [
   {
     id: 'cfg-gym',
     route: '/settings',
+    queryParams: { section: 'config' },
     targets: ['[data-tour="cfg-exercises"]', '[data-tour="cfg-training-types"]'],
     mascot: 'marley',
     title: 'El gym, a la teva manera',
@@ -99,6 +101,7 @@ export const TOUR_STOPS: TourStop[] = [
   {
     id: 'cfg-sports',
     route: '/settings',
+    queryParams: { section: 'config' },
     targets: ['[data-tour="cfg-sports"]'],
     mascot: 'xoco',
     title: 'I tot el que no és gym',
@@ -108,6 +111,7 @@ export const TOUR_STOPS: TourStop[] = [
   {
     id: 'cfg-routines',
     route: '/settings',
+    queryParams: { section: 'config' },
     targets: ['[data-tour="cfg-routines"]'],
     mascot: 'both',
     title: 'Programa la setmana',

@@ -567,8 +567,10 @@ export class HomeComponent {
     this.router.navigate(['/train/planner']);
   }
 
+  /** El botó porta a definir objectius, no al Perfil en general: hi arriba
+   *  amb la secció ja oberta. */
   goToSettings(): void {
-    this.router.navigate(['/settings']);
+    this.router.navigateByUrl('/settings?section=goal');
   }
 
   async dismissRoutineHint(): Promise<void> {

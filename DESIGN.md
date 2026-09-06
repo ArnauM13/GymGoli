@@ -237,8 +237,13 @@ form.
   the outline, and `aria-expanded` says whether the group is open.
 - Group the open ids in one `signal<ReadonlySet<Id>>`, empty by default.
 - Honour `prefers-reduced-motion`: no open animation, no chevron rotation.
-- Anything the guided tour highlights must be **opened programmatically**
-  before the stop runs — a collapsed section has nothing to light up.
+- Give the sections a **deep link** (`/settings?section=advanced`) and write
+  the last-opened one back to the URL with `replaceUrl: true`. That single
+  mechanism covers arriving from a hint or CTA, coming back from a sub-page
+  with the section you left open, and reloading the page.
+- Anything the guided tour highlights lives inside a section, so its stop
+  must navigate with that `?section=` — a collapsed section has nothing to
+  light up.
 - **One level only.** Don't nest sub-collapsibles, and don't split an open
   section into subsections the reader has to scan past: a section that is
   worth opening is worth showing whole.

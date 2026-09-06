@@ -77,7 +77,10 @@ export class DiscoveryHintComponent {
   readonly hintService = inject(AppHintService);
   private router = inject(Router);
 
+  /** Les rutes dels consells poden portar query params
+   *  (`/settings?section=advanced`), que `navigate([...])` es menjaria com a
+   *  part del camí. */
   go(route: string): void {
-    this.router.navigate([route]);
+    this.router.navigateByUrl(route);
   }
 }

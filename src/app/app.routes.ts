@@ -1,4 +1,5 @@
-import { Routes } from '@angular/router';
+import { inject } from '@angular/core';
+import { Router, Routes } from '@angular/router';
 
 import { authGuard } from './core/guards/auth.guard';
 
@@ -81,6 +82,13 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () =>
       import('./features/settings/settings.component').then(m => m.SettingsComponent),
+  },
+  {
+    // Els paràmetres avançats van deixar de ser una pàgina pròpia: ara són una
+    // secció del Perfil. Els enllaços vells (i la snapshot del service worker
+    // d'algú) hi continuen anant a parar.
+    path: 'settings/advanced',
+    redirectTo: () => inject(Router).parseUrl('/settings?section=advanced'),
   },
   {
     path: 'templates',

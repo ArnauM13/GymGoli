@@ -203,7 +203,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
               <span class="aw-nudge-title">Comptar la calistènia al volum?</span>
               <span class="aw-nudge-sub">Afegeix el teu pes corporal i les dominades i companyia sumaran volum. Si no, es registren igual però no compten al volum — tu tries.</span>
             </div>
-            <button class="aw-nudge-cta" (click)="router.navigate(['/settings'])">Afegir</button>
+            <button class="aw-nudge-cta" (click)="router.navigateByUrl('/settings?section=advanced')">Afegir</button>
             <button class="aw-nudge-x" (click)="hintService.dismiss('nudge-bodyweight-volume')" aria-label="No tornar a mostrar">
               <span class="material-symbols-outlined">close</span>
             </button>

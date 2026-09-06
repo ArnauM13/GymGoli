@@ -52,7 +52,7 @@ const DISCOVERY_HINTS: AppHint[] = [
     icon: 'flag',
     title: 'Marca\'t un objectiu setmanal',
     body: 'Defineix quantes activitats vols fer cada setmana i segueix el teu progrés a Inici i al calendari.',
-    route: '/settings',
+    route: '/settings?section=goal',
     cta: 'Definir objectiu',
   },
   {
@@ -68,7 +68,7 @@ const DISCOVERY_HINTS: AppHint[] = [
     icon: 'palette',
     title: 'Fes l\'app teva des de Perfil',
     body: 'Tema i unitats de pes a «Preferències de l\'app»; el temporitzador de descans i el teu pes corporal, a «Paràmetres avançats».',
-    route: '/settings',
+    route: '/settings?section=app-prefs',
     cta: 'Obrir Perfil',
   },
   {
@@ -76,7 +76,7 @@ const DISCOVERY_HINTS: AppHint[] = [
     icon: 'tune',
     title: 'Opcions per entrenar més fi',
     body: 'Activa supersets, dropsets, RIR o l\'escala de dificultat numèrica als paràmetres avançats del Perfil.',
-    route: '/settings',
+    route: '/settings?section=advanced',
     cta: 'Paràmetres avançats',
   },
 ];

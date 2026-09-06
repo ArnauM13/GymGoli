@@ -63,6 +63,14 @@ describe('OnboardingTourService', () => {
     it('has no duplicate ids', () => {
       expect(new Set(TOUR_STOPS.map(s => s.id)).size).toBe(TOUR_STOPS.length);
     });
+
+    // El Perfil arrenca plegat: una parada que assenyali una fila de dins
+    // d'una secció ha de demanar-la a la URL, o no hi haurà res per il·luminar.
+    it('asks the Perfil for the section holding the rows it points at', () => {
+      for (const stop of TOUR_STOPS.filter(s => s.route === '/settings')) {
+        expect(stop.queryParams).withContext(stop.id).toEqual({ section: 'config' });
+      }
+    });
   });
 
   // ── Navegació ────────────────────────────────────────────────────────────
@@ -117,7 +125,9 @@ describe('OnboardingTourService', () => {
     it('navigates when the stop changes screen', () => {
       url = '/home';
       while (!service.isLast() && service.stop()!.route === '/home') service.next();
-      expect(navigate).toHaveBeenCalledWith(['/settings'], {});
+      // Les parades del Perfil demanen la secció on són les files que
+      // il·luminen: plegada, no hi hauria res per assenyalar.
+      expect(navigate).toHaveBeenCalledWith(['/settings'], { queryParams: { section: 'config' } });
     });
 
     it('finishes instead of running off the end', () => {

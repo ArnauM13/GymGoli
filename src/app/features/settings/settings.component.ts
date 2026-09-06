@@ -1,6 +1,8 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { map } from 'rxjs/operators';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
 import { AuthService } from '../../core/services/auth.service';
@@ -21,12 +23,24 @@ import {
 import { todayStr } from '../../shared/utils/date.utils';
 
 /**
- * Les seccions plegables del Perfil. L'ordre del `type` és l'ordre a la
+ * Les seccions plegables del Perfil. L'ordre de la llista és l'ordre a la
  * pàgina: primer el que canvia sovint, i l'onboarding penúltim, just abans
  * del compte.
+ *
+ * Són ids públics: viatgen a la URL com a `?section=…`, i qui vulgui portar
+ * algú a una secció concreta els fa servir.
  */
-type SectionId =
-  'goal' | 'config' | 'app-prefs' | 'advanced' | 'trainer' | 'onboarding' | 'account';
+const SECTION_IDS = [
+  'goal', 'config', 'app-prefs', 'advanced', 'trainer', 'onboarding', 'account',
+] as const;
+
+type SectionId = typeof SECTION_IDS[number];
+
+/** El `?section=` de la URL l'escriu qui vol, així que es valida abans de
+ *  fer-li cas. Un id desconegut simplement no obre res. */
+function asSectionId(value: string | null): SectionId | null {
+  return SECTION_IDS.includes(value as SectionId) ? value as SectionId : null;
+}
 
 @Component({
   selector: 'app-settings',
@@ -1054,6 +1068,7 @@ export class SettingsComponent {
   private typeService      = inject(TrainingTypeService);
   private workoutService   = inject(WorkoutService);
   private router           = inject(Router);
+  private route            = inject(ActivatedRoute);
   private feedback         = inject(FeedbackService);
   private doc              = inject(DOCUMENT);
   private confirmDialog    = inject(ConfirmDialogService);
@@ -1066,11 +1081,13 @@ export class SettingsComponent {
     this.sportService.ensureLoaded();
     this.typeService.ensureLoaded();
 
-    // Tres parades del tour il·luminen files de «Configuració». Amb la secció
-    // plegada no hi ha res per il·luminar i el tour es quedaria explicant una
-    // pantalla que l'usuari no veu: mentre passa per aquí, s'obre sola.
+    // Qui arriba demanant una secció la troba oberta. Hi entren per aquí els
+    // consells de descoberta, el nudge del pes corporal, el botó d'enrere de
+    // les subpàgines de configuració i les parades del tour al Perfil: totes
+    // apunten a `/settings?section=…` i no han de saber res més.
     effect(() => {
-      if (this.tour.stop()?.route === '/settings') this.openSection('config');
+      const id = this.requestedSection();
+      if (id) this.openSection(id);
     });
   }
 
@@ -1080,17 +1097,43 @@ export class SettingsComponent {
    *  plegat sencer i cada visita només desplega el que ve a buscar. */
   private readonly openSections = signal<ReadonlySet<SectionId>>(new Set());
 
+  /** La secció que demana la URL, si en demana cap de vàlida. */
+  private readonly requestedSection = toSignal(
+    this.route.queryParamMap.pipe(map(p => asSectionId(p.get('section')))),
+    { initialValue: asSectionId(this.route.snapshot.queryParamMap.get('section')) },
+  );
+
   isOpen(id: SectionId): boolean { return this.openSections().has(id); }
 
   toggleSection(id: SectionId): void {
     const next = new Set(this.openSections());
-    next.has(id) ? next.delete(id) : next.add(id);
+    if (next.has(id)) next.delete(id); else next.add(id);
     this.openSections.set(next);
+    this.syncSectionUrl();
   }
 
   openSection(id: SectionId): void {
     if (this.isOpen(id)) return;
     this.openSections.set(new Set(this.openSections()).add(id));
+    this.syncSectionUrl();
+  }
+
+  /**
+   * L'última secció oberta viatja a la URL, substituint l'entrada d'historial
+   * en comptes d'afegir-ne una: així el botó d'enrere segueix sortint del
+   * Perfil, i no va desfent seccions una a una.
+   *
+   * És el que fa que tornar d'«Configurar exercicis» et deixi al Perfil amb
+   * «Configuració» oberta, com l'havies deixat, i que recarregar no la tanqui.
+   */
+  private syncSectionUrl(): void {
+    const last = [...this.openSections()].at(-1) ?? null;
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { section: last },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   // ── Onboarding ───────────────────────────────────────────────────────────
