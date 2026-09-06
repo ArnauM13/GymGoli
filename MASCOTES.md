@@ -72,6 +72,8 @@ sense problema: també sap estar quiet, si hi ha companyia.
 
 | Lloc | Qui | Com |
 | ---- | --- | --- |
+| Presentació de l'onboarding | tots dos, i després un de sol per diapositiva | Figura gran centrada; es presenten ells |
+| Tour guiat | segons la parada (taula de sota) | Figura a la targeta que assenyala la pantalla |
 | Suggeriment de `train` | Marley si és gym, Xoco si és esport | La targeta **és** la bafarada, amb el gos al costat |
 | Targetes d'insight (`home`) | segons el tipus (taula de sota) | Avatar + emoji, sense veu pròpia |
 | Feed del dia (`home`) | Marley als entrenaments, Xoco als esports | Xapa sobre la icona d'activitat |
@@ -97,6 +99,47 @@ en comptes de tornar-lo a escriure.
 
 Sense `mascot` surt la icona sola (l'usa el botó de «Nou entrenament»), i
 `both` s'ignora: una activitat és de gimnàs o d'esport, mai les dues.
+
+### L'onboarding i el tour
+
+És l'únic lloc on **es presenten**: diuen com es diuen i de què va cadascun.
+A la resta de l'app ja no cal — allà o parlen d'una dada o no hi són.
+
+L'onboarding són quatre diapositives i el gos hi surt gran i centrat: els dos
+junts per obrir i tancar, i una per al Marley i una per al Xoco on cadascú diu
+qui és en primera persona. Aquí sí que porten frase pròpia («Tu diràs.»,
+«Sortim?»), perquè s'estan presentant. Les dues transversals no en porten.
+
+Acaba oferint el **tour guiat**, que és la peça que importa: en comptes
+d'explicar l'app amb captures, els gossos et porten per l'app de veritat.
+Cada parada navega a la seva pantalla, il·lumina l'element del qual parla i
+t'ho diu al costat. Dir «els esports es configuren a Perfil» no serveix de
+res si l'usuari no ha vist mai on és Perfil.
+
+El repartiment segueix el de sempre — el que és de gimnàs el diu el Marley,
+el que és d'esport el Xoco, i el que és de tots dos no el diu ningú en
+primera persona:
+
+| Parada | Qui | Frase de gos |
+| ------ | --- | ------------ |
+| Pestanya d'Inici | tots dos | sí, és l'obertura |
+| El botó del dia | Marley | sí |
+| Historial i Progrés | tots dos | no |
+| Pestanya de Perfil | tots dos | no |
+| Exercicis i tipus d'entrenament | Marley | sí |
+| Esports | Xoco | sí |
+| Rutines i planificador | tots dos | no |
+| Tancament | tots dos | sí, és el comiat |
+
+Les regles que el mantenen amable:
+
+1. **No assalta ningú.** Només s'engega si l'usuari diu que sí a l'onboarding,
+   o si el demana des de Perfil. A qui ja fa servir l'app no li surt mai sol.
+2. **Es pot deixar a mitges sempre.** «Salta el tour» hi és a totes les
+   parades, i deixar-lo compta com fet: no se li torna a oferir.
+3. **Nou parades.** Complet però no aclaparador: cada pantalla nova costa
+   atenció, i un tour que es fa llarg s'abandona a la meitat, que és pitjor
+   que un de curt.
 
 ### La bafarada
 
@@ -184,6 +227,9 @@ Decidit pel camí:
 - **La bafarada no substitueix res.** Va néixer com a capa per sobre de les
   targetes, i així es queda: si algun dia es planteja treure la targeta quan
   surt la bafarada, la resposta és no.
+
+- **Presentar-se és cosa d'una vegada.** Ho fan a l'onboarding i prou. A la
+  resta de l'app no diuen mai qui són: o porten una dada, o no hi són.
 
 La següent, acordada i pendent de fer:
 

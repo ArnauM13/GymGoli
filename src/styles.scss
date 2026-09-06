@@ -39,6 +39,11 @@ html {
   --c-shadow:    rgba(0, 0, 0, 0.07);
   --c-shadow-md: rgba(0, 0, 0, 0.11);
 
+  // Foscor del tour guiat. Prou fosca perquè el que queda il·luminat sigui
+  // clarament l'única cosa que importa, prou clara perquè es reconegui la
+  // pantalla que hi ha al darrere — el tour ensenya l'app, no la tapa.
+  --tour-dim: rgba(0, 26, 30, 0.62);
+
   // Accents already used across the app, promoted to tokens.
   --c-amber:  #d97706;
   --c-danger: #d32f2f;
@@ -71,6 +76,8 @@ html.dark {
   --c-brand-rgb: 0, 131, 143;
   --c-shadow:    rgba(0, 0, 0, 0.4);
   --c-shadow-md: rgba(0, 0, 0, 0.5);
+
+  --tour-dim: rgba(0, 0, 0, 0.72);
 
   --c-amber:  #ff9800;
   --c-danger: #ef5350;

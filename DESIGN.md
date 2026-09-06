@@ -816,6 +816,39 @@ Cada mascota té dues imatges a `mascot.model.ts`, i no són intercanviables:
 
 Tots surten de `assets/bibis.png`, que segueix sent la icona de l'app.
 
+### El tour guiat
+
+`<app-onboarding-tour>` és la capa que ensenya on són les coses: enfosqueix
+la pantalla, hi retalla un forat sobre l'element del qual parla i hi posa la
+targeta del gos al costat. **El que s'il·lumina és l'app de veritat**, amb les
+dades de l'usuari — no una captura ni una pantalla de mentida.
+
+El recorregut viu a `core/models/onboarding-tour.model.ts` i el porta
+`OnboardingTourService`; la capa no sap res de rutes ni de text. Les
+personalitats i el repartiment de parades són a `MASCOTES.md`.
+
+- **Els objectius s'apunten amb `data-tour`**, mai amb classes de CSS:
+  renombrar una classe és una refactorització normal i no ha de trencar el
+  tour en silenci.
+- **El forat és un rectangle transparent amb `box-shadow: 0 0 0 9999px`**, no
+  quatre panells encaixats: surt més barat i queda net als cantons. L'anell
+  que batega va al `::after` per no barallar-s'hi.
+- **La targeta va sempre a l'altra banda del forat** — a sobre si l'element és
+  a la meitat de baix (la barra de navegació), a sota si és a dalt — i hi
+  apunta amb una fletxa alineada al centre de l'element. Es llegeixen com una
+  sola cosa.
+- **Es mesura cada frame**, no un sol cop: així el forat segueix l'element
+  mentre la pàgina fa scroll, entra amb animació o es recol·loca.
+- **Mentre és obert, el que hi ha sota queda bloquejat.** El recorregut el
+  porten els botons de la targeta; si es pogués tocar el fons, l'usuari
+  acabaria en una pantalla que la parada no espera.
+- **Una parada sense objectiu** (l'obertura, el comiat) surt centrada, amb el
+  fosc pla i sense fletxa.
+
+El fosc és `--tour-dim`: prou fosc perquè el que queda il·luminat sigui
+clarament l'única cosa que importa, prou clar perquè es reconegui la pantalla
+del darrere.
+
 ### La bafarada
 
 `<app-mascot-bubble>` és fixa a baix a la dreta, per sobre de la barra de

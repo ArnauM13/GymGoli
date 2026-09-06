@@ -39,6 +39,10 @@ export interface UserSettings {
   weightUnit: WeightUnit;
   restTimerSeconds: number;
   onboardingDone: boolean;
+  /** El tour guiat (Marley i Xoco) ja s'ha fet o s'ha saltat. Separat de
+   *  {@link onboardingDone} perquè l'onboarding acaba amb una pregunta: qui
+   *  no vulgui el tour aquell dia el té sempre a Perfil. */
+  guidedTourDone: boolean;
   fitnessGoal: FitnessGoal | null;
   weeklyPlan: WeeklyPlan | null;
   /** User asked to stop seeing the "set up a routine" reminder on Train. */
@@ -89,6 +93,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   weightUnit: 'kg',
   restTimerSeconds: 90,
   onboardingDone: false,
+  guidedTourDone: false,
   fitnessGoal: null,
   weeklyPlan: null,
   routineHintDismissed: false,

@@ -2,6 +2,7 @@ import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { OnboardingComponent } from './onboarding.component';
+import { OnboardingTourService } from '../../../core/services/onboarding-tour.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 
 describe('OnboardingComponent', () => {
@@ -14,10 +15,8 @@ describe('OnboardingComponent', () => {
     await TestBed.configureTestingModule({
       imports: [OnboardingComponent],
       providers: [
-        {
-          provide: UserSettingsService,
-          useValue: { update: mockUpdate },
-        },
+        { provide: UserSettingsService, useValue: { update: mockUpdate } },
+        { provide: OnboardingTourService, useValue: { total: 9 } },
       ],
     })
       .overrideComponent(OnboardingComponent, {
@@ -38,8 +37,44 @@ describe('OnboardingComponent', () => {
     expect(component.step()).toBe(0);
   });
 
-  it('has 7 slides', () => {
-    expect(component.slides.length).toBe(7);
+  it('has 4 presentation slides, then the goal and the tour offer', () => {
+    expect(component.slides.length).toBe(4);
+    expect(component.GOAL_STEP).toBe(4);
+    expect(component.INVITE_STEP).toBe(5);
+    expect(component.TOTAL_STEPS).toBe(6);
+  });
+
+  // ── Els gossos es presenten ───────────────────────────────────────────────
+
+  describe('presentation', () => {
+    it('opens with both dogs', () => {
+      expect(component.slides[0].mascot).toBe('both');
+    });
+
+    it('gives Marley and Xoco a slide each, in that order', () => {
+      expect(component.slides[1].mascot).toBe('marley');
+      expect(component.slides[2].mascot).toBe('xoco');
+    });
+
+    it('only lets a single dog speak in first person — the shared slides carry no line', () => {
+      for (const slide of component.slides) {
+        if (slide.mascot === 'both') expect(slide.line).toBeUndefined();
+        else expect(slide.line).toBeTruthy();
+      }
+    });
+
+    it('shows the cut-out figure, never the small circular avatar', () => {
+      expect(component.slideDog().figure).toContain('-full');
+    });
+
+    it('follows the current slide when the step changes', () => {
+      component.next();
+      expect(component.slideDog().figure).toContain('marley-full');
+    });
+
+    it('promises the real number of tour stops', () => {
+      expect(component.tourSteps).toBe(9);
+    });
   });
 
   // ── next() ───────────────────────────────────────────────────────────────
@@ -50,49 +85,82 @@ describe('OnboardingComponent', () => {
       expect(component.step()).toBe(1);
     });
 
-    it('advances step by step through all slides', () => {
-      component.next();
-      component.next();
-      expect(component.step()).toBe(2);
-    });
-
-    it('does not go past the goal step', () => {
+    it('does not go past the tour offer', () => {
       component.step.set(component.TOTAL_STEPS - 1);
       component.next();
       expect(component.step()).toBe(component.TOTAL_STEPS - 1);
+    });
+
+    it('goes from the goal step to the tour offer', () => {
+      component.step.set(component.GOAL_STEP);
+      component.next();
+      expect(component.step()).toBe(component.INVITE_STEP);
     });
   });
 
   // ── skipToGoal() ─────────────────────────────────────────────────────────
 
   describe('skipToGoal()', () => {
-    it('jumps to the goal step (slides.length) from step 0', () => {
+    it('jumps to the goal step from step 0', () => {
       component.skipToGoal();
-      expect(component.step()).toBe(component.slides.length);
+      expect(component.step()).toBe(component.GOAL_STEP);
     });
 
     it('works from any intermediate step', () => {
-      component.next(); // step 1
+      component.next();
       component.skipToGoal();
-      expect(component.step()).toBe(component.slides.length);
+      expect(component.step()).toBe(component.GOAL_STEP);
+    });
+
+    // Tocar el fons no ha de retrocedir ningú a un pas que ja ha contestat.
+    it('does nothing once the goal step is behind the user', () => {
+      component.step.set(component.INVITE_STEP);
+      component.skipToGoal();
+      expect(component.step()).toBe(component.INVITE_STEP);
     });
   });
 
   // ── finish() ─────────────────────────────────────────────────────────────
 
   describe('finish()', () => {
-    beforeEach(() => component.selectedGoal.set('strength' as any));
-
-    it('calls settingsService.update with onboardingDone: true', () => {
-      component.finish();
+    it('marks the onboarding done', () => {
+      component.selectedGoal.set('strength');
+      component.finish(true);
       expect(mockUpdate).toHaveBeenCalledWith(jasmine.objectContaining({ onboardingDone: true }));
     });
 
-    it('emits the done output event', () => {
-      let emitted = false;
-      component.done.subscribe(() => (emitted = true));
-      component.finish();
-      expect(emitted).toBeTrue();
+    it('saves the chosen goal with its weekly default', () => {
+      component.selectedGoal.set('strength');
+      component.finish(true);
+      expect(mockUpdate).toHaveBeenCalledWith(jasmine.objectContaining({
+        fitnessGoal: 'strength', metricsEnabled: true, weeklyActivityGoal: 3,
+      }));
+    });
+
+    it('lets the user through without a goal', () => {
+      component.finish(false);
+      const patch = mockUpdate.calls.mostRecent().args[0];
+      expect(patch.onboardingDone).toBeTrue();
+      expect('fitnessGoal' in patch).toBeFalse();
+    });
+
+    it('leaves the tour un-done when the user accepts it, so it can run', () => {
+      component.finish(true);
+      const patch = mockUpdate.calls.mostRecent().args[0];
+      expect('guidedTourDone' in patch).toBeFalse();
+    });
+
+    it('marks the tour done when declined, so it is never pushed again', () => {
+      component.finish(false);
+      expect(mockUpdate).toHaveBeenCalledWith(jasmine.objectContaining({ guidedTourDone: true }));
+    });
+
+    it('emits whether the tour should start', () => {
+      const emitted: boolean[] = [];
+      component.done.subscribe(v => emitted.push(v));
+      component.finish(true);
+      component.finish(false);
+      expect(emitted).toEqual([true, false]);
     });
   });
 

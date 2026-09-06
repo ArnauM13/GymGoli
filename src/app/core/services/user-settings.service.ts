@@ -55,6 +55,7 @@ export class UserSettingsService {
   readonly catalogSyncedVersion    = computed(() => this._settings().catalogSyncedVersion ?? 0);
   readonly dismissedBuiltInTemplateIds = computed(() => this._settings().dismissedBuiltInTemplateIds ?? []);
   readonly dismissedHints              = computed(() => this._settings().dismissedHints ?? []);
+  readonly guidedTourDone              = computed(() => this._settings().guidedTourDone ?? false);
 
   constructor() {
     if (typeof window !== 'undefined') {

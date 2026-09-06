@@ -3,6 +3,9 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 
 import { TrainerService } from '../../../core/services/trainer.service';
 
+/** `data-tour="nav/home"` i companyia surten de `path`: el tour guiat hi
+ *  apunta per ensenyar on és cada pestanya, i així afegir-ne una no demana
+ *  tocar res aquí. */
 interface NavItem {
   path: string;
   icon: string;
@@ -22,6 +25,7 @@ interface NavItem {
             routerLinkActive="active"
             class="nav-item"
             [attr.aria-label]="item.label"
+            [attr.data-tour]="'nav' + item.path"
           >
             <span class="material-symbols-outlined nav-icon">{{ item.icon }}</span>
             <span class="nav-label">{{ item.label }}</span>

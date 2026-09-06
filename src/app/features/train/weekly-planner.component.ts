@@ -35,7 +35,7 @@ const TODAY = (): string => todayStr();
         }
       </app-page-header>
 
-      <div class="mode-banner">
+      <div class="mode-banner" data-tour="planner-mode">
         <span class="material-symbols-outlined mode-banner-icon">{{ weekMonday ? 'event' : 'event_repeat' }}</span>
         <span class="mode-banner-text">
           @if (weekMonday; as monday) {
@@ -50,7 +50,8 @@ const TODAY = (): string => todayStr();
       </div>
 
       @for (day of days; track day.index) {
-        <div class="card-section" [class.day-open]="isDayExpanded(day.index)" [class.day-locked]="isDayLocked(day.index)">
+        <div class="card-section" [class.day-open]="isDayExpanded(day.index)" [class.day-locked]="isDayLocked(day.index)"
+             [attr.data-tour]="$first ? 'planner-day' : null">
           <button type="button" class="day-toggle" (click)="toggleDay(day.index)" [disabled]="isDayLocked(day.index)">
             <span class="material-symbols-outlined section-icon">today</span>
             <h2 class="section-title">{{ day.label }}</h2>
