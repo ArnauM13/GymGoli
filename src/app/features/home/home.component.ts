@@ -55,6 +55,7 @@ const RECENT_DAYS = 30;
            sota la targeta del dia, i com que aquesta creix amb l'activitat,
            com més entrenaves més avall queia el botó. -->
       <button class="start-workout-btn" [class.start-workout-btn--past]="isPast()"
+              data-tour="day-action"
               (click)="runDayAction()">
         <span class="swb-icon-wrap" aria-hidden="true">
           <span class="material-symbols-outlined swb-icon">{{ dayAction().icon }}</span>

@@ -1,5 +1,6 @@
-import { Component, inject, output, signal } from '@angular/core';
+import { Component, computed, inject, output, signal } from '@angular/core';
 
+import { MASCOTS, Mascot } from '../../../core/models/mascot.model';
 import {
   FitnessGoal,
   CATALOG_VERSION,
@@ -7,49 +8,50 @@ import {
   FITNESS_GOAL_LABELS,
   FITNESS_GOAL_WEEKLY_DEFAULTS,
 } from '../../../core/models/user-settings.model';
+import { OnboardingTourService } from '../../../core/services/onboarding-tour.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 
+/**
+ * Una diapositiva de la presentació. Qui parla mana: el Marley es presenta
+ * ell, el Xoco es presenta ell, i les dues transversals les fan tots dos
+ * sense veu pròpia (MASCOTES.md §Regles de veu).
+ */
 interface OnboardingSlide {
-  emoji: string;
+  mascot: Mascot;
   title: string;
   body: string;
+  /** La frase del gos, de dues a cinc paraules. Només quan parla un de sol. */
+  line?: string;
 }
 
+/**
+ * La presentació. Aquí no s'explica com funciona l'app — això ho fa el tour
+ * guiat, ensenyant-ho a la pantalla de debò. Aquí només es presenten els dos
+ * gossos i es promet com serà la cosa, que és el que costa d'entendre d'una
+ * captura i el que es recorda.
+ */
 const SLIDES: OnboardingSlide[] = [
   {
-    emoji: '💪',
-    title: 'Benvingut/da a GymGoli',
-    body: 'El teu registre d\'entrenaments personal. Sense complicacions, sense pressió.',
+    mascot: 'both',
+    title: 'Hola! Som el Marley i el Xoco',
+    body: 'Aquesta és la GymGoli, i nosaltres t\'hi acompanyem. Aquí hi va tot l\'esport que fas: el gimnàs i la resta.',
   },
   {
-    emoji: '📅',
-    title: 'Registra el teu moviment',
-    body: 'Gym, esports, cardio... tot compta. Afegeix sessions en segons i consulta el teu historial quan vulguis.',
+    mascot: 'marley',
+    title: 'Jo soc el Marley',
+    body: 'Porto els entrenaments de gimnàs: els exercicis, les sèries, les plantilles. I el descans, que per mi també és feina.',
+    line: 'Tu diràs.',
   },
   {
-    emoji: '📋',
-    title: 'Plantilles d\'entrenament',
-    body: 'Crea plantilles amb exercicis, sèries i repeticions. Guarda qualsevol entrenament com a plantilla i comença el següent en un tap.',
+    mascot: 'xoco',
+    title: 'I jo el Xoco!',
+    body: 'Jo porto l\'esport: pàdel, córrer, escalada, natació… el que sigui. Tot compta i tot va al mateix lloc.',
+    line: 'Sortim?',
   },
   {
-    emoji: '🗓️',
-    title: 'Planifica la teva setmana',
-    body: 'Tria quins dies vols fer gym o esport i marca-ho com a rutina fixa perquè es repeteixi automàticament cada setmana.',
-  },
-  {
-    emoji: '📶',
-    title: 'Funciona sense connexió',
-    body: 'Entrena sense internet. Els canvis es guarden al dispositiu i es sincronitzen automàticament quan recuperis connexió.',
-  },
-  {
-    emoji: '⚙️',
-    title: 'Fes-la teva des de Perfil',
-    body: 'A Perfil pots configurar esports i exercicis, unitats de pes, temporitzador de descans, tema i opcions avançades. Explora-ho quan vulguis.',
-  },
-  {
-    emoji: '🎯',
-    title: 'Personalitzat per a tu',
-    body: 'Diga\'ns quin és el teu objectiu i l\'app t\'acompanyarà al teu ritme, sense alarmes ni pressions.',
+    mascot: 'both',
+    title: 'Sense alarmes ni pressions',
+    body: 'Registres el que fas i prou. Ens alegrem de veure\'t tant si has entrenat com si no.',
   },
 ];
 
@@ -57,7 +59,10 @@ const GOAL_OPTIONS: { value: FitnessGoal; emoji: string; label: string }[] = (
   Object.keys(FITNESS_GOAL_LABELS) as FitnessGoal[]
 ).map(v => ({ value: v, emoji: FITNESS_GOAL_EMOJIS[v], label: FITNESS_GOAL_LABELS[v] }));
 
-const TOTAL_STEPS = SLIDES.length + 1; // +1 for goal step
+/** Índex del pas on es tria l'objectiu, i del que ofereix el tour. */
+const GOAL_STEP   = SLIDES.length;
+const INVITE_STEP = SLIDES.length + 1;
+const TOTAL_STEPS = SLIDES.length + 2;
 
 @Component({
   selector: 'app-onboarding',
@@ -67,17 +72,22 @@ const TOTAL_STEPS = SLIDES.length + 1; // +1 for goal step
       <div class="ob-card" (click)="$event.stopPropagation()">
 
         @if (step() < SLIDES_LEN) {
-          <!-- Info slides -->
+          <!-- Presentació: qui són -->
           <div class="ob-slide">
-            <div class="ob-emoji">{{ currentSlide().emoji }}</div>
+            <img class="ob-dog" [class.ob-dog--pair]="currentSlide().mascot === 'both'"
+                 [src]="slideDog().figure" [alt]="slideDog().alt">
             <h2 class="ob-title">{{ currentSlide().title }}</h2>
             <p class="ob-body">{{ currentSlide().body }}</p>
+            @if (currentSlide().line) {
+              <p class="ob-line">{{ currentSlide().line }}</p>
+            }
           </div>
-        } @else {
-          <!-- Goal selection step -->
+
+        } @else if (step() === GOAL_STEP) {
+          <!-- Objectiu -->
           <div class="ob-goal-slide">
             <h2 class="ob-title">Quin és el teu objectiu?</h2>
-            <p class="ob-body">Ho farem servir per acompanyar-te millor.</p>
+            <p class="ob-body">Ho farem servir per acompanyar-te millor. Es pot canviar sempre des de Perfil.</p>
             <div class="ob-goal-grid">
               @for (g of goalOptions; track g.value) {
                 <button
@@ -90,16 +100,28 @@ const TOTAL_STEPS = SLIDES.length + 1; // +1 for goal step
               }
             </div>
           </div>
+
+        } @else {
+          <!-- L'oferta del tour: la part important de tot això -->
+          <div class="ob-slide">
+            <img class="ob-dog ob-dog--pair" [src]="pairDog.figure" [alt]="pairDog.alt">
+            <h2 class="ob-title">T'ensenyem on és tot?</h2>
+            <p class="ob-body">
+              {{ tourSteps }} parades per l'app de veritat: t'anem portant a cada
+              pantalla i t'assenyalem les coses. El pots deixar quan vulguis.
+            </p>
+            <p class="ob-line">Vine!</p>
+          </div>
         }
 
-        <!-- Pagination dots -->
+        <!-- Punts de progrés -->
         <div class="ob-dots">
           @for (i of dotIndices; track i) {
             <div class="ob-dot" [class.active]="i === step()"></div>
           }
         </div>
 
-        <!-- Navigation -->
+        <!-- Navegació -->
         <div class="ob-actions">
           @if (step() < SLIDES_LEN - 1) {
             <button class="ob-skip" (click)="skipToGoal()">Salta</button>
@@ -107,21 +129,32 @@ const TOTAL_STEPS = SLIDES.length + 1; // +1 for goal step
               Següent
               <span class="material-symbols-outlined">arrow_forward</span>
             </button>
-          } @else if (step() === SLIDES_LEN - 1) {
+          } @else if (step() < GOAL_STEP) {
             <button class="ob-next" (click)="next()">
               Continua
               <span class="material-symbols-outlined">arrow_forward</span>
             </button>
+          } @else if (step() === GOAL_STEP) {
+            <button class="ob-next" [disabled]="!selectedGoal()" (click)="next()">
+              {{ selectedGoal() ? 'Continua' : 'Tria un objectiu' }}
+              @if (selectedGoal()) {
+                <span class="material-symbols-outlined">arrow_forward</span>
+              }
+            </button>
           } @else {
-            <button class="ob-finish" [disabled]="!selectedGoal()" (click)="finish()">
-              {{ selectedGoal() ? 'Comencem! 🚀' : 'Tria un objectiu' }}
+            <button class="ob-finish" (click)="finish(true)">
+              Va, ensenyeu-m'ho 🐾
             </button>
           }
         </div>
 
-        @if (step() === TOTAL_STEPS - 1 && !selectedGoal()) {
-          <button class="ob-skip-goal" (click)="finishWithoutGoal()">
+        @if (step() === GOAL_STEP && !selectedGoal()) {
+          <button class="ob-quiet" (click)="next()">
             Continuar sense objectiu
+          </button>
+        } @else if (step() === INVITE_STEP) {
+          <button class="ob-quiet" (click)="finish(false)">
+            Ara no, ja hi ballaré sol
           </button>
         }
 
@@ -146,8 +179,8 @@ const TOTAL_STEPS = SLIDES.length + 1; // +1 for goal step
       width: 100%; max-width: 480px;
       background: var(--c-card);
       border-radius: 28px 28px 0 0;
-      padding: 32px 28px 24px;
-      display: flex; flex-direction: column; align-items: center; gap: 20px;
+      padding: 28px 28px 24px;
+      display: flex; flex-direction: column; align-items: center; gap: 18px;
       animation: ob-slide-up 0.3s cubic-bezier(0.34, 1.15, 0.64, 1);
     }
 
@@ -157,18 +190,25 @@ const TOTAL_STEPS = SLIDES.length + 1; // +1 for goal step
     }
 
     .ob-slide {
-      display: flex; flex-direction: column; align-items: center; gap: 16px;
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
       text-align: center; width: 100%;
-      min-height: 180px; justify-content: center;
+      min-height: 200px; justify-content: center;
     }
 
-    .ob-emoji {
-      font-size: 56px; line-height: 1;
-      animation: ob-emoji-in 0.3s ease;
+    /* Es presenten ells: aquí surten grans i retallats del fons, sense cercle
+     * ni marc — la silueta ja diu qui és. Cap emoji hi pot competir. */
+    .ob-dog {
+      height: 118px; width: auto; display: block;
+      filter: drop-shadow(0 4px 10px var(--c-shadow-md));
+      mask-image: linear-gradient(to bottom, #000 86%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, #000 86%, transparent 100%);
+      animation: ob-dog-in 0.34s cubic-bezier(0.34, 1.3, 0.64, 1) both;
     }
-    @keyframes ob-emoji-in {
-      from { transform: scale(0.7); opacity: 0; }
-      to   { transform: scale(1);   opacity: 1; }
+    .ob-dog--pair { height: 104px; }
+
+    @keyframes ob-dog-in {
+      from { transform: translateY(10px) scale(0.9); opacity: 0; }
+      to   { transform: none; opacity: 1; }
     }
 
     .ob-title {
@@ -179,11 +219,17 @@ const TOTAL_STEPS = SLIDES.length + 1; // +1 for goal step
 
     .ob-body {
       margin: 0;
-      font-size: 15px; color: var(--c-text-3); line-height: 1.6;
-      max-width: 320px; text-align: center;
+      font-size: 15px; color: var(--c-text-3); line-height: 1.55;
+      max-width: 340px; text-align: center;
     }
 
-    /* Goal step */
+    /* La seva frase, no la de l'app. */
+    .ob-line {
+      margin: 0; font-size: 15px; font-weight: 700; font-style: italic;
+      color: var(--c-brand);
+    }
+
+    /* Objectiu */
     .ob-goal-slide {
       display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%;
     }
@@ -211,7 +257,7 @@ const TOTAL_STEPS = SLIDES.length + 1; // +1 for goal step
     }
     .ob-goal-btn.selected .ob-goal-label { color: var(--c-brand); }
 
-    /* Dots */
+    /* Punts */
     .ob-dots { display: flex; gap: 6px; }
     .ob-dot {
       width: 6px; height: 6px; border-radius: 50%;
@@ -219,7 +265,7 @@ const TOTAL_STEPS = SLIDES.length + 1; // +1 for goal step
       &.active { background: var(--c-brand); width: 20px; border-radius: 3px; }
     }
 
-    /* Actions */
+    /* Accions */
     .ob-actions { display: flex; gap: 10px; width: 100%; }
 
     .ob-skip {
@@ -230,26 +276,18 @@ const TOTAL_STEPS = SLIDES.length + 1; // +1 for goal step
       &:hover { border-color: var(--c-border); color: var(--c-text-2); }
     }
 
-    .ob-next {
+    .ob-next, .ob-finish {
       flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
       padding: 14px; border-radius: 14px; border: none;
-      background: var(--c-brand); color: var(--c-card);
+      background: var(--c-brand); color: white;
       font-size: 15px; font-weight: 700; cursor: pointer;
       transition: all 0.15s; touch-action: manipulation;
       .material-symbols-outlined { font-size: 18px; }
-      &:hover { background: var(--c-brand-dk); }
-    }
-
-    .ob-finish {
-      flex: 1; padding: 14px; border-radius: 14px; border: none;
-      background: var(--c-brand); color: var(--c-card);
-      font-size: 15px; font-weight: 700; cursor: pointer;
-      transition: all 0.15s; touch-action: manipulation;
       &:hover:not(:disabled) { background: var(--c-brand-dk); }
       &:disabled { background: var(--c-border-2); color: var(--c-text-3); cursor: default; }
     }
 
-    .ob-skip-goal {
+    .ob-quiet {
       border: none; background: transparent; padding: 4px 8px;
       font-size: 13px; color: var(--c-text-3); cursor: pointer;
       text-decoration: underline; touch-action: manipulation;
@@ -258,44 +296,64 @@ const TOTAL_STEPS = SLIDES.length + 1; // +1 for goal step
 })
 export class OnboardingComponent {
   private settingsService = inject(UserSettingsService);
+  private tourService     = inject(OnboardingTourService);
 
-  readonly done = output<void>();
+  /** `true` quan l'usuari accepta el tour guiat: qui l'engega és l'app. */
+  readonly done = output<boolean>();
 
   readonly SLIDES_LEN  = SLIDES.length;
+  readonly GOAL_STEP   = GOAL_STEP;
+  readonly INVITE_STEP = INVITE_STEP;
   readonly TOTAL_STEPS = TOTAL_STEPS;
   readonly slides      = SLIDES;
   readonly goalOptions = GOAL_OPTIONS;
   readonly dotIndices  = Array.from({ length: TOTAL_STEPS }, (_, i) => i);
+  /** Es llegeix del tour perquè la promesa no menteixi si el recorregut creix. */
+  readonly tourSteps   = this.tourService.total;
 
-  readonly step         = signal(0);
-  readonly selectedGoal = signal<FitnessGoal | null>(null);
+  readonly step = signal(0);
+  /** Arrenca amb el que l'usuari ja tingui: per a algú nou és null, i per a
+   *  qui repeteix la benvinguda des dels paràmetres avançats surt marcat el
+   *  seu, que és el que espera veure-hi. */
+  readonly selectedGoal = signal<FitnessGoal | null>(this.settingsService.fitnessGoal());
 
-  readonly currentSlide = () => SLIDES[this.step()] ?? SLIDES[SLIDES.length - 1];
+  readonly currentSlide = computed(() => SLIDES[this.step()] ?? SLIDES[SLIDES.length - 1]);
+  readonly slideDog     = computed(() => MASCOTS[this.currentSlide().mascot]);
+  readonly pairDog      = MASCOTS['both'];
 
   next(): void {
     if (this.step() < TOTAL_STEPS - 1) this.step.update(s => s + 1);
   }
 
+  /** Saltar-se la presentació. Un cop passat l'objectiu ja no fa res: tocar
+   *  el fons no ha de retrocedir ningú a un pas que ja ha contestat. */
   skipToGoal(): void {
-    this.step.set(SLIDES.length);
+    if (this.step() < GOAL_STEP) this.step.set(GOAL_STEP);
   }
 
-  finish(): void {
+  /**
+   * Tanca l'onboarding. L'objectiu és opcional: qui no en tria cap entra
+   * igualment i el pot posar més tard des de Perfil.
+   */
+  finish(startTour: boolean): void {
     const goal = this.selectedGoal();
-    if (!goal) return;
     this.settingsService.update({
-      onboardingDone:       true,
-      fitnessGoal:          goal,
-      metricsEnabled:       true,
-      weeklyActivityGoal:   FITNESS_GOAL_WEEKLY_DEFAULTS[goal],
-      // New users are seeded with the current catalog, so mark them up to date.
+      onboardingDone: true,
+      // Els usuaris nous entren amb el catàleg actual: no se'ls ha d'oferir
+      // actualitzar-lo el primer dia.
       catalogSyncedVersion: CATALOG_VERSION,
+      ...(goal ? {
+        fitnessGoal: goal,
+        // L'objectiu setmanal per defecte només és per a qui encara no en té.
+        // Repetir la benvinguda no ha de trepitjar el que algú s'hagi ajustat.
+        ...(this.settingsService.hasWeeklyGoal() ? {} : {
+          metricsEnabled:     true,
+          weeklyActivityGoal: FITNESS_GOAL_WEEKLY_DEFAULTS[goal],
+        }),
+      } : {}),
+      // Qui no vol el tour ara el té sempre a Perfil; no se li torna a oferir sol.
+      ...(startTour ? {} : { guidedTourDone: true }),
     });
-    this.done.emit();
-  }
-
-  finishWithoutGoal(): void {
-    this.settingsService.update({ onboardingDone: true, catalogSyncedVersion: CATALOG_VERSION });
-    this.done.emit();
+    this.done.emit(startTour);
   }
 }

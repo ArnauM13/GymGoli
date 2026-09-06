@@ -1,7 +1,8 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
 import { UserSettingsService } from '../../core/services/user-settings.service';
+import { OnboardingTourService } from '../../core/services/onboarding-tour.service';
 import { DifficultyScale } from '../../core/models/user-settings.model';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 
@@ -97,6 +98,49 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
           </div>
         </div>
       </div>
+
+      <!-- ── Provar l'onboarding ──
+           L'onboarding només es veu un cop, i el tour guiat només si l'has
+           acceptat. Sense això, l'única manera de tornar-los a veure amb el
+           teu compte seria esborrar les preferències a mà. -->
+      <div class="section">
+        <h2 class="section-title">Onboarding</h2>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Repetir la benvinguda</span>
+            <span class="setting-desc">
+              Torna a mostrar la presentació del Marley i el Xoco des del principi, tal com
+              la veu algú que entra per primer cop, amb l'oferta del tour al final.
+              L'objectiu que ja tinguis no es toca.
+            </span>
+          </div>
+          <button class="setting-action" (click)="replayOnboarding()">
+            <span class="material-symbols-outlined">restart_alt</span>
+            Repetir
+          </button>
+        </div>
+
+        <div class="setting-row setting-row--top">
+          <div class="setting-info">
+            <span class="setting-label">Fer només el tour guiat</span>
+            <span class="setting-desc">
+              Les {{ tourStops }} parades per l'app, sense passar per la presentació.
+              També el tens a Perfil, a Configuració.
+            </span>
+          </div>
+          <button class="setting-action" (click)="startTour()">
+            <span class="material-symbols-outlined">explore</span>
+            Comença
+          </button>
+        </div>
+
+        @if (replayed()) {
+          <p class="setting-note">
+            Fet. Tanca aquesta pàgina si la benvinguda no s'obre sola.
+          </p>
+        }
+      </div>
     </div>
   `,
   styles: [`
@@ -120,6 +164,22 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
     }
     .setting-label { font-size: 15px; font-weight: 700; color: var(--c-text); }
     .setting-desc { font-size: 12px; color: var(--c-text-2); line-height: 1.4; }
+    .section-title {
+      margin: 0 0 14px; font-size: 13px; font-weight: 700; color: var(--c-text-3);
+      letter-spacing: 0.3px; text-transform: uppercase;
+    }
+    .setting-action {
+      display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
+      padding: 9px 14px; border-radius: 11px;
+      border: 1.5px solid var(--c-border-2); background: var(--c-card);
+      font-size: 12.5px; font-weight: 700; color: var(--c-brand);
+      cursor: pointer; touch-action: manipulation; transition: border-color 0.15s, background 0.15s;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover { border-color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.06); }
+    }
+    .setting-note {
+      margin: 12px 0 0; font-size: 12px; font-weight: 600; color: var(--c-brand); line-height: 1.4;
+    }
     .unit-toggle {
       display: flex; border: 1.5px solid var(--c-border); border-radius: 10px; overflow: hidden; flex-shrink: 0;
     }
@@ -134,6 +194,24 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 })
 export class SettingsAdvancedComponent {
   readonly settingsService = inject(UserSettingsService);
+  private tour             = inject(OnboardingTourService);
+
+  readonly tourStops = this.tour.total;
+  /** Confirmació a la pantalla: en pàgines llargues la benvinguda s'obre per
+   *  sobre i, si l'usuari ha fet scroll, no és evident que hagi passat res. */
+  readonly replayed = signal(false);
+
+  /**
+   * Torna a deixar el compte com el d'algú que entra per primer cop, pel que
+   * fa a la benvinguda. No toca cap dada: ni entrenaments, ni esports, ni
+   * preferències — només els dos indicadors de «ja ho has vist».
+   */
+  replayOnboarding(): void {
+    this.settingsService.update({ onboardingDone: false, guidedTourDone: false });
+    this.replayed.set(true);
+  }
+
+  startTour(): void { this.tour.start(); }
 
   toggleSupersets(): void {
     this.settingsService.update({ supersetsEnabled: !this.settingsService.supersetsEnabled() });

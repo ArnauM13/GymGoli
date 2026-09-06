@@ -10,6 +10,7 @@ import { TrainingTypeService } from '../../core/services/training-type.service';
 import { SportService } from '../../core/services/sport.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
+import { OnboardingTourService } from '../../core/services/onboarding-tour.service';
 import { TrainerService } from '../../core/services/trainer.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
@@ -192,7 +193,7 @@ import { todayStr } from '../../shared/utils/date.utils';
       <div class="section">
         <h2 class="section-title">Configuració</h2>
 
-        <a class="nav-row" routerLink="/exercises">
+        <a class="nav-row" routerLink="/exercises" data-tour="cfg-exercises">
           <span class="material-symbols-outlined nav-row-icon">fitness_center</span>
           <div class="setting-info">
             <span class="setting-label">Configurar exercicis</span>
@@ -203,7 +204,7 @@ import { todayStr } from '../../shared/utils/date.utils';
 
         <div class="setting-divider"></div>
 
-        <a class="nav-row" routerLink="/training-types">
+        <a class="nav-row" routerLink="/training-types" data-tour="cfg-training-types">
           <span class="material-symbols-outlined nav-row-icon">exercise</span>
           <div class="setting-info">
             <span class="setting-label">Configurar tipus d'entrenament</span>
@@ -214,7 +215,7 @@ import { todayStr } from '../../shared/utils/date.utils';
 
         <div class="setting-divider"></div>
 
-        <a class="nav-row" routerLink="/sports-config">
+        <a class="nav-row" routerLink="/sports-config" data-tour="cfg-sports">
           <span class="material-symbols-outlined nav-row-icon">sports_soccer</span>
           <div class="setting-info">
             <span class="setting-label">Configurar esports</span>
@@ -225,7 +226,7 @@ import { todayStr } from '../../shared/utils/date.utils';
 
         <div class="setting-divider"></div>
 
-        <a class="nav-row" routerLink="/train/planner">
+        <a class="nav-row" routerLink="/train/planner" data-tour="cfg-routines">
           <span class="material-symbols-outlined nav-row-icon">event_repeat</span>
           <div class="setting-info">
             <span class="setting-label">Estableix rutines</span>
@@ -236,7 +237,7 @@ import { todayStr } from '../../shared/utils/date.utils';
 
         <div class="setting-divider"></div>
 
-        <a class="nav-row" routerLink="/templates">
+        <a class="nav-row" routerLink="/templates" data-tour="cfg-templates">
           <span class="material-symbols-outlined nav-row-icon">bookmark</span>
           <div class="setting-info">
             <span class="setting-label">Plantilles</span>
@@ -244,6 +245,20 @@ import { todayStr } from '../../shared/utils/date.utils';
           </div>
           <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
         </a>
+
+        <div class="setting-divider"></div>
+
+        <!-- El tour no s'engega mai sol a algú que ja fa servir l'app: qui el
+             va saltar el primer dia, o qui vol repassar on era una cosa, el
+             troba aquí. -->
+        <button class="nav-row" (click)="startTour()">
+          <span class="material-symbols-outlined nav-row-icon">explore</span>
+          <div class="setting-info">
+            <span class="setting-label">Fes el tour amb el Marley i el Xoco</span>
+            <span class="setting-desc">Un repàs guiat per l'app: les pestanyes, la configuració i les rutines.</span>
+          </div>
+          <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
+        </button>
       </div>
 
       <!-- ── Bloc 3: Preferències ── -->
@@ -871,6 +886,7 @@ export class SettingsComponent {
   private feedback         = inject(FeedbackService);
   private doc              = inject(DOCUMENT);
   private confirmDialog    = inject(ConfirmDialogService);
+  private tour             = inject(OnboardingTourService);
 
   constructor() {
     // Load the catalogs so the "add new catalog items" action knows what the
@@ -879,6 +895,10 @@ export class SettingsComponent {
     this.sportService.ensureLoaded();
     this.typeService.ensureLoaded();
   }
+
+  /** Engega el tour guiat. Ell mateix se'n va a Inici: la primera parada és
+   *  la pestanya d'Inici, i explicar-la des de Perfil no tindria cap sentit. */
+  startTour(): void { this.tour.start(); }
 
   readonly CATALOG_VERSION = CATALOG_VERSION;
   readonly catalogReady = computed(() =>

@@ -10,17 +10,25 @@ import { NavigationHistoryService } from './core/services/navigation-history.ser
 import { TrainingTypeService } from './core/services/training-type.service';
 import { NavBarComponent } from './shared/components/nav-bar/nav-bar.component';
 import { OnboardingComponent } from './shared/components/onboarding/onboarding.component';
+import { OnboardingTourComponent } from './shared/components/onboarding-tour/onboarding-tour.component';
+import { OnboardingTourService } from './core/services/onboarding-tour.service';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, NavBarComponent, OnboardingComponent],
+  imports: [RouterOutlet, NavBarComponent, OnboardingComponent, OnboardingTourComponent],
   template: `
     @if (auth.user() !== undefined) {
     <div class="app-shell app-ready">
 
       @if (showOnboarding()) {
-        <app-onboarding (done)="onOnboardingDone()" />
+        <app-onboarding (done)="onOnboardingDone($event)" />
+      }
+
+      <!-- El tour va per sobre de tot i de qualsevol pàgina: enfosqueix
+           l'app de veritat i n'il·lumina una peça cada vegada. -->
+      @if (tour.active()) {
+        <app-onboarding-tour />
       }
 
       <main class="app-content" [class.page-anim-a]="!pageAnimToggle()" [class.page-anim-b]="pageAnimToggle()">
@@ -101,6 +109,7 @@ import { OnboardingComponent } from './shared/components/onboarding/onboarding.c
 export class AppComponent {
   readonly auth           = inject(AuthService);
   readonly offlineService = inject(OfflineService);
+  readonly tour           = inject(OnboardingTourService);
   private settingsService = inject(UserSettingsService);
   private router          = inject(Router);
   private doc             = inject(DOCUMENT);
@@ -148,5 +157,11 @@ export class AppComponent {
       .subscribe(() => this.pageAnimToggle.update(v => !v));
   }
 
-  onOnboardingDone(): void { /* showOnboarding() reacts to settings change automatically */ }
+  /** `showOnboarding()` ja reacciona sol al canvi de settings; l'únic que
+   *  cal fer aquí és engegar el tour si l'usuari l'ha acceptat. Va després de
+   *  l'onboarding i no dins seu perquè el tour necessita la pantalla lliure:
+   *  el que il·lumina és l'app, no el diàleg. */
+  onOnboardingDone(startTour: boolean): void {
+    if (startTour) this.tour.start();
+  }
 }
