@@ -120,10 +120,11 @@ export class WeeklySummaryComponent {
     if (s.goalMode === 'combined' || !s.goalMode) {
       const total = s.weeklyActivityGoal;
       if (!total) return [];
-      const activeDays = doneDays.filter(d =>
-        this.workoutService.getDoneWorkoutsForDate(d).length > 0 ||
-        this.sportService.getSportSessionsForDate(d).length > 0
-      ).length;
+      // Es compten sessions, no dies: dos entrenaments el mateix dia són dos.
+      // És el mateix criteri que a Progrés, i han de dir el mateix.
+      const sessions = doneDays.reduce((acc, d) =>
+        acc + this.workoutService.getDoneWorkoutsForDate(d).length
+            + this.sportService.getSportSessionsForDate(d).length, 0);
       const fitnessGoal = this.settingsService.fitnessGoal();
       const iconMap: Record<string, string> = {
         strength: 'fitness_center', fitness: 'directions_run',
@@ -132,7 +133,7 @@ export class WeeklySummaryComponent {
       const icon = fitnessGoal ? (iconMap[fitnessGoal] ?? 'directions_run') : 'directions_run';
       // Objectiu combinat: la barra compta gym i esport alhora, així que hi
       // van tots dos.
-      return [mk(icon, activeDays, total, 'both')];
+      return [mk(icon, sessions, total, 'both')];
     }
 
     const gymGoal   = s.weeklyGymGoal;

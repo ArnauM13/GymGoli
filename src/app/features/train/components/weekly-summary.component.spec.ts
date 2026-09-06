@@ -70,7 +70,7 @@ describe('WeeklySummaryComponent', () => {
   });
 
   describe('weekBars()', () => {
-    it('counts the active days of the week against a combined goal', () => {
+    it('counts the sessions of the week against a combined goal', () => {
       mockSettings.set({ ...DEFAULT_USER_SETTINGS, goalMode: 'combined', weeklyActivityGoal: 4 });
       gymDays   = ['2025-04-21'];
       sportDays = ['2025-04-22'];
@@ -80,6 +80,14 @@ describe('WeeklySummaryComponent', () => {
       expect(bars[0].done).toBe(2);
       expect(bars[0].target).toBe(4);
       expect(bars[0].mascot).toBe('both');
+    });
+
+    it('comptabilitza dues sessions el mateix dia com a dues, no com un dia', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, goalMode: 'combined', weeklyActivityGoal: 4 });
+      gymDays   = ['2025-04-21', '2025-04-21'];
+      sportDays = ['2025-04-21'];
+
+      expect(component.weekBars()[0].done).toBe(3);
     });
 
     it('never draws past the end of the bar', () => {
