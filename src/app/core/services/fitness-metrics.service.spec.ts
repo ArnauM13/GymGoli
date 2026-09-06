@@ -19,9 +19,9 @@ const MOCK_DATE = '2025-04-23';
 const THURSDAY  = '2025-04-24';
 const TUESDAY   = '2025-04-22';
 
-/** Els dotze tipus, per comprovar que cap es queda sense explicació. */
+/** Tots els tipus, per comprovar que cap es queda sense explicació. */
 const ALL_TYPES: InsightType[] = [
-  'ratxa_en_joc', 'objectiu_a_l_alca', 'objectiu_desajustat', 'compliment_objectiu',
+  'ratxa_assolida', 'ratxa_en_joc', 'objectiu_a_l_alca', 'objectiu_desajustat', 'compliment_objectiu',
   'sense_activitat', 'carrega_alta', 'progres', 'volum_gym',
   'tendencia_volum', 'esforc_creixent', 'patro_setmanal', 'equilibri_gym',
 ];
@@ -162,6 +162,67 @@ describe('FitnessMetricsService', () => {
   });
 
   // ── Nivell 1 · Objectiu ──────────────────────────────────────────────────
+
+  describe('ratxa_assolida', () => {
+    it('congratulates once the streak reaches two closed weeks', () => {
+      withGoal(2);
+      mockWorkouts.set(spread(1, 3, 2).map(dd => makeWorkout(dd)));
+
+      const ins = find('ratxa_assolida');
+      expect(ins).toBeTruthy();
+      expect(ins!.title).toBe('3 setmanes seguides');
+      expect(ins!.stat).toBe('6 activitats en aquestes setmanes');
+    });
+
+    it('counts the whole streak, not only the weeks the cards look at', () => {
+      // Vint setmanes complint: les xifres han de sortir de totes, no de les
+      // catorze que fan servir la resta d'insights.
+      withGoal(2);
+      mockWorkouts.set(spread(1, 20, 2).map(dd => makeWorkout(dd)));
+
+      const ins = find('ratxa_assolida')!;
+      expect(ins.title).toBe('20 setmanes seguides');
+      expect(ins.stat).toBe('40 activitats en aquestes setmanes');
+      expect(ins.detail.facts[2].value).toBe('2,0 activitats per setmana');
+    });
+
+    it('stays quiet with a single closed week, which is not a streak yet', () => {
+      withGoal(2);
+      mockWorkouts.set(weekDates(1, 2).map(dd => makeWorkout(dd)));
+
+      expect(types()).not.toContain('ratxa_assolida');
+    });
+
+    it('stays quiet when the last closed week broke the streak', () => {
+      withGoal(2);
+      mockWorkouts.set([
+        ...spread(2, 4, 2).map(dd => makeWorkout(dd)),
+        makeWorkout(weekDates(1, 1)[0]),
+      ]);
+
+      expect(types()).not.toContain('ratxa_assolida');
+    });
+
+    it('is a one-off tied to the week that grew the streak', () => {
+      // La clau porta el dilluns de l'última setmana tancada: la setmana que
+      // ve serà una altra fita, i aquesta no tornarà mai.
+      withGoal(2);
+      mockWorkouts.set(spread(1, 3, 2).map(dd => makeWorkout(dd)));
+
+      expect(find('ratxa_assolida')!.once).toBe(`ratxa_assolida:${monday(1)}`);
+    });
+
+    it('wins over the streak-at-risk card when both are true', () => {
+      // Dijous, ratxa de 3 i la setmana en curs a mitges: el primer que ha de
+      // veure és la felicitació, que només es pot dir avui.
+      withGoal(3);
+      mockWorkouts.set([...spread(1, 3, 3).map(dd => makeWorkout(dd)), makeWorkout(monday(0))]);
+      mockToday.set(THURSDAY);
+
+      expect(types()).toContain('ratxa_en_joc');
+      expect(service.insights()[0].type).toBe('ratxa_assolida');
+    });
+  });
 
   describe('ratxa_en_joc', () => {
     /** 3 setmanes tancades complint i la setmana en curs a mitges. */
@@ -674,7 +735,7 @@ describe('FitnessMetricsService', () => {
   });
 
   /**
-   * Escenaris que, tots junts, disparen els dotze tipus d'insight. Cada un
+   * Escenaris que, tots junts, disparen tots els tipus d'insight. Cada un
    * ve del test del seu tipus: aquí no es comprova què surt, sinó que el que
    * surt es pugui explicar.
    */
@@ -837,7 +898,7 @@ describe('FitnessMetricsService', () => {
   // ── El detall ────────────────────────────────────────────────────────────
 
   describe('el detall', () => {
-    it('cobreix els dotze tipus entre tots els escenaris', () => {
+    it('cobreix tots els tipus entre tots els escenaris', () => {
       const seen = new Set(everyInsight().map(i => i.type));
       for (const t of ALL_TYPES) expect(seen.has(t)).toBe(true, `falta ${t}`);
     });

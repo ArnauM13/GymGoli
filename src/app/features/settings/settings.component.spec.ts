@@ -7,7 +7,6 @@ import { Router } from '@angular/router';
 import { SettingsComponent } from './settings.component';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { AuthService } from '../../core/services/auth.service';
-import { FitnessMetricsService } from '../../core/services/fitness-metrics.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { SportService } from '../../core/services/sport.service';
 import { ExerciseService } from '../../core/services/exercise.service';
@@ -27,7 +26,6 @@ describe('SettingsComponent', () => {
   let mockGoal:          ReturnType<typeof signal<number | null>>;
   let mockGymGoal:       ReturnType<typeof signal<number | null>>;
   let mockSportGoal:     ReturnType<typeof signal<number | null>>;
-  let mockStreak:        ReturnType<typeof signal<number>>;
   let mockUpdate:        jasmine.Spy;
   let mockLogout:        jasmine.Spy;
   let mockDeleteAccount: jasmine.Spy;
@@ -43,7 +41,6 @@ describe('SettingsComponent', () => {
     mockGoal       = signal<number | null>(null);
     mockGymGoal    = signal<number | null>(null);
     mockSportGoal  = signal<number | null>(null);
-    mockStreak     = signal(0);
     mockUpdate     = jasmine.createSpy('update');
     mockLogout     = jasmine.createSpy('logout').and.returnValue(Promise.resolve());
     mockDeleteAccount = jasmine.createSpy('deleteAccount').and.returnValue(Promise.resolve());
@@ -87,10 +84,6 @@ describe('SettingsComponent', () => {
             }),
             update: mockUpdate,
           },
-        },
-        {
-          provide: FitnessMetricsService,
-          useValue: { goalStreak: mockStreak },
         },
         {
           provide: AuthService,
@@ -291,19 +284,6 @@ describe('SettingsComponent', () => {
       expect(component.settingsService.metricsEnabled()).toBeTrue();
       mockEnabled.set(false);
       expect(component.settingsService.metricsEnabled()).toBeFalse();
-    });
-  });
-
-  // ── metricsService.goalStreak ────────────────────────────────────────────
-
-  describe('metricsService.goalStreak', () => {
-    it('exposes the injected metrics service', () => {
-      expect(component.metricsService).toBeTruthy();
-    });
-
-    it('reflects the current streak value', () => {
-      mockStreak.set(3);
-      expect(component.metricsService.goalStreak()).toBe(3);
     });
   });
 

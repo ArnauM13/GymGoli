@@ -86,7 +86,6 @@ sense problema: també sap estar quiet, si hi ha companyia.
 | Detall d'un insight (full que puja des de la targeta) | el mateix que la targeta | Avatar gran a la capçalera, **sense veu**: allà s'explica la dada |
 | Feed del dia (`home`) | Marley als entrenaments, Xoco als esports | Xapa sobre la icona d'activitat |
 | Barres d'objectiu setmanal | Marley al gym, Xoco a l'esport, tots dos si l'objectiu és combinat | Avatar a l'esquerra |
-| Ratxa | tots dos | Avatar a l'esquerra |
 
 ### La icona d'activitat
 
@@ -198,7 +197,7 @@ exactament on eren. Els gossos només s'hi afegeixen al costat.
 | ------- | --- |
 | `carrega_alta`, `volum_gym`, `equilibri_gym` | Marley |
 | `progres`, `esforc_creixent` | el gos de l'àmbit: Marley si la dada és de gym, Xoco si és d'esport |
-| objectius (`ratxa_en_joc`, `objectiu_a_l_alca`, `objectiu_desajustat`, `compliment_objectiu`), `sense_activitat`, `tendencia_volum`, `patro_setmanal`, ratxa, resum de setmana | tots dos |
+| objectius (`ratxa_assolida`, `ratxa_en_joc`, `objectiu_a_l_alca`, `objectiu_desajustat`, `compliment_objectiu`), `sense_activitat`, `tendencia_volum`, `patro_setmanal`, resum de setmana | tots dos |
 
 Els insights són **tendències**, no consells del dia: el «què faig avui» el diu
 el suggeriment de `train` i el «com va la setmana», les barres d'objectiu. Per
@@ -213,6 +212,12 @@ La targeta té tres línies i l'ordre importa: **títol** (la porta oberta),
 Tancar-lo el silencia **el dia d'avui i prou**, com la bafarada. L'endemà
 torna si encara és cert.
 
+L'excepció són les **fites** (`once` a `insight.model.ts`): es diuen una sola
+vegada i no tornen mai més. Avui només ho és `ratxa_assolida`, la felicitació
+del dia que la ratxa creix. Una fita és un moment, no un estat: si es quedés a
+la pantalla deixaria de ser una alegria i passaria a ser una cosa que pots
+perdre.
+
 ---
 
 ## Variants
@@ -224,8 +229,8 @@ atzar a propòsit — els insights són `computed()` i una frase que canviés a 
 recàlcul es notaria.
 
 En tenen els missatges on parla un gos: `carrega_alta`, `sense_activitat`,
-`esforc_creixent`, `equilibri_gym`, `progres` (gym i esport) i el final de
-`ratxa_en_joc`. Els que són pura dada — `compliment_objectiu`,
+`esforc_creixent`, `equilibri_gym`, `progres` (gym i esport), `ratxa_assolida`
+i el final de `ratxa_en_joc`. Els que són pura dada — `compliment_objectiu`,
 `tendencia_volum`, `volum_gym`, `patro_setmanal` — no en porten: allà la xifra
 ja diu prou i una frase de gos només hi faria nosa.
 
@@ -246,6 +251,12 @@ Decidit pel camí:
 - **Presentar-se és cosa d'una vegada.** Ho fan a l'onboarding i prou. A la
   resta de l'app no diuen mai qui són: o porten una dada, o no hi són.
 
+- **La ratxa es felicita, no es penja.** Ja no viu enlloc fix: ni al resum de
+  setmana d'Inici ni a l'objectiu del Perfil. Es diu el dia que creix, amb les
+  setmanes que portes i les xifres d'aquelles setmanes, i després desapareix.
+  Un comptador sempre a la vista converteix una alegria en una cosa que pots
+  perdre, i això seria exactament la pressió que l'onboarding promet no fer.
+
 La següent, acordada i pendent de fer:
 
 - **Acabar un entrenament queda buit.** Avui l'acabes i ja està, i és
@@ -254,8 +265,8 @@ La següent, acordada i pendent de fer:
 
 Encara obert:
 
-- Si la ratxa mereix alguna cosa més que una fila quan és molt llarga (10+
-  setmanes), o si val més que es mantingui igual de discreta sempre.
+- Si les ratxes molt llargues (10+ setmanes) mereixen una felicitació
+  diferent de les primeres, o si val més que totes es diguin igual.
 - Si el gos de la bafarada hauria de canviar de cara segons el missatge
   (content, tranquil, adormit) o si amb una de sola ja n'hi ha prou. Ara mateix
   només tenim el dibuix somrient de `bibis.png`; qualsevol altra expressió vol

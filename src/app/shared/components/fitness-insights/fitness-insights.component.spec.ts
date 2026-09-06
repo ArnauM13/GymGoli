@@ -12,6 +12,7 @@ const YESTERDAY = '2025-04-22';
 
 const DISMISS_KEY = 'gymgoli_insight_dismissed';
 const SHOWN_KEY   = 'gymgoli_insight_shown';
+const ONCE_KEY    = 'gymgoli_insight_once';
 
 function makeInsight(type: string, overrides: Partial<FitnessInsight> = {}): FitnessInsight {
   return {
@@ -71,6 +72,7 @@ describe('FitnessInsightsComponent', () => {
   beforeEach(() => {
     localStorage.removeItem(DISMISS_KEY);
     localStorage.removeItem(SHOWN_KEY);
+    localStorage.removeItem(ONCE_KEY);
     TestBed.resetTestingModule();
 
     mockEnabled  = signal(true);
@@ -82,6 +84,7 @@ describe('FitnessInsightsComponent', () => {
   afterEach(() => {
     localStorage.removeItem(DISMISS_KEY);
     localStorage.removeItem(SHOWN_KEY);
+    localStorage.removeItem(ONCE_KEY);
   });
 
   // ── Un i prou ────────────────────────────────────────────────────────────
@@ -194,6 +197,55 @@ describe('FitnessInsightsComponent', () => {
       expect(component.insight()!.type).toBe('patro_setmanal');
 
       expect(JSON.parse(localStorage.getItem(SHOWN_KEY)!)).toEqual({ patro_setmanal: TODAY });
+    });
+  });
+
+  // ── Fites: una vegada i prou ─────────────────────────────────────────────
+
+  describe('once', () => {
+    it('shows a milestone that has never been celebrated', async () => {
+      await build();
+      mockInsights.set([makeInsight('ratxa_assolida', { once: 'ratxa_assolida:2025-04-14' })]);
+
+      expect(component.insight()!.type).toBe('ratxa_assolida');
+    });
+
+    it('records the milestone when it shows it', async () => {
+      await build();
+      mockInsights.set([makeInsight('ratxa_assolida', { once: 'ratxa_assolida:2025-04-14' })]);
+      // Pintar-la és el que en deixa constància, via `effect`.
+      fixture.detectChanges();
+
+      expect(JSON.parse(localStorage.getItem(ONCE_KEY)!)).toEqual(['ratxa_assolida:2025-04-14']);
+    });
+
+    it('never shows the same milestone again, not even months later', async () => {
+      localStorage.setItem(ONCE_KEY, JSON.stringify(['ratxa_assolida:2025-04-14']));
+      await build();
+      mockInsights.set([
+        makeInsight('ratxa_assolida', { once: 'ratxa_assolida:2025-04-14' }),
+        makeInsight('equilibri_gym'),
+      ]);
+
+      expect(component.insight()!.type).toBe('equilibri_gym');
+    });
+
+    it('lets the next milestone through — it is another achievement', async () => {
+      localStorage.setItem(ONCE_KEY, JSON.stringify(['ratxa_assolida:2025-04-14']));
+      await build();
+      mockInsights.set([makeInsight('ratxa_assolida', { once: 'ratxa_assolida:2025-04-21' })]);
+
+      expect(component.insight()!.type).toBe('ratxa_assolida');
+    });
+
+    it('drops it as soon as the candidates are recomputed', async () => {
+      // Sense esperar a reobrir l'app: la còpia en memòria ja la té marcada.
+      await build();
+      mockInsights.set([makeInsight('ratxa_assolida', { once: 'ratxa_assolida:2025-04-14' })]);
+      fixture.detectChanges();
+
+      mockToday.set('2025-04-24');
+      expect(component.insight()).toBeNull();
     });
   });
 

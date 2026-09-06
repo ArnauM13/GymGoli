@@ -8,6 +8,7 @@ import { Mascot } from './mascot.model';
  */
 export type InsightType =
   // Objectiu — el que hi ha en joc més enllà de la setmana en curs
+  | 'ratxa_assolida'
   | 'ratxa_en_joc'
   | 'objectiu_a_l_alca'
   | 'objectiu_desajustat'
@@ -130,6 +131,16 @@ export interface FitnessInsight {
    * es poden tancar.
    */
   cooldownDays: number;
+  /**
+   * Una fita, no un estat: es mostra **una sola vegada** i no torna mai més.
+   *
+   * La clau identifica l'assoliment concret (`ratxa_assolida:2025-04-14`), no
+   * el tipus: la fita següent porta una clau nova i sí que es podrà dir. És el
+   * que permet felicitar sense que la felicitació es converteixi en un
+   * marcador permanent — una ratxa penjada tot el dia a la pantalla deixa de
+   * ser una alegria i passa a ser una cosa que pots perdre.
+   */
+  once?: string;
   /** L'explicació de darrere. Veure `InsightDetail`. */
   detail: InsightDetail;
 }

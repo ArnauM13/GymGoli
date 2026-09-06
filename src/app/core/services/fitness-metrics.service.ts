@@ -206,7 +206,13 @@ export class FitnessMetricsService {
     return candidates.sort((a, b) => a.level - b.level || b.strength - a.strength);
   });
 
-  /** Setmanes seguides assolint l'objectiu, comptant la setmana en curs. */
+  /**
+   * Setmanes seguides assolint l'objectiu, comptant la setmana en curs.
+   *
+   * Cap pantalla la porta penjada: la ratxa es diu el dia que creix
+   * (`ratxa_assolida`) i prou. Es queda aquí com a xifra del domini, que és
+   * d'on surt tot el que se'n digui.
+   */
   readonly goalStreak = computed((): number => {
     const g = this._goalCfg();
     if (!g.has) return 0;
@@ -222,21 +228,28 @@ export class FitnessMetricsService {
     return streak;
   });
 
-  /** Igual que `goalStreak` però només amb setmanes ja tancades. */
-  private readonly _closedStreak = computed((): number => {
+  /**
+   * Les setmanes **ja tancades** que formen la ratxa d'ara, de la més nova a
+   * la més vella. La setmana en curs no hi és: encara li queden dies i podria
+   * acabar de qualsevol manera.
+   */
+  private readonly _closedStreakWeeks = computed((): WeekStat[] => {
     const g = this._goalCfg();
-    if (!g.has) return 0;
+    if (!g.has) return [];
 
     const today = this.todayService.today();
     const weeks = this._weekStats(today, this.workoutService.doneWorkouts(), this.sportService.sessions(), 53);
 
-    let streak = 0;
+    const out: WeekStat[] = [];
     for (const w of weeks.slice(1)) {
       if (!goalMet(w, g)) break;
-      streak++;
+      out.push(w);
     }
-    return streak;
+    return out;
   });
+
+  /** Igual que `goalStreak` però només amb setmanes ja tancades. */
+  private readonly _closedStreak = computed((): number => this._closedStreakWeeks().length);
 
   private readonly _goalCfg = computed((): GoalCfg => {
     const s        = this.settingsService.settings();
@@ -299,6 +312,58 @@ export class FitnessMetricsService {
 
     const closedStreak = this._closedStreak();
     const closed       = weeks.slice(1);
+
+    // ── Ratxa assolida ───────────────────────────────────────────────────────
+    // La felicitació, i l'únic lloc on es parla de la ratxa quan va bé: ni el
+    // resum de setmana ni el perfil la porten penjada. Una xifra sempre a la
+    // vista es converteix en una cosa que pots perdre; dita el dia que passa,
+    // és el que és — una alegria.
+    //
+    // `once` la lliga a la setmana que la fa créixer: es diu una vegada i no
+    // torna mai més per aquella setmana. La següent ja és una altra fita.
+    const streakWeeks = this._closedStreakWeeks();
+    if (closedStreak >= 2) {
+      const lastWeek  = streakWeeks[0];
+      const firstWeek = streakWeeks[streakWeeks.length - 1];
+      const span      = dateRange(firstWeek.monday, lastWeek.end);
+      const totalAct  = streakWeeks.reduce((sum, w) => sum + w.total, 0);
+      const avg       = totalAct / streakWeeks.length;
+      out.push({
+        type: 'ratxa_assolida',
+        once: `ratxa_assolida:${lastWeek.monday}`,
+        mascot: 'both',
+        emoji: '🎉',
+        title: `${closedStreak} setmanes seguides`,
+        stat: `${plural(totalAct, 'activitat', 'activitats')} en aquestes setmanes`,
+        message: pickVariant([
+          'Ben fet.',
+          'Això és constància.',
+          'Seguim.',
+        ], lastWeek.monday + 'ratxa_assolida'),
+        color: '#e65100',
+        level,
+        // Per sobre de qualsevol altre candidat del seu nivell: es diu el dia
+        // que toca o no es diu mai.
+        strength: 95 + closedStreak,
+        cooldownDays: 0,
+        detail: {
+          headline: `Has arribat a l'objectiu ${closedStreak} setmanes seguides, sense fallar-ne cap.`,
+          chart: {
+            caption: 'Activitats per setmana',
+            range: dateRange(closed[7].monday, closed[0].end),
+            bars: weekBars(closed.slice(0, 8), { highlight: w => goalMet(w, g) }),
+            reference: this._goalLine(g),
+          },
+          facts: [
+            { label: 'Setmanes seguides', value: plural(closedStreak, 'setmana', 'setmanes'), note: span },
+            { label: 'Activitats en total', value: plural(totalAct, 'activitat', 'activitats'), note: span },
+            { label: 'De mitjana', value: `${fmt1(avg)} activitats per setmana`, note: span },
+            { label: 'Objectiu', value: `${g.total} per setmana` },
+          ],
+          meaning: 'La ratxa són les setmanes seguides en què has arribat a l\'objectiu. Aquesta felicitació surt una sola vegada, el dia que la ratxa creix, i després desapareix: no és cap marcador que hagis de mantenir.',
+        },
+      });
+    }
 
     // ── Ratxa en joc ─────────────────────────────────────────────────────────
     // L'únic insight que mira la setmana en curs, i és a propòsit: una ratxa

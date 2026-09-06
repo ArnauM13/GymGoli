@@ -9,8 +9,15 @@ import { UserSettingsService } from '../../../core/services/user-settings.servic
 
 const DISMISS_KEY = 'gymgoli_insight_dismissed';
 const SHOWN_KEY   = 'gymgoli_insight_shown';
+const ONCE_KEY    = 'gymgoli_insight_once';
 /** Les entrades més velles que això ja no diuen res: es poden llençar. */
 const KEEP_DAYS = 60;
+/**
+ * Fites recordades. No caduquen mai (una felicitació repetida mesos després
+ * seria una equivocació, no un record), així que la llista es talla per
+ * quantitat: les més velles ja no poden tornar a ser candidates.
+ */
+const KEEP_ONCE = 100;
 
 type SeenMap = Record<string, string>;
 
@@ -31,6 +38,18 @@ function daysSince(dateStr: string | undefined, today: string): number | null {
   const b = new Date(today   + 'T12:00:00').getTime();
   if (Number.isNaN(a) || Number.isNaN(b)) return null;
   return Math.round((b - a) / 86_400_000);
+}
+
+function readList(key: string): string[] {
+  try {
+    const raw = localStorage.getItem(key);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((k): k is string => typeof k === 'string') : [];
+  } catch { return []; }
+}
+
+function writeList(key: string, list: string[]): void {
+  try { localStorage.setItem(key, JSON.stringify(list)); } catch { /* mode privat */ }
 }
 
 function prune(map: SeenMap, today: string): SeenMap {
@@ -209,6 +228,12 @@ export class FitnessInsightsComponent {
    */
   private readonly shownAt: SeenMap = readMap(SHOWN_KEY);
 
+  /**
+   * Les fites ja celebrades (`once`). Com `shownAt`, és una còpia morta: si
+   * fos reactiva, la felicitació es taparia a si mateixa en pintar-se.
+   */
+  private readonly seenOnce = new Set<string>(readList(ONCE_KEY));
+
   /** Un i prou: el primer candidat que avui es pot ensenyar. */
   readonly insight = computed((): FitnessInsight | null => {
     if (!this.settingsService.metricsEnabled() || !this.settingsService.loaded()) return null;
@@ -217,7 +242,7 @@ export class FitnessInsightsComponent {
     const dismissed = this.dismissed();
 
     return this.metricsService.insights().find(i =>
-      dismissed[i.type] !== today && !this._resting(i, today)
+      dismissed[i.type] !== today && !this._resting(i, today) && !this._alreadyCelebrated(i)
     ) ?? null;
   });
 
@@ -228,7 +253,10 @@ export class FitnessInsightsComponent {
   constructor() {
     effect(() => {
       const ins = this.insight();
-      if (ins) this._recordShown(ins.type, this.todayService.today());
+      if (ins) {
+        this._recordShown(ins.type, this.todayService.today());
+        if (ins.once) this._recordOnce(ins.once);
+      }
       // Si l'insight canvia sota els peus (canvi de dia, dades noves), el full
       // que hi havia obert ja no parla del que es veu: es tanca.
       if (!ins) this._detailOpen.set(false);
@@ -253,6 +281,24 @@ export class FitnessInsightsComponent {
     if (insight.cooldownDays <= 0) return false;
     const age = daysSince(this.shownAt[insight.type], today);
     return age !== null && age >= 1 && age < insight.cooldownDays;
+  }
+
+  /** Una fita ja celebrada no es torna a celebrar mai. Veure `once`. */
+  private _alreadyCelebrated(insight: FitnessInsight): boolean {
+    return insight.once !== undefined && this.seenOnce.has(insight.once);
+  }
+
+  /**
+   * Deixa constància de la fita. Es guarda en memòria **i** al disc: la còpia
+   * en memòria és la que fa que demà, quan el `computed()` es torni a fer,
+   * la felicitació d'avui ja no hi sigui, sense esperar a reobrir l'app.
+   */
+  private _recordOnce(key: string): void {
+    if (this.seenOnce.has(key)) return;
+    this.seenOnce.add(key);
+    const stored = readList(ONCE_KEY).filter(k => k !== key);
+    stored.push(key);
+    writeList(ONCE_KEY, stored.slice(-KEEP_ONCE));
   }
 
   private _recordShown(type: string, today: string): void {
