@@ -87,7 +87,7 @@ const TOTAL_STEPS = SLIDES.length + 2;
           <!-- Objectiu -->
           <div class="ob-goal-slide">
             <h2 class="ob-title">Quin és el teu objectiu?</h2>
-            <p class="ob-body">Ho farem servir per acompanyar-te millor. Es pot canviar sempre des de Perfil.</p>
+            <p class="ob-body">Ho farem servir per acompanyar-te millor. Es pot canviar sempre des de Perfil, a «El meu objectiu».</p>
             <div class="ob-goal-grid">
               @for (g of goalOptions; track g.value) {
                 <button
@@ -333,7 +333,7 @@ export class OnboardingComponent {
 
   /**
    * Tanca l'onboarding. L'objectiu és opcional: qui no en tria cap entra
-   * igualment i el pot posar més tard des de Perfil.
+   * igualment i el pot posar més tard des de Perfil, a «El meu objectiu».
    */
   finish(startTour: boolean): void {
     const goal = this.selectedGoal();
@@ -351,7 +351,8 @@ export class OnboardingComponent {
           weeklyActivityGoal: FITNESS_GOAL_WEEKLY_DEFAULTS[goal],
         }),
       } : {}),
-      // Qui no vol el tour ara el té sempre a Perfil; no se li torna a oferir sol.
+      // Qui no vol el tour ara el té sempre a Perfil, a «Onboarding»; no se li
+      // torna a oferir sol.
       ...(startTour ? {} : { guidedTourDone: true }),
     });
     this.done.emit(startTour);

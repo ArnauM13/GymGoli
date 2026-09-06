@@ -10,8 +10,9 @@ import { UserSettingsService } from './user-settings.service';
  * no hi ha res del DOM.
  *
  * Es fa servir des de dos llocs: just després de l'onboarding (si l'usuari
- * l'accepta) i des de Perfil, per repetir-lo. No s'engega mai tot sol a algú
- * que ja fa servir l'app: un tour que t'assalta és pitjor que no tenir-ne.
+ * l'accepta) i des de Perfil, a la secció «Onboarding», per repetir-lo. No
+ * s'engega mai tot sol a algú que ja fa servir l'app: un tour que t'assalta
+ * és pitjor que no tenir-ne.
  */
 @Injectable({ providedIn: 'root' })
 export class OnboardingTourService {
@@ -53,7 +54,8 @@ export class OnboardingTourService {
   }
 
   /** L'usuari el talla pel mig. Compta com a fet: no se li ha de tornar a
-   *  oferir sol, i sempre el té a Perfil si el vol reprendre. */
+   *  oferir sol, i sempre el té a Perfil, a «Onboarding», si el vol
+   *  reprendre. */
   skip(): void { this._end(); }
 
   finish(): void { this._end(); }

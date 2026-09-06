@@ -1,5 +1,5 @@
 import { NO_ERRORS_SCHEMA } from '@angular/core';
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { Router } from '@angular/router';
@@ -14,10 +14,14 @@ import { TrainerService } from '../../core/services/trainer.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { TrainingTypeService } from '../../core/services/training-type.service';
+import { OnboardingTourService } from '../../core/services/onboarding-tour.service';
 import { DEFAULT_TRAINING_TYPES } from '../../core/models/training-type.model';
 
 describe('SettingsComponent', () => {
   let component: SettingsComponent;
+  let fixture: ComponentFixture<SettingsComponent>;
+  let mockTourStop: ReturnType<typeof signal<{ route: string } | null>>;
+  let mockStartTour: jasmine.Spy;
   let mockEnabled:       ReturnType<typeof signal<boolean>>;
   let mockThemeMode:     ReturnType<typeof signal<'light' | 'dark' | 'system'>>;
   let mockWeightUnit:    ReturnType<typeof signal<'kg' | 'lb'>>;
@@ -46,6 +50,8 @@ describe('SettingsComponent', () => {
     mockDeleteAccount = jasmine.createSpy('deleteAccount').and.returnValue(Promise.resolve());
     mockNavigate   = jasmine.createSpy('navigate').and.returnValue(Promise.resolve(true));
     mockFeedbackError = jasmine.createSpy('error');
+    mockTourStop   = signal<{ route: string } | null>(null);
+    mockStartTour  = jasmine.createSpy('start');
 
     await TestBed.configureTestingModule({
       imports: [SettingsComponent],
@@ -149,6 +155,10 @@ describe('SettingsComponent', () => {
           provide: ConfirmDialogService,
           useValue: { confirm: jasmine.createSpy('confirm').and.resolveTo(false) },
         },
+        {
+          provide: OnboardingTourService,
+          useValue: { stop: mockTourStop, total: 9, start: mockStartTour },
+        },
       ],
     })
       .overrideComponent(SettingsComponent, {
@@ -156,7 +166,7 @@ describe('SettingsComponent', () => {
       })
       .compileComponents();
 
-    const fixture = TestBed.createComponent(SettingsComponent);
+    fixture = TestBed.createComponent(SettingsComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
@@ -631,6 +641,28 @@ describe('SettingsComponent', () => {
     it('setDifficultyScale() stores the chosen scale', () => {
       component.setDifficultyScale('numeric');
       expect(mockUpdate).toHaveBeenCalledWith({ difficultyScale: 'numeric' });
+    });
+  });
+
+  // ── El tour i la secció «Configuració» ───────────────────────────────────
+
+  describe('guided tour', () => {
+    it('opens Configuració while the tour stands on a Perfil stop', () => {
+      expect(component.isOpen('config')).toBe(false);
+      mockTourStop.set({ route: '/settings' });
+      fixture.detectChanges();
+      expect(component.isOpen('config')).toBe(true);
+    });
+
+    it('leaves the sections alone for a stop on another screen', () => {
+      mockTourStop.set({ route: '/home' });
+      fixture.detectChanges();
+      expect(component.isOpen('config')).toBe(false);
+    });
+
+    it('startTour() hands over to the tour service', () => {
+      component.startTour();
+      expect(mockStartTour).toHaveBeenCalled();
     });
   });
 });

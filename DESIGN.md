@@ -239,6 +239,9 @@ form.
 - Honour `prefers-reduced-motion`: no open animation, no chevron rotation.
 - Anything the guided tour highlights must be **opened programmatically**
   before the stop runs — a collapsed section has nothing to light up.
+- **One level only.** Don't nest sub-collapsibles, and don't split an open
+  section into subsections the reader has to scan past: a section that is
+  worth opening is worth showing whole.
 
 ---
 

@@ -299,9 +299,10 @@ type SectionId =
       </div>
 
       <!-- ── Paràmetres avançats ──
-           El que abans era una pàgina a part (/settings/advanced). Aquí hi
-           conviuen les preferències personals (el teu cos, el teu descans) i
-           les opcions que canvien com es registra un entrenament. -->
+           El que abans era una pàgina a part (/settings/advanced), més les
+           preferències personals (el teu cos, el teu descans). Una sola
+           llista i prou: partir-la en subseccions només afegia un nivell
+           més per travessar abans d'arribar al que venies a canviar. -->
       <div class="section" [class.section--open]="isOpen('advanced')">
         <h2 class="section-heading">
           <button class="section-head" (click)="toggleSection('advanced')" [attr.aria-expanded]="isOpen('advanced')">
@@ -312,8 +313,6 @@ type SectionId =
         </h2>
         @if (isOpen('advanced')) {
           <div class="section-body">
-
-            <h3 class="subsection-title">Preferències personals</h3>
 
             <div class="setting-row">
               <div class="setting-info">
@@ -366,11 +365,7 @@ type SectionId =
               </div>
             }
 
-            <div class="setting-divider"></div>
-
-            <h3 class="subsection-title">Opcions d'entrenament</h3>
-
-            <div class="setting-row">
+            <div class="setting-row setting-row--top">
               <div class="setting-info">
                 <span class="setting-label">Agrupar en superset</span>
                 <span class="setting-desc">Permet enllaçar exercicis perquè es facin seguits, sense descans.</span>

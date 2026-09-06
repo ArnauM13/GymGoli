@@ -41,7 +41,7 @@ export interface UserSettings {
   onboardingDone: boolean;
   /** El tour guiat (Marley i Xoco) ja s'ha fet o s'ha saltat. Separat de
    *  {@link onboardingDone} perquè l'onboarding acaba amb una pregunta: qui
-   *  no vulgui el tour aquell dia el té sempre a Perfil. */
+   *  no vulgui el tour aquell dia el té sempre a Perfil, a «Onboarding». */
   guidedTourDone: boolean;
   fitnessGoal: FitnessGoal | null;
   weeklyPlan: WeeklyPlan | null;
