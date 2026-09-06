@@ -195,6 +195,64 @@ The fundamental container. Everything sits inside a section card:
 > only — items inside a section card use the `.item-card` pattern (which
 > has a thin border, no shadow).
 
+### 3a. Collapsible section card
+
+For pages that are a list of many unrelated groups (`settings`), the section
+header becomes the toggle and the body only renders when open. **Sections
+start collapsed**, so the page reads as a list of doors instead of one long
+form.
+
+```html
+<div class="section" [class.section--open]="isOpen('goal')">
+  <h2 class="section-heading">
+    <button class="section-head" (click)="toggleSection('goal')"
+            [attr.aria-expanded]="isOpen('goal')">
+      <span class="material-symbols-outlined section-icon">flag</span>
+      <span class="section-title">El meu objectiu</span>
+      <span class="material-symbols-outlined section-chevron">expand_more</span>
+    </button>
+  </h2>
+  @if (isOpen('goal')) {
+    <div class="section-body"><!-- content --></div>
+  }
+</div>
+```
+
+```scss
+.section { border-radius: 18px; box-shadow: 0 2px 10px var(--c-shadow); overflow: hidden; }
+.section-heading { margin: 0; }
+.section-head {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 15px 16px;
+  border: none; background: none; text-align: left; font: inherit;
+  cursor: pointer; touch-action: manipulation;
+  &:hover { background: var(--c-hover); }
+}
+.section-chevron { transition: transform 0.2s; }
+.section--open .section-chevron { transform: rotate(180deg); }
+.section-body { padding: 0 16px 16px; animation: section-open 0.18s ease-out; }
+```
+
+- The heading wraps the button (not the other way round): screen readers keep
+  the outline, and `aria-expanded` says whether the group is open.
+- Group the open ids in one `signal<ReadonlySet<Id>>`, empty by default.
+- Honour `prefers-reduced-motion`: no open animation, no chevron rotation.
+- Give the sections a **deep link** (`/settings?section=advanced`) and write
+  the last-opened one back to the URL with `replaceUrl: true`. That single
+  mechanism covers arriving from a hint or CTA, coming back from a sub-page
+  with the section you left open, and reloading the page.
+- Anything the guided tour highlights lives inside a section, so its stop
+  must navigate with that `?section=` — a collapsed section has nothing to
+  light up.
+- **One level only.** Don't nest sub-collapsibles, and don't split an open
+  section into subsections the reader has to scan past: a section that is
+  worth opening is worth showing whole.
+- Inside an open section, **distance does the grouping** that subtitles
+  would: rows that belong together sit closer (`.setting-row--tight`,
+  `margin-top: 10px`, no rule) and the next group opens with the
+  `.setting-row--top` rule. If a row doesn't belong to any group here, it
+  probably belongs to another section.
+
 ---
 
 ## 4. Item Card
@@ -759,7 +817,7 @@ When in doubt, look at how it's done in:
 | --------------------------------------- | ----------------------------------------------- |
 | `features/train/train.component.ts`     | Section cards, type-grid, sport-grid, FAB, sticky topbar, skeleton screens |
 | `features/library/library.component.ts` | Page header, filter chips, item cards with category color bar |
-| `features/settings/settings.component.ts` | Sub-page with back button, setting row, hint banner |
+| `features/settings/settings.component.ts` | Collapsible section cards, setting row, nav row, danger actions |
 | `shared/components/fitness-insights/fitness-insights.component.ts` | Color-tinted item cards with dynamic accent |
 
 ---

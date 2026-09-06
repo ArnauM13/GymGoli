@@ -46,6 +46,12 @@ export interface TourStop {
  *
  * Nou parades. És deliberat: cada pantalla nova costa atenció, i un tour que
  * es fa llarg s'abandona a la meitat — que és pitjor que un de curt.
+ *
+ * Les parades del Perfil (`cfg-*`) assenyalen files que viuen dins d'una
+ * secció plegable, i per això naveguen amb `?section=config`: el Perfil obre
+ * la secció que li demana la URL. Si algú mou aquestes files a una altra
+ * secció, aquí s'ha de canviar el `queryParams`, o el tour parlarà d'una cosa
+ * que no es veu.
  */
 export const TOUR_STOPS: TourStop[] = [
   {
@@ -80,20 +86,22 @@ export const TOUR_STOPS: TourStop[] = [
     targets: ['[data-tour="nav/settings"]'],
     mascot: 'both',
     title: 'Perfil: on es configura tot',
-    body: 'Exercicis, tipus d\'entrenament, esports, rutines i objectiu setmanal. Hi entrem.',
+    body: 'Exercicis, tipus d\'entrenament, esports, rutines i objectiu setmanal, cada cosa dins la seva secció. Toca un títol i s\'obre. Hi entrem.',
   },
   {
     id: 'cfg-gym',
     route: '/settings',
+    queryParams: { section: 'config' },
     targets: ['[data-tour="cfg-exercises"]', '[data-tour="cfg-training-types"]'],
     mascot: 'marley',
     title: 'El gym, a la teva manera',
-    body: 'Els exercicis que fas i els tipus d\'entrenament (Empenta, Tracció, Cames…) surten d\'aquí: el que configuris és el que et trobaràs mentre entrenes.',
+    body: 'Dins de «Configuració»: els exercicis que fas i els tipus d\'entrenament (Empenta, Tracció, Cames…). El que configuris és el que et trobaràs mentre entrenes.',
     line: 'Aquesta part és meva.',
   },
   {
     id: 'cfg-sports',
     route: '/settings',
+    queryParams: { section: 'config' },
     targets: ['[data-tour="cfg-sports"]'],
     mascot: 'xoco',
     title: 'I tot el que no és gym',
@@ -103,6 +111,7 @@ export const TOUR_STOPS: TourStop[] = [
   {
     id: 'cfg-routines',
     route: '/settings',
+    queryParams: { section: 'config' },
     targets: ['[data-tour="cfg-routines"]'],
     mascot: 'both',
     title: 'Programa la setmana',
@@ -122,7 +131,7 @@ export const TOUR_STOPS: TourStop[] = [
     targets: [],
     mascot: 'both',
     title: 'Un sol lloc per a tot',
-    body: 'Gym, pàdel, córrer, escalada… tot al mateix registre, també sense connexió. El tour el pots repetir des de Perfil quan vulguis.',
+    body: 'Gym, pàdel, córrer, escalada… tot al mateix registre, també sense connexió. El tour el pots repetir des de Perfil, a «Onboarding».',
     line: 'Anem?',
   },
 ];

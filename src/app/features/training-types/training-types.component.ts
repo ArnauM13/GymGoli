@@ -175,8 +175,9 @@ export class TrainingTypesComponent {
 
   /** Aquestes pàgines de configuració s'obren tant des del Perfil com des
    *  d'Entrenament: tornar sempre al Perfil et treia d'on eres. L'historial
-   *  de navegació sap d'on véns; el Perfil només és el pla B. */
-  goBack(): void { this.navHistory.goBack('/settings'); }
+   *  de navegació sap d'on véns; el Perfil només és el pla B, i s'hi torna
+   *  amb «Configuració» oberta, que és d'on surt aquesta pàgina. */
+  goBack(): void { this.navHistory.goBack('/settings?section=config'); }
 
   openForm(type?: TrainingType): void {
     const ref = this.dialog.open(TrainingTypeFormDialogComponent, {

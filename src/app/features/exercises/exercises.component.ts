@@ -44,7 +44,7 @@ import { NavigationHistoryService } from '../../core/services/navigation-history
       @if (!hintService.isDismissed('exercises-bodyweight-legend')) {
         <div class="bw-legend">
           <span class="material-symbols-outlined bw-legend-icon">info</span>
-          <p class="bw-legend-text">Els exercicis de propi pes (dominades, fons, flexions…) compten al volum amb el teu <strong>pes corporal × un factor</strong> segons quant del cos mouen. Afegeix el teu pes a Perfil per activar-ho.</p>
+          <p class="bw-legend-text">Els exercicis de propi pes (dominades, fons, flexions…) compten al volum amb el teu <strong>pes corporal × un factor</strong> segons quant del cos mouen. Afegeix el teu pes a Perfil, a «El meu cos», per activar-ho.</p>
           <button class="bw-legend-x" (click)="hintService.dismiss('exercises-bodyweight-legend')" aria-label="Tancar">
             <span class="material-symbols-outlined">close</span>
           </button>
@@ -322,8 +322,9 @@ export class ExercisesComponent {
 
   /** Aquestes pàgines de configuració s'obren tant des del Perfil com des
    *  d'Entrenament: tornar sempre al Perfil et treia d'on eres. L'historial
-   *  de navegació sap d'on véns; el Perfil només és el pla B. */
-  goBack(): void { this.navHistory.goBack('/settings'); }
+   *  de navegació sap d'on véns; el Perfil només és el pla B, i s'hi torna
+   *  amb «Configuració» oberta, que és d'on surt aquesta pàgina. */
+  goBack(): void { this.navHistory.goBack('/settings?section=config'); }
 
   openForm(exercise?: Exercise): void {
     const ref = this.dialog.open(ExerciseFormDialogComponent, {

@@ -1,8 +1,9 @@
 import { NO_ERRORS_SCHEMA } from '@angular/core';
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
+import { BehaviorSubject } from 'rxjs';
 
 import { SettingsComponent } from './settings.component';
 import { UserSettingsService } from '../../core/services/user-settings.service';
@@ -14,10 +15,14 @@ import { TrainerService } from '../../core/services/trainer.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { TrainingTypeService } from '../../core/services/training-type.service';
+import { OnboardingTourService } from '../../core/services/onboarding-tour.service';
 import { DEFAULT_TRAINING_TYPES } from '../../core/models/training-type.model';
 
 describe('SettingsComponent', () => {
   let component: SettingsComponent;
+  let fixture: ComponentFixture<SettingsComponent>;
+  let mockQueryParams: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
+  let mockStartTour: jasmine.Spy;
   let mockEnabled:       ReturnType<typeof signal<boolean>>;
   let mockThemeMode:     ReturnType<typeof signal<'light' | 'dark' | 'system'>>;
   let mockWeightUnit:    ReturnType<typeof signal<'kg' | 'lb'>>;
@@ -46,6 +51,8 @@ describe('SettingsComponent', () => {
     mockDeleteAccount = jasmine.createSpy('deleteAccount').and.returnValue(Promise.resolve());
     mockNavigate   = jasmine.createSpy('navigate').and.returnValue(Promise.resolve(true));
     mockFeedbackError = jasmine.createSpy('error');
+    mockQueryParams = new BehaviorSubject(convertToParamMap({}));
+    mockStartTour   = jasmine.createSpy('start');
 
     await TestBed.configureTestingModule({
       imports: [SettingsComponent],
@@ -66,6 +73,10 @@ describe('SettingsComponent', () => {
             supersetsEnabled:   signal(false),
             dropsetsEnabled:    signal(false),
             rirEnabled:         signal(false),
+            manualRestEnabled:  signal(false),
+            bodyweightFactorEnabled:       signal(false),
+            nextExerciseSuggestionEnabled: signal(false),
+            guidedTourDone:     signal(false),
             difficultyScale:    signal('emoji'),
             bodyweightKg:       signal(null),
             catalogSyncedVersion: signal(0),
@@ -145,6 +156,17 @@ describe('SettingsComponent', () => {
           provide: ConfirmDialogService,
           useValue: { confirm: jasmine.createSpy('confirm').and.resolveTo(false) },
         },
+        {
+          provide: OnboardingTourService,
+          useValue: { stop: signal(null), total: 9, start: mockStartTour },
+        },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            queryParamMap: mockQueryParams,
+            snapshot: { get queryParamMap() { return mockQueryParams.value; } },
+          },
+        },
       ],
     })
       .overrideComponent(SettingsComponent, {
@@ -152,7 +174,7 @@ describe('SettingsComponent', () => {
       })
       .compileComponents();
 
-    const fixture = TestBed.createComponent(SettingsComponent);
+    fixture = TestBed.createComponent(SettingsComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
@@ -179,13 +201,6 @@ describe('SettingsComponent', () => {
     it('calls update exactly once per toggle', () => {
       component.toggleMetrics();
       expect(mockUpdate).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('toggleRoutineHint()', () => {
-    it('dismisses the hint when currently shown', () => {
-      component.toggleRoutineHint();
-      expect(mockUpdate).toHaveBeenCalledWith({ routineHintDismissed: true });
     });
   });
 
@@ -551,6 +566,151 @@ describe('SettingsComponent', () => {
     it('revokes the object URL after download', async () => {
       await component.exportData();
       expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:fake-url');
+    });
+  });
+
+  // ── Seccions plegables ───────────────────────────────────────────────────
+
+  describe('collapsible sections', () => {
+    it('starts with every section collapsed', () => {
+      for (const id of ['goal', 'body', 'config', 'app-prefs', 'advanced', 'onboarding', 'account'] as const) {
+        expect(component.isOpen(id)).withContext(id).toBe(false);
+      }
+    });
+
+    it('opens a section on the first toggle and closes it on the second', () => {
+      component.toggleSection('advanced');
+      expect(component.isOpen('advanced')).toBe(true);
+      component.toggleSection('advanced');
+      expect(component.isOpen('advanced')).toBe(false);
+    });
+
+    it('keeps the other sections closed when one opens', () => {
+      component.toggleSection('goal');
+      expect(component.isOpen('config')).toBe(false);
+      expect(component.isOpen('account')).toBe(false);
+    });
+
+    it('openSection() is idempotent', () => {
+      component.openSection('config');
+      component.openSection('config');
+      expect(component.isOpen('config')).toBe(true);
+    });
+  });
+
+  // ── Onboarding ───────────────────────────────────────────────────────────
+
+  describe('replayOnboarding()', () => {
+    it('clears both "already seen" flags without touching any data', () => {
+      component.replayOnboarding();
+      expect(mockUpdate).toHaveBeenCalledWith({ onboardingDone: false, guidedTourDone: false });
+    });
+
+    it('flags the on-screen confirmation', () => {
+      expect(component.replayed()).toBe(false);
+      component.replayOnboarding();
+      expect(component.replayed()).toBe(true);
+    });
+  });
+
+  // ── Paràmetres avançats ──────────────────────────────────────────────────
+
+  describe('advanced toggles', () => {
+    it('toggleSupersets() flips supersetsEnabled', () => {
+      component.toggleSupersets();
+      expect(mockUpdate).toHaveBeenCalledWith({ supersetsEnabled: true });
+    });
+
+    it('toggleDropsets() flips dropsetsEnabled', () => {
+      component.toggleDropsets();
+      expect(mockUpdate).toHaveBeenCalledWith({ dropsetsEnabled: true });
+    });
+
+    it('toggleNextExerciseSuggestion() flips nextExerciseSuggestionEnabled', () => {
+      component.toggleNextExerciseSuggestion();
+      expect(mockUpdate).toHaveBeenCalledWith({ nextExerciseSuggestionEnabled: true });
+    });
+
+    it('toggleRir() flips rirEnabled', () => {
+      component.toggleRir();
+      expect(mockUpdate).toHaveBeenCalledWith({ rirEnabled: true });
+    });
+
+    it('toggleManualRest() flips manualRestEnabled', () => {
+      component.toggleManualRest();
+      expect(mockUpdate).toHaveBeenCalledWith({ manualRestEnabled: true });
+    });
+
+    it('toggleBodyweightFactor() flips bodyweightFactorEnabled', () => {
+      component.toggleBodyweightFactor();
+      expect(mockUpdate).toHaveBeenCalledWith({ bodyweightFactorEnabled: true });
+    });
+
+    it('setDifficultyScale() stores the chosen scale', () => {
+      component.setDifficultyScale('numeric');
+      expect(mockUpdate).toHaveBeenCalledWith({ difficultyScale: 'numeric' });
+    });
+  });
+
+  // ── Enllaços directes a una secció (?section=…) ──────────────────────────
+
+  describe('?section=', () => {
+    it('opens the section the URL asks for', () => {
+      expect(component.isOpen('advanced')).toBe(false);
+      mockQueryParams.next(convertToParamMap({ section: 'advanced' }));
+      fixture.detectChanges();
+      expect(component.isOpen('advanced')).toBe(true);
+    });
+
+    it('ignores an unknown section id', () => {
+      mockQueryParams.next(convertToParamMap({ section: 'nope' }));
+      fixture.detectChanges();
+      for (const id of ['goal', 'body', 'config', 'app-prefs', 'advanced', 'onboarding', 'account'] as const) {
+        expect(component.isOpen(id)).withContext(id).toBe(false);
+      }
+    });
+
+    it('opens «El meu cos» for the bodyweight nudge deep link', () => {
+      mockQueryParams.next(convertToParamMap({ section: 'body' }));
+      fixture.detectChanges();
+      expect(component.isOpen('body')).toBe(true);
+    });
+
+    it('writes the section the user opens back to the URL, replacing history', () => {
+      component.toggleSection('goal');
+      expect(mockNavigate).toHaveBeenCalledWith([], jasmine.objectContaining({
+        queryParams: { section: 'goal' },
+        replaceUrl: true,
+      }));
+    });
+
+    it('carries the most recently opened section', () => {
+      component.toggleSection('goal');
+      component.toggleSection('config');
+      const [, extras] = mockNavigate.calls.mostRecent().args as [unknown[], { queryParams: unknown }];
+      expect(extras.queryParams).toEqual({ section: 'config' });
+    });
+
+    it('falls back to a still-open section when one closes', () => {
+      component.toggleSection('goal');
+      component.toggleSection('config');
+      component.toggleSection('config');
+      const [, extras] = mockNavigate.calls.mostRecent().args as [unknown[], { queryParams: unknown }];
+      expect(extras.queryParams).toEqual({ section: 'goal' });
+    });
+
+    it('clears the param once nothing is open', () => {
+      component.toggleSection('goal');
+      component.toggleSection('goal');
+      const [, extras] = mockNavigate.calls.mostRecent().args as [unknown[], { queryParams: unknown }];
+      expect(extras.queryParams).toEqual({ section: null });
+    });
+  });
+
+  describe('startTour()', () => {
+    it('hands over to the tour service', () => {
+      component.startTour();
+      expect(mockStartTour).toHaveBeenCalled();
     });
   });
 });

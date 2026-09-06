@@ -567,13 +567,15 @@ export class HomeComponent {
     this.router.navigate(['/train/planner']);
   }
 
+  /** El botó porta a definir objectius, no al Perfil en general: hi arriba
+   *  amb la secció ja oberta. */
   goToSettings(): void {
-    this.router.navigate(['/settings']);
+    this.router.navigateByUrl('/settings?section=goal');
   }
 
   async dismissRoutineHint(): Promise<void> {
     const ok = await this.confirmDialog.confirm(
-      'Si l\'amagues, no tornaràs a veure aquest avís. Podràs reactivar-lo des del teu Perfil.',
+      'Si l\'amagues, no tornaràs a veure aquest avís.',
       { title: 'Amagar avís de rutina', confirmLabel: 'Amagar', cancelLabel: 'Cancel·lar' },
     );
     if (!ok) return;

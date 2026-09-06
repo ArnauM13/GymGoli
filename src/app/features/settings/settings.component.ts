@@ -1,6 +1,8 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { map } from 'rxjs/operators';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
 import { AuthService } from '../../core/services/auth.service';
@@ -15,10 +17,30 @@ import { ConfirmDialogService } from '../../shared/services/confirm-dialog.servi
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { kgToDisplay, displayToKg } from '../../shared/utils/weight.utils';
 import {
-  FitnessGoal, GoalMode, ThemeMode, WeightUnit,
+  DifficultyScale, FitnessGoal, GoalMode, ThemeMode, WeightUnit,
   FITNESS_GOAL_EMOJIS, FITNESS_GOAL_LABELS, CATALOG_VERSION,
 } from '../../core/models/user-settings.model';
 import { todayStr } from '../../shared/utils/date.utils';
+
+/**
+ * Les seccions plegables del Perfil. L'ordre de la llista és l'ordre a la
+ * pàgina: primer el que canvia sovint, i l'onboarding penúltim, just abans
+ * del compte.
+ *
+ * Són ids públics: viatgen a la URL com a `?section=…`, i qui vulgui portar
+ * algú a una secció concreta els fa servir.
+ */
+const SECTION_IDS = [
+  'goal', 'body', 'config', 'app-prefs', 'advanced', 'trainer', 'onboarding', 'account',
+] as const;
+
+type SectionId = typeof SECTION_IDS[number];
+
+/** El `?section=` de la URL l'escriu qui vol, així que es valida abans de
+ *  fer-li cas. Un id desconegut simplement no obre res. */
+function asSectionId(value: string | null): SectionId | null {
+  return SECTION_IDS.includes(value as SectionId) ? value as SectionId : null;
+}
 
 @Component({
   selector: 'app-settings',
@@ -38,519 +60,694 @@ import { todayStr } from '../../shared/utils/date.utils';
         @if (authService.user()?.email; as e) { <span class="identity-email">{{ e }}</span> }
       </div>
 
-      <!-- ── Bloc 1: El meu objectiu ── -->
-      <div class="section">
-        <h2 class="section-title">El meu objectiu</h2>
+      <!-- ── El meu objectiu ── -->
+      <div class="section" [class.section--open]="isOpen('goal')">
+        <h2 class="section-heading">
+          <button class="section-head" (click)="toggleSection('goal')" [attr.aria-expanded]="isOpen('goal')">
+            <span class="material-symbols-outlined section-icon">flag</span>
+            <span class="section-title">El meu objectiu</span>
+            <span class="material-symbols-outlined section-chevron">expand_more</span>
+          </button>
+        </h2>
+        @if (isOpen('goal')) {
+          <div class="section-body">
+            @if (!settingsService.fitnessGoal()) {
+              <p class="section-desc">Tria un objectiu i l'app adaptarà els consells i l'objectiu setmanal per a tu.</p>
+            }
+            <div class="fitness-goal-grid">
+              @for (g of fitnessGoalOptions; track g.value) {
+                <button class="fg-btn" [class.selected]="settingsService.fitnessGoal() === g.value"
+                        (click)="setFitnessGoal(g.value)">
+                  <span class="fg-emoji">{{ g.emoji }}</span>
+                  <span class="fg-label">{{ g.label }}</span>
+                </button>
+              }
+            </div>
 
-        @if (!settingsService.fitnessGoal()) {
-          <p class="section-desc">Tria un objectiu i l'app adaptarà els consells i l'objectiu setmanal per a tu.</p>
-        }
-        <div class="fitness-goal-grid">
-          @for (g of fitnessGoalOptions; track g.value) {
-            <button class="fg-btn" [class.selected]="settingsService.fitnessGoal() === g.value"
-                    (click)="setFitnessGoal(g.value)">
-              <span class="fg-emoji">{{ g.emoji }}</span>
-              <span class="fg-label">{{ g.label }}</span>
-            </button>
-          }
-        </div>
+            <div class="setting-divider"></div>
 
-        <div class="setting-divider"></div>
+            <h3 class="subsection-title">Objectiu setmanal</h3>
 
-        <h3 class="subsection-title">Objectiu setmanal</h3>
-
-          <!-- Mode selector -->
-          <div class="mode-selector">
-            <button
-              class="mode-btn"
-              [class.mode-btn--active]="settingsService.goalMode() === 'combined'"
-              (click)="setGoalMode('combined')"
-            >Combinat</button>
-            <button
-              class="mode-btn"
-              [class.mode-btn--active]="settingsService.goalMode() === 'separate'"
-              (click)="setGoalMode('separate')"
-            >Separat</button>
-          </div>
-
-          @if (settingsService.goalMode() === 'combined') {
-            <div class="setting-row">
-              <div class="setting-info">
-                <span class="setting-label">Activitats per setmana</span>
-                <span class="setting-desc">Gym i esport compten igual.</span>
+              <!-- Mode selector -->
+              <div class="mode-selector">
+                <button
+                  class="mode-btn"
+                  [class.mode-btn--active]="settingsService.goalMode() === 'combined'"
+                  (click)="setGoalMode('combined')"
+                >Combinat</button>
+                <button
+                  class="mode-btn"
+                  [class.mode-btn--active]="settingsService.goalMode() === 'separate'"
+                  (click)="setGoalMode('separate')"
+                >Separat</button>
               </div>
 
-              @if (settingsService.weeklyActivityGoal() === null) {
-                <button class="goal-set-btn" (click)="setGoal(3)">
-                  <span class="material-symbols-outlined">add</span>
-                  Definir
+              @if (settingsService.goalMode() === 'combined') {
+                <div class="setting-row">
+                  <div class="setting-info">
+                    <span class="setting-label">Activitats per setmana</span>
+                    <span class="setting-desc">Gym i esport compten igual.</span>
+                  </div>
+
+                  @if (settingsService.weeklyActivityGoal() === null) {
+                    <button class="goal-set-btn" (click)="setGoal(3)">
+                      <span class="material-symbols-outlined">add</span>
+                      Definir
+                    </button>
+                  } @else {
+                    <div class="goal-stepper">
+                      <button class="step-btn" (click)="adjustGoal(-1)" [disabled]="settingsService.weeklyActivityGoal()! <= 1" aria-label="Menys">
+                        <span class="material-symbols-outlined">remove</span>
+                      </button>
+                      <span class="goal-value">{{ settingsService.weeklyActivityGoal() }}</span>
+                      <button class="step-btn" (click)="adjustGoal(1)" [disabled]="settingsService.weeklyActivityGoal()! >= 7" aria-label="Més">
+                        <span class="material-symbols-outlined">add</span>
+                      </button>
+                      <button class="step-btn step-btn--danger" (click)="clearGoal()" aria-label="Eliminar objectiu">
+                        <span class="material-symbols-outlined">close</span>
+                      </button>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <div class="separate-goals">
+
+                  <div class="goal-row">
+                    <div class="goal-row-info">
+                      <span class="material-symbols-outlined goal-icon">fitness_center</span>
+                      <div class="setting-info">
+                        <span class="setting-label">Entrenos de gym</span>
+                        <span class="setting-desc">Sessions de musculació per setmana.</span>
+                      </div>
+                    </div>
+                    @if (settingsService.weeklyGymGoal() === null) {
+                      <button class="goal-set-btn" (click)="setGymGoal(2)">
+                        <span class="material-symbols-outlined">add</span>
+                        Definir
+                      </button>
+                    } @else {
+                      <div class="goal-stepper">
+                        <button class="step-btn" (click)="adjustGymGoal(-1)" [disabled]="settingsService.weeklyGymGoal()! <= 1" aria-label="Menys">
+                          <span class="material-symbols-outlined">remove</span>
+                        </button>
+                        <span class="goal-value">{{ settingsService.weeklyGymGoal() }}</span>
+                        <button class="step-btn" (click)="adjustGymGoal(1)" [disabled]="settingsService.weeklyGymGoal()! >= 7" aria-label="Més">
+                          <span class="material-symbols-outlined">add</span>
+                        </button>
+                        <button class="step-btn step-btn--danger" (click)="clearGymGoal()" aria-label="Eliminar objectiu gym">
+                          <span class="material-symbols-outlined">close</span>
+                        </button>
+                      </div>
+                    }
+                  </div>
+
+                  <div class="goal-row">
+                    <div class="goal-row-info">
+                      <span class="material-symbols-outlined goal-icon">directions_run</span>
+                      <div class="setting-info">
+                        <span class="setting-label">Sessions d'esport</span>
+                        <span class="setting-desc">Activitats esportives per setmana.</span>
+                      </div>
+                    </div>
+                    @if (settingsService.weeklySportGoal() === null) {
+                      <button class="goal-set-btn" (click)="setSportGoal(2)">
+                        <span class="material-symbols-outlined">add</span>
+                        Definir
+                      </button>
+                    } @else {
+                      <div class="goal-stepper">
+                        <button class="step-btn" (click)="adjustSportGoal(-1)" [disabled]="settingsService.weeklySportGoal()! <= 1" aria-label="Menys">
+                          <span class="material-symbols-outlined">remove</span>
+                        </button>
+                        <span class="goal-value">{{ settingsService.weeklySportGoal() }}</span>
+                        <button class="step-btn" (click)="adjustSportGoal(1)" [disabled]="settingsService.weeklySportGoal()! >= 7" aria-label="Més">
+                          <span class="material-symbols-outlined">add</span>
+                        </button>
+                        <button class="step-btn step-btn--danger" (click)="clearSportGoal()" aria-label="Eliminar objectiu esport">
+                          <span class="material-symbols-outlined">close</span>
+                        </button>
+                      </div>
+                    }
+                  </div>
+
+                </div>
+              }
+          </div>
+        }
+      </div>
+
+      <!-- ── El meu cos ──
+           El pes corporal no és un paràmetre: és una dada teva, i l'única
+           que l'app fa servir per calcular. Va amb el seu interruptor
+           (el factor per exercici), que sense pes no serveix de res. -->
+      <div class="section" [class.section--open]="isOpen('body')">
+        <h2 class="section-heading">
+          <button class="section-head" (click)="toggleSection('body')" [attr.aria-expanded]="isOpen('body')">
+            <span class="material-symbols-outlined section-icon">monitor_weight</span>
+            <span class="section-title">El meu cos</span>
+            <span class="material-symbols-outlined section-chevron">expand_more</span>
+          </button>
+        </h2>
+        @if (isOpen('body')) {
+          <div class="section-body">
+
+            <div class="setting-row">
+              <div class="setting-info">
+                <span class="setting-label">Pes corporal</span>
+                <span class="setting-desc">Opcional. Si l'afegeixes, els exercicis de propi pes (dominades, fons…) sumaran volum. Si no, es registren igual però no compten al volum.</span>
+              </div>
+              <div class="rest-input-wrap">
+                <input
+                  class="rest-input"
+                  type="number"
+                  min="1"
+                  max="500"
+                  inputmode="decimal"
+                  placeholder="—"
+                  [value]="bodyweightDisplay() ?? ''"
+                  (change)="setBodyweightFromInput($event)"
+                />
+                <span class="rest-input-unit">{{ settingsService.weightUnit() }}</span>
+              </div>
+            </div>
+
+            <div class="setting-row setting-row--tight">
+              <div class="setting-info">
+                <span class="setting-label">Ajustar el factor de pes corporal</span>
+                <span class="setting-desc">Mostra al formulari d'exercici el % del pes corporal que compta al volum (p. ex. flexions 65%). Per defecte ja ve amb valors sensats.</span>
+              </div>
+              <mat-slide-toggle
+                [checked]="settingsService.bodyweightFactorEnabled()"
+                (change)="toggleBodyweightFactor()"
+                color="primary"
+              />
+            </div>
+
+          </div>
+        }
+      </div>
+
+      <!-- ── Configuració ── -->
+      <div class="section" [class.section--open]="isOpen('config')">
+        <h2 class="section-heading">
+          <button class="section-head" (click)="toggleSection('config')" [attr.aria-expanded]="isOpen('config')">
+            <span class="material-symbols-outlined section-icon">settings</span>
+            <span class="section-title">Configuració</span>
+            <span class="material-symbols-outlined section-chevron">expand_more</span>
+          </button>
+        </h2>
+        @if (isOpen('config')) {
+          <div class="section-body">
+            <a class="nav-row" routerLink="/exercises" data-tour="cfg-exercises">
+              <span class="material-symbols-outlined nav-row-icon">fitness_center</span>
+              <div class="setting-info">
+                <span class="setting-label">Configurar exercicis</span>
+                <span class="setting-desc">Afegeix, edita i organitza els teus exercicis.</span>
+              </div>
+              <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
+            </a>
+
+            <div class="setting-divider"></div>
+
+            <a class="nav-row" routerLink="/training-types" data-tour="cfg-training-types">
+              <span class="material-symbols-outlined nav-row-icon">exercise</span>
+              <div class="setting-info">
+                <span class="setting-label">Configurar tipus d'entrenament</span>
+                <span class="setting-desc">Crea i edita els tipus de gimnàs (Empenta, Tracció, Cames…).</span>
+              </div>
+              <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
+            </a>
+
+            <div class="setting-divider"></div>
+
+            <a class="nav-row" routerLink="/sports-config" data-tour="cfg-sports">
+              <span class="material-symbols-outlined nav-row-icon">sports_soccer</span>
+              <div class="setting-info">
+                <span class="setting-label">Configurar esports</span>
+                <span class="setting-desc">Gestiona els teus esports, mètriques i subtipus.</span>
+              </div>
+              <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
+            </a>
+
+            <div class="setting-divider"></div>
+
+            <a class="nav-row" routerLink="/train/planner" data-tour="cfg-routines">
+              <span class="material-symbols-outlined nav-row-icon">event_repeat</span>
+              <div class="setting-info">
+                <span class="setting-label">Estableix rutines</span>
+                <span class="setting-desc">Defineix el pla setmanal de gym i esport per dia.</span>
+              </div>
+              <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
+            </a>
+
+            <div class="setting-divider"></div>
+
+            <a class="nav-row" routerLink="/templates" data-tour="cfg-templates">
+              <span class="material-symbols-outlined nav-row-icon">bookmark</span>
+              <div class="setting-info">
+                <span class="setting-label">Plantilles</span>
+                <span class="setting-desc">Crea i gestiona les teves plantilles d'entrenament.</span>
+              </div>
+              <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
+            </a>
+          </div>
+        }
+      </div>
+
+      <!-- ── Preferències de l'app ── -->
+      <div class="section" [class.section--open]="isOpen('app-prefs')">
+        <h2 class="section-heading">
+          <button class="section-head" (click)="toggleSection('app-prefs')" [attr.aria-expanded]="isOpen('app-prefs')">
+            <span class="material-symbols-outlined section-icon">palette</span>
+            <span class="section-title">Preferències de l'app</span>
+            <span class="material-symbols-outlined section-chevron">expand_more</span>
+          </button>
+        </h2>
+        @if (isOpen('app-prefs')) {
+          <div class="section-body">
+            <div class="setting-row">
+              <div class="setting-info">
+                <span class="setting-label">Tema</span>
+                <span class="setting-desc">Clar, fosc, o automàtic segons el sistema.</span>
+              </div>
+              <div class="unit-toggle">
+                <button class="unit-btn" [class.unit-btn--active]="settingsService.themeMode() === 'light'"  (click)="setThemeMode('light')"  aria-label="Tema clar">☀️</button>
+                <button class="unit-btn" [class.unit-btn--active]="settingsService.themeMode() === 'system'" (click)="setThemeMode('system')" aria-label="Tema del sistema">🌗</button>
+                <button class="unit-btn" [class.unit-btn--active]="settingsService.themeMode() === 'dark'"   (click)="setThemeMode('dark')"   aria-label="Tema fosc">🌙</button>
+              </div>
+            </div>
+
+            <div class="setting-row setting-row--top">
+              <div class="setting-info">
+                <span class="setting-label">Unitat de pes</span>
+                <span class="setting-desc">Els valors es guarden sempre en kg.</span>
+              </div>
+              <div class="unit-toggle">
+                <button class="unit-btn" [class.unit-btn--active]="settingsService.weightUnit() === 'kg'" (click)="setWeightUnit('kg')">kg</button>
+                <button class="unit-btn" [class.unit-btn--active]="settingsService.weightUnit() === 'lb'" (click)="setWeightUnit('lb')">lb</button>
+              </div>
+            </div>
+
+            <div class="setting-row setting-row--top">
+              <div class="setting-info">
+                <span class="setting-label">Insights personalitzats</span>
+                <span class="setting-desc">Consells automàtics a Inici basats en el teu historial, les rutines i l'objectiu setmanal.</span>
+              </div>
+              <mat-slide-toggle
+                [checked]="settingsService.metricsEnabled()"
+                (change)="toggleMetrics()"
+                color="primary"
+              />
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- ── Paràmetres avançats ──
+           El que abans era una pàgina a part (/settings/advanced). Sense
+           subtítols, però ordenat: el que va junt s'assembla junt. Quatre
+           grups, separats per una línia: com s'estructura una sèrie, què
+           n'anotes, el descans, i l'ajuda mentre entrenes. -->
+      <div class="section" [class.section--open]="isOpen('advanced')">
+        <h2 class="section-heading">
+          <button class="section-head" (click)="toggleSection('advanced')" [attr.aria-expanded]="isOpen('advanced')">
+            <span class="material-symbols-outlined section-icon">tune</span>
+            <span class="section-title">Paràmetres avançats</span>
+            <span class="material-symbols-outlined section-chevron">expand_more</span>
+          </button>
+        </h2>
+        @if (isOpen('advanced')) {
+          <div class="section-body">
+
+            <!-- Com s'estructura una sèrie -->
+            <div class="setting-row">
+              <div class="setting-info">
+                <span class="setting-label">Agrupar en superset</span>
+                <span class="setting-desc">Permet enllaçar exercicis perquè es facin seguits, sense descans.</span>
+              </div>
+              <mat-slide-toggle
+                [checked]="settingsService.supersetsEnabled()"
+                (change)="toggleSupersets()"
+                color="primary"
+              />
+            </div>
+
+            <div class="setting-row setting-row--tight">
+              <div class="setting-info">
+                <span class="setting-label">Dropsets</span>
+                <span class="setting-desc">Permet afegir trams a pes reduït immediatament després d'una sèrie.</span>
+              </div>
+              <mat-slide-toggle
+                [checked]="settingsService.dropsetsEnabled()"
+                (change)="toggleDropsets()"
+                color="primary"
+              />
+            </div>
+
+            <!-- Què n'anotes -->
+            <div class="setting-row setting-row--top">
+              <div class="setting-info">
+                <span class="setting-label">RIR (Reps In Reserve)</span>
+                <span class="setting-desc">Permet registrar quantes repeticions et quedaven a cada sèrie.</span>
+              </div>
+              <mat-slide-toggle
+                [checked]="settingsService.rirEnabled()"
+                (change)="toggleRir()"
+                color="primary"
+              />
+            </div>
+
+            <div class="setting-row setting-row--tight">
+              <div class="setting-info">
+                <span class="setting-label">Escala de dificultat</span>
+                <span class="setting-desc">Com es mostra i es registra la sensació de cada exercici.</span>
+              </div>
+              <div class="unit-toggle">
+                <button class="unit-btn" [class.unit-btn--active]="settingsService.difficultyScale() === 'emoji'" (click)="setDifficultyScale('emoji')">😐</button>
+                <button class="unit-btn" [class.unit-btn--active]="settingsService.difficultyScale() === 'numeric'" (click)="setDifficultyScale('numeric')">1-10</button>
+              </div>
+            </div>
+
+            <!-- El descans: el que el compta sol i el que l'anotes tu -->
+            <div class="setting-row setting-row--top">
+              <div class="setting-info">
+                <span class="setting-label">Descans entre sèries</span>
+                <span class="setting-desc">Temporitzador automàtic en afegir una sèrie.</span>
+              </div>
+              <mat-slide-toggle
+                [checked]="restTimerEnabled()"
+                (change)="toggleRestTimer()"
+                color="primary"
+              />
+            </div>
+
+            @if (restTimerEnabled()) {
+              <div class="setting-row setting-row--tight rest-timer-input-row">
+                <div class="setting-info">
+                  <span class="setting-label">Durada del descans</span>
+                </div>
+                <div class="rest-input-wrap">
+                  <input
+                    class="rest-input"
+                    type="number"
+                    min="1"
+                    max="3600"
+                    [value]="settingsService.restTimerSeconds()"
+                    (change)="setRestTimerFromInput($event)"
+                  />
+                  <span class="rest-input-unit">s</span>
+                </div>
+              </div>
+            }
+
+            <div class="setting-row setting-row--tight">
+              <div class="setting-info">
+                <span class="setting-label">Anotar el descans manualment</span>
+                <span class="setting-desc">Permet apuntar el descans fet abans de cada sèrie, com una nota.</span>
+              </div>
+              <mat-slide-toggle
+                [checked]="settingsService.manualRestEnabled()"
+                (change)="toggleManualRest()"
+                color="primary"
+              />
+            </div>
+
+            <!-- L'ajuda mentre entrenes -->
+            <div class="setting-row setting-row--top">
+              <div class="setting-info">
+                <span class="setting-label">Suggeriment del proper exercici</span>
+                <span class="setting-desc">Mentre entrenes, mostra el "Sèrie activa" amb el proper exercici recomanat segons el teu historial i plantilles.</span>
+              </div>
+              <mat-slide-toggle
+                [checked]="settingsService.nextExerciseSuggestionEnabled()"
+                (change)="toggleNextExerciseSuggestion()"
+                color="primary"
+              />
+            </div>
+
+          </div>
+        }
+      </div>
+
+      <!-- ── Mode entrenador (comentat) ──
+           Es manté aquí, sencer, en comptes d'esborrar-lo: la lògica del
+           component («toggleTrainerMode», invitacions, desconnexió) segueix
+           intacta, i tornar-lo a encendre és treure aquestes dues línies.
+
+      <div class="section" [class.section--open]="isOpen('trainer')">
+        <h2 class="section-heading">
+          <button class="section-head" (click)="toggleSection('trainer')" [attr.aria-expanded]="isOpen('trainer')">
+            <span class="material-symbols-outlined section-icon">groups</span>
+            <span class="section-title">Mode entrenador</span>
+            <span class="material-symbols-outlined section-chevron">expand_more</span>
+          </button>
+        </h2>
+        @if (isOpen('trainer')) {
+          <div class="section-body">
+
+            <div class="setting-row">
+              <div class="setting-info">
+                <span class="setting-label">Activa el mode entrenador</span>
+                <span class="setting-desc">Gestiona clients, crea rutines i proposa entrenaments.</span>
+              </div>
+              <mat-slide-toggle
+                [checked]="trainerService.isTrainer()"
+                [disabled]="togglingTrainer()"
+                (change)="toggleTrainerMode()"
+                color="primary"
+              />
+            </div>
+
+            @if (trainerService.isTrainer()) {
+              <div class="setting-divider"></div>
+
+              <a class="nav-row" routerLink="/trainer">
+                <div class="setting-info">
+                  <span class="setting-label">Dashboard de clients</span>
+                  <span class="setting-desc">Gestiona els teus clients i les seves propostes.</span>
+                </div>
+                <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
+              </a>
+
+              <div class="setting-row setting-row--top">
+                <div class="setting-info">
+                  <span class="setting-label">Invitació</span>
+                  <span class="setting-desc">Comparteix el codi o l'enllaç als teus clients.</span>
+                </div>
+                @if (!trainerService.activeInvite()) {
+                  <button class="goal-set-btn" (click)="generateTrainerInvite()" [disabled]="generatingInvite()">
+                    @if (generatingInvite()) {
+                      <span class="material-symbols-outlined spin">sync</span>
+                    } @else {
+                      <span class="material-symbols-outlined">add</span>
+                      Genera
+                    }
+                  </button>
+                }
+              </div>
+
+              @if (trainerService.activeInvite(); as inv) {
+                <div class="invite-block">
+                  <div class="invite-code-display">{{ inv.code }}</div>
+                  <div class="invite-btns">
+                    <button class="invite-action-btn" (click)="copyInviteCode(inv.code)">
+                      <span class="material-symbols-outlined">content_copy</span>
+                      Copia codi
+                    </button>
+                    <button class="invite-action-btn" (click)="copyInviteLink(inv.token)">
+                      <span class="material-symbols-outlined">share</span>
+                      Copia enllaç
+                    </button>
+                    <button class="invite-action-btn" (click)="generateTrainerInvite()" [disabled]="generatingInvite()">
+                      <span class="material-symbols-outlined">refresh</span>
+                      Nou
+                    </button>
+                  </div>
+                </div>
+              }
+            }
+
+            @if (trainerService.hasTrainer()) {
+              <div class="setting-divider"></div>
+
+              <div class="setting-row setting-row--top">
+                <div class="setting-info">
+                  <span class="setting-label">{{ trainerService.myTrainer()?.displayName ?? 'Entrenador' }}</span>
+                  <span class="setting-desc">Entrenador personal connectat.</span>
+                </div>
+              </div>
+              <div class="setting-row setting-row--top">
+                <div class="setting-info">
+                  <span class="setting-label danger-label">Desconnectar entrenador</span>
+                  <span class="setting-desc">Deixaràs de rebre propostes d'entrenament.</span>
+                </div>
+                <button class="danger-btn" (click)="disconnectTrainer()">Desconnecta</button>
+              </div>
+            } @else if (trainerService.isTrainer()) {
+              <div class="setting-divider"></div>
+
+              <p class="section-desc">Tens un codi d'invitació? Introdueix-lo per connectar-te amb el teu entrenador.</p>
+
+              @if (!showInviteInput()) {
+                <button class="goal-set-btn" (click)="showInviteInput.set(true)">
+                  <span class="material-symbols-outlined">key</span>
+                  Introduir codi
                 </button>
               } @else {
-                <div class="goal-stepper">
-                  <button class="step-btn" (click)="adjustGoal(-1)" [disabled]="settingsService.weeklyActivityGoal()! <= 1" aria-label="Menys">
-                    <span class="material-symbols-outlined">remove</span>
+                <div class="invite-input-row">
+                  <input
+                    class="invite-code-input"
+                    type="text"
+                    placeholder="Ex: A3B7F2XQ"
+                    maxlength="8"
+                    [value]="inviteCodeInput()"
+                    (input)="inviteCodeInput.set($any($event.target).value.toUpperCase())"
+                    (keydown.enter)="acceptInviteCode()"
+                  />
+                  <button class="btn-primary-sm" (click)="acceptInviteCode()" [disabled]="acceptingInvite() || inviteCodeInput().length < 6">
+                    @if (acceptingInvite()) {
+                      <span class="material-symbols-outlined spin">sync</span>
+                    } @else {
+                      Unir-me
+                    }
                   </button>
-                  <span class="goal-value">{{ settingsService.weeklyActivityGoal() }}</span>
-                  <button class="step-btn" (click)="adjustGoal(1)" [disabled]="settingsService.weeklyActivityGoal()! >= 7" aria-label="Més">
-                    <span class="material-symbols-outlined">add</span>
-                  </button>
-                  <button class="step-btn step-btn--danger" (click)="clearGoal()" aria-label="Eliminar objectiu">
+                  <button class="icon-btn-sm" (click)="showInviteInput.set(false)">
                     <span class="material-symbols-outlined">close</span>
                   </button>
                 </div>
               }
-            </div>
-          } @else {
-            <div class="separate-goals">
-
-              <div class="goal-row">
-                <div class="goal-row-info">
-                  <span class="material-symbols-outlined goal-icon">fitness_center</span>
-                  <div class="setting-info">
-                    <span class="setting-label">Entrenos de gym</span>
-                    <span class="setting-desc">Sessions de musculació per setmana.</span>
-                  </div>
-                </div>
-                @if (settingsService.weeklyGymGoal() === null) {
-                  <button class="goal-set-btn" (click)="setGymGoal(2)">
-                    <span class="material-symbols-outlined">add</span>
-                    Definir
-                  </button>
-                } @else {
-                  <div class="goal-stepper">
-                    <button class="step-btn" (click)="adjustGymGoal(-1)" [disabled]="settingsService.weeklyGymGoal()! <= 1" aria-label="Menys">
-                      <span class="material-symbols-outlined">remove</span>
-                    </button>
-                    <span class="goal-value">{{ settingsService.weeklyGymGoal() }}</span>
-                    <button class="step-btn" (click)="adjustGymGoal(1)" [disabled]="settingsService.weeklyGymGoal()! >= 7" aria-label="Més">
-                      <span class="material-symbols-outlined">add</span>
-                    </button>
-                    <button class="step-btn step-btn--danger" (click)="clearGymGoal()" aria-label="Eliminar objectiu gym">
-                      <span class="material-symbols-outlined">close</span>
-                    </button>
-                  </div>
-                }
-              </div>
-
-              <div class="goal-row">
-                <div class="goal-row-info">
-                  <span class="material-symbols-outlined goal-icon">directions_run</span>
-                  <div class="setting-info">
-                    <span class="setting-label">Sessions d'esport</span>
-                    <span class="setting-desc">Activitats esportives per setmana.</span>
-                  </div>
-                </div>
-                @if (settingsService.weeklySportGoal() === null) {
-                  <button class="goal-set-btn" (click)="setSportGoal(2)">
-                    <span class="material-symbols-outlined">add</span>
-                    Definir
-                  </button>
-                } @else {
-                  <div class="goal-stepper">
-                    <button class="step-btn" (click)="adjustSportGoal(-1)" [disabled]="settingsService.weeklySportGoal()! <= 1" aria-label="Menys">
-                      <span class="material-symbols-outlined">remove</span>
-                    </button>
-                    <span class="goal-value">{{ settingsService.weeklySportGoal() }}</span>
-                    <button class="step-btn" (click)="adjustSportGoal(1)" [disabled]="settingsService.weeklySportGoal()! >= 7" aria-label="Més">
-                      <span class="material-symbols-outlined">add</span>
-                    </button>
-                    <button class="step-btn step-btn--danger" (click)="clearSportGoal()" aria-label="Eliminar objectiu esport">
-                      <span class="material-symbols-outlined">close</span>
-                    </button>
-                  </div>
-                }
-              </div>
-
-            </div>
-          }
-      </div>
-
-      <!-- ── Progrés ── -->
-      <div class="section">
-        <a class="nav-row" routerLink="/charts">
-          <span class="material-symbols-outlined nav-row-icon">bar_chart</span>
-          <div class="setting-info">
-            <span class="setting-label">El meu progrés</span>
-            <span class="setting-desc">Resum, gràfiques i seguiment de l'objectiu setmanal.</span>
-          </div>
-          <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
-        </a>
-      </div>
-
-      <!-- ── Bloc 2: Configuració ── -->
-      <div class="section">
-        <h2 class="section-title">Configuració</h2>
-
-        <a class="nav-row" routerLink="/exercises" data-tour="cfg-exercises">
-          <span class="material-symbols-outlined nav-row-icon">fitness_center</span>
-          <div class="setting-info">
-            <span class="setting-label">Configurar exercicis</span>
-            <span class="setting-desc">Afegeix, edita i organitza els teus exercicis.</span>
-          </div>
-          <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
-        </a>
-
-        <div class="setting-divider"></div>
-
-        <a class="nav-row" routerLink="/training-types" data-tour="cfg-training-types">
-          <span class="material-symbols-outlined nav-row-icon">exercise</span>
-          <div class="setting-info">
-            <span class="setting-label">Configurar tipus d'entrenament</span>
-            <span class="setting-desc">Crea i edita els tipus de gimnàs (Empenta, Tracció, Cames…).</span>
-          </div>
-          <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
-        </a>
-
-        <div class="setting-divider"></div>
-
-        <a class="nav-row" routerLink="/sports-config" data-tour="cfg-sports">
-          <span class="material-symbols-outlined nav-row-icon">sports_soccer</span>
-          <div class="setting-info">
-            <span class="setting-label">Configurar esports</span>
-            <span class="setting-desc">Gestiona els teus esports, mètriques i subtipus.</span>
-          </div>
-          <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
-        </a>
-
-        <div class="setting-divider"></div>
-
-        <a class="nav-row" routerLink="/train/planner" data-tour="cfg-routines">
-          <span class="material-symbols-outlined nav-row-icon">event_repeat</span>
-          <div class="setting-info">
-            <span class="setting-label">Estableix rutines</span>
-            <span class="setting-desc">Defineix el pla setmanal de gym i esport per dia.</span>
-          </div>
-          <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
-        </a>
-
-        <div class="setting-divider"></div>
-
-        <a class="nav-row" routerLink="/templates" data-tour="cfg-templates">
-          <span class="material-symbols-outlined nav-row-icon">bookmark</span>
-          <div class="setting-info">
-            <span class="setting-label">Plantilles</span>
-            <span class="setting-desc">Crea i gestiona les teves plantilles d'entrenament.</span>
-          </div>
-          <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
-        </a>
-
-        <div class="setting-divider"></div>
-
-        <!-- El tour no s'engega mai sol a algú que ja fa servir l'app: qui el
-             va saltar el primer dia, o qui vol repassar on era una cosa, el
-             troba aquí. -->
-        <button class="nav-row" (click)="startTour()">
-          <span class="material-symbols-outlined nav-row-icon">explore</span>
-          <div class="setting-info">
-            <span class="setting-label">Fes el tour amb el Marley i el Xoco</span>
-            <span class="setting-desc">Un repàs guiat per l'app: les pestanyes, la configuració i les rutines.</span>
-          </div>
-          <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
-        </button>
-      </div>
-
-      <!-- ── Bloc 3: Preferències ── -->
-      <div class="section">
-        <h2 class="section-title">Preferències</h2>
-
-        <div class="setting-row setting-row--top">
-          <div class="setting-info">
-            <span class="setting-label">Tema</span>
-            <span class="setting-desc">Clar, fosc, o automàtic segons el sistema.</span>
-          </div>
-          <div class="unit-toggle">
-            <button class="unit-btn" [class.unit-btn--active]="settingsService.themeMode() === 'light'"  (click)="setThemeMode('light')"  aria-label="Tema clar">☀️</button>
-            <button class="unit-btn" [class.unit-btn--active]="settingsService.themeMode() === 'system'" (click)="setThemeMode('system')" aria-label="Tema del sistema">🌗</button>
-            <button class="unit-btn" [class.unit-btn--active]="settingsService.themeMode() === 'dark'"   (click)="setThemeMode('dark')"   aria-label="Tema fosc">🌙</button>
-          </div>
-        </div>
-
-        <div class="setting-row setting-row--top">
-          <div class="setting-info">
-            <span class="setting-label">Unitat de pes</span>
-            <span class="setting-desc">Els valors es guarden sempre en kg.</span>
-          </div>
-          <div class="unit-toggle">
-            <button class="unit-btn" [class.unit-btn--active]="settingsService.weightUnit() === 'kg'" (click)="setWeightUnit('kg')">kg</button>
-            <button class="unit-btn" [class.unit-btn--active]="settingsService.weightUnit() === 'lb'" (click)="setWeightUnit('lb')">lb</button>
-          </div>
-        </div>
-
-        <div class="setting-row setting-row--top">
-          <div class="setting-info">
-            <span class="setting-label">Pes corporal</span>
-            <span class="setting-desc">Opcional. Si l'afegeixes, els exercicis de propi pes (dominades, fons…) sumaran volum. Si no, es registren igual però no compten al volum.</span>
-          </div>
-          <div class="rest-input-wrap">
-            <input
-              class="rest-input"
-              type="number"
-              min="1"
-              max="500"
-              inputmode="decimal"
-              placeholder="—"
-              [value]="bodyweightDisplay() ?? ''"
-              (change)="setBodyweightFromInput($event)"
-            />
-            <span class="rest-input-unit">{{ settingsService.weightUnit() }}</span>
-          </div>
-        </div>
-
-        <div class="setting-row setting-row--top">
-          <div class="setting-info">
-            <span class="setting-label">Descans entre sèries</span>
-            <span class="setting-desc">Temporitzador automàtic en afegir una sèrie.</span>
-          </div>
-          <mat-slide-toggle
-            [checked]="restTimerEnabled()"
-            (change)="toggleRestTimer()"
-            color="primary"
-          />
-        </div>
-
-        @if (restTimerEnabled()) {
-          <div class="setting-row setting-row--top rest-timer-input-row">
-            <div class="setting-info">
-              <span class="setting-label">Durada del descans</span>
-            </div>
-            <div class="rest-input-wrap">
-              <input
-                class="rest-input"
-                type="number"
-                min="1"
-                max="3600"
-                [value]="settingsService.restTimerSeconds()"
-                (change)="setRestTimerFromInput($event)"
-              />
-              <span class="rest-input-unit">s</span>
-            </div>
-          </div>
-        }
-
-        <div class="setting-row setting-row--top">
-          <div class="setting-info">
-            <span class="setting-label">Insights personalitzats</span>
-            <span class="setting-desc">Consells automàtics a Inici basats en el teu historial, les rutines i l'objectiu setmanal.</span>
-          </div>
-          <mat-slide-toggle
-            [checked]="settingsService.metricsEnabled()"
-            (change)="toggleMetrics()"
-            color="primary"
-          />
-        </div>
-
-        <div class="setting-row setting-row--top">
-          <div class="setting-info">
-            <span class="setting-label">Avís de rutina a Inici</span>
-            <span class="setting-desc">Recorda't de planificar una rutina quan encara no en tens cap.</span>
-          </div>
-          <mat-slide-toggle
-            [checked]="!settingsService.settings().routineHintDismissed"
-            (change)="toggleRoutineHint()"
-            color="primary"
-          />
-        </div>
-
-        <a class="nav-row nav-row--top" routerLink="/settings/advanced">
-          <span class="material-symbols-outlined nav-row-icon">tune</span>
-          <div class="setting-info">
-            <span class="setting-label">Paràmetres avançats</span>
-            <span class="setting-desc">Supersets, dropsets, RIR i l'escala de dificultat.</span>
-          </div>
-          <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
-        </a>
-
-      </div>
-
-      <!-- ── Bloc 3: Mode entrenador ── -->
-      <div class="section">
-        <h2 class="section-title">Mode entrenador</h2>
-
-        <div class="setting-row">
-          <div class="setting-info">
-            <span class="setting-label">Activa el mode entrenador</span>
-            <span class="setting-desc">Gestiona clients, crea rutines i proposa entrenaments.</span>
-          </div>
-          <mat-slide-toggle
-            [checked]="trainerService.isTrainer()"
-            [disabled]="togglingTrainer()"
-            (change)="toggleTrainerMode()"
-            color="primary"
-          />
-        </div>
-
-        @if (trainerService.isTrainer()) {
-          <div class="setting-divider"></div>
-
-          <a class="nav-row" routerLink="/trainer">
-            <div class="setting-info">
-              <span class="setting-label">Dashboard de clients</span>
-              <span class="setting-desc">Gestiona els teus clients i les seves propostes.</span>
-            </div>
-            <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
-          </a>
-
-          <div class="setting-row setting-row--top">
-            <div class="setting-info">
-              <span class="setting-label">Invitació</span>
-              <span class="setting-desc">Comparteix el codi o l'enllaç als teus clients.</span>
-            </div>
-            @if (!trainerService.activeInvite()) {
-              <button class="goal-set-btn" (click)="generateTrainerInvite()" [disabled]="generatingInvite()">
-                @if (generatingInvite()) {
-                  <span class="material-symbols-outlined spin">sync</span>
-                } @else {
-                  <span class="material-symbols-outlined">add</span>
-                  Genera
-                }
-              </button>
             }
-          </div>
 
-          @if (trainerService.activeInvite(); as inv) {
-            <div class="invite-block">
-              <div class="invite-code-display">{{ inv.code }}</div>
-              <div class="invite-btns">
-                <button class="invite-action-btn" (click)="copyInviteCode(inv.code)">
-                  <span class="material-symbols-outlined">content_copy</span>
-                  Copia codi
-                </button>
-                <button class="invite-action-btn" (click)="copyInviteLink(inv.token)">
-                  <span class="material-symbols-outlined">share</span>
-                  Copia enllaç
-                </button>
-                <button class="invite-action-btn" (click)="generateTrainerInvite()" [disabled]="generatingInvite()">
-                  <span class="material-symbols-outlined">refresh</span>
-                  Nou
-                </button>
-              </div>
-            </div>
-          }
+          </div>
         }
+      </div>
+      -->
 
-        @if (trainerService.hasTrainer()) {
-          <div class="setting-divider"></div>
+      <!-- ── Onboarding ──
+           Penúltim, just abans del compte: no és el que véns a buscar cada
+           dia, però ha de ser fàcil de trobar quan vols repassar l'app.
+           El tour no s'engega mai sol a algú que ja fa servir l'app: qui el
+           va saltar el primer dia, o qui vol repassar on era una cosa, el
+           troba aquí. -->
+      <div class="section" [class.section--open]="isOpen('onboarding')">
+        <h2 class="section-heading">
+          <button class="section-head" (click)="toggleSection('onboarding')" [attr.aria-expanded]="isOpen('onboarding')">
+            <span class="material-symbols-outlined section-icon">pets</span>
+            <span class="section-title">Onboarding</span>
+            <span class="material-symbols-outlined section-chevron">expand_more</span>
+          </button>
+        </h2>
+        @if (isOpen('onboarding')) {
+          <div class="section-body">
 
-          <div class="setting-row setting-row--top">
-            <div class="setting-info">
-              <span class="setting-label">{{ trainerService.myTrainer()?.displayName ?? 'Entrenador' }}</span>
-              <span class="setting-desc">Entrenador personal connectat.</span>
-            </div>
-          </div>
-          <div class="setting-row setting-row--top">
-            <div class="setting-info">
-              <span class="setting-label danger-label">Desconnectar entrenador</span>
-              <span class="setting-desc">Deixaràs de rebre propostes d'entrenament.</span>
-            </div>
-            <button class="danger-btn" (click)="disconnectTrainer()">Desconnecta</button>
-          </div>
-        } @else if (trainerService.isTrainer()) {
-          <div class="setting-divider"></div>
-
-          <p class="section-desc">Tens un codi d'invitació? Introdueix-lo per connectar-te amb el teu entrenador.</p>
-
-          @if (!showInviteInput()) {
-            <button class="goal-set-btn" (click)="showInviteInput.set(true)">
-              <span class="material-symbols-outlined">key</span>
-              Introduir codi
+            <button class="nav-row" (click)="startTour()">
+              <span class="material-symbols-outlined nav-row-icon">explore</span>
+              <div class="setting-info">
+                <span class="setting-label">Fes el tour amb el Marley i el Xoco</span>
+                <span class="setting-desc">Un repàs guiat per l'app en {{ tourStops }} parades: les pestanyes, la configuració i les rutines.</span>
+              </div>
+              <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
             </button>
-          } @else {
-            <div class="invite-input-row">
-              <input
-                class="invite-code-input"
-                type="text"
-                placeholder="Ex: A3B7F2XQ"
-                maxlength="8"
-                [value]="inviteCodeInput()"
-                (input)="inviteCodeInput.set($any($event.target).value.toUpperCase())"
-                (keydown.enter)="acceptInviteCode()"
-              />
-              <button class="btn-primary-sm" (click)="acceptInviteCode()" [disabled]="acceptingInvite() || inviteCodeInput().length < 6">
-                @if (acceptingInvite()) {
-                  <span class="material-symbols-outlined spin">sync</span>
-                } @else {
-                  Unir-me
-                }
-              </button>
-              <button class="icon-btn-sm" (click)="showInviteInput.set(false)">
-                <span class="material-symbols-outlined">close</span>
-              </button>
-            </div>
-          }
+
+            <div class="setting-divider"></div>
+
+            <button class="nav-row" (click)="replayOnboarding()">
+              <span class="material-symbols-outlined nav-row-icon">sentiment_very_satisfied</span>
+              <div class="setting-info">
+                <span class="setting-label">Coneix el Marley i el Xoco</span>
+                <span class="setting-desc">Torna a veure la benvinguda des del principi, tal com la veu algú que entra per primer cop. No es toca cap dada teva.</span>
+              </div>
+              <span class="material-symbols-outlined nav-row-arrow">restart_alt</span>
+            </button>
+
+            @if (replayed()) {
+              <p class="setting-note">Fet. La benvinguda s'obre tot seguit.</p>
+            }
+
+          </div>
         }
       </div>
 
-      <!-- ── Bloc 4: Compte ── -->
-      <div class="section section--danger">
-        <h2 class="section-title">Compte</h2>
-
-        @if (catalogReady() && missingCatalogCount() > 0 && settingsService.catalogSyncedVersion() < CATALOG_VERSION) {
-          <button type="button" class="nav-row" (click)="addCatalogDefaults()" [disabled]="addingCatalog()">
-            <span class="material-symbols-outlined nav-row-icon">library_add</span>
-            <div class="setting-info">
-              <span class="setting-label">Actualitzar el catàleg de sèrie</span>
-              <span class="setting-desc">Afegeix els exercicis, esports i tipus d'entrenament de sèrie que et falten i posa al dia les seves mètriques (p. ex. els estils de Yoga). No toca els que has creat tu.</span>
-            </div>
-            <span class="material-symbols-outlined nav-row-arrow">add</span>
+      <!-- ── Compte ── -->
+      <div class="section section--danger" [class.section--open]="isOpen('account')">
+        <h2 class="section-heading">
+          <button class="section-head" (click)="toggleSection('account')" [attr.aria-expanded]="isOpen('account')">
+            <span class="material-symbols-outlined section-icon">account_circle</span>
+            <span class="section-title">Compte</span>
+            <span class="material-symbols-outlined section-chevron">expand_more</span>
           </button>
+        </h2>
+        @if (isOpen('account')) {
+          <div class="section-body">
+            @if (catalogReady() && missingCatalogCount() > 0 && settingsService.catalogSyncedVersion() < CATALOG_VERSION) {
+              <button type="button" class="nav-row" (click)="addCatalogDefaults()" [disabled]="addingCatalog()">
+                <span class="material-symbols-outlined nav-row-icon">library_add</span>
+                <div class="setting-info">
+                  <span class="setting-label">Actualitzar el catàleg de sèrie</span>
+                  <span class="setting-desc">Afegeix els exercicis, esports i tipus d'entrenament de sèrie que et falten i posa al dia les seves mètriques (p. ex. els estils de Yoga). No toca els que has creat tu.</span>
+                </div>
+                <span class="material-symbols-outlined nav-row-arrow">add</span>
+              </button>
 
-          <div class="setting-divider"></div>
-        }
-
-        @if (catalogReady() && exerciseService.backfillableCount() > 0) {
-          <button type="button" class="nav-row" (click)="backfillDescriptions()" [disabled]="fillingDescriptions()">
-            <span class="material-symbols-outlined nav-row-icon">edit_note</span>
-            <div class="setting-info">
-              <span class="setting-label">Omplir descripcions que falten</span>
-              <span class="setting-desc">Completa la descripció, els músculs, el grup i la guia de sèries dels teus exercicis que coincideixen de nom amb el catàleg i tenen camps buits. No sobreescriu res del que ja has escrit.</span>
-            </div>
-            <span class="material-symbols-outlined nav-row-arrow">add</span>
-          </button>
-
-          <div class="setting-divider"></div>
-        }
-
-        <div class="setting-row">
-          <div class="setting-info">
-            <span class="setting-label">Exportar les meves dades</span>
-            <span class="setting-desc">Descarrega un JSON amb tots els teus entrenaments, esports i configuració.</span>
-          </div>
-          <button class="export-btn" (click)="exportData()" aria-label="Descarregar dades">
-            <span class="material-symbols-outlined">download</span>
-          </button>
-        </div>
-
-        <div class="setting-row setting-row--top">
-          <div class="setting-info">
-            <span class="setting-label">Tancar sessió</span>
-            <span class="setting-desc">Sortiràs de l'aplicació en aquest dispositiu.</span>
-          </div>
-          <button class="danger-btn danger-btn--soft" (click)="logout()">Sortir</button>
-        </div>
-
-        <a class="nav-row nav-row--top" routerLink="/privacy">
-          <div class="setting-info">
-            <span class="setting-label">Política de privacitat</span>
-            <span class="setting-desc">Condicions d'ús i tractament de dades.</span>
-          </div>
-          <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
-        </a>
-
-        <div class="setting-divider"></div>
-
-        <div class="setting-row">
-          <div class="setting-info">
-            <span class="setting-label danger-label">Eliminar compte</span>
-            <span class="setting-desc">S'eliminaran totes les teves dades de forma permanent.</span>
-          </div>
-          <button class="danger-btn" (click)="deleteAccount()" [disabled]="deletingAccount()">
-            @if (deletingAccount()) {
-              <span class="material-symbols-outlined spin">sync</span>
-            } @else {
-              Eliminar
+              <div class="setting-divider"></div>
             }
-          </button>
-        </div>
+
+            @if (catalogReady() && exerciseService.backfillableCount() > 0) {
+              <button type="button" class="nav-row" (click)="backfillDescriptions()" [disabled]="fillingDescriptions()">
+                <span class="material-symbols-outlined nav-row-icon">edit_note</span>
+                <div class="setting-info">
+                  <span class="setting-label">Omplir descripcions que falten</span>
+                  <span class="setting-desc">Completa la descripció, els músculs, el grup i la guia de sèries dels teus exercicis que coincideixen de nom amb el catàleg i tenen camps buits. No sobreescriu res del que ja has escrit.</span>
+                </div>
+                <span class="material-symbols-outlined nav-row-arrow">add</span>
+              </button>
+
+              <div class="setting-divider"></div>
+            }
+
+            <div class="setting-row">
+              <div class="setting-info">
+                <span class="setting-label">Exportar les meves dades</span>
+                <span class="setting-desc">Descarrega un JSON amb tots els teus entrenaments, esports i configuració.</span>
+              </div>
+              <button class="export-btn" (click)="exportData()" aria-label="Descarregar dades">
+                <span class="material-symbols-outlined">download</span>
+              </button>
+            </div>
+
+            <div class="setting-row setting-row--top">
+              <div class="setting-info">
+                <span class="setting-label">Tancar sessió</span>
+                <span class="setting-desc">Sortiràs de l'aplicació en aquest dispositiu.</span>
+              </div>
+              <button class="danger-btn danger-btn--soft" (click)="logout()">Sortir</button>
+            </div>
+
+            <a class="nav-row nav-row--top" routerLink="/privacy">
+              <div class="setting-info">
+                <span class="setting-label">Política de privacitat</span>
+                <span class="setting-desc">Condicions d'ús i tractament de dades.</span>
+              </div>
+              <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
+            </a>
+
+            <div class="setting-divider"></div>
+
+            <div class="setting-row">
+              <div class="setting-info">
+                <span class="setting-label danger-label">Eliminar compte</span>
+                <span class="setting-desc">S'eliminaran totes les teves dades de forma permanent.</span>
+              </div>
+              <button class="danger-btn" (click)="deleteAccount()" [disabled]="deletingAccount()">
+                @if (deletingAccount()) {
+                  <span class="material-symbols-outlined spin">sync</span>
+                } @else {
+                  Eliminar
+                }
+              </button>
+            </div>
+          </div>
+        }
       </div>
 
     </div>
@@ -577,29 +774,66 @@ import { todayStr } from '../../shared/utils/date.utils';
     .identity-name  { font-size: 18px; font-weight: 800; color: var(--c-text); letter-spacing: -0.3px; }
     .identity-email { font-size: 13px; color: var(--c-text-2); }
 
+    /* ── Section (plegable) ──
+       Al Perfil hi ha molta cosa i cada visita en busca una: totes les
+       seccions arrenquen tancades, així la pàgina es llegeix com una llista
+       de portes i no com un formulari infinit. */
     .section {
       background: var(--c-card);
       border-radius: 18px;
       box-shadow: 0 2px 10px var(--c-shadow);
-      padding: 16px; margin-bottom: 16px;
+      margin-bottom: 12px; overflow: hidden;
     }
 
-    .section-title {
-      margin: 0 0 14px;
-      font-size: 13px; font-weight: 700; color: var(--c-text-2);
-      letter-spacing: 0.3px; text-transform: uppercase;
+    .section-heading { margin: 0; }
+    .section-head {
+      display: flex; align-items: center; gap: 10px;
+      width: 100%; padding: 15px 16px;
+      border: none; background: none; text-align: left; font: inherit;
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
+      &:hover { background: var(--c-hover); }
     }
+    .section-icon {
+      font-size: 21px; color: var(--c-brand); flex-shrink: 0;
+      font-variation-settings: 'FILL' 0, 'wght' 400;
+    }
+    .section-title {
+      margin: 0; flex: 1;
+      font-size: 16px; font-weight: 800; color: var(--c-text); letter-spacing: -0.1px;
+    }
+    .section-chevron {
+      font-size: 22px; color: var(--c-text-3); flex-shrink: 0;
+      transition: transform 0.2s;
+    }
+    .section--open .section-chevron { transform: rotate(180deg); }
+
+    .section-body { padding: 0 16px 16px; animation: section-open 0.18s ease-out; }
+    @keyframes section-open {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .section-body { animation: none; }
+      .section-chevron { transition: none; }
+    }
+
     .subsection-title {
       margin: 0 0 12px;
       font-size: 13px; font-weight: 700; color: var(--c-text);
     }
     .section-desc {
-      margin: -8px 0 12px; font-size: 13px; color: var(--c-text-3); line-height: 1.5;
+      margin: 0 0 12px; font-size: 13px; color: var(--c-text-3); line-height: 1.5;
+    }
+    .setting-note {
+      margin: 12px 0 0; font-size: 12px; font-weight: 600; color: var(--c-brand); line-height: 1.4;
     }
 
     .setting-row {
       display: flex; align-items: center; gap: 14px;
       &.setting-row--top { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--c-border-2); }
+      /* Sense subtítols, la distància és qui diu què va amb què: les files
+         d'un mateix grup s'enganxen, i la línia de --top obre el següent. */
+      &.setting-row--tight { margin-top: 10px; }
     }
 
     /* ── Nav row (link with chevron) ── */
@@ -861,6 +1095,7 @@ export class SettingsComponent {
   private typeService      = inject(TrainingTypeService);
   private workoutService   = inject(WorkoutService);
   private router           = inject(Router);
+  private route            = inject(ActivatedRoute);
   private feedback         = inject(FeedbackService);
   private doc              = inject(DOCUMENT);
   private confirmDialog    = inject(ConfirmDialogService);
@@ -872,11 +1107,83 @@ export class SettingsComponent {
     this.exerciseService.ensureLoaded();
     this.sportService.ensureLoaded();
     this.typeService.ensureLoaded();
+
+    // Qui arriba demanant una secció la troba oberta. Hi entren per aquí els
+    // consells de descoberta, el nudge del pes corporal, el botó d'enrere de
+    // les subpàgines de configuració i les parades del tour al Perfil: totes
+    // apunten a `/settings?section=…` i no han de saber res més.
+    effect(() => {
+      const id = this.requestedSection();
+      if (id) this.openSection(id);
+    });
   }
+
+  // ── Seccions plegables ───────────────────────────────────────────────────
+
+  /** Les seccions obertes ara mateix. Buit per defecte: el Perfil s'obre
+   *  plegat sencer i cada visita només desplega el que ve a buscar. */
+  private readonly openSections = signal<ReadonlySet<SectionId>>(new Set());
+
+  /** La secció que demana la URL, si en demana cap de vàlida. */
+  private readonly requestedSection = toSignal(
+    this.route.queryParamMap.pipe(map(p => asSectionId(p.get('section')))),
+    { initialValue: asSectionId(this.route.snapshot.queryParamMap.get('section')) },
+  );
+
+  isOpen(id: SectionId): boolean { return this.openSections().has(id); }
+
+  toggleSection(id: SectionId): void {
+    const next = new Set(this.openSections());
+    if (next.has(id)) next.delete(id); else next.add(id);
+    this.openSections.set(next);
+    this.syncSectionUrl();
+  }
+
+  openSection(id: SectionId): void {
+    if (this.isOpen(id)) return;
+    this.openSections.set(new Set(this.openSections()).add(id));
+    this.syncSectionUrl();
+  }
+
+  /**
+   * L'última secció oberta viatja a la URL, substituint l'entrada d'historial
+   * en comptes d'afegir-ne una: així el botó d'enrere segueix sortint del
+   * Perfil, i no va desfent seccions una a una.
+   *
+   * És el que fa que tornar d'«Configurar exercicis» et deixi al Perfil amb
+   * «Configuració» oberta, com l'havies deixat, i que recarregar no la tanqui.
+   */
+  private syncSectionUrl(): void {
+    const last = [...this.openSections()].at(-1) ?? null;
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { section: last },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  // ── Onboarding ───────────────────────────────────────────────────────────
+
+  readonly tourStops = this.tour.total;
+
+  /** Confirmació a la pantalla: la benvinguda s'obre per sobre de tot i, si
+   *  l'usuari ha fet scroll, no és evident que hagi passat res. */
+  readonly replayed = signal(false);
 
   /** Engega el tour guiat. Ell mateix se'n va a Inici: la primera parada és
    *  la pestanya d'Inici, i explicar-la des de Perfil no tindria cap sentit. */
   startTour(): void { this.tour.start(); }
+
+  /**
+   * Torna a deixar el compte com el d'algú que entra per primer cop, pel que
+   * fa a la benvinguda. No toca cap dada: ni entrenaments, ni esports, ni
+   * preferències — només els dos indicadors de «ja ho has vist».
+   */
+  replayOnboarding(): void {
+    this.settingsService.update({ onboardingDone: false, guidedTourDone: false });
+    this.replayed.set(true);
+  }
 
   readonly CATALOG_VERSION = CATALOG_VERSION;
   readonly catalogReady = computed(() =>
@@ -1003,10 +1310,6 @@ export class SettingsComponent {
     this.settingsService.update({ metricsEnabled: !this.settingsService.metricsEnabled() });
   }
 
-  toggleRoutineHint(): void {
-    this.settingsService.update({ routineHintDismissed: !this.settingsService.settings().routineHintDismissed });
-  }
-
   setGoalMode(mode: GoalMode): void {
     this.settingsService.update({ goalMode: mode });
   }
@@ -1057,6 +1360,36 @@ export class SettingsComponent {
 
   clearSportGoal(): void {
     this.settingsService.update({ weeklySportGoal: null });
+  }
+
+  // ── Paràmetres avançats ──────────────────────────────────────────────────
+
+  toggleSupersets(): void {
+    this.settingsService.update({ supersetsEnabled: !this.settingsService.supersetsEnabled() });
+  }
+
+  toggleDropsets(): void {
+    this.settingsService.update({ dropsetsEnabled: !this.settingsService.dropsetsEnabled() });
+  }
+
+  toggleNextExerciseSuggestion(): void {
+    this.settingsService.update({ nextExerciseSuggestionEnabled: !this.settingsService.nextExerciseSuggestionEnabled() });
+  }
+
+  toggleRir(): void {
+    this.settingsService.update({ rirEnabled: !this.settingsService.rirEnabled() });
+  }
+
+  toggleManualRest(): void {
+    this.settingsService.update({ manualRestEnabled: !this.settingsService.manualRestEnabled() });
+  }
+
+  toggleBodyweightFactor(): void {
+    this.settingsService.update({ bodyweightFactorEnabled: !this.settingsService.bodyweightFactorEnabled() });
+  }
+
+  setDifficultyScale(scale: DifficultyScale): void {
+    this.settingsService.update({ difficultyScale: scale });
   }
 
   // ── Trainer mode ─────────────────────────────────────────────────────────
