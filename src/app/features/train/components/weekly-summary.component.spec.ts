@@ -2,43 +2,47 @@ import { NO_ERRORS_SCHEMA, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { WeeklySummaryComponent } from './weekly-summary.component';
-import { FitnessMetricsService } from '../../../core/services/fitness-metrics.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { SportService } from '../../../core/services/sport.service';
-import { DEFAULT_USER_SETTINGS } from '../../../core/models/user-settings.model';
+import { DEFAULT_USER_SETTINGS, UserSettings } from '../../../core/models/user-settings.model';
 
 // Fixed Wednesday, so "this week" is Mon Apr 21 → Sun Apr 27.
-const MOCK_DATE  = '2025-04-23';
-const THIS_WEEK  = '2025-04-22'; // Tuesday of the same week
-const LAST_WEEK  = '2025-04-16';
+const MOCK_DATE = '2025-04-23';
 
 describe('WeeklySummaryComponent', () => {
   let fixture: ComponentFixture<WeeklySummaryComponent>;
   let component: WeeklySummaryComponent;
-  let mockStreak: ReturnType<typeof signal<number>>;
+  let mockSettings: ReturnType<typeof signal<UserSettings>>;
+  let mockHasGoal:  ReturnType<typeof signal<boolean>>;
+  let mockLoaded:   ReturnType<typeof signal<boolean>>;
+  let gymDays:      string[];
+  let sportDays:    string[];
 
   beforeEach(async () => {
     jasmine.clock().install();
     jasmine.clock().mockDate(new Date(MOCK_DATE + 'T12:00:00'));
 
-    mockStreak = signal(0);
+    mockSettings = signal<UserSettings>({ ...DEFAULT_USER_SETTINGS });
+    mockHasGoal  = signal(true);
+    mockLoaded   = signal(true);
+    gymDays      = [];
+    sportDays    = [];
 
     await TestBed.configureTestingModule({
       imports: [WeeklySummaryComponent],
       providers: [
-        { provide: FitnessMetricsService, useValue: { goalStreak: mockStreak } },
         {
           provide: UserSettingsService,
           useValue: {
-            settings:       signal(DEFAULT_USER_SETTINGS),
-            hasWeeklyGoal:  signal(true),
-            loaded:         signal(true),
-            fitnessGoal:    signal(null),
+            settings:      mockSettings,
+            hasWeeklyGoal: mockHasGoal,
+            loaded:        mockLoaded,
+            fitnessGoal:   signal(null),
           },
         },
-        { provide: WorkoutService, useValue: { getDoneWorkoutsForDate: () => [] } },
-        { provide: SportService,   useValue: { getSportSessionsForDate: () => [] } },
+        { provide: WorkoutService, useValue: { getDoneWorkoutsForDate: (d: string) => gymDays.filter(x => x === d) } },
+        { provide: SportService,   useValue: { getSportSessionsForDate: (d: string) => sportDays.filter(x => x === d) } },
       ],
       schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();
@@ -49,37 +53,86 @@ describe('WeeklySummaryComponent', () => {
 
   afterEach(() => jasmine.clock().uninstall());
 
-  describe('streak', () => {
-    it('shows the streak on the current week', () => {
-      mockStreak.set(4);
-      expect(component.streak()).toBe(4);
+  describe('show()', () => {
+    it('shows the strip once there is a goal and the settings are loaded', () => {
+      expect(component.show()).toBeTrue();
     });
 
-    it('shows it too when the viewed date is another day of the current week', () => {
-      mockStreak.set(4);
-      fixture.componentRef.setInput('weekDate', THIS_WEEK);
-      expect(component.streak()).toBe(4);
+    it('stays hidden without a weekly goal', () => {
+      mockHasGoal.set(false);
+      expect(component.show()).toBeFalse();
     });
 
-    it('hides it when looking at a past week — today\'s streak says nothing there', () => {
-      mockStreak.set(4);
-      fixture.componentRef.setInput('weekDate', LAST_WEEK);
-      expect(component.streak()).toBeNull();
+    it('stays hidden while the settings are still loading', () => {
+      mockLoaded.set(false);
+      expect(component.show()).toBeFalse();
+    });
+  });
+
+  describe('weekBars()', () => {
+    it('counts the active days of the week against a combined goal', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, goalMode: 'combined', weeklyActivityGoal: 4 });
+      gymDays   = ['2025-04-21'];
+      sportDays = ['2025-04-22'];
+
+      const bars = component.weekBars();
+      expect(bars.length).toBe(1);
+      expect(bars[0].done).toBe(2);
+      expect(bars[0].target).toBe(4);
+      expect(bars[0].mascot).toBe('both');
     });
 
-    it('hides it with a single week, which is not a streak yet', () => {
-      mockStreak.set(1);
-      expect(component.streak()).toBeNull();
+    it('never draws past the end of the bar', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, goalMode: 'combined', weeklyActivityGoal: 1 });
+      gymDays = ['2025-04-21', '2025-04-22'];
+
+      expect(component.weekBars()[0].pct).toBe(100);
     });
 
-    it('shows it from two weeks on', () => {
-      mockStreak.set(2);
-      expect(component.streak()).toBe(2);
+    it('draws one bar per goal when they are separate', () => {
+      mockSettings.set({
+        ...DEFAULT_USER_SETTINGS,
+        goalMode: 'separate', weeklyGymGoal: 2, weeklySportGoal: 1,
+      });
+      gymDays   = ['2025-04-21', '2025-04-22'];
+      sportDays = ['2025-04-22'];
+
+      const bars = component.weekBars();
+      expect(bars.map(b => b.mascot)).toEqual(['marley', 'xoco']);
+      expect(bars[0].done).toBe(2);
+      expect(bars[1].done).toBe(1);
     });
 
-    it('hides it with no streak at all', () => {
-      mockStreak.set(0);
-      expect(component.streak()).toBeNull();
+    it('ignores days that have not happened yet', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, goalMode: 'combined', weeklyActivityGoal: 3 });
+      gymDays = ['2025-04-27']; // diumenge, encara per venir
+
+      expect(component.weekBars()[0].done).toBe(0);
+    });
+
+    it('draws nothing when the combined goal is not set', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, goalMode: 'combined', weeklyActivityGoal: null });
+      expect(component.weekBars()).toEqual([]);
+    });
+  });
+
+  describe('la ratxa', () => {
+    it('no surt al resum de setmana: es felicita quan s\'aconsegueix, no es penja', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, goalMode: 'combined', weeklyActivityGoal: 2 });
+      gymDays = ['2025-04-21', '2025-04-22'];
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.textContent).not.toContain('seguides');
+    });
+  });
+
+  describe('dogsOf()', () => {
+    it('pairs both dogs for a combined goal', () => {
+      expect(component.dogsOf('both').length).toBe(2);
+    });
+
+    it('returns a single dog otherwise', () => {
+      expect(component.dogsOf('marley').length).toBe(1);
     });
   });
 });

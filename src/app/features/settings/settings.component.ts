@@ -5,7 +5,6 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
 import { AuthService } from '../../core/services/auth.service';
 import { ExerciseService } from '../../core/services/exercise.service';
-import { FitnessMetricsService } from '../../core/services/fitness-metrics.service';
 import { TrainingTypeService } from '../../core/services/training-type.service';
 import { SportService } from '../../core/services/sport.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
@@ -162,17 +161,6 @@ import { todayStr } from '../../shared/utils/date.utils';
                 }
               </div>
 
-            </div>
-          }
-
-          @if (metricsService.goalStreak() > 0) {
-            <div class="streak-row">
-              <span class="streak-fire">🔥</span>
-              <span class="streak-text">
-                {{ metricsService.goalStreak() }}
-                setmana{{ metricsService.goalStreak() !== 1 ? 'nes' : '' }}
-                consecutiva{{ metricsService.goalStreak() !== 1 ? 's' : '' }}
-              </span>
             </div>
           }
       </div>
@@ -774,15 +762,6 @@ import { todayStr } from '../../shared/utils/date.utils';
     .fg-emoji { font-size: 22px; line-height: 1; flex-shrink: 0; }
     .fg-label { font-size: 13px; font-weight: 700; color: var(--c-text-2); line-height: 1.2; }
 
-    /* ── Goal streak ── */
-    .streak-row {
-      display: flex; align-items: center; gap: 8px;
-      margin-top: 10px; padding: 8px 12px;
-      background: rgba(230, 81, 0, 0.07); border-radius: 10px;
-    }
-    .streak-fire { font-size: 17px; line-height: 1; flex-shrink: 0; }
-    .streak-text { font-size: 13px; font-weight: 700; color: #e65100; }
-
     /* ── Export button ── */
     .export-btn {
       width: 38px; height: 38px; border-radius: 10px; border: 1.5px solid var(--c-border);
@@ -876,7 +855,6 @@ import { todayStr } from '../../shared/utils/date.utils';
 export class SettingsComponent {
   readonly authService     = inject(AuthService);
   readonly settingsService = inject(UserSettingsService);
-  readonly metricsService  = inject(FitnessMetricsService);
   readonly trainerService  = inject(TrainerService);
   readonly exerciseService = inject(ExerciseService);
   private sportService     = inject(SportService);
