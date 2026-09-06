@@ -277,6 +277,21 @@ describe('FitnessMetricsService', () => {
     });
   });
 
+  it('says nothing that compares a new user with a past they do not have', () => {
+    // Dues setmanes d'app i moltes ganes: res del que compara contra "abans"
+    // pot sortir, perquè aquest "abans" són setmanes en què encara no hi era.
+    withGoal(3);
+    mockWorkouts.set([
+      ...weekDates(1, 6).map(dd => makeWorkoutWithCats(dd, ['push'])),
+      ...[5, 4, 3, 2, 1].map(n => makeWorkout(d(-n))),
+    ]);
+
+    const shown = types();
+    for (const t of ['sense_activitat', 'carrega_alta', 'tendencia_volum', 'patro_setmanal', 'equilibri_gym']) {
+      expect(shown).not.toContain(t as InsightType);
+    }
+  });
+
   it('does not judge 6 or 12 weeks of history a new user does not have', () => {
     // Tres setmanes registrades: els buckets anteriors existeixen, però són
     // setmanes en què l'usuari encara no hi era.
@@ -320,6 +335,27 @@ describe('FitnessMetricsService', () => {
 
       expect(types()).not.toContain('sense_activitat');
     });
+
+    it('stays quiet for a brand-new user: nothing has been abandoned yet', () => {
+      // Quinze dies d'app, molt intensos, i tres setmanes de silenci. Sense el
+      // filtre d'història, dividir aquelles activitats entre 8 setmanes donava
+      // un "ritme d'abans" de més de 2 per setmana i li dèiem que ens trobava
+      // a faltar algú que tot just havia arribat.
+      const dates = [-27, -26, -25, -24, -23, -22, -21, -20, -19];
+      mockWorkouts.set(dates.map(n => makeWorkout(d(n))));
+      mockSports.set([makeSport()]);
+      mockSessions.set(dates.map(n => makeSession(d(n))));
+
+      expect(types()).not.toContain('sense_activitat');
+    });
+
+    it('does not turn a few days in a row into a habit worth missing', () => {
+      // Tres dies seguits fa mes i mig i prou: el ritme d'abans es mesura com a
+      // mínim sobre quatre setmanes, no sobre els tres dies que va durar.
+      mockWorkouts.set([-40, -39, -38].flatMap(n => [makeWorkout(d(n)), makeWorkout(d(n))]));
+
+      expect(types()).not.toContain('sense_activitat');
+    });
   });
 
   describe('carrega_alta', () => {
@@ -337,6 +373,19 @@ describe('FitnessMetricsService', () => {
 
     it('stays quiet when a busy week is the user\'s normal', () => {
       mockWorkouts.set(spread(0, 9, 5).map(dd => makeWorkout(dd)));
+
+      expect(types()).not.toContain('carrega_alta');
+    });
+
+    it('stays quiet for a new user: the average is not made of empty weeks', () => {
+      // Tres setmanes d'app entrenant molt. La "mitjana" sortia de dividir-ho
+      // entre vuit setmanes, cinc de les quals ell no havia viscut, i qualsevol
+      // setmana seva quedava per sobre.
+      mockWorkouts.set([
+        ...weekDates(2, 7).map(dd => makeWorkout(dd)),
+        ...weekDates(1, 7).map(dd => makeWorkout(dd)),
+        ...[6, 5, 4, 3, 2, 1].map(n => makeWorkout(d(-n))),
+      ]);
 
       expect(types()).not.toContain('carrega_alta');
     });
@@ -442,7 +491,10 @@ describe('FitnessMetricsService', () => {
   describe('tendencia_volum', () => {
     it('compares the last four weeks with the four before them', () => {
       // Finestres de 28 dies comptats des d'avui, no setmanes de calendari.
+      // El de fa 80 dies queda fora de totes dues: només hi és perquè l'usuari
+      // tingui prou passat per comparar dos mesos.
       mockWorkouts.set([
+        makeWorkout(d(-80)),
         ...[30, 35, 40, 45].map(n => makeWorkout(d(-n))),
         ...Array.from({ length: 12 }, (_, i) => makeWorkout(d(-(i + 1)))),
       ]);
@@ -455,6 +507,7 @@ describe('FitnessMetricsService', () => {
 
     it('frames a quieter month without any pressure', () => {
       mockWorkouts.set([
+        makeWorkout(d(-80)),
         ...Array.from({ length: 12 }, (_, i) => makeWorkout(d(-(i + 29)))),
         ...[1, 5, 9, 13].map(n => makeWorkout(d(-n))),
       ]);
@@ -466,7 +519,19 @@ describe('FitnessMetricsService', () => {
 
     it('stays quiet on a change under 25%', () => {
       mockWorkouts.set([
+        makeWorkout(d(-80)),
         ...Array.from({ length: 12 }, (_, i) => makeWorkout(d(-(i + 29)))),
+        ...Array.from({ length: 12 }, (_, i) => makeWorkout(d(-(i + 1)))),
+      ]);
+
+      expect(types()).not.toContain('tendencia_volum');
+    });
+
+    it('stays quiet for a first month: there is no month before it', () => {
+      // Mateixa forma que el primer cas, però sense passat: tot l'històric de
+      // l'usuari cap dins de la finestra "d'abans".
+      mockWorkouts.set([
+        ...[30, 35, 40].map(n => makeWorkout(d(-n))),
         ...Array.from({ length: 12 }, (_, i) => makeWorkout(d(-(i + 1)))),
       ]);
 
@@ -545,6 +610,19 @@ describe('FitnessMetricsService', () => {
 
       expect(types()).not.toContain('patro_setmanal');
     });
+
+    it('needs 12 weeks of history before calling anything a pattern', () => {
+      // Sis setmanes de dimarts i dijous claríssims: encara no és "el teu
+      // patró de setmana", és com han anat aquestes sis setmanes.
+      const dates: string[] = [];
+      for (let w = 1; w <= 6; w++) {
+        const week = weekDates(w, 7);
+        dates.push(week[1], week[3]);
+      }
+      mockWorkouts.set(dates.map(dd => makeWorkout(dd)));
+
+      expect(types()).not.toContain('patro_setmanal');
+    });
   });
 
   describe('equilibri_gym', () => {
@@ -568,6 +646,15 @@ describe('FitnessMetricsService', () => {
         ...weekDates(6, 3).map(dd => makeWorkoutWithCats(dd, ['push'])),
         ...weekDates(4, 3).map(dd => makeWorkoutWithCats(dd, ['pull'])),
         ...weekDates(2, 3).map(dd => makeWorkoutWithCats(dd, ['legs'])),
+      ]);
+
+      expect(types()).not.toContain('equilibri_gym');
+    });
+
+    it('stays quiet in the first weeks, when it is just the order of starting', () => {
+      mockWorkouts.set([
+        ...weekDates(2, 4).map(dd => makeWorkoutWithCats(dd, ['push'])),
+        ...weekDates(1, 3).map(dd => makeWorkoutWithCats(dd, ['pull'])),
       ]);
 
       expect(types()).not.toContain('equilibri_gym');
