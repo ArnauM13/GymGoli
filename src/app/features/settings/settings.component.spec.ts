@@ -605,12 +605,6 @@ describe('SettingsComponent', () => {
       component.replayOnboarding();
       expect(mockUpdate).toHaveBeenCalledWith({ onboardingDone: false, guidedTourDone: false });
     });
-
-    it('flags the on-screen confirmation', () => {
-      expect(component.replayed()).toBe(false);
-      component.replayOnboarding();
-      expect(component.replayed()).toBe(true);
-    });
   });
 
   // ── Paràmetres avançats ──────────────────────────────────────────────────

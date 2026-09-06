@@ -226,15 +226,18 @@ form.
   width: 100%; padding: 15px 16px;
   border: none; background: none; text-align: left; font: inherit;
   cursor: pointer; touch-action: manipulation;
-  &:hover { background: var(--c-hover); }
+  -webkit-tap-highlight-color: transparent;
 }
 .section-chevron { transition: transform 0.2s; }
 .section--open .section-chevron { transform: rotate(180deg); }
-.section-body { padding: 0 16px 16px; animation: section-open 0.18s ease-out; }
+.section-body { padding: 8px 16px 16px; animation: section-open 0.18s ease-out; }
 ```
 
 - The heading wraps the button (not the other way round): screen readers keep
   the outline, and `aria-expanded` says whether the group is open.
+- **The header doesn't change colour when you press it.** A `:hover` background
+  stays stuck on touch after the tap, so the section you just opened looks
+  selected. The chevron already says whether it's open.
 - Group the open ids in one `signal<ReadonlySet<Id>>`, empty by default.
 - Honour `prefers-reduced-motion`: no open animation, no chevron rotation.
 - Give the sections a **deep link** (`/settings?section=advanced`) and write

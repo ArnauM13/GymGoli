@@ -660,10 +660,6 @@ function asSectionId(value: string | null): SectionId | null {
               <span class="material-symbols-outlined nav-row-arrow">restart_alt</span>
             </button>
 
-            @if (replayed()) {
-              <p class="setting-note">Fet. La benvinguda s'obre tot seguit.</p>
-            }
-
           </div>
         }
       </div>
@@ -790,8 +786,10 @@ function asSectionId(value: string | null): SectionId | null {
       display: flex; align-items: center; gap: 10px;
       width: 100%; padding: 15px 16px;
       border: none; background: none; text-align: left; font: inherit;
-      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
-      &:hover { background: var(--c-hover); }
+      cursor: pointer; touch-action: manipulation;
+      /* Sense canvi de fons: el toc deixava el gris del :hover enganxat a la
+       * secció que acabaves d'obrir. El xebró ja diu si està oberta. */
+      -webkit-tap-highlight-color: transparent;
     }
     .section-icon {
       font-size: 21px; color: var(--c-brand); flex-shrink: 0;
@@ -807,7 +805,7 @@ function asSectionId(value: string | null): SectionId | null {
     }
     .section--open .section-chevron { transform: rotate(180deg); }
 
-    .section-body { padding: 0 16px 16px; animation: section-open 0.18s ease-out; }
+    .section-body { padding: 8px 16px 16px; animation: section-open 0.18s ease-out; }
     @keyframes section-open {
       from { opacity: 0; transform: translateY(-4px); }
       to   { opacity: 1; transform: none; }
@@ -1167,10 +1165,6 @@ export class SettingsComponent {
 
   readonly tourStops = this.tour.total;
 
-  /** Confirmació a la pantalla: la benvinguda s'obre per sobre de tot i, si
-   *  l'usuari ha fet scroll, no és evident que hagi passat res. */
-  readonly replayed = signal(false);
-
   /** Engega el tour guiat. Ell mateix se'n va a Inici: la primera parada és
    *  la pestanya d'Inici, i explicar-la des de Perfil no tindria cap sentit. */
   startTour(): void { this.tour.start(); }
@@ -1182,7 +1176,6 @@ export class SettingsComponent {
    */
   replayOnboarding(): void {
     this.settingsService.update({ onboardingDone: false, guidedTourDone: false });
-    this.replayed.set(true);
   }
 
   readonly CATALOG_VERSION = CATALOG_VERSION;
