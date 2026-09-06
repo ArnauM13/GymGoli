@@ -1,7 +1,9 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 
+import { InsightDetailSheetComponent } from './insight-detail-sheet.component';
 import { MASCOTS, MascotMeta } from '../../../core/models/mascot.model';
-import { FitnessInsight, FitnessMetricsService } from '../../../core/services/fitness-metrics.service';
+import { FitnessInsight } from '../../../core/models/insight.model';
+import { FitnessMetricsService } from '../../../core/services/fitness-metrics.service';
 import { TodayService } from '../../../core/services/today.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 
@@ -43,6 +45,7 @@ function prune(map: SeenMap, today: string): SeenMap {
 @Component({
   selector: 'app-fitness-insights',
   standalone: true,
+  imports: [InsightDetailSheetComponent],
   template: `
     <!-- Aquí els gossos no surten a parlar: els insights es queden en
          targetes. Les bafarades es reserven per a l'entrenament suggerit.
@@ -53,22 +56,32 @@ function prune(map: SeenMap, today: string): SeenMap {
       <div class="insights-wrap">
         <div class="insight-card" [style.--ic]="ins.color">
           <div class="ic-accent"></div>
-          <div class="ic-who" [class.ic-who--pair]="mascotsOf(ins).length > 1">
-            @for (m of mascotsOf(ins); track m.name) {
-              <img class="ic-avatar" [src]="m.avatar" [alt]="m.alt">
-            }
-            <span class="ic-emoji">{{ ins.emoji }}</span>
-          </div>
-          <div class="ic-body">
-            <span class="ic-title">{{ ins.title }}</span>
-            <span class="ic-stat">{{ ins.stat }}</span>
-            <span class="ic-msg">{{ ins.message }}</span>
-          </div>
-          <button class="ic-dismiss" (click)="dismiss(ins.type)" title="Tancar">
-            <span class="material-symbols-outlined">close</span>
+          <!-- Tota la targeta obre el detall; la creu queda a fora del botó,
+               que si no seria un botó dins d'un botó. -->
+          <button class="ic-open" (click)="openDetail()"
+                  [attr.aria-label]="openLabel(ins)">
+            <span class="ic-who" [class.ic-who--pair]="mascotsOf(ins).length > 1">
+              @for (m of mascotsOf(ins); track m.name) {
+                <img class="ic-avatar" [src]="m.avatar" [alt]="m.alt">
+              }
+              <span class="ic-emoji" aria-hidden="true">{{ ins.emoji }}</span>
+            </span>
+            <span class="ic-body">
+              <span class="ic-title">{{ ins.title }}</span>
+              <span class="ic-stat">{{ ins.stat }}</span>
+              <span class="ic-msg">{{ ins.message }}</span>
+            </span>
+            <span class="material-symbols-outlined ic-more" aria-hidden="true">chevron_right</span>
+          </button>
+          <button class="ic-dismiss" (click)="dismiss(ins.type)" aria-label="Tancar">
+            <span class="material-symbols-outlined" aria-hidden="true">close</span>
           </button>
         </div>
       </div>
+
+      @if (detailOpen()) {
+        <app-insight-detail-sheet [insight]="ins" (close)="closeDetail()" />
+      }
     }
   `,
   styles: [`
@@ -94,6 +107,25 @@ function prune(map: SeenMap, today: string): SeenMap {
     .ic-accent {
       width: 5px; align-self: stretch; flex-shrink: 0;
       background: var(--ic);
+    }
+
+    /* La targeta sencera és el botó que obre el detall. Es pinta com abans:
+       el botó no ha d'afegir cap marc, només fer-la tocable. */
+    .ic-open {
+      flex: 1; min-width: 0;
+      display: flex; align-items: center; gap: 0;
+      border: none; background: transparent; padding: 0;
+      font: inherit; color: inherit; text-align: left;
+      cursor: pointer; touch-action: manipulation;
+      transition: background 0.15s;
+      &:hover { background: color-mix(in srgb, var(--ic) 5%, transparent); }
+      &:active { background: color-mix(in srgb, var(--ic) 8%, transparent); }
+      &:focus-visible { outline: 2px solid var(--ic); outline-offset: -2px; }
+    }
+
+    .ic-more {
+      flex-shrink: 0; font-size: 18px; color: var(--c-text-3);
+      opacity: 0.65;
     }
 
     /* Qui parla (avatar) + com se sent (emoji, com a xapa a sota a la dreta).
@@ -132,6 +164,8 @@ function prune(map: SeenMap, today: string): SeenMap {
       padding: 12px 4px 12px 0;
     }
 
+    .ic-title, .ic-stat, .ic-msg { display: block; }
+
     .ic-title {
       font-size: 13px; font-weight: 800; line-height: 1.2;
       color: color-mix(in srgb, var(--ic) 60%, var(--c-text));
@@ -150,6 +184,7 @@ function prune(map: SeenMap, today: string): SeenMap {
     .ic-dismiss {
       flex-shrink: 0;
       width: 40px; height: 40px;
+      align-self: center;
       border: none; background: transparent; cursor: pointer;
       color: var(--c-text-3); touch-action: manipulation; margin-right: 4px;
       display: flex; align-items: center; justify-content: center;
@@ -186,12 +221,27 @@ export class FitnessInsightsComponent {
     ) ?? null;
   });
 
+  /** El full amb el «per què t'ho diem». S'obre tocant la targeta. */
+  private readonly _detailOpen = signal(false);
+  readonly detailOpen = this._detailOpen.asReadonly();
+
   constructor() {
     effect(() => {
       const ins = this.insight();
       if (ins) this._recordShown(ins.type, this.todayService.today());
+      // Si l'insight canvia sota els peus (canvi de dia, dades noves), el full
+      // que hi havia obert ja no parla del que es veu: es tanca.
+      if (!ins) this._detailOpen.set(false);
     });
   }
+
+  /** El botó ha de dir on porta, no repetir el títol que ja es llegeix. */
+  openLabel(insight: FitnessInsight): string {
+    return `Veure per què t'ho diem: ${insight.title}`;
+  }
+
+  openDetail(): void  { this._detailOpen.set(true); }
+  closeDetail(): void { this._detailOpen.set(false); }
 
   /**
    * Un estat lent (un patró de 12 setmanes) no canvia d'un dia per l'altre:
@@ -224,6 +274,7 @@ export class FitnessInsightsComponent {
 
   /** Es tanca i no torna en tot el dia. L'endemà sí. */
   dismiss(type: string): void {
+    this._detailOpen.set(false);
     const today = this.todayService.today();
     this.dismissed.update(prev => {
       const next = prune({ ...prev }, today);

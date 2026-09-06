@@ -551,6 +551,34 @@ nav pill (inset side margins, all four corners rounded) and slide up from below.
 - Floating cards that aren't full sheets (rest timer, confirm bars) sit above
   the nav with `bottom: calc(var(--nav-height) + N)` — never a hardcoded px.
 
+### Insight detail sheet & mini chart
+
+Tapping an insight card on `home` opens `app-insight-detail-sheet`: the same
+floating sheet shell, with the card's own hue passed down as `--ic`. Its
+layout is fixed — header (avatar + title + stat), one-line headline, chart,
+a bordered list of figures, and a tinted "what it means" block.
+
+The chart is plain CSS, no chart library:
+
+- **Bars only, one series.** No legend (the caption names the series), no
+  pie, no line. It has to be readable by someone who doesn't read charts.
+- **Two rows, not one:** a `position: relative` bar row of fixed height, and
+  a separate label row underneath — so a bar's height is measured against the
+  plot alone and never against the text below it.
+- **Colour is the insight's hue**: `--ic` at 42% over the card for context
+  bars, full `--ic` for the ones being explained, and a neutral grey mix for
+  bars that are only there to compare against. A bar may carry its own
+  `color` (training types keep theirs everywhere). In dark mode both mix
+  toward `--c-text` — the insight hues are picked for white.
+- **One number, not twelve.** Only the *last* highlighted bar gets its value
+  written above it; a number on every bar stops being read.
+- **Thin out the x labels above 8 bars** (first, last, and the highlighted
+  one). Never drop a bar to make labels fit — the data stays whole.
+- **A reference line is always named** (`objectiu 3`, `el teu ritme`), and the
+  scale includes it so it can't fall outside the plot.
+- **Accessibility:** the plot is `role="img"` with an `aria-label` that reads
+  every bar out loud; the figures below repeat the numbers as text.
+
 ---
 
 ## 9. Interaction Patterns

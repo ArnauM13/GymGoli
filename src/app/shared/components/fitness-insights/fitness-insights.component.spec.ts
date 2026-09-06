@@ -2,7 +2,8 @@ import { NO_ERRORS_SCHEMA, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { FitnessInsightsComponent } from './fitness-insights.component';
-import { FitnessInsight, FitnessMetricsService, INSIGHT_LEVEL } from '../../../core/services/fitness-metrics.service';
+import { FitnessInsight, INSIGHT_LEVEL } from '../../../core/models/insight.model';
+import { FitnessMetricsService } from '../../../core/services/fitness-metrics.service';
 import { TodayService } from '../../../core/services/today.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 
@@ -24,6 +25,12 @@ function makeInsight(type: string, overrides: Partial<FitnessInsight> = {}): Fit
     level: INSIGHT_LEVEL.tendencia,
     strength: 10,
     cooldownDays: 0,
+    detail: {
+      headline: `Headline for ${type}`,
+      chart: { caption: 'Activitats per setmana', bars: [{ label: 'dl', value: 2 }] },
+      facts: [{ label: 'Fact', value: '2' }],
+      meaning: `Meaning for ${type}`,
+    },
     ...overrides,
   };
 }
@@ -183,6 +190,50 @@ describe('FitnessInsightsComponent', () => {
       expect(component.insight()!.type).toBe('patro_setmanal');
 
       expect(JSON.parse(localStorage.getItem(SHOWN_KEY)!)).toEqual({ patro_setmanal: TODAY });
+    });
+  });
+
+  // ── El detall ────────────────────────────────────────────────────────────
+
+  describe('el full de detall', () => {
+    it('comença tancat i s\'obre tocant la targeta', async () => {
+      await build();
+      mockInsights.set([makeInsight('tendencia_volum')]);
+
+      expect(component.detailOpen()).toBe(false);
+
+      component.openDetail();
+      expect(component.detailOpen()).toBe(true);
+    });
+
+    it('el botó diu on porta, sense repetir només el títol', async () => {
+      await build();
+      const label = component.openLabel(makeInsight('tendencia_volum'));
+
+      expect(label).toContain('Title for tendencia_volum');
+      expect(label.length).toBeGreaterThan('Title for tendencia_volum'.length);
+    });
+
+    it('es tanca sol quan es tanca la targeta', async () => {
+      await build();
+      mockInsights.set([makeInsight('tendencia_volum')]);
+      component.openDetail();
+
+      component.dismiss('tendencia_volum');
+
+      expect(component.detailOpen()).toBe(false);
+    });
+
+    it('es tanca sol si l\'insight desapareix sota els peus', async () => {
+      await build();
+      mockInsights.set([makeInsight('tendencia_volum')]);
+      fixture.detectChanges();
+      component.openDetail();
+
+      mockInsights.set([]);
+      fixture.detectChanges();
+
+      expect(component.detailOpen()).toBe(false);
     });
   });
 
