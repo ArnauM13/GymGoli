@@ -75,8 +75,8 @@ const DISCOVERY_HINTS: AppHint[] = [
     id: 'discover-advanced',
     icon: 'tune',
     title: 'Opcions per entrenar més fi',
-    body: 'Activa supersets, dropsets, RIR o l\'escala de dificultat numèrica als paràmetres avançats.',
-    route: '/settings/advanced',
+    body: 'Activa supersets, dropsets, RIR o l\'escala de dificultat numèrica als paràmetres avançats del Perfil.',
+    route: '/settings',
     cta: 'Paràmetres avançats',
   },
 ];

@@ -573,7 +573,7 @@ export class HomeComponent {
 
   async dismissRoutineHint(): Promise<void> {
     const ok = await this.confirmDialog.confirm(
-      'Si l\'amagues, no tornaràs a veure aquest avís. Podràs reactivar-lo des del teu Perfil.',
+      'Si l\'amagues, no tornaràs a veure aquest avís.',
       { title: 'Amagar avís de rutina', confirmLabel: 'Amagar', cancelLabel: 'Cancel·lar' },
     );
     if (!ok) return;

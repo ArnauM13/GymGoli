@@ -66,6 +66,10 @@ describe('SettingsComponent', () => {
             supersetsEnabled:   signal(false),
             dropsetsEnabled:    signal(false),
             rirEnabled:         signal(false),
+            manualRestEnabled:  signal(false),
+            bodyweightFactorEnabled:       signal(false),
+            nextExerciseSuggestionEnabled: signal(false),
+            guidedTourDone:     signal(false),
             difficultyScale:    signal('emoji'),
             bodyweightKg:       signal(null),
             catalogSyncedVersion: signal(0),
@@ -179,13 +183,6 @@ describe('SettingsComponent', () => {
     it('calls update exactly once per toggle', () => {
       component.toggleMetrics();
       expect(mockUpdate).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('toggleRoutineHint()', () => {
-    it('dismisses the hint when currently shown', () => {
-      component.toggleRoutineHint();
-      expect(mockUpdate).toHaveBeenCalledWith({ routineHintDismissed: true });
     });
   });
 
@@ -551,6 +548,89 @@ describe('SettingsComponent', () => {
     it('revokes the object URL after download', async () => {
       await component.exportData();
       expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:fake-url');
+    });
+  });
+
+  // ── Seccions plegables ───────────────────────────────────────────────────
+
+  describe('collapsible sections', () => {
+    it('starts with every section collapsed', () => {
+      for (const id of ['goal', 'config', 'app-prefs', 'advanced', 'onboarding', 'account'] as const) {
+        expect(component.isOpen(id)).withContext(id).toBe(false);
+      }
+    });
+
+    it('opens a section on the first toggle and closes it on the second', () => {
+      component.toggleSection('advanced');
+      expect(component.isOpen('advanced')).toBe(true);
+      component.toggleSection('advanced');
+      expect(component.isOpen('advanced')).toBe(false);
+    });
+
+    it('keeps the other sections closed when one opens', () => {
+      component.toggleSection('goal');
+      expect(component.isOpen('config')).toBe(false);
+      expect(component.isOpen('account')).toBe(false);
+    });
+
+    it('openSection() is idempotent', () => {
+      component.openSection('config');
+      component.openSection('config');
+      expect(component.isOpen('config')).toBe(true);
+    });
+  });
+
+  // ── Onboarding ───────────────────────────────────────────────────────────
+
+  describe('replayOnboarding()', () => {
+    it('clears both "already seen" flags without touching any data', () => {
+      component.replayOnboarding();
+      expect(mockUpdate).toHaveBeenCalledWith({ onboardingDone: false, guidedTourDone: false });
+    });
+
+    it('flags the on-screen confirmation', () => {
+      expect(component.replayed()).toBe(false);
+      component.replayOnboarding();
+      expect(component.replayed()).toBe(true);
+    });
+  });
+
+  // ── Paràmetres avançats ──────────────────────────────────────────────────
+
+  describe('advanced toggles', () => {
+    it('toggleSupersets() flips supersetsEnabled', () => {
+      component.toggleSupersets();
+      expect(mockUpdate).toHaveBeenCalledWith({ supersetsEnabled: true });
+    });
+
+    it('toggleDropsets() flips dropsetsEnabled', () => {
+      component.toggleDropsets();
+      expect(mockUpdate).toHaveBeenCalledWith({ dropsetsEnabled: true });
+    });
+
+    it('toggleNextExerciseSuggestion() flips nextExerciseSuggestionEnabled', () => {
+      component.toggleNextExerciseSuggestion();
+      expect(mockUpdate).toHaveBeenCalledWith({ nextExerciseSuggestionEnabled: true });
+    });
+
+    it('toggleRir() flips rirEnabled', () => {
+      component.toggleRir();
+      expect(mockUpdate).toHaveBeenCalledWith({ rirEnabled: true });
+    });
+
+    it('toggleManualRest() flips manualRestEnabled', () => {
+      component.toggleManualRest();
+      expect(mockUpdate).toHaveBeenCalledWith({ manualRestEnabled: true });
+    });
+
+    it('toggleBodyweightFactor() flips bodyweightFactorEnabled', () => {
+      component.toggleBodyweightFactor();
+      expect(mockUpdate).toHaveBeenCalledWith({ bodyweightFactorEnabled: true });
+    });
+
+    it('setDifficultyScale() stores the chosen scale', () => {
+      component.setDifficultyScale('numeric');
+      expect(mockUpdate).toHaveBeenCalledWith({ difficultyScale: 'numeric' });
     });
   });
 });
