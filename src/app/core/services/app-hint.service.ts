@@ -67,7 +67,7 @@ const DISCOVERY_HINTS: AppHint[] = [
     id: 'discover-preferences',
     icon: 'palette',
     title: 'Fes l\'app teva des de Perfil',
-    body: 'Tema i unitats de pes a «Preferències de l\'app»; el temporitzador de descans i el teu pes corporal, a «Paràmetres avançats».',
+    body: 'Tema i unitats de pes a «Preferències de l\'app»; el temporitzador de descans, a «Paràmetres avançats»; el teu pes corporal, a «El meu cos».',
     route: '/settings?section=app-prefs',
     cta: 'Obrir Perfil',
   },

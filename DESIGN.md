@@ -247,6 +247,11 @@ form.
 - **One level only.** Don't nest sub-collapsibles, and don't split an open
   section into subsections the reader has to scan past: a section that is
   worth opening is worth showing whole.
+- Inside an open section, **distance does the grouping** that subtitles
+  would: rows that belong together sit closer (`.setting-row--tight`,
+  `margin-top: 10px`, no rule) and the next group opens with the
+  `.setting-row--top` rule. If a row doesn't belong to any group here, it
+  probably belongs to another section.
 
 ---
 

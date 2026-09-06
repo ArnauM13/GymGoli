@@ -31,7 +31,7 @@ import { todayStr } from '../../shared/utils/date.utils';
  * algú a una secció concreta els fa servir.
  */
 const SECTION_IDS = [
-  'goal', 'config', 'app-prefs', 'advanced', 'trainer', 'onboarding', 'account',
+  'goal', 'body', 'config', 'app-prefs', 'advanced', 'trainer', 'onboarding', 'account',
 ] as const;
 
 type SectionId = typeof SECTION_IDS[number];
@@ -196,6 +196,57 @@ function asSectionId(value: string | null): SectionId | null {
         }
       </div>
 
+      <!-- ── El meu cos ──
+           El pes corporal no és un paràmetre: és una dada teva, i l'única
+           que l'app fa servir per calcular. Va amb el seu interruptor
+           (el factor per exercici), que sense pes no serveix de res. -->
+      <div class="section" [class.section--open]="isOpen('body')">
+        <h2 class="section-heading">
+          <button class="section-head" (click)="toggleSection('body')" [attr.aria-expanded]="isOpen('body')">
+            <span class="material-symbols-outlined section-icon">monitor_weight</span>
+            <span class="section-title">El meu cos</span>
+            <span class="material-symbols-outlined section-chevron">expand_more</span>
+          </button>
+        </h2>
+        @if (isOpen('body')) {
+          <div class="section-body">
+
+            <div class="setting-row">
+              <div class="setting-info">
+                <span class="setting-label">Pes corporal</span>
+                <span class="setting-desc">Opcional. Si l'afegeixes, els exercicis de propi pes (dominades, fons…) sumaran volum. Si no, es registren igual però no compten al volum.</span>
+              </div>
+              <div class="rest-input-wrap">
+                <input
+                  class="rest-input"
+                  type="number"
+                  min="1"
+                  max="500"
+                  inputmode="decimal"
+                  placeholder="—"
+                  [value]="bodyweightDisplay() ?? ''"
+                  (change)="setBodyweightFromInput($event)"
+                />
+                <span class="rest-input-unit">{{ settingsService.weightUnit() }}</span>
+              </div>
+            </div>
+
+            <div class="setting-row setting-row--tight">
+              <div class="setting-info">
+                <span class="setting-label">Ajustar el factor de pes corporal</span>
+                <span class="setting-desc">Mostra al formulari d'exercici el % del pes corporal que compta al volum (p. ex. flexions 65%). Per defecte ja ve amb valors sensats.</span>
+              </div>
+              <mat-slide-toggle
+                [checked]="settingsService.bodyweightFactorEnabled()"
+                (change)="toggleBodyweightFactor()"
+                color="primary"
+              />
+            </div>
+
+          </div>
+        }
+      </div>
+
       <!-- ── Configuració ── -->
       <div class="section" [class.section--open]="isOpen('config')">
         <h2 class="section-heading">
@@ -313,10 +364,10 @@ function asSectionId(value: string | null): SectionId | null {
       </div>
 
       <!-- ── Paràmetres avançats ──
-           El que abans era una pàgina a part (/settings/advanced), més les
-           preferències personals (el teu cos, el teu descans). Una sola
-           llista i prou: partir-la en subseccions només afegia un nivell
-           més per travessar abans d'arribar al que venies a canviar. -->
+           El que abans era una pàgina a part (/settings/advanced). Sense
+           subtítols, però ordenat: el que va junt s'assembla junt. Quatre
+           grups, separats per una línia: com s'estructura una sèrie, què
+           n'anotes, el descans, i l'ajuda mentre entrenes. -->
       <div class="section" [class.section--open]="isOpen('advanced')">
         <h2 class="section-heading">
           <button class="section-head" (click)="toggleSection('advanced')" [attr.aria-expanded]="isOpen('advanced')">
@@ -328,26 +379,56 @@ function asSectionId(value: string | null): SectionId | null {
         @if (isOpen('advanced')) {
           <div class="section-body">
 
+            <!-- Com s'estructura una sèrie -->
             <div class="setting-row">
               <div class="setting-info">
-                <span class="setting-label">Pes corporal</span>
-                <span class="setting-desc">Opcional. Si l'afegeixes, els exercicis de propi pes (dominades, fons…) sumaran volum. Si no, es registren igual però no compten al volum.</span>
+                <span class="setting-label">Agrupar en superset</span>
+                <span class="setting-desc">Permet enllaçar exercicis perquè es facin seguits, sense descans.</span>
               </div>
-              <div class="rest-input-wrap">
-                <input
-                  class="rest-input"
-                  type="number"
-                  min="1"
-                  max="500"
-                  inputmode="decimal"
-                  placeholder="—"
-                  [value]="bodyweightDisplay() ?? ''"
-                  (change)="setBodyweightFromInput($event)"
-                />
-                <span class="rest-input-unit">{{ settingsService.weightUnit() }}</span>
+              <mat-slide-toggle
+                [checked]="settingsService.supersetsEnabled()"
+                (change)="toggleSupersets()"
+                color="primary"
+              />
+            </div>
+
+            <div class="setting-row setting-row--tight">
+              <div class="setting-info">
+                <span class="setting-label">Dropsets</span>
+                <span class="setting-desc">Permet afegir trams a pes reduït immediatament després d'una sèrie.</span>
+              </div>
+              <mat-slide-toggle
+                [checked]="settingsService.dropsetsEnabled()"
+                (change)="toggleDropsets()"
+                color="primary"
+              />
+            </div>
+
+            <!-- Què n'anotes -->
+            <div class="setting-row setting-row--top">
+              <div class="setting-info">
+                <span class="setting-label">RIR (Reps In Reserve)</span>
+                <span class="setting-desc">Permet registrar quantes repeticions et quedaven a cada sèrie.</span>
+              </div>
+              <mat-slide-toggle
+                [checked]="settingsService.rirEnabled()"
+                (change)="toggleRir()"
+                color="primary"
+              />
+            </div>
+
+            <div class="setting-row setting-row--tight">
+              <div class="setting-info">
+                <span class="setting-label">Escala de dificultat</span>
+                <span class="setting-desc">Com es mostra i es registra la sensació de cada exercici.</span>
+              </div>
+              <div class="unit-toggle">
+                <button class="unit-btn" [class.unit-btn--active]="settingsService.difficultyScale() === 'emoji'" (click)="setDifficultyScale('emoji')">😐</button>
+                <button class="unit-btn" [class.unit-btn--active]="settingsService.difficultyScale() === 'numeric'" (click)="setDifficultyScale('numeric')">1-10</button>
               </div>
             </div>
 
+            <!-- El descans: el que el compta sol i el que l'anotes tu -->
             <div class="setting-row setting-row--top">
               <div class="setting-info">
                 <span class="setting-label">Descans entre sèries</span>
@@ -361,7 +442,7 @@ function asSectionId(value: string | null): SectionId | null {
             </div>
 
             @if (restTimerEnabled()) {
-              <div class="setting-row setting-row--top rest-timer-input-row">
+              <div class="setting-row setting-row--tight rest-timer-input-row">
                 <div class="setting-info">
                   <span class="setting-label">Durada del descans</span>
                 </div>
@@ -379,30 +460,19 @@ function asSectionId(value: string | null): SectionId | null {
               </div>
             }
 
-            <div class="setting-row setting-row--top">
+            <div class="setting-row setting-row--tight">
               <div class="setting-info">
-                <span class="setting-label">Agrupar en superset</span>
-                <span class="setting-desc">Permet enllaçar exercicis perquè es facin seguits, sense descans.</span>
+                <span class="setting-label">Anotar el descans manualment</span>
+                <span class="setting-desc">Permet apuntar el descans fet abans de cada sèrie, com una nota.</span>
               </div>
               <mat-slide-toggle
-                [checked]="settingsService.supersetsEnabled()"
-                (change)="toggleSupersets()"
+                [checked]="settingsService.manualRestEnabled()"
+                (change)="toggleManualRest()"
                 color="primary"
               />
             </div>
 
-            <div class="setting-row setting-row--top">
-              <div class="setting-info">
-                <span class="setting-label">Dropsets</span>
-                <span class="setting-desc">Permet afegir trams a pes reduït immediatament després d'una sèrie.</span>
-              </div>
-              <mat-slide-toggle
-                [checked]="settingsService.dropsetsEnabled()"
-                (change)="toggleDropsets()"
-                color="primary"
-              />
-            </div>
-
+            <!-- L'ajuda mentre entrenes -->
             <div class="setting-row setting-row--top">
               <div class="setting-info">
                 <span class="setting-label">Suggeriment del proper exercici</span>
@@ -415,52 +485,6 @@ function asSectionId(value: string | null): SectionId | null {
               />
             </div>
 
-            <div class="setting-row setting-row--top">
-              <div class="setting-info">
-                <span class="setting-label">RIR (Reps In Reserve)</span>
-                <span class="setting-desc">Permet registrar quantes repeticions et quedaven a cada sèrie.</span>
-              </div>
-              <mat-slide-toggle
-                [checked]="settingsService.rirEnabled()"
-                (change)="toggleRir()"
-                color="primary"
-              />
-            </div>
-
-            <div class="setting-row setting-row--top">
-              <div class="setting-info">
-                <span class="setting-label">Anotar el descans manualment</span>
-                <span class="setting-desc">Permet apuntar el descans fet abans de cada sèrie, com una nota.</span>
-              </div>
-              <mat-slide-toggle
-                [checked]="settingsService.manualRestEnabled()"
-                (change)="toggleManualRest()"
-                color="primary"
-              />
-            </div>
-
-            <div class="setting-row setting-row--top">
-              <div class="setting-info">
-                <span class="setting-label">Ajustar el factor de pes corporal</span>
-                <span class="setting-desc">Mostra al formulari d'exercici el % del pes corporal que compta al volum (p. ex. flexions 65%). Per defecte ja ve amb valors sensats.</span>
-              </div>
-              <mat-slide-toggle
-                [checked]="settingsService.bodyweightFactorEnabled()"
-                (change)="toggleBodyweightFactor()"
-                color="primary"
-              />
-            </div>
-
-            <div class="setting-row setting-row--top">
-              <div class="setting-info">
-                <span class="setting-label">Escala de dificultat</span>
-                <span class="setting-desc">Com es mostra i es registra la sensació de cada exercici.</span>
-              </div>
-              <div class="unit-toggle">
-                <button class="unit-btn" [class.unit-btn--active]="settingsService.difficultyScale() === 'emoji'" (click)="setDifficultyScale('emoji')">😐</button>
-                <button class="unit-btn" [class.unit-btn--active]="settingsService.difficultyScale() === 'numeric'" (click)="setDifficultyScale('numeric')">1-10</button>
-              </div>
-            </div>
           </div>
         }
       </div>
@@ -807,6 +831,9 @@ function asSectionId(value: string | null): SectionId | null {
     .setting-row {
       display: flex; align-items: center; gap: 14px;
       &.setting-row--top { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--c-border-2); }
+      /* Sense subtítols, la distància és qui diu què va amb què: les files
+         d'un mateix grup s'enganxen, i la línia de --top obre el següent. */
+      &.setting-row--tight { margin-top: 10px; }
     }
 
     /* ── Nav row (link with chevron) ── */

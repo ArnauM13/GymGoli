@@ -573,7 +573,7 @@ describe('SettingsComponent', () => {
 
   describe('collapsible sections', () => {
     it('starts with every section collapsed', () => {
-      for (const id of ['goal', 'config', 'app-prefs', 'advanced', 'onboarding', 'account'] as const) {
+      for (const id of ['goal', 'body', 'config', 'app-prefs', 'advanced', 'onboarding', 'account'] as const) {
         expect(component.isOpen(id)).withContext(id).toBe(false);
       }
     });
@@ -665,9 +665,15 @@ describe('SettingsComponent', () => {
     it('ignores an unknown section id', () => {
       mockQueryParams.next(convertToParamMap({ section: 'nope' }));
       fixture.detectChanges();
-      for (const id of ['goal', 'config', 'app-prefs', 'advanced', 'onboarding', 'account'] as const) {
+      for (const id of ['goal', 'body', 'config', 'app-prefs', 'advanced', 'onboarding', 'account'] as const) {
         expect(component.isOpen(id)).withContext(id).toBe(false);
       }
+    });
+
+    it('opens «El meu cos» for the bodyweight nudge deep link', () => {
+      mockQueryParams.next(convertToParamMap({ section: 'body' }));
+      fixture.detectChanges();
+      expect(component.isOpen('body')).toBe(true);
     });
 
     it('writes the section the user opens back to the URL, replacing history', () => {

@@ -44,7 +44,7 @@ import { NavigationHistoryService } from '../../core/services/navigation-history
       @if (!hintService.isDismissed('exercises-bodyweight-legend')) {
         <div class="bw-legend">
           <span class="material-symbols-outlined bw-legend-icon">info</span>
-          <p class="bw-legend-text">Els exercicis de propi pes (dominades, fons, flexions…) compten al volum amb el teu <strong>pes corporal × un factor</strong> segons quant del cos mouen. Afegeix el teu pes a Perfil, a «Paràmetres avançats», per activar-ho.</p>
+          <p class="bw-legend-text">Els exercicis de propi pes (dominades, fons, flexions…) compten al volum amb el teu <strong>pes corporal × un factor</strong> segons quant del cos mouen. Afegeix el teu pes a Perfil, a «El meu cos», per activar-ho.</p>
           <button class="bw-legend-x" (click)="hintService.dismiss('exercises-bodyweight-legend')" aria-label="Tancar">
             <span class="material-symbols-outlined">close</span>
           </button>
