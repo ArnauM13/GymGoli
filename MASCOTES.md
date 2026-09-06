@@ -141,6 +141,13 @@ Les regles que el mantenen amable:
    atenció, i un tour que es fa llarg s'abandona a la meitat, que és pitjor
    que un de curt.
 
+Com que tot plegat només es veu un cop, **Perfil → Paràmetres avançats** té
+un «Repetir la benvinguda» que torna a armar la presentació i el tour, i un
+«Fer només el tour guiat». No esborra res: només els dos indicadors de «ja ho
+has vist». Sense això, l'única manera de tornar-los a veure amb el teu propi
+compte seria tocar les preferències a mà — i el copy dels gossos és
+justament el que s'ha de poder rellegir en context.
+
 ### La bafarada
 
 El gos surt a baix a la dreta amb bafarada de còmic i et diu una cosa curta.

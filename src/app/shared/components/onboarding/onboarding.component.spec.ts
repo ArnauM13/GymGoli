@@ -8,14 +8,16 @@ import { UserSettingsService } from '../../../core/services/user-settings.servic
 describe('OnboardingComponent', () => {
   let component: OnboardingComponent;
   let mockUpdate: jasmine.Spy;
+  let settings: { update: jasmine.Spy; fitnessGoal: () => any; hasWeeklyGoal: () => boolean };
 
   beforeEach(async () => {
     mockUpdate = jasmine.createSpy('update');
+    settings   = { update: mockUpdate, fitnessGoal: () => null, hasWeeklyGoal: () => false };
 
     await TestBed.configureTestingModule({
       imports: [OnboardingComponent],
       providers: [
-        { provide: UserSettingsService, useValue: { update: mockUpdate } },
+        { provide: UserSettingsService, useValue: settings },
         { provide: OnboardingTourService, useValue: { total: 9 } },
       ],
     })
@@ -74,6 +76,10 @@ describe('OnboardingComponent', () => {
 
     it('promises the real number of tour stops', () => {
       expect(component.tourSteps).toBe(9);
+    });
+
+    it('starts with no goal picked for a new account', () => {
+      expect(component.selectedGoal()).toBeNull();
     });
   });
 
@@ -153,6 +159,17 @@ describe('OnboardingComponent', () => {
     it('marks the tour done when declined, so it is never pushed again', () => {
       component.finish(false);
       expect(mockUpdate).toHaveBeenCalledWith(jasmine.objectContaining({ guidedTourDone: true }));
+    });
+
+    // Repetir la benvinguda des dels paràmetres avançats no ha de trepitjar
+    // un objectiu setmanal que l'usuari s'hagi ajustat.
+    it('leaves an existing weekly goal alone', () => {
+      settings.hasWeeklyGoal = () => true;
+      component.selectedGoal.set('weight');
+      component.finish(false);
+      const patch = mockUpdate.calls.mostRecent().args[0];
+      expect(patch.fitnessGoal).toBe('weight');
+      expect('weeklyActivityGoal' in patch).toBeFalse();
     });
 
     it('emits whether the tour should start', () => {

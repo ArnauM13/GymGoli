@@ -311,8 +311,11 @@ export class OnboardingComponent {
   /** Es llegeix del tour perquè la promesa no menteixi si el recorregut creix. */
   readonly tourSteps   = this.tourService.total;
 
-  readonly step         = signal(0);
-  readonly selectedGoal = signal<FitnessGoal | null>(null);
+  readonly step = signal(0);
+  /** Arrenca amb el que l'usuari ja tingui: per a algú nou és null, i per a
+   *  qui repeteix la benvinguda des dels paràmetres avançats surt marcat el
+   *  seu, que és el que espera veure-hi. */
+  readonly selectedGoal = signal<FitnessGoal | null>(this.settingsService.fitnessGoal());
 
   readonly currentSlide = computed(() => SLIDES[this.step()] ?? SLIDES[SLIDES.length - 1]);
   readonly slideDog     = computed(() => MASCOTS[this.currentSlide().mascot]);
@@ -340,9 +343,13 @@ export class OnboardingComponent {
       // actualitzar-lo el primer dia.
       catalogSyncedVersion: CATALOG_VERSION,
       ...(goal ? {
-        fitnessGoal:        goal,
-        metricsEnabled:     true,
-        weeklyActivityGoal: FITNESS_GOAL_WEEKLY_DEFAULTS[goal],
+        fitnessGoal: goal,
+        // L'objectiu setmanal per defecte només és per a qui encara no en té.
+        // Repetir la benvinguda no ha de trepitjar el que algú s'hagi ajustat.
+        ...(this.settingsService.hasWeeklyGoal() ? {} : {
+          metricsEnabled:     true,
+          weeklyActivityGoal: FITNESS_GOAL_WEEKLY_DEFAULTS[goal],
+        }),
       } : {}),
       // Qui no vol el tour ara el té sempre a Perfil; no se li torna a oferir sol.
       ...(startTour ? {} : { guidedTourDone: true }),
