@@ -107,6 +107,52 @@ function recordFromJson(raw: Record<string, unknown>): WorkoutRecord | null {
   };
 }
 
+/**
+ * Fusiona dues versions del mateix entrenament sense perdre cap sèrie.
+ *
+ * Passa quan dos dispositius han tocat la mateixa sessió sense veure's: el
+ * mòbil sense cobertura al gimnàs i la tauleta a casa. Agafar-ne una i llençar
+ * l'altra vol dir perdre entrenament fet, així que:
+ *
+ * - **Exercicis**: la unió dels dos costats. Si tots dos tenen el mateix
+ *   exercici, es queda el que porta més sèries — ningú entrena per treure-se'n.
+ * - **La resta** (notes, sensació, categories, estat): mana la versió
+ *   modificada més tard.
+ *
+ * És la mateixa idea que fan servir els sistemes de sincronització provats:
+ * el servidor mana per defecte, però no en allò que aquest dispositiu ha
+ * canviat des de l'última vegada que es van veure.
+ */
+export function mergeWorkouts(mine: Workout, theirs: Workout): Workout {
+  const mineNewer = (mine.updatedAt?.getTime() ?? 0) >= (theirs.updatedAt?.getTime() ?? 0);
+  const base      = mineNewer ? mine : theirs;
+
+  const byExercise = new Map<string, WorkoutEntry>();
+  for (const e of [...theirs.entries, ...mine.entries]) {
+    const prev = byExercise.get(e.exerciseId);
+    if (!prev || e.sets.length > prev.sets.length) byExercise.set(e.exerciseId, e);
+  }
+
+  // L'ordre el marca la versió més nova, i el que només és a l'altra va al final.
+  const ordered: WorkoutEntry[] = [];
+  const seen = new Set<string>();
+  for (const e of base.entries) {
+    const best = byExercise.get(e.exerciseId);
+    if (best && !seen.has(e.exerciseId)) { ordered.push(best); seen.add(e.exerciseId); }
+  }
+  for (const [id, e] of byExercise) if (!seen.has(id)) ordered.push(e);
+
+  // La marca ha de quedar per davant de les dues, no només de l'hora d'aquest
+  // dispositiu: si té el rellotge endarrerit respecte de l'altre, la pujada
+  // tornaria a topar amb la mateixa versió i el conflicte no s'acabaria mai.
+  const ahead = Math.max(
+    Date.now(),
+    (mine.updatedAt?.getTime()   ?? 0) + 1,
+    (theirs.updatedAt?.getTime() ?? 0) + 1,
+  );
+  return { ...base, entries: ordered, updatedAt: new Date(ahead) };
+}
+
 export function countSets(w: Workout): number {
   return w.entries.reduce((sum, e) => sum + e.sets.length, 0);
 }
@@ -134,6 +180,24 @@ export class WorkoutStoreService {
   /** Avança a cada confirmació del servidor. `mark()` en pren una foto abans
    *  de llançar una consulta, i la fusió sap què ha passat mentrestant. */
   private _tick = 0;
+
+  /** El dispositiu s'ha quedat sense espai i hi ha coses que només són a
+   *  memòria. Qui ho ensenyi ha d'avisar: tancar l'app ara sí que perdria
+   *  alguna cosa. */
+  readonly storageFull = signal(false);
+
+  /** Mesos que s'han comprovat contra una resposta sencera del servidor en
+   *  aquesta sessió. Només d'aquests se sap del cert que el que hi ha aquí ja
+   *  és a dalt, i per tant només aquests es poden alliberar. */
+  private readonly _reconciled = new Set<string>();
+
+  constructor() {
+    // Sense això el navegador pot alliberar l'espai d'aquest lloc quan el
+    // dispositiu va just, i s'endú l'entrenament que encara no ha pujat. Els
+    // navegadors només ho concedeixen a llocs que l'usuari fa servir de debò,
+    // que és exactament el cas.
+    void navigator.storage?.persist?.().catch(() => { /* no passa res */ });
+  }
 
   /** Puja a cada canvi perquè els `computed()` de sobre es refacin. */
   private readonly _version = signal(0);
@@ -181,8 +245,13 @@ export class WorkoutStoreService {
     this.uid = null;
     this._byId.clear();
     this._tombstones.clear();
+    this._reconciled.clear();
     this._bump();
   }
+
+  /** El servidor ha contestat sencer per aquest mes i el que hi ha aquí ja
+   *  quadra amb el que hi ha allà. */
+  markReconciled(monthKey: string): void { this._reconciled.add(monthKey); }
 
   // ── Lectura ───────────────────────────────────────────────────────────────
 
@@ -288,6 +357,37 @@ export class WorkoutStoreService {
     this.syncLog.log('push-ok', { id, rev, sets: countSets(rec.workout) });
   }
 
+  /**
+   * El servidor tenia una versió que aquest dispositiu no havia vist. Es
+   * fusionen les dues i el resultat queda pendent, per tornar-hi amb el que
+   * inclou el que hi havia als dos costats.
+   */
+  resolveConflict(id: string, theirs: Workout): void {
+    const rec = this._byId.get(id);
+    if (!rec) { this.applyServerRow(theirs); return; }
+    const merged = mergeWorkouts(rec.workout, theirs);
+    this.syncLog.log('conflict', {
+      id, sets: countSets(merged),
+      note: `local ${countSets(rec.workout)} + servidor ${countSets(theirs)}`,
+    });
+    this.put(merged);
+  }
+
+  /**
+   * Torna a marcar per pujar una sessió que ja constava com a sincronitzada.
+   *
+   * És per a la recuperació manual: quan el que hi ha al dispositiu és bo i el
+   * que hi ha a la base de dades no (per exemple, entrenaments que hi van
+   * arribar buits), això els torna a posar a la cua. La marca de temps es
+   * refresca perquè aquesta versió guanyi al servidor.
+   */
+  forceResync(id: string): boolean {
+    const rec = this._byId.get(id);
+    if (!rec) return false;
+    this.put({ ...rec.workout, updatedAt: new Date() });
+    return true;
+  }
+
   ackDelete(id: string): void {
     if (!this._tombstones.delete(id)) return;
     this._persistTombstones();
@@ -379,6 +479,11 @@ export class WorkoutStoreService {
     for (const key of this._monthKeys(uid)) {
       const month = key.slice(`gymgoli_month_${uid}_`.length);
       if (keep.has(month)) continue;
+      // Mai es tira res que no s'hagi comprovat contra el servidor en aquesta
+      // sessió. Suposar que un mes vell «ja hi és» i alliberar-lo és la manera
+      // més fàcil d'esborrar l'única còpia bona que quedava d'un entrenament
+      // que mai va pujar del tot.
+      if (!this._reconciled.has(month)) continue;
       const stillNeeded = [...this._byId.values()].some(
         r => r.workout.date.startsWith(month) && r.rev > r.syncedRev
       );
@@ -428,7 +533,7 @@ export class WorkoutStoreService {
     const records = [...this._byId.values()].filter(r => r.workout.date.startsWith(month));
     const key     = this._monthKey(uid, month);
 
-    const inWindow = this._retainedMonths().has(month);
+    const inWindow = this._retainedMonths().has(month) || !this._reconciled.has(month);
     const pending  = records.some(r => r.rev > r.syncedRev);
     if (!inWindow && !pending) {
       try { localStorage.removeItem(key); } catch { /* res a fer */ }
@@ -438,8 +543,32 @@ export class WorkoutStoreService {
       try { localStorage.removeItem(key); } catch { /* res a fer */ }
       return;
     }
-    try { localStorage.setItem(key, JSON.stringify(records)); }
-    catch { /* sense espai: el que hi ha a memòria continua sent bo */ }
+    this._write(key, JSON.stringify(records), month);
+  }
+
+  /**
+   * Escriu al dispositiu, i si no hi cap fa lloc i ho torna a provar.
+   *
+   * En un sistema on el dispositiu és la còpia bona, empassar-se un error
+   * d'espai en silenci és perdre dades sense assabentar-se'n: el que hi ha a
+   * memòria sembla guardat i no ho està. Primer s'allibera el que ja és a la
+   * base de dades (mesos vells sincronitzats, i el diari), i si tot i així no
+   * hi cap queda anotat i marcat.
+   */
+  private _write(key: string, value: string, month: string): void {
+    try { localStorage.setItem(key, value); this.storageFull.set(false); return; }
+    catch { /* provem de fer lloc */ }
+
+    this.prune();
+    try { localStorage.setItem(key, value); this.storageFull.set(false); return; }
+    catch { /* encara no hi cap */ }
+
+    this.syncLog.clear(); // el diari és el primer que es pot sacrificar
+    try { localStorage.setItem(key, value); this.storageFull.set(false); }
+    catch {
+      this.storageFull.set(true);
+      this.syncLog.log('storage-full', { note: month });
+    }
   }
 
   private _persistTombstones(): void {

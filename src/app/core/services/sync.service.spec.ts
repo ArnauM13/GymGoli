@@ -7,8 +7,11 @@ import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { Workout, WorkoutSet } from '../models/workout.model';
 
-/** Què contesta l'`update` pendent: `[]` = cap fila trobada. */
+/** Què contesta l'`update` pendent: `[]` = cap fila canviada. */
 let updateResult: { data: unknown[]; error: unknown };
+/** La fila que hi ha al servidor quan l'`update` no en canvia cap: `null` vol
+ *  dir que ja no hi és; una fila vol dir que algú altre l'ha tocada després. */
+let serverRow: Record<string, unknown> | null;
 /** Quant triga el servidor a contestar. La finestra que obre aquesta espera és
  *  on abans es perdien les sèries registrades mentre la petició viatjava. */
 let latencyMs: number;
@@ -22,7 +25,15 @@ function buildMock() {
   const updateSpy = jasmine.createSpy('update').and.callFake(() => {
     const chain: Record<string, unknown> = {};
     chain['eq']     = () => chain;
+    chain['lt']     = () => chain;   // la guarda: no trepitjar res més nou
     chain['select'] = () => answer(updateResult);
+    return chain;
+  });
+
+  const selectSpy = jasmine.createSpy('select').and.callFake(() => {
+    const chain: Record<string, unknown> = {};
+    chain['eq']         = () => chain;
+    chain['maybeSingle'] = () => answer({ data: serverRow, error: null });
     return chain;
   });
 
@@ -35,10 +46,10 @@ function buildMock() {
   });
 
   const fromSpy = jasmine.createSpy('from').and.callFake(() => ({
-    upsert: upsertSpy, update: updateSpy, delete: deleteSpy,
+    upsert: upsertSpy, update: updateSpy, delete: deleteSpy, select: selectSpy,
   }));
 
-  return { client: { from: fromSpy }, fromSpy, upsertSpy, updateSpy, deleteSpy };
+  return { client: { from: fromSpy }, fromSpy, upsertSpy, updateSpy, deleteSpy, selectSpy };
 }
 
 function makeWorkout(id: string, date: string, sets: WorkoutSet[] = []): Workout {
@@ -57,6 +68,7 @@ describe('SyncService', () => {
   beforeEach(() => {
     localStorage.clear();
     updateResult = { data: [{ id: 'w1' }], error: null };
+    serverRow    = null;
     latencyMs    = 0;
     deleteCalls  = [];
     uid = signal<string | null>('user-1');
@@ -133,6 +145,29 @@ describe('SyncService', () => {
 
     expect(service.vanished()).toBeNull();
     expect(service.pendingCount()).toBe(0);
+    discardPeriodicTasks();
+  }));
+
+  // El mòbil edita l'entrenament sense cobertura mentre la tauleta hi afegeix
+  // sèries. Escriure-hi a sobre en tornar la connexió és perdre entrenament fet.
+  it('fusiona en comptes de trepitjar quan el servidor té una versió més nova', fakeAsync(() => {
+    updateResult = { data: [], error: null };   // la guarda no canvia cap fila
+    serverRow = {
+      id: 'w1', date: '2024-03-06', created_at: '2024-03-06T08:00:00Z',
+      updated_at: new Date(Date.now() + 60_000).toISOString(),
+      entries: [{ exerciseId: 'ex2', exerciseName: 'Dominades', sets: [{ weight: 0, reps: 10 }] }],
+    };
+
+    const w = makeWorkout('w1', '2024-03-06', [{ weight: 80, reps: 8 }]);
+    store.put(w);
+    store.ackUpsert('w1', 1);   // ja existia al servidor
+    store.put(w);               // i aquí s'ha editat
+    service.notifyPending();
+    tick(2000);
+
+    // Hi són els dos exercicis: no s'ha descartat cap dels dos costats.
+    expect(store.get('w1')!.entries.map(e => e.exerciseId).sort()).toEqual(['ex1', 'ex2']);
+    expect(service.vanished()).toBeNull();
     discardPeriodicTasks();
   }));
 

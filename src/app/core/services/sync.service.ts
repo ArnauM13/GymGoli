@@ -2,10 +2,11 @@ import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { SupabaseClient } from '@supabase/supabase-js';
 
 import { AuthService } from './auth.service';
+import { Workout } from '../models/workout.model';
 import { OfflineService } from './offline.service';
 import { SupabaseService } from './supabase.service';
 import { SyncLogService } from './sync-log.service';
-import { WorkoutStoreService, countSets, toRow } from './workout-store.service';
+import { WorkoutStoreService, countSets, toRow, toWorkout } from './workout-store.service';
 
 export type SyncStatus = 'synced' | 'pending' | 'syncing' | 'error';
 
@@ -134,6 +135,12 @@ export class SyncService {
           const rev = rec.rev;
           try {
             const outcome = await this._push(uid, rec.workout, rec.syncedRev === 0);
+            if (outcome === 'conflict') {
+              // El servidor té una versió que aquest dispositiu no havia vist.
+              // Es fusiona i queda pendent: la propera passada hi torna amb el
+              // que inclou les dues bandes.
+              continue;
+            }
             if (outcome === 'missing') {
               // La fila ja no hi és: s'ha esborrat des d'un altre dispositiu.
               // Es dóna per tancada aquí i qui l'ensenyi que la tregui.
@@ -161,11 +168,20 @@ export class SyncService {
 
   // ── Privat ─────────────────────────────────────────────────────────────────
 
-  /** `'missing'` quan l'edició no ha trobat cap fila: ja no hi és.
-   *  Una sessió que el servidor no ha vist mai va per `upsert`, que un
-   *  reintent d'una alta que sí que havia arribat no ha de petar per clau
-   *  duplicada. */
-  private async _push(uid: string, w: Parameters<typeof toRow>[0], isNew: boolean): Promise<'ok' | 'missing'> {
+  /**
+   * Envia una sessió, sense trepitjar mai una versió més nova.
+   *
+   * Una sessió que el servidor no ha vist mai va per `upsert`, que un reintent
+   * d'una alta que sí que havia arribat no ha de petar per clau duplicada.
+   *
+   * Les edicions van amb guarda: només substitueixen la fila si la que hi ha
+   * és més antiga que la nostra. Si no en canvia cap, o bé la fila ja no hi és
+   * (`missing`) o bé un altre dispositiu l'ha tocada després (`conflict`), i
+   * llavors es fusionen les dues en comptes de descartar-ne una. Abans
+   * l'edició s'escrivia a sobre sense mirar res, i el que havies registrat des
+   * de l'altre dispositiu desapareixia.
+   */
+  private async _push(uid: string, w: Workout, isNew: boolean): Promise<'ok' | 'missing' | 'conflict'> {
     const row = toRow(w, uid);
 
     if (isNew) {
@@ -181,9 +197,23 @@ export class SyncService {
       .update(row)
       .eq('id', w.id)
       .eq('user_id', uid)
+      .lt('updated_at', row['updated_at'] as string)
       .select('id');
     if (error) throw error;
-    return (data ?? []).length > 0 ? 'ok' : 'missing';
+    if ((data ?? []).length > 0) return 'ok';
+
+    // Cap fila canviada: cal saber si és que ja no hi és o que és més nova.
+    const { data: current, error: readError } = await this.supabase
+      .from('workouts')
+      .select('*')
+      .eq('id', w.id)
+      .eq('user_id', uid)
+      .maybeSingle();
+    if (readError) throw readError;
+    if (!current) return 'missing';
+
+    this.store.resolveConflict(w.id, toWorkout(current as Record<string, unknown>));
+    return 'conflict';
   }
 
   /** Ha fallat: es guarda quan es pot tornar a provar i es deixa constar. El

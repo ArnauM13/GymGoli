@@ -139,9 +139,22 @@ const VERDICT_LABEL: Record<DiffRow['verdict'], string> = {
           }
         </div>
         @if (diffError()) { <p class="err">{{ diffError() }}</p> }
+
+        @if (recoverable().length) {
+          <div class="recover">
+            <p>
+              <b>{{ recoverable().length }} sessions</b> estan més completes en aquest
+              dispositiu que a la base de dades. Pujar-les hi escriurà el que tens aquí.
+            </p>
+            <button class="btn-primary" (click)="recoverAll()" [disabled]="recovering()">
+              {{ recovering() ? 'Pujant…' : 'Pujar-les totes (' + recoverable().length + ')' }}
+            </button>
+          </div>
+        }
+
         @if (diff().length) {
           <div class="table">
-            <div class="tr th"><span>Dia</span><span>Dispositiu</span><span>Servidor</span><span>Estat</span></div>
+            <div class="tr th"><span>Dia</span><span>Dispositiu</span><span>Servidor</span><span>Estat</span><span></span></div>
             @for (d of visibleDiff(); track d.id) {
               <div class="tr" [class.bad]="d.verdict !== 'ok'">
                 <span>{{ d.date }}</span>
@@ -151,6 +164,11 @@ const VERDICT_LABEL: Record<DiffRow['verdict'], string> = {
                   @else { {{ d.serverEntries }} ex · {{ d.serverSets }} sèr }
                 </span>
                 <span class="verdict">{{ verdictLabel(d.verdict) }}</span>
+                <span>
+                  @if (canRecover(d)) {
+                    <button class="btn-row" (click)="recoverOne(d.id)" [disabled]="recovering()">Pujar</button>
+                  }
+                </span>
               </div>
             }
           </div>
@@ -321,10 +339,22 @@ const VERDICT_LABEL: Record<DiffRow['verdict'], string> = {
 
     .table { display: flex; flex-direction: column; margin-top: 10px; }
     .tr {
-      display: grid; grid-template-columns: 1fr 1.1fr 1.1fr 0.9fr; gap: 6px;
+      display: grid; grid-template-columns: 0.9fr 1fr 1fr 0.9fr 52px; gap: 6px; align-items: center;
       padding: 7px 6px; border-bottom: 1px solid var(--c-border-2); font-size: 11.5px; color: var(--c-text-2);
       &.th { font-weight: 700; color: var(--c-text-3); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.3px; }
       &.bad { background: color-mix(in srgb, var(--c-danger) 8%, transparent); .verdict { color: var(--c-danger); font-weight: 700; } }
+    }
+
+    .recover {
+      margin-top: 12px; padding: 10px 12px; border-radius: 12px;
+      border: 1.5px solid color-mix(in srgb, var(--c-amber) 50%, transparent);
+      background: color-mix(in srgb, var(--c-amber) 8%, var(--c-card));
+      p { margin: 0 0 8px; font-size: 12px; color: var(--c-text-2); line-height: 1.45; }
+    }
+    .btn-row {
+      padding: 4px 9px; border-radius: 8px; border: 1.5px solid var(--c-border-2);
+      background: var(--c-card); color: var(--c-brand); font-size: 10.5px; font-weight: 700; cursor: pointer;
+      &:disabled { opacity: 0.5; cursor: default; }
     }
 
     .log { max-height: 320px; overflow: auto; margin-top: 4px; }
@@ -373,6 +403,7 @@ export class DebugLocalDataComponent {
   readonly comparing      = signal(false);
   readonly diff           = signal<DiffRow[]>([]);
   readonly diffError      = signal<string | null>(null);
+  readonly recovering     = signal(false);
 
   // ── Lectura en cru ────────────────────────────────────────────────────────
   readonly keys = computed(() => {
@@ -409,6 +440,11 @@ export class DebugLocalDataComponent {
   readonly emptyWorkouts   = computed(() => this.workouts().filter(w => w.setCount === 0));
   readonly visibleWorkouts = computed(() => this.onlyEmpty() ? this.emptyWorkouts() : this.workouts());
   readonly mismatches      = computed(() => this.diff().filter(d => d.verdict !== 'ok'));
+
+  /** Les sessions que aquí estan més completes que a la base de dades. Són
+   *  les que es poden recuperar: pujar-les no fa perdre res, hi escriu el que
+   *  el dispositiu té i el servidor no. */
+  readonly recoverable = computed(() => this.diff().filter(d => this.canRecover(d)));
   readonly visibleDiff     = computed(() => this.onlyMismatches() ? this.mismatches() : this.diff());
 
   // ── Accions ───────────────────────────────────────────────────────────────
@@ -471,6 +507,48 @@ export class DebugLocalDataComponent {
       this.diffError.set(`No s'ha pogut consultar el servidor: ${(e as Error).message}`);
     } finally {
       this.comparing.set(false);
+    }
+  }
+
+  /** Pujar-la té sentit quan aquí hi ha sèries que allà no hi són. Una fila
+   *  que ja coincideix, o que només és al servidor, no s'ha de tocar. */
+  canRecover(d: DiffRow): boolean {
+    if (d.serverSets === null) return d.localSets > 0;  // encara no hi ha arribat
+    return d.localSets > d.serverSets;
+  }
+
+  /**
+   * Torna a posar a la cua el que hi ha al dispositiu, perquè s'escrigui a la
+   * base de dades.
+   *
+   * És la recuperació dels entrenaments que hi van arribar buits: el que tens
+   * aquí és el bo, i això fa que hi torni a pujar amb una marca de temps nova
+   * perquè guanyi. Res que no estigui guardat aquí es pot recuperar així.
+   */
+  async recoverOne(id: string): Promise<void> {
+    await this._recover([id]);
+  }
+
+  async recoverAll(): Promise<void> {
+    await this._recover(this.recoverable().map(d => d.id));
+  }
+
+  private async _recover(ids: string[]): Promise<void> {
+    if (!ids.length) return;
+    this.recovering.set(true);
+    try {
+      const queued = ids.filter(id => this.store.forceResync(id));
+      if (!queued.length) {
+        this.feedback.error('No en queda cap al dispositiu per pujar');
+        return;
+      }
+      await this.sync.flush();
+      await this.compare();   // ensenya com ha quedat, sense haver de recarregar
+      const left = this.recoverable().length;
+      if (left === 0) this.feedback.success(`${queued.length} sessions pujades`);
+      else this.feedback.info(`${queued.length - left} pujades, ${left} pendents de reintentar`);
+    } finally {
+      this.recovering.set(false);
     }
   }
 

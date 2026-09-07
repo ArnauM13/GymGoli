@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 
-import { WorkoutStoreService } from './workout-store.service';
+import { WorkoutStoreService, mergeWorkouts } from './workout-store.service';
 import { Workout, WorkoutSet } from '../models/workout.model';
 
 function makeWorkout(id: string, date: string, sets: WorkoutSet[] = []): Workout {
@@ -174,10 +174,74 @@ describe('WorkoutStoreService', () => {
     });
   });
 
+  // Dos dispositius han tocat la mateixa sessió sense veure's. Quedar-se'n una
+  // i llençar l'altra vol dir perdre entrenament que s'ha fet de veritat.
+  describe('fusió entre dispositius', () => {
+    function at(date: string, sets: number, ms: number): Workout {
+      const w = makeWorkout('w1', date, Array.from({ length: sets }, () => ({ weight: 80, reps: 8 })));
+      return { ...w, updatedAt: new Date(ms) };
+    }
+
+    it('es queda el costat amb més sèries del mateix exercici', () => {
+      const merged = mergeWorkouts(at(thisMonth(), 4, 2000), at(thisMonth(), 2, 1000));
+      expect(merged.entries[0].sets.length).toBe(4);
+    });
+
+    it('no perd un exercici que només és a l\'altre costat', () => {
+      const mine   = at(thisMonth(), 3, 2000);
+      const theirs = { ...at(thisMonth(), 1, 1000), entries: [
+        { exerciseId: 'ex2', exerciseName: 'Dominades', sets: [{ weight: 0, reps: 10 }] },
+      ] };
+
+      const merged = mergeWorkouts(mine, theirs);
+
+      expect(merged.entries.map(e => e.exerciseId).sort()).toEqual(['ex1', 'ex2']);
+    });
+
+    it('la marca de temps queda per davant de totes dues, encara que el rellotge vagi endarrerit', () => {
+      const future = Date.now() + 60_000;
+      const merged = mergeWorkouts(at(thisMonth(), 1, 1000), at(thisMonth(), 1, future));
+
+      // Si no, la pujada tornaria a topar amb la mateixa versió del servidor i
+      // el conflicte no s'acabaria mai.
+      expect(merged.updatedAt!.getTime()).toBeGreaterThan(future);
+    });
+
+    it('resoldre un conflicte deixa la sessió pendent amb el que hi ha als dos costats', () => {
+      store.put(at(thisMonth(), 3, 2000));
+      store.ackUpsert('w1', 1);
+
+      store.resolveConflict('w1', { ...at(thisMonth(), 1, 3000), entries: [
+        { exerciseId: 'ex2', exerciseName: 'Dominades', sets: [{ weight: 0, reps: 10 }] },
+      ] });
+
+      expect(store.get('w1')!.entries.length).toBe(2);
+      expect(store.isPending('w1')).toBeTrue();
+    });
+  });
+
+  describe('recuperació manual', () => {
+    it('torna a encuar una sessió que ja constava com a pujada', () => {
+      store.put(makeWorkout('w1', thisMonth(), [{ weight: 80, reps: 8 }]));
+      store.ackUpsert('w1', 1);
+      expect(store.isPending('w1')).toBeFalse();
+
+      expect(store.forceResync('w1')).toBeTrue();
+
+      expect(store.isPending('w1')).toBeTrue();
+      expect(store.get('w1')!.entries[0].sets.length).toBe(1);
+    });
+
+    it('diu que no quan aquí no hi ha res a pujar', () => {
+      expect(store.forceResync('no-existeix')).toBeFalse();
+    });
+  });
+
   describe('espai', () => {
     it('allibera els mesos vells que ja són a la base de dades', () => {
       store.put(makeWorkout('vell', '2024-01-10'));
       store.ackUpsert('vell', 1);
+      store.markReconciled('2024-01');
       store.prune();
 
       expect(localStorage.getItem('gymgoli_month_user-1_2024-01')).toBeNull();
@@ -185,6 +249,18 @@ describe('WorkoutStoreService', () => {
 
     it('no toca mai un mes vell amb res per pujar', () => {
       store.put(makeWorkout('vell', '2024-01-10'));   // pendent
+      store.markReconciled('2024-01');
+      store.prune();
+
+      expect(localStorage.getItem('gymgoli_month_user-1_2024-01')).not.toBeNull();
+    });
+
+    // Suposar que un mes vell «ja hi és» i alliberar-lo és la manera més fàcil
+    // d'esborrar l'única còpia bona que quedava d'un entrenament que mai va
+    // pujar del tot.
+    it('no toca un mes que no s\'ha comprovat contra el servidor', () => {
+      store.put(makeWorkout('vell', '2024-01-10'));
+      store.ackUpsert('vell', 1);
       store.prune();
 
       expect(localStorage.getItem('gymgoli_month_user-1_2024-01')).not.toBeNull();

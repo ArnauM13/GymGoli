@@ -77,10 +77,16 @@ export class WorkoutService {
   private _allLoaded = false;
   private _realtimeChannel: RealtimeChannel | null = null;
   private _lastRefreshAt = 0;
+  /** Fins on s'han demanat canvis (`updated_at` del servidor). */
+  private _lastPulledAt: string | null = null;
+  private _lastFullPullAt = 0;
 
   /** Marge mínim entre refrescos automàtics: tornar a l'app dispara alhora
    *  `focus` i `visibilitychange`, i no cal demanar-ho tot dos cops. */
   private static readonly REFRESH_THROTTLE_MS = 10_000;
+  /** Cada quant es fa la comprovació sencera, l'única que veu els esborrats
+   *  fets des d'un altre dispositiu. */
+  private static readonly FULL_PULL_EVERY_MS = 5 * 60_000;
 
   // Per-exercise load tracking (for progress/charts lazy loading)
   private readonly _exLoadedIds      = new Set<string>();
@@ -151,6 +157,8 @@ export class WorkoutService {
       this._fullMonths.clear();
       this._monthLoads.clear();
       this._monthsSeen.clear();
+      this._lastPulledAt  = null;
+      this._lastFullPullAt = 0;
       this._allLoaded = false;
       this._exLoadedIds.clear();
       this._exLoadPromises.clear();
@@ -215,12 +223,64 @@ export class WorkoutService {
     if (!immediate && now - this._lastRefreshAt < WorkoutService.REFRESH_THROTTLE_MS) return;
     this._lastRefreshAt = now;
 
+    // Primer el que ha canviat des de l'últim cop: és una consulta petita i
+    // porta de seguida el que s'ha registrat des d'un altre dispositiu.
+    await this._pullChanges();
+
+    // I de tant en tant, la comprovació sencera. És l'única que veu el que ha
+    // desaparegut: una sessió esborrada des d'un altre dispositiu ja no surt a
+    // cap consulta de canvis, perquè no hi ha cap fila que ho digui.
+    const dueFullPull = now - this._lastFullPullAt > WorkoutService.FULL_PULL_EVERY_MS;
+    if (!dueFullPull && this._lastPulledAt) return;
+    this._lastFullPullAt = now;
+
     if (this._allLoaded) { await this._fetchAll(true); return; }
 
     await Promise.all([...this._monthsSeen].map(key => {
       const [y, m] = key.split('-').map(Number);
       return this.ensureMonthLoaded(y, m - 1, true);
     }));
+  }
+
+  /**
+   * Demana només el que ha canviat des de l'últim cop.
+   *
+   * És el patró que fan servir els sistemes de sincronització provats: un
+   * marcador d'on es va quedar (aquí, `updated_at`) i, a partir d'aquí, només
+   * les files noves. Tornar a demanar mesos sencers cada cop que tornaves a
+   * l'app era car i lent, i sobretot arribava tard.
+   */
+  private async _pullChanges(): Promise<void> {
+    const uid = this.auth.uid();
+    if (!uid) return;
+
+    const since = this._lastPulledAt;
+    const askedAt = new Date().toISOString();
+    try {
+      let q = this.supabase
+        .from('workouts')
+        .select('*')
+        .eq('user_id', uid)
+        .order('updated_at', { ascending: true });
+      if (since) q = q.gt('updated_at', since);
+      else       q = q.gte('date', this._retentionStart());
+
+      const { data, error } = await q;
+      if (error) return;
+
+      for (const r of data ?? []) this.store.applyServerRow(toWorkout(r as Record<string, unknown>));
+      this._lastPulledAt = askedAt;
+    } catch {
+      // Sense xarxa: el marcador no es mou i la propera vegada es reprèn aquí.
+    }
+  }
+
+  /** Des de quan es demanen canvis el primer cop: la finestra que l'app fa
+   *  servir sense connexió, no tot l'historial. */
+  private _retentionStart(): string {
+    const d = new Date();
+    const from = new Date(d.getFullYear(), d.getMonth() - 2, 1);
+    return `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}-01`;
   }
 
   // ── Realtime subscription (every date, not just today) ──────────────────
@@ -339,6 +399,7 @@ export class WorkoutService {
 
       const fetched = (data ?? []).map(r => toWorkout(r as Record<string, unknown>));
       this.store.mergeServerScope(fetched, w => w.date.startsWith(key), since);
+      this.store.markReconciled(key);
       this._fullMonths.add(key);
     } catch {
       // Sense xarxa: es manté el que hi ha al dispositiu, que és el que val.
@@ -418,7 +479,7 @@ export class WorkoutService {
       const fetched = (data ?? []).map(r => toWorkout(r as Record<string, unknown>));
       this.store.mergeServerScope(fetched, () => true, since);
       for (const w of fetched) this._monthsSeen.add(w.date.substring(0, 7));
-      for (const key of this._monthsSeen) this._fullMonths.add(key);
+      for (const key of this._monthsSeen) { this._fullMonths.add(key); this.store.markReconciled(key); }
       this._allLoaded = true;
     } finally {
       if (!silent) this.isLoading.set(false);

@@ -19,7 +19,9 @@ export type SyncLogEvent =
   | 'pull-adopt'    // ens quedem la versió del servidor
   | 'pull-keep'     // ens quedem la local, que encara no ha pujat
   | 'pull-remove'   // ha desaparegut del servidor: fora d'aquí també
-  | 'prune';        // s'allibera espai d'un mes ja sincronitzat
+  | 'prune'          // s'allibera espai d'un mes ja sincronitzat
+  | 'storage-full'   // no hi cap al dispositiu: hi ha coses només a memòria
+  | 'conflict';      // el servidor tenia una versió més nova: s'han fusionat
 
 export interface SyncLogEntry {
   /** Hora local en ISO, que és com es mira contra el que veus a la pantalla. */
