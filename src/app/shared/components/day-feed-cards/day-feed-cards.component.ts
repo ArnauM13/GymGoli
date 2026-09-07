@@ -1,6 +1,7 @@
 import { Component, booleanAttribute, inject, input, output, signal } from '@angular/core';
 
 import { ActivityIconComponent } from '../activity-icon/activity-icon.component';
+import { SportDetailComponent } from '../sport-detail/sport-detail.component';
 import { WorkoutDetailComponent } from '../workout-detail/workout-detail.component';
 import { Sport, SportMetricDef, SportSession } from '../../../core/models/sport.model';
 import { FeelingLevel, Workout } from '../../../core/models/workout.model';
@@ -29,14 +30,14 @@ export interface DayFeedEntry {
  * L'activitat d'un dia: entrenaments i esports, amb la mateixa targeta.
  *
  * Les dues activitats es llegeixen igual — barra de color, icona amb el gos,
- * títol que diu què és, detall i xifres — i només canvia el chevron i què
- * passa quan la toques: un entrenament s'obre (o es desplega a l'Historial),
- * un esport es desplega per editar-lo aquí mateix.
+ * títol que diu què és, detall i xifres — i es comporten igual: tocar-les
+ * desplega el detall aquí mateix (les sèries d'un entrenament, les dades
+ * d'una sessió d'esport) i, a sota, un botó porta a l'activitat sencera.
  */
 @Component({
   selector: 'app-day-feed-cards',
   standalone: true,
-  imports: [ActivityIconComponent, WorkoutDetailComponent],
+  imports: [ActivityIconComponent, SportDetailComponent, WorkoutDetailComponent],
   template: `
     @for (w of day()?.workouts ?? []; track w.id) {
       <div class="act-card" [class.act-card--planned]="isPlanned(w)"
@@ -46,7 +47,7 @@ export interface DayFeedEntry {
 
         <div class="ac-head">
           <button class="ac-main" (click)="handleWorkoutClick(w)"
-                  [attr.aria-expanded]="expandWorkouts() && !isPlanned(w) ? expandedWorkoutId() === w.id : null">
+                  [attr.aria-expanded]="isPlanned(w) ? null : expandedWorkoutId() === w.id">
             <app-activity-icon [icon]="workoutPrimaryIcon(w)"
                                [color]="workoutPrimaryColor(w)" mascot="marley" />
             <div class="ac-info">
@@ -87,7 +88,7 @@ export interface DayFeedEntry {
             </span>
             @if (!isPlanned(w)) {
               <span class="material-symbols-outlined ac-chevron" aria-hidden="true">
-                {{ expandWorkouts() ? (expandedWorkoutId() === w.id ? 'expand_less' : 'expand_more') : 'chevron_right' }}
+                {{ expandedWorkoutId() === w.id ? 'expand_less' : 'expand_more' }}
               </span>
             }
           </button>
@@ -105,7 +106,7 @@ export interface DayFeedEntry {
           }
         </div>
 
-        @if (expandWorkouts() && expandedWorkoutId() === w.id && !isPlanned(w)) {
+        @if (expandedWorkoutId() === w.id && !isPlanned(w)) {
           <app-workout-detail [workout]="w" />
           <div class="ac-detail-actions">
             <button class="ac-open-btn" (click)="open.emit(w.id)">
@@ -173,8 +174,18 @@ export interface DayFeedEntry {
           }
         </div>
 
-        @if (expandedSportId() === item.session.id) {
-          <div class="sport-detail">
+        @if (expandedSportId() === item.session.id && !sportEditing()) {
+          <app-sport-detail [sport]="item.sport" [session]="item.session" />
+          <div class="ac-detail-actions">
+            <button class="ac-open-btn" (click)="editSport(item)">
+              <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>
+              Editar sessió
+            </button>
+          </div>
+        }
+
+        @if (expandedSportId() === item.session.id && sportEditing()) {
+          <div class="sport-edit">
             <!-- Durada -->
             <div class="sd-field">
               <span class="sd-field-label">Durada</span>
@@ -258,7 +269,9 @@ export interface DayFeedEntry {
                 <span class="material-symbols-outlined" aria-hidden="true">delete</span>
               </button>
               <div class="sd-main-actions">
-                <button class="sd-cancel" (click)="collapseSport()">Cancel·lar</button>
+                <!-- Cancel·lar torna al detall, no plega la targeta: has entrat
+                     a editar des d'allà i és on esperes tornar. -->
+                <button class="sd-cancel" (click)="cancelSportEdit()">Cancel·lar</button>
                 <button class="sd-save" [disabled]="editSaving()" (click)="saveSportEdit(item)">Guardar</button>
               </div>
             </div>
@@ -396,7 +409,7 @@ export interface DayFeedEntry {
     }
 
     /* ── Sport session inline edit panel ── */
-    .sport-detail {
+    .sport-edit {
       padding: 4px 14px 14px; border-top: 1px solid var(--c-border-2);
       display: flex; flex-direction: column;
     }
@@ -498,9 +511,6 @@ export class DayFeedCardsComponent {
   readonly today = inject(TodayService).today;
 
   readonly day  = input<DayFeedEntry | null>(null);
-  /** A l'Historial l'entrenament es desplega aquí mateix amb el desglossament
-   *  de sèries; a Inici la targeta porta directament a l'entrenament. */
-  readonly expandWorkouts = input(false, { transform: booleanAttribute });
   /** El volum és la xifra que menys es mira d'un cop d'ull i la que més
    *  amplada es menja; a Activitat recent, on les targetes s'apilen, se
    *  n'amaga. A la targeta del dia i a l'Historial s'hi queda. */
@@ -512,6 +522,8 @@ export class DayFeedCardsComponent {
 
   readonly expandedSportId   = signal<string | null>(null);
   readonly expandedWorkoutId = signal<string | null>(null);
+  /** Si la targeta d'esport desplegada ensenya el detall o el formulari. */
+  readonly sportEditing      = signal(false);
   readonly editSaving      = signal(false);
   readonly editDuration    = signal(60);
   readonly editSubtype     = signal<string | null>(null);
@@ -584,11 +596,7 @@ export class DayFeedCardsComponent {
 
   handleWorkoutClick(w: Workout): void {
     if (this.isPlanned(w)) { this.startPlan(w); return; }
-    if (this.expandWorkouts()) {
-      this.expandedWorkoutId.update(id => id === w.id ? null : w.id);
-      return;
-    }
-    this.open.emit(w.id);
+    this.expandedWorkoutId.update(id => id === w.id ? null : w.id);
   }
 
   async startPlan(w: Workout): Promise<void> {
@@ -617,18 +625,37 @@ export class DayFeedCardsComponent {
 
   // ── Sport session inline expand/edit ────────────────────────────────────
 
+  /** Tocar la targeta desplega el detall de la sessió, igual que un
+   *  entrenament. Editar-la és el pas següent, amb el seu botó. */
   toggleSportExpand(item: { sport: Sport; session: SportSession }): void {
     if (this.expandedSportId() === item.session.id) { this.collapseSport(); return; }
     this.expandedSportId.set(item.session.id);
+    this.sportEditing.set(false);
+    this._loadSportEdit(item);
+  }
+
+  /** Del detall al formulari, amb els valors que la sessió ja porta. */
+  editSport(item: { sport: Sport; session: SportSession }): void {
+    this._loadSportEdit(item);
+    this.sportEditing.set(true);
+  }
+
+  /** Sortir de l'edició torna al detall: la targeta segueix oberta. */
+  cancelSportEdit(): void {
+    this.sportEditing.set(false);
+  }
+
+  collapseSport(): void {
+    this.expandedSportId.set(null);
+    this.sportEditing.set(false);
+  }
+
+  private _loadSportEdit(item: { session: SportSession }): void {
     this.editDuration.set(item.session.duration ?? 60);
     this.editSubtype.set(item.session.subtypeId ?? null);
     this.editFeeling.set(item.session.feeling ?? null);
     this.editMetrics.set({ ...(item.session.metrics ?? {}) });
     this.editNotes.set(item.session.notes ?? '');
-  }
-
-  collapseSport(): void {
-    this.expandedSportId.set(null);
   }
 
   editMetric(key: string): string | number | null {

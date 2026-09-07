@@ -65,11 +65,16 @@ describe('DayFeedCardsComponent', () => {
       await fixture.whenStable();
     });
 
-    it('emits open immediately for a done workout', () => {
+    it('desplega un entrenament fet en comptes d\'obrir-lo de dret', () => {
       const openSpy = spyOn(component.open, 'emit');
       component.handleWorkoutClick(makeWorkout());
-      expect(openSpy).toHaveBeenCalledWith('1');
+      expect(component.expandedWorkoutId()).toBe('1');
+      expect(openSpy).not.toHaveBeenCalled();
       expect(startPlannedWorkout).not.toHaveBeenCalled();
+
+      // I el segon clic el plega.
+      component.handleWorkoutClick(makeWorkout());
+      expect(component.expandedWorkoutId()).toBeNull();
     });
   });
 
@@ -187,14 +192,11 @@ describe('DayFeedCardsComponent', () => {
       expect((fixture.nativeElement as HTMLElement).querySelector('.ac-stat--vol')).toBeNull();
     });
 
-    it('points a workout out of the feed by default, and expands it in place when asked to', () => {
+    it('desplega l\'entrenament a la mateixa targeta, a tot arreu', () => {
       fixture.componentRef.setInput('day', day);
       fixture.detectChanges();
       expect((fixture.nativeElement as HTMLElement).querySelector('.ac-chevron')?.textContent?.trim())
-        .toBe('chevron_right');
-
-      fixture.componentRef.setInput('expandWorkouts', true);
-      fixture.detectChanges();
+        .toBe('expand_more');
 
       const row = (fixture.nativeElement as HTMLElement).querySelector('.ac-main') as HTMLElement;
       row.click();
@@ -210,7 +212,6 @@ describe('DayFeedCardsComponent', () => {
     it('still opens the workout from the expanded panel', () => {
       const openSpy = spyOn(component.open, 'emit');
       fixture.componentRef.setInput('day', day);
-      fixture.componentRef.setInput('expandWorkouts', true);
       fixture.detectChanges();
       component.handleWorkoutClick(day.workouts[0]);
       fixture.detectChanges();
@@ -231,7 +232,7 @@ describe('DayFeedCardsComponent', () => {
       }],
     };
 
-    it('expands inline in place of navigating away when clicked, and collapses on a second click', () => {
+    it('desplega el detall de la sessió, no el formulari, i plega al segon clic', () => {
       fixture.componentRef.setInput('day', day);
       fixture.detectChanges();
 
@@ -239,11 +240,46 @@ describe('DayFeedCardsComponent', () => {
       row.click();
       fixture.detectChanges();
       expect(component.expandedSportId()).toBe('sess1');
-      expect((fixture.nativeElement as HTMLElement).querySelector('.sport-detail')).toBeTruthy();
+      expect(component.sportEditing()).toBeFalse();
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('app-sport-detail')).toBeTruthy();
+      expect(el.querySelector('.sport-edit')).toBeNull();
 
       row.click();
       fixture.detectChanges();
       expect(component.expandedSportId()).toBeNull();
+    });
+
+    it('passa del detall al formulari amb el botó d\'editar, i en torna al cancel·lar', () => {
+      fixture.componentRef.setInput('day', day);
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      (el.querySelector('.ac-main') as HTMLElement).click();
+      fixture.detectChanges();
+
+      (el.querySelector('.ac-open-btn') as HTMLElement).click();
+      fixture.detectChanges();
+      expect(component.sportEditing()).toBeTrue();
+      expect(el.querySelector('.sport-edit')).toBeTruthy();
+      expect(el.querySelector('app-sport-detail')).toBeNull();
+
+      component.cancelSportEdit();
+      fixture.detectChanges();
+      // Cancel·lar torna al detall: la targeta segueix oberta.
+      expect(component.expandedSportId()).toBe('sess1');
+      expect(el.querySelector('app-sport-detail')).toBeTruthy();
+    });
+
+    it('editar una sessió carrega els valors que ja porta', () => {
+      const item = {
+        ...day.sports[0],
+        session: { ...day.sports[0].session, duration: 75, feeling: 4 as const, notes: 'Bé' },
+      };
+      component.editSport(item);
+      expect(component.editDuration()).toBe(75);
+      expect(component.editFeeling()).toBe(4);
+      expect(component.editNotes()).toBe('Bé');
     });
 
     it('saveSportEdit() updates the session with the edited fields and collapses', async () => {

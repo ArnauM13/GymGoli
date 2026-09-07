@@ -79,7 +79,7 @@ import { TrainingTypeService } from '../../core/services/training-type.service';
           @if (days.length > 0) {
             <div class="feed-wrap">
               @for (day of days; track day.date) {
-                <app-day-feed-cards [day]="day" expandWorkouts (open)="goToWorkout($event)" />
+                <app-day-feed-cards [day]="day" (open)="goToWorkout($event)" />
               }
             </div>
           } @else {
@@ -144,7 +144,7 @@ import { TrainingTypeService } from '../../core/services/training-type.service';
           @for (day of feedDays(); track day.date) {
             <div class="feed-day">
               <div class="feed-day-header">{{ dayLabel(day.date) }}</div>
-              <app-day-feed-cards [day]="day" expandWorkouts (open)="goToWorkout($event)" />
+              <app-day-feed-cards [day]="day" (open)="goToWorkout($event)" />
             </div>
           }
         </div>
