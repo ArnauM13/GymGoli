@@ -47,6 +47,7 @@ describe('TrainComponent', () => {
   /** Com al servei de debò, un senyal: `activeProposal()` hi reacciona. */
   let hasTrainerSignal: ReturnType<typeof signal<boolean>>;
   let updateSettings: jasmine.Spy;
+  let sportService: { [k: string]: any };
 
   beforeEach(async () => {
     forceOffline = signal(false);
@@ -84,7 +85,11 @@ describe('TrainComponent', () => {
       ensureLoaded:            jasmine.createSpy().and.resolveTo(undefined),
       toggleSport:             jasmine.createSpy().and.resolveTo(undefined),
       setSessionSubtype:       jasmine.createSpy().and.resolveTo(undefined),
+      logSession:              jasmine.createSpy().and.resolveTo(undefined),
+      updateSession:           jasmine.createSpy().and.resolveTo(undefined),
+      deleteSession:           jasmine.createSpy().and.resolveTo(undefined),
     };
+    sportService = mockSportService;
 
     await TestBed.configureTestingModule({
       imports:   [TrainComponent],
@@ -274,6 +279,60 @@ describe('TrainComponent', () => {
       component.openSessionLogger(sport);
       component.openSessionLogger(sport);
       expect(component.loggerSport()).toBeNull();
+    });
+
+    // El registre d'esport és l'únic lloc on una sessió es toca: les targetes
+    // del feed la desplegen i hi porten, però no la modifiquen.
+    it('omple el registre amb la sessió que ja hi ha aquell dia', () => {
+      sportService['getSessionForDate'].and.returnValue({
+        id: 'sess1', date: TODAY, sportId: 's1', duration: 75,
+        subtypeId: 'sub1', feeling: 4, metrics: { distance_km: 8 }, notes: 'Bé',
+      });
+      component.openSessionLogger(sport);
+
+      expect(component.loggerSessionId()).toBe('sess1');
+      expect(component.loggerDuration()).toBe(75);
+      expect(component.loggerSubtype()).toBe('sub1');
+      expect(component.loggerFeeling()).toBe(4);
+      expect(component.loggerMetrics()).toEqual({ distance_km: 8 });
+      expect(component.loggerNotes()).toBe('Bé');
+    });
+  });
+
+  describe('saveSession()', () => {
+    const sport = { id: 's1', name: 'Running', icon: 'directions_run', color: '#000', subtypes: [], metricDefs: [] } as any;
+
+    it('crea una sessió nova quan el dia no en tenia cap', async () => {
+      component.openSessionLogger(sport);
+      component.loggerDuration.set(45);
+      await component.saveSession();
+
+      expect(sportService['logSession']).toHaveBeenCalledWith(
+        TODAY, 's1', jasmine.objectContaining({ duration: 45 }), 'done', undefined);
+    });
+
+    it("guardar un pla d'un dia que ja ha arribat el registra", async () => {
+      sportService['getSessionForDate'].and.returnValue({
+        id: 'sess1', date: TODAY, sportId: 's1', duration: 60, status: 'planned',
+      });
+      component.openSessionLogger(sport);
+      component.loggerDuration.set(90);
+      await component.saveSession();
+
+      expect(sportService['updateSession']).toHaveBeenCalledWith(
+        'sess1', TODAY, jasmine.objectContaining({ duration: 90 }), 'done');
+    });
+
+    it('una sessió ja feta es guarda sense tocar-ne l\'estat', async () => {
+      sportService['getSessionForDate'].and.returnValue({
+        id: 'sess1', date: TODAY, sportId: 's1', duration: 60,
+      });
+      component.openSessionLogger(sport);
+      component.loggerDuration.set(30);
+      await component.saveSession();
+
+      expect(sportService['updateSession']).toHaveBeenCalledWith(
+        'sess1', TODAY, jasmine.objectContaining({ duration: 30 }), undefined);
     });
   });
 

@@ -327,8 +327,14 @@ l'activitat sencera.
 
 | | Entrenament | Esport |
 | --- | --- | --- |
-| Detall | `app-workout-detail` — exercicis, sèries, drop sets i PRs | `app-sport-detail` — subtipus, durada, mètriques i sensació |
-| Botó del peu | «Obrir entrenament» → pàgina d'Entrenar | «Editar sessió» → formulari a la mateixa targeta |
+| Detall | `app-workout-detail` — exercicis, sèries, drop sets i PRs | `app-sport-detail` — dades de la sessió, rècords i context |
+| Botó del peu | «Obrir entrenament» → `/train?workout=` | «Obrir sessió» → `/train?sport=&date=` |
+
+**El feed no modifica res.** Ni una targeta ni el seu detall porten cap camp,
+cap selector ni cap botó de guardar: es llegeixen. Tocar dades vol dir sortir
+del feed i anar a la pàgina que sap registrar-les. Les úniques accions que hi
+queden són les d'una activitat **planificada** (eliminar i començar/registrar),
+iguals per a gimnàs i esport.
 
 Una activitat **planificada** no es desplega: la targeta porta les seves dues
 accions (eliminar i començar/registrar) i prou, perquè encara no hi ha res a
@@ -368,9 +374,17 @@ Regles que la fan llegible:
   el mateix marge esquerre a totes dues targetes.
 - **La barra de 5px** és absoluta (`position: absolute; left: 0; top: 0;
   bottom: 0`) perquè acompanyi també el panell desplegat.
-- **El detall és una lectura, no un formulari**: files `etiqueta → valor`
-  alineades a la dreta, notes a part i un peu que resumeix. Editar és el pas
-  següent, amb el seu botó; cancel·lar-lo torna al detall, no plega la targeta.
+- **El detall és una lectura, no un formulari**: blocs amb títol (`Sessió`,
+  `Com ha anat`), files `etiqueta → valor` alineades a la dreta, notes a part i
+  un peu que resumeix. Editar és el pas següent, amb el seu botó, i passa en
+  una altra pàgina.
+- **El detall d'un esport hi posa el que la sessió no porta.** Una sessió
+  d'esport és plana (durada, un parell de mètriques) i un entrenament no ho és,
+  així que la substància ve del context: com se situa la durada respecte de la
+  teva mitjana, quines xifres són la teva millor marca (xapa `RÈCORD`, el
+  germà del `PR` d'una sèrie) i quantes en portes d'aquell esport. Es calcula
+  sobre l'historial **sencer** (`loadAllSessions`) i no surt fins que hi és
+  tot: una fita comptada a mitges enganya més que no dir-ne res.
 
 
 ---

@@ -94,7 +94,8 @@ const RECENT_DAYS = 30;
 
         <div class="today-body">
           @if (previewFeedEntry(); as day) {
-            <app-day-feed-cards [day]="day" (open)="goToWorkout($event)" />
+            <app-day-feed-cards [day]="day" (open)="goToWorkout($event)"
+                                (openSport)="goToSportSession($event)" />
           } @else {
             <div class="today-empty">
               <span class="material-symbols-outlined today-empty-icon">bedtime</span>
@@ -183,7 +184,8 @@ const RECENT_DAYS = 30;
               @for (day of historyFeedDays(); track day.date) {
                 <div class="feed-day">
                   <div class="feed-day-header">{{ dayLabel(day.date) }}</div>
-                  <app-day-feed-cards [day]="day" hideVolume (open)="goToWorkout($event)" />
+                  <app-day-feed-cards [day]="day" hideVolume (open)="goToWorkout($event)"
+                                      (openSport)="goToSportSession($event)" />
                 </div>
               }
             }
@@ -607,6 +609,14 @@ export class HomeComponent {
 
   goToWorkout(workoutId: string): void {
     this.router.navigate(['/train'], { queryParams: { workout: workoutId } });
+  }
+
+  /** Una sessió d'esport s'obre allà on es registra: la pàgina d'Entrenar,
+   *  amb el seu dia i el registre d'aquell esport ja obert. */
+  goToSportSession(item: { sport: Sport; session: SportSession }): void {
+    this.router.navigate(['/train'], {
+      queryParams: { sport: item.sport.id, date: item.session.date },
+    });
   }
 
   goToPlanner(): void {

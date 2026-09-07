@@ -36,7 +36,11 @@ describe('DayFeedCardsComponent', () => {
       imports: [DayFeedCardsComponent],
       providers: [
         { provide: WorkoutService, useValue: { startPlannedWorkout, deleteWorkout } },
-        { provide: SportService, useValue: { updateSession, deleteSession, startPlannedSession } },
+        { provide: SportService, useValue: {
+          updateSession, deleteSession, startPlannedSession,
+          sessions: signal([]), allSessionsLoaded: signal(false),
+          loadAllSessions: jasmine.createSpy().and.resolveTo(undefined),
+        } },
         { provide: UserSettingsService, useValue: { difficultyScale: signal('emoji'), bodyweightKg: signal(null), weightUnit: signal<'kg' | 'lb'>('kg') } },
         { provide: ExerciseService, useValue: { loadTypeOf: () => undefined, getById: () => undefined } },
         { provide: FeedbackService, useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
@@ -232,7 +236,7 @@ describe('DayFeedCardsComponent', () => {
       }],
     };
 
-    it('desplega el detall de la sessió, no el formulari, i plega al segon clic', () => {
+    it('desplega el detall de la sessió, i el plega al segon clic', () => {
       fixture.componentRef.setInput('day', day);
       fixture.detectChanges();
 
@@ -240,67 +244,37 @@ describe('DayFeedCardsComponent', () => {
       row.click();
       fixture.detectChanges();
       expect(component.expandedSportId()).toBe('sess1');
-      expect(component.sportEditing()).toBeFalse();
-      const el = fixture.nativeElement as HTMLElement;
-      expect(el.querySelector('app-sport-detail')).toBeTruthy();
-      expect(el.querySelector('.sport-edit')).toBeNull();
+      expect((fixture.nativeElement as HTMLElement).querySelector('app-sport-detail')).toBeTruthy();
 
       row.click();
       fixture.detectChanges();
       expect(component.expandedSportId()).toBeNull();
     });
 
-    it('passa del detall al formulari amb el botó d\'editar, i en torna al cancel·lar', () => {
+    // El feed és de lectura, com el d'un entrenament: cap camp, cap botó de
+    // guardar i cap manera de tocar la sessió sense sortir d'aquí.
+    it('no deixa modificar res des de la targeta', () => {
       fixture.componentRef.setInput('day', day);
+      fixture.detectChanges();
+      (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('.ac-main')!.click();
       fixture.detectChanges();
 
       const el = fixture.nativeElement as HTMLElement;
-      (el.querySelector('.ac-main') as HTMLElement).click();
-      fixture.detectChanges();
-
-      (el.querySelector('.ac-open-btn') as HTMLElement).click();
-      fixture.detectChanges();
-      expect(component.sportEditing()).toBeTrue();
-      expect(el.querySelector('.sport-edit')).toBeTruthy();
-      expect(el.querySelector('app-sport-detail')).toBeNull();
-
-      component.cancelSportEdit();
-      fixture.detectChanges();
-      // Cancel·lar torna al detall: la targeta segueix oberta.
-      expect(component.expandedSportId()).toBe('sess1');
-      expect(el.querySelector('app-sport-detail')).toBeTruthy();
+      expect(el.querySelector('input, textarea, select')).toBeNull();
+      expect(el.querySelector('.sport-edit')).toBeNull();
+      expect(el.querySelector('.sd-save')).toBeNull();
+      expect(updateSession).not.toHaveBeenCalled();
     });
 
-    it('editar una sessió carrega els valors que ja porta', () => {
-      const item = {
-        ...day.sports[0],
-        session: { ...day.sports[0].session, duration: 75, feeling: 4 as const, notes: 'Bé' },
-      };
-      component.editSport(item);
-      expect(component.editDuration()).toBe(75);
-      expect(component.editFeeling()).toBe(4);
-      expect(component.editNotes()).toBe('Bé');
-    });
+    it('obre la sessió des del panell desplegat', () => {
+      const openSportSpy = spyOn(component.openSport, 'emit');
+      fixture.componentRef.setInput('day', day);
+      fixture.detectChanges();
+      (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('.ac-main')!.click();
+      fixture.detectChanges();
 
-    it('saveSportEdit() updates the session with the edited fields and collapses', async () => {
-      component.toggleSportExpand(day.sports[0]);
-      component.editDuration.set(45);
-
-      await component.saveSportEdit(day.sports[0]);
-
-      // Una sessió ja feta es guarda sense tocar-ne l'estat.
-      expect(updateSession).toHaveBeenCalledWith(
-        'sess1', '2024-03-05', jasmine.objectContaining({ duration: 45 }), undefined);
-      expect(component.expandedSportId()).toBeNull();
-    });
-
-    it('deleteSportEdit() deletes the session and collapses', async () => {
-      component.toggleSportExpand(day.sports[0]);
-
-      await component.deleteSportEdit(day.sports[0]);
-
-      expect(deleteSession).toHaveBeenCalledWith('sess1', '2024-03-05');
-      expect(component.expandedSportId()).toBeNull();
+      (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('.ac-open-btn')!.click();
+      expect(openSportSpy).toHaveBeenCalledWith(day.sports[0]);
     });
   });
 
@@ -356,27 +330,6 @@ describe('DayFeedCardsComponent', () => {
       confirm.and.resolveTo(false);
       await component.deleteSportPlan(plannedDay('2024-03-05').sports[0]);
       expect(deleteSession).not.toHaveBeenCalled();
-    });
-
-    it('guardar-ne les dades el registra si el dia ja ha passat', async () => {
-      const item = plannedDay('2024-03-05').sports[0];
-      component.toggleSportExpand(item);
-      component.editDuration.set(90);
-
-      await component.saveSportEdit(item);
-
-      expect(updateSession).toHaveBeenCalledWith(
-        'sess1', '2024-03-05', jasmine.objectContaining({ duration: 90 }), 'done');
-    });
-
-    it('guardar-ne les dades el manté planificat si el dia encara ha de venir', async () => {
-      const item = plannedDay('2999-01-01').sports[0];
-      component.toggleSportExpand(item);
-
-      await component.saveSportEdit(item);
-
-      expect(updateSession).toHaveBeenCalledWith(
-        'sess1', '2999-01-01', jasmine.any(Object), undefined);
     });
   });
 });

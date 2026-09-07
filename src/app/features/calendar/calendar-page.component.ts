@@ -79,7 +79,8 @@ import { TrainingTypeService } from '../../core/services/training-type.service';
           @if (days.length > 0) {
             <div class="feed-wrap">
               @for (day of days; track day.date) {
-                <app-day-feed-cards [day]="day" (open)="goToWorkout($event)" />
+                <app-day-feed-cards [day]="day" (open)="goToWorkout($event)"
+                                    (openSport)="goToSportSession($event)" />
               }
             </div>
           } @else {
@@ -144,7 +145,8 @@ import { TrainingTypeService } from '../../core/services/training-type.service';
           @for (day of feedDays(); track day.date) {
             <div class="feed-day">
               <div class="feed-day-header">{{ dayLabel(day.date) }}</div>
-              <app-day-feed-cards [day]="day" (open)="goToWorkout($event)" />
+              <app-day-feed-cards [day]="day" (open)="goToWorkout($event)"
+                                    (openSport)="goToSportSession($event)" />
             </div>
           }
         </div>
@@ -660,6 +662,14 @@ export class CalendarPageComponent implements OnDestroy {
 
   goToWorkout(workoutId: string): void {
     this.router.navigate(['/train'], { queryParams: { workout: workoutId } });
+  }
+
+  /** Una sessió d'esport s'obre allà on es registra: la pàgina d'Entrenar,
+   *  amb el seu dia i el registre d'aquell esport ja obert. */
+  goToSportSession(item: { sport: Sport; session: SportSession }): void {
+    this.router.navigate(['/train'], {
+      queryParams: { sport: item.sport.id, date: item.session.date },
+    });
   }
 
   // ── Visual helpers ───────────────────────────────────────────────────────
