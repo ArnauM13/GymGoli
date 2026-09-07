@@ -164,6 +164,20 @@ describe('HomeComponent', () => {
       expect(entry?.date).toBe('2020-01-01');
       expect(entry?.workouts.some(w => w.id === 'plan1')).toBeTrue();
     });
+
+    it('inclou els esports planificats del dia, com els entrenaments', () => {
+      // El bug: un pàdel planificat per avui no sortia a la targeta d'Avui
+      // (els entrenaments planificats sí), perquè aquí només s'hi llegien
+      // les sessions ja fetes.
+      const sportService = TestBed.inject(SportService);
+      (sportService.getPlannedSportSessionsForDate as jasmine.Spy).and.callFake((date: string) =>
+        date === TODAY ? [{ sport: { id: 'padel', name: 'Pàdel' }, session: { id: 's1', date: TODAY, sportId: 'padel', status: 'planned' } }] : []);
+      sessionsSignal.set([{ id: 's1' }]);
+
+      const entry = component.previewFeedEntry();
+      expect(entry?.sports.some(s => s.session.id === 's1')).toBeTrue();
+      expect(component.plannedCount()).toBe(1);
+    });
   });
 
   // ── selectDate() ─────────────────────────────────────────────────────────

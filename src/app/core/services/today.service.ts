@@ -1,4 +1,4 @@
-import { DestroyRef, Injectable, inject, signal } from '@angular/core';
+import { DestroyRef, Injectable, NgZone, inject, signal } from '@angular/core';
 
 import { nextMidnight, todayStr } from '../../shared/utils/date.utils';
 
@@ -19,6 +19,7 @@ export class TodayService {
   readonly today = this._today.asReadonly();
 
   private _timer: ReturnType<typeof setTimeout> | null = null;
+  private readonly _zone = inject(NgZone);
 
   constructor() {
     this._scheduleMidnight();
@@ -49,10 +50,16 @@ export class TodayService {
     // Un segon de coixí perquè el temporitzador no s'avanci a la mitjanit per
     // arrodoniment i es quedi amb el dia d'ahir.
     const ms = Math.max(1000, nextMidnight().getTime() - Date.now() + 1000);
-    // setTimeout satura per sobre de ~24,8 dies; aquí mai hi arribem.
-    this._timer = setTimeout(() => {
-      this.refresh();
-      this._scheduleMidnight();
-    }, ms);
+    // Fora de la zona d'Angular: un temporitzador de moltes hores pendent
+    // deixa l'app "mai estable" (whenStable() no torna mai, i qui l'espera
+    // —tests inclosos— es queda penjat). El canvi de dia sí que entra a la
+    // zona, que és quan cal repintar.
+    this._zone.runOutsideAngular(() => {
+      // setTimeout satura per sobre de ~24,8 dies; aquí mai hi arribem.
+      this._timer = setTimeout(() => this._zone.run(() => {
+        this.refresh();
+        this._scheduleMidnight();
+      }), ms);
+    });
   }
 }

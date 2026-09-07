@@ -21,6 +21,7 @@ describe('DayFeedCardsComponent', () => {
   let deleteWorkout: jasmine.Spy;
   let updateSession: jasmine.Spy;
   let deleteSession: jasmine.Spy;
+  let startPlannedSession: jasmine.Spy;
   let confirm: jasmine.Spy;
 
   beforeEach(async () => {
@@ -28,13 +29,14 @@ describe('DayFeedCardsComponent', () => {
     deleteWorkout = jasmine.createSpy().and.resolveTo(undefined);
     updateSession = jasmine.createSpy().and.resolveTo(undefined);
     deleteSession = jasmine.createSpy().and.resolveTo(undefined);
+    startPlannedSession = jasmine.createSpy().and.resolveTo(undefined);
     confirm = jasmine.createSpy().and.resolveTo(true);
 
     await TestBed.configureTestingModule({
       imports: [DayFeedCardsComponent],
       providers: [
         { provide: WorkoutService, useValue: { startPlannedWorkout, deleteWorkout } },
-        { provide: SportService, useValue: { updateSession, deleteSession } },
+        { provide: SportService, useValue: { updateSession, deleteSession, startPlannedSession } },
         { provide: UserSettingsService, useValue: { difficultyScale: signal('emoji'), bodyweightKg: signal(null), weightUnit: signal<'kg' | 'lb'>('kg') } },
         { provide: ExerciseService, useValue: { loadTypeOf: () => undefined, getById: () => undefined } },
         { provide: FeedbackService, useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
@@ -250,7 +252,9 @@ describe('DayFeedCardsComponent', () => {
 
       await component.saveSportEdit(day.sports[0]);
 
-      expect(updateSession).toHaveBeenCalledWith('sess1', '2024-03-05', jasmine.objectContaining({ duration: 45 }));
+      // Una sessió ja feta es guarda sense tocar-ne l'estat.
+      expect(updateSession).toHaveBeenCalledWith(
+        'sess1', '2024-03-05', jasmine.objectContaining({ duration: 45 }), undefined);
       expect(component.expandedSportId()).toBeNull();
     });
 
@@ -261,6 +265,82 @@ describe('DayFeedCardsComponent', () => {
 
       expect(deleteSession).toHaveBeenCalledWith('sess1', '2024-03-05');
       expect(component.expandedSportId()).toBeNull();
+    });
+  });
+
+  describe('esport planificat', () => {
+    const plannedDay = (date: string) => ({
+      date,
+      workouts: [],
+      sports: [{
+        sport: { id: 'padel', name: 'Pàdel', icon: 'sports_tennis', color: '#000', subtypes: [], metricDefs: [], createdAt: new Date() },
+        session: { id: 'sess1', date, sportId: 'padel', duration: 60, status: 'planned' as const, createdAt: new Date() },
+      }],
+    });
+
+    it('es llegeix com un pla: xapa "Planificat" i targeta de pla', () => {
+      fixture.componentRef.setInput('day', plannedDay('2024-03-05'));
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('.ac-tag')?.textContent?.trim()).toBe('Planificat');
+      expect(el.querySelector('.act-card')?.classList).toContain('act-card--planned');
+    });
+
+    it('ofereix registrar-lo i eliminar-lo quan el dia ja ha arribat', () => {
+      fixture.componentRef.setInput('day', plannedDay('2024-03-05'));
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('.ac-act--del')).toBeTruthy();
+      expect(el.querySelector('.ac-act--start')).toBeTruthy();
+    });
+
+    it('no ofereix registrar un pla que encara no ha arribat', () => {
+      fixture.componentRef.setInput('day', plannedDay('2999-01-01'));
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('.ac-act--del')).toBeTruthy();
+      expect(el.querySelector('.ac-act--start')).toBeNull();
+    });
+
+    it('registerSportPlan() promou la sessió a feta', async () => {
+      await component.registerSportPlan(plannedDay('2024-03-05').sports[0]);
+      expect(startPlannedSession).toHaveBeenCalledWith('sess1', '2024-03-05');
+    });
+
+    it('deleteSportPlan() elimina el pla després de confirmar-ho', async () => {
+      await component.deleteSportPlan(plannedDay('2024-03-05').sports[0]);
+      expect(confirm).toHaveBeenCalled();
+      expect(deleteSession).toHaveBeenCalledWith('sess1', '2024-03-05');
+    });
+
+    it('deleteSportPlan() no fa res si es cancel·la', async () => {
+      confirm.and.resolveTo(false);
+      await component.deleteSportPlan(plannedDay('2024-03-05').sports[0]);
+      expect(deleteSession).not.toHaveBeenCalled();
+    });
+
+    it('guardar-ne les dades el registra si el dia ja ha passat', async () => {
+      const item = plannedDay('2024-03-05').sports[0];
+      component.toggleSportExpand(item);
+      component.editDuration.set(90);
+
+      await component.saveSportEdit(item);
+
+      expect(updateSession).toHaveBeenCalledWith(
+        'sess1', '2024-03-05', jasmine.objectContaining({ duration: 90 }), 'done');
+    });
+
+    it('guardar-ne les dades el manté planificat si el dia encara ha de venir', async () => {
+      const item = plannedDay('2999-01-01').sports[0];
+      component.toggleSportExpand(item);
+
+      await component.saveSportEdit(item);
+
+      expect(updateSession).toHaveBeenCalledWith(
+        'sess1', '2999-01-01', jasmine.any(Object), undefined);
     });
   });
 });

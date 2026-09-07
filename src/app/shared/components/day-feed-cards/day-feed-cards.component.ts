@@ -6,6 +6,7 @@ import { Sport, SportMetricDef, SportSession } from '../../../core/models/sport.
 import { FeelingLevel, Workout } from '../../../core/models/workout.model';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { SportService } from '../../../core/services/sport.service';
+import { TodayService } from '../../../core/services/today.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 import { ExerciseService } from '../../../core/services/exercise.service';
 import { FeedbackService } from '../../services/feedback.service';
@@ -118,7 +119,8 @@ export interface DayFeedEntry {
     }
 
     @for (item of day()?.sports ?? []; track item.session.id) {
-      <div class="act-card" [class.expanded]="expandedSportId() === item.session.id"
+      <div class="act-card" [class.act-card--planned]="isSportPlanned(item)"
+           [class.expanded]="expandedSportId() === item.session.id"
            [style.--ac]="item.sport.color">
         <span class="ac-bar" [style.background]="item.sport.color" aria-hidden="true"></span>
 
@@ -129,6 +131,7 @@ export interface DayFeedEntry {
             <div class="ac-info">
               <div class="ac-title-row">
                 <span class="ac-title">{{ item.sport.name }}</span>
+                @if (isSportPlanned(item)) { <span class="ac-tag">Planificat</span> }
                 @if (sportSubtype(item); as sub) { <span class="ac-subtype">{{ sub }}</span> }
                 @if (item.session.notes?.trim(); as note) { <span class="ac-detail">{{ note }}</span> }
               </div>
@@ -153,6 +156,23 @@ export interface DayFeedEntry {
               {{ expandedSportId() === item.session.id ? 'expand_less' : 'expand_more' }}
             </span>
           </button>
+
+          @if (isSportPlanned(item)) {
+            <div class="ac-actions">
+              <button class="ac-act ac-act--del" (click)="deleteSportPlan(item)"
+                      aria-label="Eliminar planificació">
+                <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+              </button>
+              <!-- Un pla de demà encara no es pot haver fet: el botó de
+                   registrar només surt quan el dia ja ha arribat. -->
+              @if (item.session.date <= today()) {
+                <button class="ac-act ac-act--start" (click)="registerSportPlan(item)"
+                        aria-label="Registrar">
+                  <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
+                </button>
+              }
+            </div>
+          }
         </div>
 
         @if (expandedSportId() === item.session.id) {
@@ -483,6 +503,9 @@ export class DayFeedCardsComponent {
   private feedback       = inject(FeedbackService);
   private confirmDialog   = inject(ConfirmDialogService);
 
+  /** El dia d'avui com a senyal: la targeta d'un pla canvia sola a mitjanit. */
+  readonly today = inject(TodayService).today;
+
   readonly day  = input<DayFeedEntry | null>(null);
   /** A l'Historial l'entrenament es desplega aquí mateix amb el desglossament
    *  de sèries; a Inici la targeta porta directament a l'entrenament. */
@@ -535,6 +558,37 @@ export class DayFeedCardsComponent {
 
   sportStats(item: { sport: Sport; session: SportSession }): ActivityStat[] {
     return sportCardStats(item.session, item.sport);
+  }
+
+  /** Un esport encara per fer, igual que un entrenament planificat: es
+   *  llegeix com un pla (xapa i vora discontínua), no com una sessió feta. */
+  isSportPlanned(item: { session: SportSession }): boolean {
+    return item.session.status === 'planned';
+  }
+
+  /** Registra el pla tal com estava previst — la durada i el subtipus que ja
+   *  portava passen a comptar com a fets. Per canviar-ne res, la targeta es
+   *  desplega com qualsevol altra sessió. */
+  async registerSportPlan(item: { sport: Sport; session: SportSession }): Promise<void> {
+    try {
+      await this.sportService.startPlannedSession(item.session.id, item.session.date);
+      this.feedback.success(`${item.sport.name} registrat`, 2000);
+    } catch {
+      this.feedback.error('Error en registrar', 2500);
+    }
+  }
+
+  async deleteSportPlan(item: { sport: Sport; session: SportSession }): Promise<void> {
+    const ok = await this.confirmDialog.confirm('Eliminar aquesta planificació?', {
+      variant: 'danger', confirmLabel: 'Eliminar', cancelLabel: 'Cancel·lar',
+    });
+    if (!ok) return;
+    try {
+      await this.sportService.deleteSession(item.session.id, item.session.date);
+      this.feedback.success('Planificació eliminada', 2000);
+    } catch {
+      this.feedback.error('Error en eliminar', 2500);
+    }
   }
 
   handleWorkoutClick(w: Workout): void {
@@ -625,13 +679,17 @@ export class DayFeedCardsComponent {
     this.editSaving.set(true);
     try {
       const metrics = this.editMetrics();
+      // Omplir les dades d'un pla d'avui o d'abans és registrar-lo: si es
+      // quedava 'planned' la sessió no comptava enlloc (ni al calendari ni a
+      // les estadístiques), com al registre d'esport de la pàgina d'Entrenar.
+      const promote = this.isSportPlanned(item) && item.session.date <= this.today();
       await this.sportService.updateSession(item.session.id, item.session.date, {
         subtypeId: this.editSubtype() ?? undefined,
         duration:  this.editDuration() || undefined,
         feeling:   this.editFeeling() ?? undefined,
         metrics:   Object.keys(metrics).length ? metrics : undefined,
         notes:     this.editNotes().trim() || undefined,
-      });
+      }, promote ? 'done' : undefined);
       this.collapseSport();
     } catch {
       this.feedback.error('Error en guardar', 2500);
