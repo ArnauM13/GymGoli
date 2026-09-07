@@ -17,6 +17,11 @@ export class SyncService {
   readonly status       = signal<SyncStatus>('synced');
   readonly pendingCount = signal<number>(0);
 
+  /** L'última edició que no ha trobat la fila al servidor: l'entrenament
+   *  s'havia esborrat des d'un altre dispositiu. Qui l'ensenyi l'ha de treure
+   *  també d'aquí, que si no es queda com un fantasma només en aquest mòbil. */
+  readonly vanished = signal<{ id: string; date: string; at: number } | null>(null);
+
   private _backoff       = new Map<string, BackoffState>();
   private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private _retryTimer: ReturnType<typeof setInterval> | null = null;
@@ -148,8 +153,11 @@ export class SyncService {
       if (!snap) { this.markClean(workoutId); continue; }
 
       try {
-        await this._upsertToSupabase(uid, snap, this.isInsert(workoutId));
+        const outcome = await this._upsertToSupabase(uid, snap, this.isInsert(workoutId));
         this.markClean(workoutId);
+        // Avisar després de netejar: mentre consti com a pendent, qui torni a
+        // demanar el mes el conservaria per no perdre'l.
+        if (outcome === 'missing') this.vanished.set({ id: workoutId, date: snap.date, at: Date.now() });
       } catch {
         anyError = true;
         const count = (this._backoff.get(workoutId)?.retryCount ?? 0) + 1;
@@ -167,7 +175,8 @@ export class SyncService {
 
   // ── Private: Supabase ──────────────────────────────────────────────────────
 
-  private async _upsertToSupabase(uid: string, w: Workout, isInsert: boolean): Promise<void> {
+  /** `'missing'` quan l'edició no ha trobat cap fila: ja no hi és. */
+  private async _upsertToSupabase(uid: string, w: Workout, isInsert: boolean): Promise<'ok' | 'missing'> {
     const row: Record<string, unknown> = {
       id:                 w.id,
       user_id:            uid,
@@ -188,14 +197,17 @@ export class SyncService {
         .from('workouts')
         .upsert(row as unknown as Parameters<typeof this.supabase.from>[0], { onConflict: 'id' });
       if (error) throw error;
-    } else {
-      const { error } = await this.supabase
-        .from('workouts')
-        .update(row)
-        .eq('id', w.id)
-        .eq('user_id', uid);
-      if (error) throw error;
+      return 'ok';
     }
+
+    const { data, error } = await this.supabase
+      .from('workouts')
+      .update(row)
+      .eq('id', w.id)
+      .eq('user_id', uid)
+      .select('id');
+    if (error) throw error;
+    return (data ?? []).length > 0 ? 'ok' : 'missing';
   }
 
   // ── Private: localStorage ──────────────────────────────────────────────────

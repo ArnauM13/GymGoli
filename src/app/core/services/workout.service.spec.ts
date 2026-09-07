@@ -8,23 +8,37 @@ import { SupabaseService } from './supabase.service';
 import { ExerciseService } from './exercise.service';
 import { SyncService } from './sync.service';
 
+interface QueryResult { data?: unknown; count?: number; error?: unknown }
+
 interface QueryChain {
   select: jasmine.Spy; eq: jasmine.Spy; neq: jasmine.Spy; order: jasmine.Spy;
   contains: jasmine.Spy; ilike: jasmine.Spy; filter: jasmine.Spy; range: jasmine.Spy;
   gte: jasmine.Spy; lte: jasmine.Spy; delete: jasmine.Spy;
-  then: (resolve: (v: { data?: unknown; count?: number; error?: unknown }) => void) => void;
+  /** Mutable so a test can change what the next query answers. */
+  result: QueryResult;
+  then: (resolve: (v: QueryResult) => void) => void;
 }
 
 /** A chainable query-builder stub: every filter method returns the same
  *  object (so calls can be inspected afterwards) and it resolves like a
  *  real supabase-js query when awaited. */
-function makeQueryChain(result: { data?: unknown; count?: number; error?: unknown }): QueryChain {
+function makeQueryChain(result: QueryResult): QueryChain {
   const chain = {} as QueryChain;
   for (const method of ['select', 'eq', 'neq', 'order', 'contains', 'ilike', 'filter', 'range', 'gte', 'lte', 'delete'] as const) {
     chain[method] = jasmine.createSpy(method).and.callFake(() => chain);
   }
-  chain.then = (resolve) => resolve(result);
+  chain.result = result;
+  chain.then = (resolve) => resolve(chain.result);
   return chain;
+}
+
+/** A Supabase `workouts` row as the service reads it (snake_case). */
+function row(id: string, date: string, extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id, date, entries: [], categories: [], status: 'done',
+    created_at: `${date}T08:00:00.000Z`,
+    ...extra,
+  };
 }
 
 describe('WorkoutService', () => {
@@ -32,16 +46,26 @@ describe('WorkoutService', () => {
   let fromSpy: jasmine.Spy;
   let workoutsChain: ReturnType<typeof makeQueryChain>;
   let service: WorkoutService;
+  let pendingIds: ReturnType<typeof signal<string[]>>;
+  let vanished: ReturnType<typeof signal<{ id: string; date: string; at: number } | null>>;
+  /** The realtime callback the service registered, so a test can play the part
+   *  of the other device. */
+  let onRemoteChange: (payload: Record<string, unknown>) => void;
 
   function setup(): void {
     uid = signal<string | null>('user-1');
+    pendingIds = signal<string[]>([]);
+    vanished = signal<{ id: string; date: string; at: number } | null>(null);
     workoutsChain = makeQueryChain({ data: [], count: 0, error: null });
 
     fromSpy = jasmine.createSpy('from').and.callFake((table: string) =>
       table === 'workouts' ? workoutsChain : makeQueryChain({ data: [], count: 0, error: null }));
 
     const channelStub = {
-      on: jasmine.createSpy('on').and.callFake(function (this: unknown) { return channelStub; }),
+      on: jasmine.createSpy('on').and.callFake((_event: string, _filter: unknown, cb: (p: Record<string, unknown>) => void) => {
+        onRemoteChange = cb;
+        return channelStub;
+      }),
       subscribe: jasmine.createSpy('subscribe'),
       unsubscribe: jasmine.createSpy('unsubscribe'),
     };
@@ -53,8 +77,9 @@ describe('WorkoutService', () => {
         { provide: ExerciseService, useValue: { getById: () => undefined } },
         { provide: SyncService,     useValue: {
           markDirty:    jasmine.createSpy('markDirty'),
-          pendingIds:   signal<string[]>([]),
+          pendingIds:   () => pendingIds(),
           pendingCount: signal(0),
+          vanished,
           getSnapshot:  () => null,
           cancelDirty:  jasmine.createSpy('cancelDirty'),
           isInsert:     () => false,
@@ -65,46 +90,8 @@ describe('WorkoutService', () => {
     TestBed.flushEffects();
   }
 
-  beforeEach(() => setup());
+  beforeEach(() => { localStorage.clear(); setup(); });
   afterEach(() => localStorage.clear());
-
-  describe('refreshLoadedMonths()', () => {
-    function todayStr(): string {
-      const d = new Date();
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    }
-
-    function workoutRow(id: string): Record<string, unknown> {
-      return {
-        id, date: todayStr(), categories: ['push'], entries: [],
-        created_at: new Date().toISOString(), status: 'done',
-      };
-    }
-
-    it('incorpora el que s\'ha apuntat des d\'un altre dispositiu', async () => {
-      // El mes en curs es carrega sol en arrencar, i sense tornar-lo a demanar
-      // es quedava congelat mentre la pestanya seguís oberta.
-      await Promise.resolve();
-      expect(service.workouts().length).toBe(0);
-
-      workoutsChain = makeQueryChain({ data: [workoutRow('remote-1')], error: null });
-      await service.refreshLoadedMonths();
-
-      expect(service.workouts().some(w => w.id === 'remote-1')).toBeTrue();
-    });
-
-    it('no repeteix la consulta si s\'acaba de fer', async () => {
-      await Promise.resolve();
-
-      workoutsChain = makeQueryChain({ data: [workoutRow('remote-1')], error: null });
-      await service.refreshLoadedMonths();
-
-      workoutsChain = makeQueryChain({ data: [workoutRow('remote-2')], error: null });
-      await service.refreshLoadedMonths();
-
-      expect(service.workouts().some(w => w.id === 'remote-2')).toBeFalse();
-    });
-  });
 
   describe('loadWorkoutPage()', () => {
     it('filters by exercise name using a plain ilike on the generated exercise_names column', async () => {
@@ -428,6 +415,135 @@ describe('WorkoutService', () => {
       expect(res.sessions).toBe(1);
       expect(res.removedWorkouts).toBe(1);
       expect(service.getWorkoutForDate('2024-03-06')).toBeNull();
+    });
+  });
+
+  // ── Sincronització entre dispositius ──────────────────────────────────────
+  //
+  // El mòbil i l'ordinador han d'ensenyar el mateix. El que ho trencava era
+  // llegir, no escriure: un mes carregat no es tornava a demanar mai, el
+  // realtime només refrescava «avui» i el que hi havia a la cau i el servidor
+  // ja no retornava es quedava enganxat.
+  describe('sincronització entre dispositius', () => {
+    it('no torna a demanar un mes ja carregat, però sí quan es força', async () => {
+      await service.ensureMonthLoaded(2024, 2);
+      const calls = workoutsChain.gte.calls.count();
+
+      await service.ensureMonthLoaded(2024, 2);
+      expect(workoutsChain.gte.calls.count()).toBe(calls);
+
+      await service.ensureMonthLoaded(2024, 2, true);
+      expect(workoutsChain.gte.calls.count()).toBe(calls + 1);
+    });
+
+    it('refreshLoaded() torna a demanar els mesos carregats', async () => {
+      await service.ensureMonthLoaded(2024, 2);
+      const calls = workoutsChain.gte.calls.count();
+
+      await service.refreshLoaded(true);
+
+      expect(workoutsChain.gte.calls.count()).toBeGreaterThan(calls);
+    });
+
+    it('refreshLoaded() es conté si s\'acaba de refrescar', async () => {
+      await service.ensureMonthLoaded(2024, 2);
+      await service.refreshLoaded(true);
+      const calls = workoutsChain.gte.calls.count();
+
+      await service.refreshLoaded(); // tornar a l'app dispara focus i visibilitychange alhora
+
+      expect(workoutsChain.gte.calls.count()).toBe(calls);
+    });
+
+    it('treu una sessió que el servidor ja no retorna (esborrada des d\'un altre dispositiu)', async () => {
+      workoutsChain.result = { data: [row('w1', '2024-03-06')], count: 1, error: null };
+      await service.ensureMonthLoaded(2024, 2);
+      expect(service.getWorkoutsForDate('2024-03-06').length).toBe(1);
+
+      workoutsChain.result = { data: [], count: 0, error: null };
+      await service.ensureMonthLoaded(2024, 2, true);
+
+      expect(service.getWorkoutsForDate('2024-03-06').length).toBe(0);
+    });
+
+    it('conserva el que encara no s\'ha pogut enviar', async () => {
+      const id = await service.createWorkoutForDate('2024-03-06');
+      pendingIds.set([id]);
+
+      workoutsChain.result = { data: [], count: 0, error: null };
+      await service.ensureMonthLoaded(2024, 2, true);
+
+      expect(service.getWorkoutsForDate('2024-03-06').map(w => w.id)).toEqual([id]);
+    });
+
+    it('conserva el que s\'ha registrat mentre la consulta viatjava', async () => {
+      const loading = service.ensureMonthLoaded(2024, 2);
+      const id = await service.createWorkoutForDate('2024-03-06');
+      await loading;
+
+      expect(service.getWorkoutsForDate('2024-03-06').map(w => w.id)).toEqual([id]);
+    });
+
+    it('es queda amb el que té si la consulta falla', async () => {
+      workoutsChain.result = { data: [row('w1', '2024-03-06')], count: 1, error: null };
+      await service.ensureMonthLoaded(2024, 2);
+
+      workoutsChain.result = { data: null, count: 0, error: new Error('network') };
+      await service.ensureMonthLoaded(2024, 2, true);
+
+      expect(service.getWorkoutsForDate('2024-03-06').length).toBe(1);
+    });
+
+    it('aplica un canvi remot a qualsevol data, no només a avui', () => {
+      onRemoteChange({ eventType: 'UPDATE', new: row('w9', '2024-03-06', { notes: 'des del mòbil' }), old: {} });
+
+      expect(service.getWorkoutsForDate('2024-03-06')[0].notes).toBe('des del mòbil');
+    });
+
+    it('mou una sessió de mes si la data ha canviat des d\'un altre dispositiu', () => {
+      onRemoteChange({ eventType: 'UPDATE', new: row('w9', '2024-03-06'), old: {} });
+      onRemoteChange({ eventType: 'UPDATE', new: row('w9', '2024-04-02'), old: {} });
+
+      expect(service.getWorkoutsForDate('2024-03-06').length).toBe(0);
+      expect(service.getWorkoutsForDate('2024-04-02').map(w => w.id)).toEqual(['w9']);
+    });
+
+    it('esborra el que s\'ha esborrat des d\'un altre dispositiu', () => {
+      onRemoteChange({ eventType: 'INSERT', new: row('w9', '2024-03-06'), old: {} });
+      onRemoteChange({ eventType: 'DELETE', new: {}, old: { id: 'w9' } });
+
+      expect(service.getWorkoutsForDate('2024-03-06').length).toBe(0);
+    });
+
+    it('no trepitja amb la versió del servidor el que encara no s\'ha enviat', async () => {
+      const id = await service.createWorkoutForDate('2024-03-06');
+      await service.addExerciseToWorkout(id, { exerciseId: 'a', exerciseName: 'A', sets: [{ weight: 60, reps: 8 }] });
+      pendingIds.set([id]);
+
+      onRemoteChange({ eventType: 'UPDATE', new: row(id, '2024-03-06'), old: {} });
+
+      expect(service.getWorkoutForDate('2024-03-06')!.entries.length).toBe(1);
+    });
+
+    it('la versió del servidor mana sobre una còpia vella de la cau', async () => {
+      const entriesWith = (weight: number) => [{ exerciseId: 'e1', exerciseName: 'E', sets: [{ weight, reps: 5 }] }];
+      workoutsChain.result = { data: [row('w1', '2024-03-06', { entries: entriesWith(50) })], count: 1, error: null };
+      await service.ensureMonthLoaded(2024, 2);
+
+      workoutsChain.result = { data: [row('w1', '2024-03-06', { entries: entriesWith(60) })], count: 1, error: null };
+      await service.loadWorkoutsForExercise('e1');
+
+      expect(service.getWorkoutForDate('2024-03-06')!.entries[0].sets[0].weight).toBe(60);
+    });
+
+    it('loadAllWorkouts() també refresca el que ja era a la cau', async () => {
+      workoutsChain.result = { data: [row('w1', '2024-03-06', { notes: 'vell' })], count: 1, error: null };
+      await service.ensureMonthLoaded(2024, 2);
+
+      workoutsChain.result = { data: [row('w1', '2024-03-06', { notes: 'nou' })], count: 1, error: null };
+      await service.loadAllWorkouts();
+
+      expect(service.getWorkoutForDate('2024-03-06')!.notes).toBe('nou');
     });
   });
 });
