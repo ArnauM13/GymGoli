@@ -521,7 +521,13 @@ export class HomeComponent {
     const planned = this.workoutService.getPlannedForDate(date);
     const done    = this.workoutService.getDoneWorkoutsForDate(date);
     const workouts: Workout[] = [...planned, ...done];
-    const sports: { sport: Sport; session: SportSession }[] = this.sportService.getSportSessionsForDate(date);
+    // Els esports planificats es llegeixen igual que els entrenaments
+    // planificats: si aquí només hi entraven les sessions fetes, un pàdel
+    // apuntat per avui no sortia enlloc de la portada.
+    const sports: { sport: Sport; session: SportSession }[] = [
+      ...this.sportService.getPlannedSportSessionsForDate(date),
+      ...this.sportService.getSportSessionsForDate(date),
+    ];
     if (workouts.length === 0 && sports.length === 0) return null;
     return { date, workouts, sports };
   });
@@ -536,11 +542,15 @@ export class HomeComponent {
     return s.charAt(0).toUpperCase() + s.slice(1);
   });
 
-  /** How many planned (not-yet-done) workouts sit on the previewed day, so the
-   *  header can flag that there's something planned. */
-  readonly plannedCount = computed(() =>
-    (this.previewFeedEntry()?.workouts ?? []).filter(w => (w.status ?? 'done') === 'planned').length
-  );
+  /** How many planned (not-yet-done) activities sit on the previewed day —
+   *  gym and sport alike — so the header can flag that there's something
+   *  planned. */
+  readonly plannedCount = computed(() => {
+    const day = this.previewFeedEntry();
+    if (!day) return 0;
+    return day.workouts.filter(w => (w.status ?? 'done') === 'planned').length
+         + day.sports.filter(s => s.session.status === 'planned').length;
+  });
 
   readonly isToday = computed(() => this.effectiveDate() === this.today());
 
@@ -637,7 +647,10 @@ export class HomeComponent {
       const done     = this.workoutService.getDoneWorkoutsForDate(dateStr);
       const planned  = this.workoutService.getPlannedForDate(dateStr);
       const workouts = [...planned, ...done];
-      const sports   = this.sportService.getSportSessionsForDate(dateStr);
+      const sports   = [
+        ...this.sportService.getPlannedSportSessionsForDate(dateStr),
+        ...this.sportService.getSportSessionsForDate(dateStr),
+      ];
       if (workouts.length > 0 || sports.length > 0) days.push({ date: dateStr, workouts, sports });
       cursor.setDate(cursor.getDate() - 1);
     }
