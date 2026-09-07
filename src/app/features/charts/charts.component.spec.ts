@@ -10,6 +10,7 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
 import { Exercise } from '../../core/models/exercise.model';
 import { Workout } from '../../core/models/workout.model';
 import { TrainingTypeService } from '../../core/services/training-type.service';
+import { TodayService } from '../../core/services/today.service';
 import { DEFAULT_TRAINING_TYPES } from '../../core/models/training-type.model';
 
 function makeExercise(id: string, category: 'push' | 'pull' | 'legs' = 'push'): Exercise {
@@ -31,25 +32,41 @@ function makeWorkout(date: string, exerciseId: string, overrides: {
   };
 }
 
+/** Un dilluns, perquè «aquesta setmana» sigui un rang conegut al test. */
+const MONDAY = '2024-03-04';
+
+interface GoalConfig {
+  goalMode?: 'combined' | 'separate';
+  weeklyActivityGoal?: number | null;
+  weeklyGymGoal?: number | null;
+  weeklySportGoal?: number | null;
+}
+
 describe('ChartsComponent', () => {
   let component: ChartsComponent;
   let mockGetWorkoutsForExercise: jasmine.Spy;
   let mockExercisesWithData: ReturnType<typeof signal<Set<string>>>;
   let mockLoadAllWorkouts: jasmine.Spy;
+  let mockDoneWorkouts: jasmine.Spy;
+  let mockSessions: jasmine.Spy;
 
   function setup(
     exercises: Exercise[] = [],
     withData: Set<string> = new Set(),
     workoutsByExercise: Record<string, Workout[]> = {},
+    opts: { goal?: GoalConfig; done?: Workout[]; sessions?: { date: string }[] } = {},
   ): void {
     TestBed.resetTestingModule();
     mockGetWorkoutsForExercise = jasmine.createSpy().and.callFake((id: string) => workoutsByExercise[id] ?? []);
     mockExercisesWithData      = signal(withData);
     mockLoadAllWorkouts        = jasmine.createSpy();
 
+    mockDoneWorkouts = jasmine.createSpy().and.returnValue(opts.done ?? []);
+    mockSessions     = jasmine.createSpy().and.returnValue(opts.sessions ?? []);
+
     const mockWorkoutService = {
       isLoading:              signal(false),
-      doneWorkouts:           jasmine.createSpy().and.returnValue([]),
+      doneWorkouts:           mockDoneWorkouts,
       exercisesWithData:      mockExercisesWithData,
       getWorkoutsForExercise: mockGetWorkoutsForExercise,
       loadAllWorkouts:        mockLoadAllWorkouts,
@@ -63,18 +80,21 @@ describe('ChartsComponent', () => {
 
     const mockSportService = {
       sports:       signal<any[]>([]),
-      sessions:     jasmine.createSpy().and.returnValue([]),
+      sessions:     mockSessions,
       isLoaded:     signal(true),
       ensureLoaded: jasmine.createSpy().and.resolveTo(undefined),
     };
 
+    const goal = opts.goal ?? {};
     const mockSettingsService = {
       weightUnit:         signal<'kg' | 'lb'>('kg'),
       darkMode:           signal(false),
-      goalMode:           signal('gym'),
-      weeklyActivityGoal: signal(3),
-      weeklyGymGoal:      signal(3),
-      weeklySportGoal:    signal(2),
+      goalMode:           signal(goal.goalMode ?? 'combined'),
+      // `null` és un valor vàlid («sense objectiu»), així que només s'omple
+      // el que no s'ha dit.
+      weeklyActivityGoal: signal(goal.weeklyActivityGoal === undefined ? 3 : goal.weeklyActivityGoal),
+      weeklyGymGoal:      signal(goal.weeklyGymGoal      === undefined ? 3 : goal.weeklyGymGoal),
+      weeklySportGoal:    signal(goal.weeklySportGoal    === undefined ? 2 : goal.weeklySportGoal),
     };
 
     TestBed.configureTestingModule({
@@ -86,6 +106,7 @@ describe('ChartsComponent', () => {
         { provide: SportService,        useValue: mockSportService },
         { provide: UserSettingsService, useValue: mockSettingsService },
         { provide: TrainingTypeService, useValue: { types: signal(DEFAULT_TRAINING_TYPES) } },
+        { provide: TodayService,        useValue: { today: signal(MONDAY) } },
       ],
     });
 
@@ -146,6 +167,66 @@ describe('ChartsComponent', () => {
 
       const record = component.exerciseGroups()[0].records[0];
       expect(record.display).toBeNull();
+    });
+  });
+
+  // ── weekBars() ───────────────────────────────────────────────────────────
+
+  describe('weekBars()', () => {
+    function onDate(date: string): Workout {
+      return { id: date, date, createdAt: new Date(), entries: [] };
+    }
+
+    it('counts only the current week, in local dates', () => {
+      // Diumenge passat i dilluns que ve queden fora; la setmana va de
+      // 2024-03-04 a 2024-03-10.
+      setup([], new Set(), {}, {
+        done: [onDate('2024-03-03'), onDate('2024-03-04'), onDate('2024-03-10'), onDate('2024-03-11')],
+      });
+
+      expect(component.thisWeekCount()).toBe(2);
+    });
+
+    it('shows one combined row plus the two breakdowns when the goal is combined', () => {
+      setup([], new Set(), {}, {
+        goal: { goalMode: 'combined', weeklyActivityGoal: 4 },
+        done: [onDate('2024-03-05'), onDate('2024-03-06')],
+        sessions: [{ date: '2024-03-07' }],
+      });
+
+      const bars = component.weekBars();
+      expect(bars.map(b => b.label)).toEqual(['Activitats', 'Gimnàs', 'Esport']);
+      expect(bars[0].count).toBe(3);
+      expect(bars[0].pct).toBe(75);
+      expect(bars[0].done).toBeFalse();
+      // Les files de detall no porten barra: no tenen objectiu propi.
+      expect(bars[1].target).toBeNull();
+      expect(bars[2].count).toBe(1);
+    });
+
+    it('shows a row per goal when gym and sport are tracked separately', () => {
+      setup([], new Set(), {}, {
+        goal: { goalMode: 'separate', weeklyGymGoal: 2, weeklySportGoal: 2 },
+        done: [onDate('2024-03-05'), onDate('2024-03-06')],
+        sessions: [{ date: '2024-03-07' }],
+      });
+
+      const bars = component.weekBars();
+      expect(bars.map(b => b.label)).toEqual(['Gimnàs', 'Esport']);
+      expect(bars[0].done).toBeTrue();
+      expect(bars[1].done).toBeFalse();
+    });
+
+    it('keeps the count and drops the bar when there is no goal set', () => {
+      setup([], new Set(), {}, {
+        goal: { goalMode: 'combined', weeklyActivityGoal: null },
+        done: [onDate('2024-03-05')],
+      });
+
+      const combined = component.weekBars()[0];
+      expect(combined.count).toBe(1);
+      expect(combined.target).toBeNull();
+      expect(combined.done).toBeFalse();
     });
   });
 
