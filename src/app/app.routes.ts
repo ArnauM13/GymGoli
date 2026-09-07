@@ -91,6 +91,14 @@ export const routes: Routes = [
     redirectTo: () => inject(Router).parseUrl('/settings?section=advanced'),
   },
   {
+    // Pàgina de diagnòstic: ensenya el localStorage en cru i el compara amb el
+    // servidor. Hi entres per l'URL, no surt a cap menú.
+    path: 'debug/local',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/debug/local-data.component').then(m => m.DebugLocalDataComponent),
+  },
+  {
     path: 'templates',
     canActivate: [authGuard],
     loadComponent: () =>
