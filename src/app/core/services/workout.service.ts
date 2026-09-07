@@ -112,6 +112,9 @@ export class WorkoutService {
   private readonly _historical = signal<Workout[]>([]);
   private _allLoaded = false;
   private _realtimeChannel: RealtimeChannel | null = null;
+  private _lastRefreshAt = 0;
+  /** Anar i tornar de l'app no ha de ser una consulta cada cop. */
+  private static readonly REFRESH_COOLDOWN_MS = 30_000;
 
   // Per-exercise load tracking (for progress/charts lazy loading)
   private readonly _exLoadedIds      = new Set<string>();
@@ -189,6 +192,13 @@ export class WorkoutService {
         this._preloadCurrentMonth();
       }
     });
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', () => void this.refreshLoadedMonths());
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) void this.refreshLoadedMonths();
+      });
+    }
   }
 
   // ── Realtime subscription for today ─────────────────────────────────────
@@ -256,6 +266,44 @@ export class WorkoutService {
     }
 
     // ── Step 2: background refresh from Supabase ────────────────────────────
+    await this._fetchMonth(uid, year, month);
+  }
+
+  /**
+   * Torna a demanar al servidor els mesos que ja es tenen carregats.
+   *
+   * Un mes es demana un sol cop per sessió (l'`ensureMonthLoaded` surt d'hora
+   * si ja el té), i això deixava una pestanya oberta ensenyant dades velles:
+   * el que s'apuntava des d'un altre dispositiu no hi sortia fins a
+   * recarregar. En tornar a l'app es torna a mirar. El canal de temps real
+   * només cobreix el dia d'avui; això cobreix la resta del mes.
+   */
+  async refreshLoadedMonths(): Promise<void> {
+    const uid = this.auth.uid();
+    if (!uid || typeof navigator === 'undefined' || !navigator.onLine) return;
+
+    const now = Date.now();
+    if (now - this._lastRefreshAt < WorkoutService.REFRESH_COOLDOWN_MS) return;
+    this._lastRefreshAt = now;
+
+    await Promise.allSettled(this._refreshableMonthKeys().map(key => {
+      const [year, month] = key.split('-').map(Number);
+      return this._fetchMonth(uid, year, month - 1);
+    }));
+  }
+
+  /** El mes en curs i l'anterior, dels que ja es tenen carregats. Tenir tot
+   *  l'històric a la memòria (pàgina de gràfics) no ha de ser una consulta per
+   *  mes cada cop que es torna a l'app: el que canvia és el més recent. */
+  private _refreshableMonthKeys(): string[] {
+    const today = new Date(this._todayStr + 'T12:00:00');
+    const prev  = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const keyOf = (d: Date) => this._monthKey(d.getFullYear(), d.getMonth());
+    return [keyOf(today), keyOf(prev)].filter(key => this._monthCache.has(key));
+  }
+
+  private async _fetchMonth(uid: string, year: number, month: number): Promise<void> {
+    const key = this._monthKey(year, month);
     try {
       const start   = `${key}-01`;
       const lastDay = new Date(year, month + 1, 0).getDate();

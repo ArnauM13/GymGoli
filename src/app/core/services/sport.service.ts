@@ -84,6 +84,9 @@ export class SportService {
   private readonly _monthCache = new Map<string, SportSession[]>();
   private readonly _sessions   = signal<SportSession[]>([]);
   private _allLoaded = false;
+  private _lastRefreshAt = 0;
+  /** Anar i tornar de l'app no ha de ser una consulta cada cop. */
+  private static readonly REFRESH_COOLDOWN_MS = 30_000;
   private _isFlushing = false;
   private _retryTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -146,8 +149,14 @@ export class SportService {
     });
 
     if (typeof window !== 'undefined') {
-      window.addEventListener('online', () => this._flushPending());
-      document.addEventListener('visibilitychange', () => { if (!document.hidden) this._flushPending(); });
+      // Primer pujar el que hi hagi pendent, després tornar a mirar el que
+      // s'hagi registrat des d'un altre dispositiu.
+      window.addEventListener('online', () => { void this._flushPending(); void this.refreshLoadedMonths(); });
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) return;
+        void this._flushPending();
+        void this.refreshLoadedMonths();
+      });
       window.addEventListener('pagehide', () => this._flushPending());
     }
   }
@@ -314,6 +323,43 @@ export class SportService {
     }
 
     // ── Step 2: background refresh from Supabase ────────────────────────────
+    await this._fetchMonth(uid, year, month);
+  }
+
+  /**
+   * Torna a demanar al servidor els mesos que ja es tenen carregats.
+   *
+   * Un mes es demana un sol cop per sessió (l'`ensureMonthLoaded` surt d'hora
+   * si ja el té), i això deixava una pestanya oberta ensenyant dades velles:
+   * el pàdel apuntat al mòbil no sortia al portàtil fins a recarregar. En
+   * tornar a l'app es torna a mirar.
+   */
+  async refreshLoadedMonths(): Promise<void> {
+    const uid = this.auth.uid();
+    if (!uid || typeof navigator === 'undefined' || !navigator.onLine) return;
+
+    const now = Date.now();
+    if (now - this._lastRefreshAt < SportService.REFRESH_COOLDOWN_MS) return;
+    this._lastRefreshAt = now;
+
+    await Promise.allSettled(this._refreshableMonthKeys().map(key => {
+      const [year, month] = key.split('-').map(Number);
+      return this._fetchMonth(uid, year, month - 1);
+    }));
+  }
+
+  /** El mes en curs i l'anterior, dels que ja es tenen carregats. Un històric
+   *  sencer a la memòria (pàgina de gràfics) no ha de ser una consulta per mes
+   *  cada cop que es torna a l'app: el que canvia és el que s'acaba de fer. */
+  private _refreshableMonthKeys(): string[] {
+    const today = new Date(this._todayStr + 'T12:00:00');
+    const prev  = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const keyOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    return [keyOf(today), keyOf(prev)].filter(key => this._monthCache.has(key));
+  }
+
+  private async _fetchMonth(uid: string, year: number, month: number): Promise<void> {
+    const key = `${year}-${String(month + 1).padStart(2, '0')}`;
     try {
       const start   = `${key}-01`;
       const lastDay = new Date(year, month + 1, 0).getDate();
@@ -322,6 +368,12 @@ export class SportService {
       // Què hi havia abans de demanar-ho: el que aparegui mentre la consulta
       // viatja s'ha registrat ara mateix i encara no pot sortir a la resposta.
       const known = new Set((this._monthCache.get(key) ?? []).map(s => s.id));
+      // El que encara no ha pujat mana sobre el que diu el servidor: una
+      // sessió registrada sense cobertura no pot desaparèixer de la pantalla
+      // en tornar a mirar el mes, ni una d'esborrada pot ressuscitar.
+      const pending  = this._readPending(uid);
+      const pendingIds = new Set(pending.map(o => o.id));
+      const deletedIds = new Set(pending.filter(o => o.op === 'delete').map(o => o.id));
 
       const { data } = await this.supabase
         .from('sport_sessions')
@@ -331,14 +383,17 @@ export class SportService {
         .lte('date', end)
         .order('date', { ascending: false });
 
-      const fetched    = (data ?? []).map(r => toSportSession(r as Record<string, unknown>));
+      const fetched = (data ?? [])
+        .map(r => toSportSession(r as Record<string, unknown>))
+        .filter(s => !deletedIds.has(s.id));
       const fetchedIds = new Set(fetched.map(s => s.id));
       // Registrar un esport d'un mes que s'estava carregant feia desaparèixer
       // la sessió de la pantalla: la resposta arribava després i s'ho enduia
-      // tot. Ara les altes fetes mentrestant es conserven.
-      const justAdded = (this._monthCache.get(key) ?? [])
-        .filter(s => !known.has(s.id) && !fetchedIds.has(s.id));
-      this._monthCache.set(key, [...fetched, ...justAdded]);
+      // tot. Ara les altes fetes mentrestant —i les que encara són a la cua—
+      // es conserven.
+      const keepLocal = (this._monthCache.get(key) ?? [])
+        .filter(s => !fetchedIds.has(s.id) && (!known.has(s.id) || pendingIds.has(s.id)));
+      this._monthCache.set(key, [...fetched, ...keepLocal]);
       this._rebuild();
       this._writeSessionsToStorage(uid, key, this._monthCache.get(key)!);
     } catch {

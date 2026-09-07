@@ -66,6 +66,45 @@ describe('WorkoutService', () => {
   }
 
   beforeEach(() => setup());
+  afterEach(() => localStorage.clear());
+
+  describe('refreshLoadedMonths()', () => {
+    function todayStr(): string {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function workoutRow(id: string): Record<string, unknown> {
+      return {
+        id, date: todayStr(), categories: ['push'], entries: [],
+        created_at: new Date().toISOString(), status: 'done',
+      };
+    }
+
+    it('incorpora el que s\'ha apuntat des d\'un altre dispositiu', async () => {
+      // El mes en curs es carrega sol en arrencar, i sense tornar-lo a demanar
+      // es quedava congelat mentre la pestanya seguís oberta.
+      await Promise.resolve();
+      expect(service.workouts().length).toBe(0);
+
+      workoutsChain = makeQueryChain({ data: [workoutRow('remote-1')], error: null });
+      await service.refreshLoadedMonths();
+
+      expect(service.workouts().some(w => w.id === 'remote-1')).toBeTrue();
+    });
+
+    it('no repeteix la consulta si s\'acaba de fer', async () => {
+      await Promise.resolve();
+
+      workoutsChain = makeQueryChain({ data: [workoutRow('remote-1')], error: null });
+      await service.refreshLoadedMonths();
+
+      workoutsChain = makeQueryChain({ data: [workoutRow('remote-2')], error: null });
+      await service.refreshLoadedMonths();
+
+      expect(service.workouts().some(w => w.id === 'remote-2')).toBeFalse();
+    });
+  });
 
   describe('loadWorkoutPage()', () => {
     it('filters by exercise name using a plain ilike on the generated exercise_names column', async () => {

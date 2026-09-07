@@ -1,4 +1,4 @@
-import { NO_ERRORS_SCHEMA } from '@angular/core';
+import { NO_ERRORS_SCHEMA, computed } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { LowerCasePipe } from '@angular/common';
@@ -14,6 +14,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { OfflineService } from '../../core/services/offline.service';
 import { TrainerService } from '../../core/services/trainer.service';
+import { TrainerProposal } from '../../core/models/trainer.model';
 import { TemplateService } from '../../core/services/template.service';
 import { SharedWorkoutService } from '../../core/services/shared-workout.service';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
@@ -43,12 +44,15 @@ describe('TrainComponent', () => {
   let goBackSpy: jasmine.Spy;
   let weeklyPlanSignal: ReturnType<typeof signal<WeeklyPlan>>;
   let settingsSignal: ReturnType<typeof signal<UserSettings>>;
+  /** Com al servei de debò, un senyal: `activeProposal()` hi reacciona. */
+  let hasTrainerSignal: ReturnType<typeof signal<boolean>>;
   let updateSettings: jasmine.Spy;
 
   beforeEach(async () => {
     forceOffline = signal(false);
     weeklyPlanSignal = signal<WeeklyPlan>(EMPTY_WEEKLY_PLAN);
     settingsSignal    = signal<UserSettings>(DEFAULT_USER_SETTINGS);
+    hasTrainerSignal  = signal(false);
     updateSettings    = jasmine.createSpy('update').and.callFake((patch: Partial<UserSettings>) => {
       settingsSignal.set({ ...settingsSignal(), ...patch });
       return Promise.resolve();
@@ -98,10 +102,11 @@ describe('TrainComponent', () => {
             weeklyPlan: weeklyPlanSignal, settings: settingsSignal, update: updateSettings,
             supersetsEnabled: signal(false), dropsetsEnabled: signal(false), dismissedHints: signal<string[]>([]),
             bodyweightKg: signal(null),
+            dismissedProposalDates: computed(() => settingsSignal().dismissedProposalDates ?? []),
           },
         },
         { provide: OfflineService,      useValue: { isOffline: signal(false), forceOffline, toggleForceOffline: jasmine.createSpy() } },
-        { provide: TrainerService,      useValue: { myTrainer: signal(null), hasTrainer: jasmine.createSpy().and.returnValue(false), getProposalForDate: jasmine.createSpy().and.returnValue(null) } },
+        { provide: TrainerService,      useValue: { myTrainer: signal(null), hasTrainer: hasTrainerSignal, getProposalForDate: jasmine.createSpy().and.returnValue(null) } },
         { provide: TemplateService,     useValue: { forCategory: jasmine.createSpy().and.returnValue([]), create: jasmine.createSpy().and.resolveTo(undefined), recordUse: jasmine.createSpy().and.resolveTo(undefined) } },
         { provide: SharedWorkoutService, useValue: { share: jasmine.createSpy().and.resolveTo('share-id') } },
         { provide: WorkoutProfileService, useValue: { profile: signal({ gym: { push: EMPTY_CATEGORY_PROFILE, pull: EMPTY_CATEGORY_PROFILE, legs: EMPTY_CATEGORY_PROFILE }, favoriteSport: null, recentSport: null, minRecovery: 2 }) } },
@@ -437,6 +442,51 @@ describe('TrainComponent', () => {
       expect(component.suggestionDismissed()).toBe(true);
       const host: HTMLElement = fixture.nativeElement;
       expect(host.querySelector('.suggestion-float-row')).toBeNull();
+    });
+  });
+
+  describe('propostes de l\'entrenador ignorades', () => {
+    const proposal: TrainerProposal = {
+      id: 'prop-1', trainerId: 't-1', clientId: 'user-1', proposalType: 'specific',
+      date: null, weekday: null, entries: [], notes: null, status: 'pending',
+      createdAt: new Date('2024-03-01T00:00:00.000Z'),
+    };
+
+    function withProposal(): void {
+      const trainer = TestBed.inject(TrainerService) as unknown as {
+        getProposalForDate: jasmine.Spy;
+      };
+      trainer.getProposalForDate.and.returnValue(proposal);
+      hasTrainerSignal.set(true);
+    }
+
+    it('ignorar-la la guarda a la configuració, no en aquest dispositiu', () => {
+      withProposal();
+      const date = component.selectedDate();
+
+      component.ignoreProposal();
+
+      expect(updateSettings).toHaveBeenCalledWith({ dismissedProposalDates: [date] });
+      expect(localStorage.getItem('gymgoli_dismissed_proposals_user-1')).toBeNull();
+    });
+
+    it('la targeta marxa a l\'instant, sense esperar cap altre canvi', () => {
+      withProposal();
+      expect(component.activeProposal()).toBe(proposal);
+
+      component.ignoreProposal();
+
+      expect(component.activeProposal()).toBeNull();
+    });
+
+    it('no la torna a guardar si ja hi és', () => {
+      withProposal();
+      component.ignoreProposal();
+      updateSettings.calls.reset();
+
+      component.ignoreProposal();
+
+      expect(updateSettings).not.toHaveBeenCalled();
     });
   });
 

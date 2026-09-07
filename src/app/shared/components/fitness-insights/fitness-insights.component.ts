@@ -1,15 +1,18 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 
 import { InsightDetailSheetComponent } from './insight-detail-sheet.component';
 import { MASCOTS, MascotMeta } from '../../../core/models/mascot.model';
 import { FitnessInsight } from '../../../core/models/insight.model';
+import { UserSettings } from '../../../core/models/user-settings.model';
 import { FitnessMetricsService } from '../../../core/services/fitness-metrics.service';
 import { TodayService } from '../../../core/services/today.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 
-const DISMISS_KEY = 'gymgoli_insight_dismissed';
-const SHOWN_KEY   = 'gymgoli_insight_shown';
-const ONCE_KEY    = 'gymgoli_insight_once';
+/** Claus d'abans que això visqués a `user_settings`. Només es llegeixen un
+ *  cop, per no perdre el que ja hi hagi en aquest dispositiu, i s'esborren. */
+const LEGACY_DISMISS_KEY = 'gymgoli_insight_dismissed';
+const LEGACY_SHOWN_KEY   = 'gymgoli_insight_shown';
+const LEGACY_ONCE_KEY    = 'gymgoli_insight_once';
 /** Les entrades més velles que això ja no diuen res: es poden llençar. */
 const KEEP_DAYS = 60;
 /**
@@ -21,15 +24,13 @@ const KEEP_ONCE = 100;
 
 type SeenMap = Record<string, string>;
 
+interface LegacySeen { dismissed: SeenMap; shownAt: SeenMap; once: string[]; }
+
 function readMap(key: string): SeenMap {
   try {
     const raw = localStorage.getItem(key);
     return raw ? (JSON.parse(raw) as SeenMap) : {};
   } catch { return {}; }
-}
-
-function writeMap(key: string, map: SeenMap): void {
-  try { localStorage.setItem(key, JSON.stringify(map)); } catch { /* mode privat */ }
 }
 
 function daysSince(dateStr: string | undefined, today: string): number | null {
@@ -48,8 +49,20 @@ function readList(key: string): string[] {
   } catch { return []; }
 }
 
-function writeList(key: string, list: string[]): void {
-  try { localStorage.setItem(key, JSON.stringify(list)); } catch { /* mode privat */ }
+/** El que hi hagi en aquest dispositiu de l'època del `localStorage`, o null
+ *  si no hi ha res a recuperar. */
+function readLegacy(): LegacySeen | null {
+  const dismissed = readMap(LEGACY_DISMISS_KEY);
+  const shownAt   = readMap(LEGACY_SHOWN_KEY);
+  const once      = readList(LEGACY_ONCE_KEY);
+  const empty = !Object.keys(dismissed).length && !Object.keys(shownAt).length && !once.length;
+  return empty ? null : { dismissed, shownAt, once };
+}
+
+function dropLegacy(): void {
+  for (const key of [LEGACY_DISMISS_KEY, LEGACY_SHOWN_KEY, LEGACY_ONCE_KEY]) {
+    try { localStorage.removeItem(key); } catch { /* mode privat */ }
+  }
 }
 
 function prune(map: SeenMap, today: string): SeenMap {
@@ -218,28 +231,26 @@ export class FitnessInsightsComponent {
   private metricsService   = inject(FitnessMetricsService);
   private todayService     = inject(TodayService);
 
-  /** Tancat → silenciat **només avui**. L'endemà torna si encara és cert. */
-  private readonly dismissed = signal<SeenMap>(readMap(DISMISS_KEY));
-
   /**
-   * Quan es va mostrar cada tipus per última vegada. És una còpia morta a
-   * propòsit: si el filtre llegís això en calent, l'insight es taparia a si
-   * mateix en el mateix moment de pintar-se.
+   * Quan es va mostrar cada tipus per última vegada, i les fites ja
+   * celebrades. Són còpies mortes a propòsit: si el filtre les llegís en
+   * calent, l'insight es taparia a si mateix en el mateix moment de
+   * pintar-se. Es prenen un sol cop, quan la configuració ha carregat.
    */
-  private readonly shownAt: SeenMap = readMap(SHOWN_KEY);
-
-  /**
-   * Les fites ja celebrades (`once`). Com `shownAt`, és una còpia morta: si
-   * fos reactiva, la felicitació es taparia a si mateixa en pintar-se.
-   */
-  private readonly seenOnce = new Set<string>(readList(ONCE_KEY));
+  private _shownAt: SeenMap = {};
+  private _seenOnce = new Set<string>();
+  private _snapshotTaken = false;
+  private readonly _seenReady = signal(false);
 
   /** Un i prou: el primer candidat que avui es pot ensenyar. */
   readonly insight = computed((): FitnessInsight | null => {
     if (!this.settingsService.metricsEnabled() || !this.settingsService.loaded()) return null;
+    // Fins que no se sap què s'ha ensenyat abans, callar: ensenyar un insight
+    // que tocava descansar és pitjor que ensenyar-lo mig segon més tard.
+    if (!this._seenReady()) return null;
 
     const today     = this.todayService.today();
-    const dismissed = this.dismissed();
+    const dismissed = this.settingsService.insightDismissedAt();
 
     return this.metricsService.insights().find(i =>
       dismissed[i.type] !== today && !this._resting(i, today) && !this._alreadyCelebrated(i)
@@ -251,16 +262,56 @@ export class FitnessInsightsComponent {
   readonly detailOpen = this._detailOpen.asReadonly();
 
   constructor() {
+    // Les còpies mortes es prenen quan la configuració ja hi és — abans no se
+    // sap res, i en canviar d'usuari es tornen a prendre.
+    effect(() => {
+      if (!this.settingsService.loaded()) {
+        this._snapshotTaken = false;
+        this._seenReady.set(false);
+        return;
+      }
+      if (this._snapshotTaken) return;
+      this._snapshotTaken = true;
+      untracked(() => this._hydrateSeen());
+    });
+
     effect(() => {
       const ins = this.insight();
-      if (ins) {
-        this._recordShown(ins.type, this.todayService.today());
-        if (ins.once) this._recordOnce(ins.once);
-      }
+      if (ins) untracked(() => this._record(ins));
       // Si l'insight canvia sota els peus (canvi de dia, dades noves), el full
       // que hi havia obert ja no parla del que es veu: es tanca.
       if (!ins) this._detailOpen.set(false);
     });
+  }
+
+  /**
+   * Pren les còpies mortes de la configuració, i recupera el que hagués
+   * quedat al `localStorage` d'aquest dispositiu si encara no s'havia pujat
+   * mai res: una fita ja celebrada no s'ha de tornar a celebrar pel fet
+   * d'haver canviat d'on es guarda.
+   */
+  private _hydrateSeen(): void {
+    const s      = this.settingsService.settings();
+    const legacy = readLegacy();
+    const synced = Object.keys(s.insightShownAt ?? {}).length > 0
+                || Object.keys(s.insightDismissedAt ?? {}).length > 0
+                || (s.insightCelebrated ?? []).length > 0;
+
+    if (legacy && !synced) {
+      this._shownAt  = legacy.shownAt;
+      this._seenOnce = new Set(legacy.once);
+      void this.settingsService.update({
+        insightShownAt:     legacy.shownAt,
+        insightDismissedAt: legacy.dismissed,
+        insightCelebrated:  legacy.once.slice(-KEEP_ONCE),
+      });
+    } else {
+      this._shownAt  = { ...(s.insightShownAt ?? {}) };
+      this._seenOnce = new Set(s.insightCelebrated ?? []);
+    }
+
+    if (legacy) dropLegacy();
+    this._seenReady.set(true);
   }
 
   /** El botó ha de dir on porta, no repetir el títol que ja es llegeix. */
@@ -279,36 +330,41 @@ export class FitnessInsightsComponent {
    */
   private _resting(insight: FitnessInsight, today: string): boolean {
     if (insight.cooldownDays <= 0) return false;
-    const age = daysSince(this.shownAt[insight.type], today);
+    const age = daysSince(this._shownAt[insight.type], today);
     return age !== null && age >= 1 && age < insight.cooldownDays;
   }
 
   /** Una fita ja celebrada no es torna a celebrar mai. Veure `once`. */
   private _alreadyCelebrated(insight: FitnessInsight): boolean {
-    return insight.once !== undefined && this.seenOnce.has(insight.once);
+    return insight.once !== undefined && this._seenOnce.has(insight.once);
   }
 
   /**
-   * Deixa constància de la fita. Es guarda en memòria **i** al disc: la còpia
-   * en memòria és la que fa que demà, quan el `computed()` es torni a fer,
-   * la felicitació d'avui ja no hi sigui, sense esperar a reobrir l'app.
+   * Deixa constància del que s'ha ensenyat, en una sola escriptura.
+   *
+   * La fita celebrada també s'apunta en memòria: és el que fa que demà, quan
+   * el `computed()` es torni a fer, la felicitació d'avui ja no hi sigui,
+   * sense esperar a reobrir l'app. El registre del dia, en canvi, no toca la
+   * còpia morta: un cop és l'insight del dia, s'hi queda tot el dia.
    */
-  private _recordOnce(key: string): void {
-    if (this.seenOnce.has(key)) return;
-    this.seenOnce.add(key);
-    const stored = readList(ONCE_KEY).filter(k => k !== key);
-    stored.push(key);
-    writeList(ONCE_KEY, stored.slice(-KEEP_ONCE));
-  }
+  private _record(insight: FitnessInsight): void {
+    const today = this.todayService.today();
+    const patch: Partial<UserSettings> = {};
 
-  private _recordShown(type: string, today: string): void {
-    if (this.shownAt[type] === today) return;
-    // La còpia en memòria no es toca: només el registre que llegirà el pròxim
-    // arrencada de l'app.
-    const stored = prune(readMap(SHOWN_KEY), today);
-    if (stored[type] === today) return;
-    stored[type] = today;
-    writeMap(SHOWN_KEY, stored);
+    const shown = prune(this.settingsService.insightShownAt(), today);
+    if (shown[insight.type] !== today) {
+      shown[insight.type] = today;
+      patch.insightShownAt = shown;
+    }
+
+    if (insight.once !== undefined && !this._seenOnce.has(insight.once)) {
+      this._seenOnce.add(insight.once);
+      const stored = this.settingsService.insightCelebrated().filter(k => k !== insight.once);
+      stored.push(insight.once);
+      patch.insightCelebrated = stored.slice(-KEEP_ONCE);
+    }
+
+    if (Object.keys(patch).length) void this.settingsService.update(patch);
   }
 
   /** `both` es pinta com els dos avatars encavalcats, no com una foto de grup. */
@@ -322,11 +378,8 @@ export class FitnessInsightsComponent {
   dismiss(type: string): void {
     this._detailOpen.set(false);
     const today = this.todayService.today();
-    this.dismissed.update(prev => {
-      const next = prune({ ...prev }, today);
-      next[type] = today;
-      writeMap(DISMISS_KEY, next);
-      return next;
-    });
+    const next  = prune(this.settingsService.insightDismissedAt(), today);
+    next[type]  = today;
+    void this.settingsService.update({ insightDismissedAt: next });
   }
 }

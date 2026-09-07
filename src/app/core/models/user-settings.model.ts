@@ -52,6 +52,17 @@ export interface UserSettings {
   /** Ids of one-off discovery hints/nudges the user has dismissed
    *  (see AppHintService). */
   dismissedHints: string[];
+  /** Insights: el dia (`YYYY-MM-DD`) en què es va tancar cada tipus. Tancar-ne
+   *  un el silencia només aquell dia; l'endemà torna si encara és cert. */
+  insightDismissedAt: Record<string, string>;
+  /** Insights: el dia en què es va ensenyar cada tipus per última vegada, per
+   *  respectar-ne el `cooldownDays`. */
+  insightShownAt: Record<string, string>;
+  /** Insights: les fites (`once`) ja celebrades, que no es tornen a celebrar
+   *  mai. Es talla per quantitat, no per antiguitat. */
+  insightCelebrated: string[];
+  /** Dates amb una proposta de l'entrenador que l'usuari ha ignorat. */
+  dismissedProposalDates: string[];
   /** Off by default — advanced workout-editor features that clutter the
    *  set-adding flow for most users. */
   supersetsEnabled: boolean;
@@ -99,6 +110,10 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   routineHintDismissed: false,
   dismissedBuiltInTemplateIds: [],
   dismissedHints: [],
+  insightDismissedAt: {},
+  insightShownAt: {},
+  insightCelebrated: [],
+  dismissedProposalDates: [],
   supersetsEnabled: false,
   dropsetsEnabled: false,
   nextExerciseSuggestionEnabled: true,
