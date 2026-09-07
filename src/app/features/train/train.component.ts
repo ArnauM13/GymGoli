@@ -52,6 +52,9 @@ const validDateParam = (v: string | null): string | null =>
 /** After this long with no change to the workout, treat the session as no
  *  longer being trained and stop the live "Sèrie activa" suggestions. */
 const STALE_SUGGESTION_MS = 2 * 60 * 60 * 1000; // 2 hours
+/** Propostes ignorades que es recorden. Una data de fa mesos ja no
+ *  filtra res, i la configuració no és lloc per a una llista que creix. */
+const KEEP_DISMISSED_PROPOSALS = 60;
 
 type GymSuggestion   = { type: 'gym';   category: ExerciseCategory; label: string; color: string; icon: string; reason: string };
 type SportSuggestion = { type: 'sport'; sport: Sport;               label: string; color: string; icon: string; reason: string };
@@ -1442,17 +1445,22 @@ export class TrainComponent implements OnDestroy {
   readonly feelingLevels5: FeelingLevel[] = [1, 2, 3, 4, 5];
   readonly acceptingProposal = signal(false);
 
-  private readonly _dismissedKey = computed(() =>
-    `gymgoli_dismissed_proposals_${this.auth?.uid() ?? ''}`
+  /** Les propostes ignorades viuen a `user_settings`: ignorar-ne una al mòbil
+   *  també la fa fora al portàtil. Reactiu, a més: en ignorar-la la targeta
+   *  marxa a l'instant, sense esperar cap altre canvi. */
+  private readonly _dismissedDates = computed(() =>
+    new Set(this.settingsService.dismissedProposalDates())
   );
-  private _dismissedDates = new Set<string>();
+  /** Per a qui ja s'ha mirat la clau antiga; per usuari, que en un mateix
+   *  navegador se'n poden encadenar dos. */
+  private _legacyProposalsDoneFor: string | null = null;
 
   readonly activeProposal = computed(() => {
     if (!this.trainerService.hasTrainer()) return null;
     const date = this.selectedDate();
     const prop = this.trainerService.getProposalForDate(date);
     if (!prop) return null;
-    if (this._dismissedDates.has(date)) return null;
+    if (this._dismissedDates().has(date)) return null;
     // Hide if already accepted as a done workout
     const alreadyAccepted = this.workoutService
       .getDoneWorkoutsForDate(date)
@@ -1823,15 +1831,13 @@ export class TrainComponent implements OnDestroy {
       });
     });
 
-    // Load dismissed proposal dates from localStorage once auth resolves
+    // Les propostes ignorades d'abans vivien només en aquest dispositiu: es
+    // pugen un sol cop a la configuració i la clau antiga s'esborra.
     effect(() => {
       const uid = this.auth.uid();
-      if (!uid) return;
-      try {
-        const key  = `gymgoli_dismissed_proposals_${uid}`;
-        const list = JSON.parse(localStorage.getItem(key) ?? '[]') as string[];
-        this._dismissedDates = new Set(list);
-      } catch { }
+      if (!uid || !this.settingsService.loaded() || this._legacyProposalsDoneFor === uid) return;
+      this._legacyProposalsDoneFor = uid;
+      untracked(() => this._migrateDismissedProposals(uid));
     });
 
   }
@@ -1854,12 +1860,28 @@ export class TrainComponent implements OnDestroy {
 
   ignoreProposal(): void {
     const date = this.selectedDate();
-    this._dismissedDates.add(date);
+    const list = this.settingsService.dismissedProposalDates();
+    if (list.includes(date)) return;
+    // Es talla per quantitat: una data ignorada fa mesos ja no filtra res.
+    void this.settingsService.update({
+      dismissedProposalDates: [...list, date].slice(-KEEP_DISMISSED_PROPOSALS),
+    });
+  }
+
+  private _migrateDismissedProposals(uid: string): void {
+    const key = `gymgoli_dismissed_proposals_${uid}`;
+    let legacy: string[] = [];
     try {
-      const key  = this._dismissedKey();
-      const list = JSON.parse(localStorage.getItem(key) ?? '[]') as string[];
-      if (!list.includes(date)) { list.push(date); localStorage.setItem(key, JSON.stringify(list)); }
-    } catch { }
+      const parsed: unknown = JSON.parse(localStorage.getItem(key) ?? '[]');
+      legacy = Array.isArray(parsed) ? parsed.filter((d): d is string => typeof d === 'string') : [];
+    } catch { return; }
+    if (!legacy.length) return;
+
+    const merged = [...new Set([...this.settingsService.dismissedProposalDates(), ...legacy])].sort();
+    void this.settingsService.update({
+      dismissedProposalDates: merged.slice(-KEEP_DISMISSED_PROPOSALS),
+    });
+    try { localStorage.removeItem(key); } catch { /* mode privat */ }
   }
 
   // ── Workout navigation ────────────────────────────────────────────────────

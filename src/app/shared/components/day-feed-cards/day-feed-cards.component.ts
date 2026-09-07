@@ -52,7 +52,6 @@ export interface DayFeedEntry {
             <div class="ac-info">
               <div class="ac-title-row">
                 <span class="ac-title">{{ workoutTypeLabel(w) }}</span>
-                @if (isPlanned(w)) { <span class="ac-tag">Planificat</span> }
                 @if (w.notes?.trim(); as note) { <span class="ac-detail">{{ note }}</span> }
               </div>
               @if (!isPlanned(w)) {
@@ -131,7 +130,6 @@ export interface DayFeedEntry {
             <div class="ac-info">
               <div class="ac-title-row">
                 <span class="ac-title">{{ item.sport.name }}</span>
-                @if (isSportPlanned(item)) { <span class="ac-tag">Planificat</span> }
                 @if (sportSubtype(item); as sub) { <span class="ac-subtype">{{ sub }}</span> }
                 @if (item.session.notes?.trim(); as note) { <span class="ac-detail">{{ note }}</span> }
               </div>
@@ -316,13 +314,6 @@ export interface DayFeedEntry {
     .ac-title {
       flex: 0 1 auto; min-width: 0; font-size: 14px; font-weight: 800; line-height: 1.25;
       color: var(--c-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .ac-tag {
-      display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0;
-      padding: 1px 7px; border-radius: 8px;
-      background: rgba(var(--c-brand-rgb), 0.12); color: var(--c-brand);
-      font-size: 10px; font-weight: 700; letter-spacing: 0.2px; line-height: 1.5;
-      .material-symbols-outlined { font-size: 12px; }
     }
     /* El subtipus és part de la identitat («Yoga · Vinyasa»), així que va al
      * costat del títol i no en una línia pròpia. */

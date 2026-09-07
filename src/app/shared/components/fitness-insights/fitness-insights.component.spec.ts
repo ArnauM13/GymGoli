@@ -1,8 +1,9 @@
-import { NO_ERRORS_SCHEMA, signal } from '@angular/core';
+import { NO_ERRORS_SCHEMA, computed, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { FitnessInsightsComponent } from './fitness-insights.component';
 import { FitnessInsight, INSIGHT_LEVEL } from '../../../core/models/insight.model';
+import { DEFAULT_USER_SETTINGS, UserSettings } from '../../../core/models/user-settings.model';
 import { FitnessMetricsService } from '../../../core/services/fitness-metrics.service';
 import { TodayService } from '../../../core/services/today.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
@@ -10,9 +11,12 @@ import { UserSettingsService } from '../../../core/services/user-settings.servic
 const TODAY     = '2025-04-23';
 const YESTERDAY = '2025-04-22';
 
-const DISMISS_KEY = 'gymgoli_insight_dismissed';
-const SHOWN_KEY   = 'gymgoli_insight_shown';
-const ONCE_KEY    = 'gymgoli_insight_once';
+/** Claus d'abans que això visqués a `user_settings`; només en queda la
+ *  migració. */
+const LEGACY_DISMISS_KEY = 'gymgoli_insight_dismissed';
+const LEGACY_SHOWN_KEY   = 'gymgoli_insight_shown';
+const LEGACY_ONCE_KEY    = 'gymgoli_insight_once';
+const LEGACY_KEYS = [LEGACY_DISMISS_KEY, LEGACY_SHOWN_KEY, LEGACY_ONCE_KEY];
 
 function makeInsight(type: string, overrides: Partial<FitnessInsight> = {}): FitnessInsight {
   return {
@@ -46,15 +50,28 @@ describe('FitnessInsightsComponent', () => {
   let mockLoaded:   ReturnType<typeof signal<boolean>>;
   let mockInsights: ReturnType<typeof signal<FitnessInsight[]>>;
   let mockToday:    ReturnType<typeof signal<string>>;
+  let mockSettings: ReturnType<typeof signal<Partial<UserSettings>>>;
+  let updateSpy:    jasmine.Spy;
   let fixture:      ReturnType<typeof TestBed.createComponent<FitnessInsightsComponent>>;
 
-  /** El component llegeix `localStorage` en construir-se: sembra-hi el que
-   *  calgui abans de cridar-la. */
+  /** El que s'ha ensenyat es llegeix de la configuració en carregar-se:
+   *  sembra-hi el que calgui (o al `localStorage`, per provar la migració)
+   *  abans de cridar-la. */
   async function build(): Promise<void> {
+    const settingsService = {
+      metricsEnabled: mockEnabled,
+      loaded:         mockLoaded,
+      settings:           () => ({ ...DEFAULT_USER_SETTINGS, ...mockSettings() }),
+      insightDismissedAt: computed(() => mockSettings().insightDismissedAt ?? {}),
+      insightShownAt:     computed(() => mockSettings().insightShownAt     ?? {}),
+      insightCelebrated:  computed(() => mockSettings().insightCelebrated  ?? []),
+      update:             updateSpy,
+    };
+
     await TestBed.configureTestingModule({
       imports: [FitnessInsightsComponent],
       providers: [
-        { provide: UserSettingsService, useValue: { metricsEnabled: mockEnabled, loaded: mockLoaded } },
+        { provide: UserSettingsService, useValue: settingsService },
         { provide: FitnessMetricsService, useValue: { insights: mockInsights } },
         { provide: TodayService, useValue: { today: mockToday } },
       ],
@@ -70,21 +87,22 @@ describe('FitnessInsightsComponent', () => {
   }
 
   beforeEach(() => {
-    localStorage.removeItem(DISMISS_KEY);
-    localStorage.removeItem(SHOWN_KEY);
-    localStorage.removeItem(ONCE_KEY);
+    for (const key of LEGACY_KEYS) localStorage.removeItem(key);
     TestBed.resetTestingModule();
 
     mockEnabled  = signal(true);
     mockLoaded   = signal(true);
     mockInsights = signal<FitnessInsight[]>([]);
     mockToday    = signal(TODAY);
+    mockSettings = signal<Partial<UserSettings>>({});
+    updateSpy    = jasmine.createSpy('update').and.callFake((patch: Partial<UserSettings>) => {
+      mockSettings.update(s => ({ ...s, ...patch }));
+      return Promise.resolve();
+    });
   });
 
   afterEach(() => {
-    localStorage.removeItem(DISMISS_KEY);
-    localStorage.removeItem(SHOWN_KEY);
-    localStorage.removeItem(ONCE_KEY);
+    for (const key of LEGACY_KEYS) localStorage.removeItem(key);
   });
 
   // ── Un i prou ────────────────────────────────────────────────────────────
@@ -131,11 +149,11 @@ describe('FitnessInsightsComponent', () => {
 
       component.dismiss('tendencia_volum');
 
-      expect(JSON.parse(localStorage.getItem(DISMISS_KEY)!)).toEqual({ tendencia_volum: TODAY });
+      expect(mockSettings().insightDismissedAt).toEqual({ tendencia_volum: TODAY });
     });
 
     it('lets a dismissed insight come back the next day', async () => {
-      localStorage.setItem(DISMISS_KEY, JSON.stringify({ tendencia_volum: YESTERDAY }));
+      mockSettings.set({ insightDismissedAt: { tendencia_volum: YESTERDAY } });
       await build();
       mockInsights.set([makeInsight('tendencia_volum')]);
 
@@ -143,7 +161,7 @@ describe('FitnessInsightsComponent', () => {
     });
 
     it('keeps it hidden for the rest of the same day', async () => {
-      localStorage.setItem(DISMISS_KEY, JSON.stringify({ tendencia_volum: TODAY }));
+      mockSettings.set({ insightDismissedAt: { tendencia_volum: TODAY } });
       await build();
       mockInsights.set([makeInsight('tendencia_volum')]);
 
@@ -155,7 +173,7 @@ describe('FitnessInsightsComponent', () => {
 
   describe('cooldown', () => {
     it('skips a slow insight seen inside its rest window', async () => {
-      localStorage.setItem(SHOWN_KEY, JSON.stringify({ patro_setmanal: YESTERDAY }));
+      mockSettings.set({ insightShownAt: { patro_setmanal: YESTERDAY } });
       await build();
       mockInsights.set([
         makeInsight('patro_setmanal', { cooldownDays: 14 }),
@@ -166,7 +184,7 @@ describe('FitnessInsightsComponent', () => {
     });
 
     it('brings it back once the rest window is over', async () => {
-      localStorage.setItem(SHOWN_KEY, JSON.stringify({ patro_setmanal: '2025-04-01' }));
+      mockSettings.set({ insightShownAt: { patro_setmanal: '2025-04-01' } });
       await build();
       mockInsights.set([makeInsight('patro_setmanal', { cooldownDays: 14 })]);
 
@@ -174,7 +192,7 @@ describe('FitnessInsightsComponent', () => {
     });
 
     it('never rests an event insight', async () => {
-      localStorage.setItem(SHOWN_KEY, JSON.stringify({ ratxa_en_joc: YESTERDAY }));
+      mockSettings.set({ insightShownAt: { ratxa_en_joc: YESTERDAY } });
       await build();
       mockInsights.set([makeInsight('ratxa_en_joc', { cooldownDays: 0 })]);
 
@@ -182,7 +200,7 @@ describe('FitnessInsightsComponent', () => {
     });
 
     it('keeps today\'s insight all day, even a slow one', async () => {
-      localStorage.setItem(SHOWN_KEY, JSON.stringify({ patro_setmanal: TODAY }));
+      mockSettings.set({ insightShownAt: { patro_setmanal: TODAY } });
       await build();
       mockInsights.set([makeInsight('patro_setmanal', { cooldownDays: 14 })]);
 
@@ -196,7 +214,7 @@ describe('FitnessInsightsComponent', () => {
       fixture.detectChanges();
       expect(component.insight()!.type).toBe('patro_setmanal');
 
-      expect(JSON.parse(localStorage.getItem(SHOWN_KEY)!)).toEqual({ patro_setmanal: TODAY });
+      expect(mockSettings().insightShownAt).toEqual({ patro_setmanal: TODAY });
     });
   });
 
@@ -216,11 +234,11 @@ describe('FitnessInsightsComponent', () => {
       // Pintar-la és el que en deixa constància, via `effect`.
       fixture.detectChanges();
 
-      expect(JSON.parse(localStorage.getItem(ONCE_KEY)!)).toEqual(['ratxa_assolida:2025-04-14']);
+      expect(mockSettings().insightCelebrated).toEqual(['ratxa_assolida:2025-04-14']);
     });
 
     it('never shows the same milestone again, not even months later', async () => {
-      localStorage.setItem(ONCE_KEY, JSON.stringify(['ratxa_assolida:2025-04-14']));
+      mockSettings.set({ insightCelebrated: ['ratxa_assolida:2025-04-14'] });
       await build();
       mockInsights.set([
         makeInsight('ratxa_assolida', { once: 'ratxa_assolida:2025-04-14' }),
@@ -231,7 +249,7 @@ describe('FitnessInsightsComponent', () => {
     });
 
     it('lets the next milestone through — it is another achievement', async () => {
-      localStorage.setItem(ONCE_KEY, JSON.stringify(['ratxa_assolida:2025-04-14']));
+      mockSettings.set({ insightCelebrated: ['ratxa_assolida:2025-04-14'] });
       await build();
       mockInsights.set([makeInsight('ratxa_assolida', { once: 'ratxa_assolida:2025-04-21' })]);
 
@@ -246,6 +264,46 @@ describe('FitnessInsightsComponent', () => {
 
       mockToday.set('2025-04-24');
       expect(component.insight()).toBeNull();
+    });
+  });
+
+  // ── La migració del que hi havia al dispositiu ───────────────────────────
+
+  describe('migració des del localStorage', () => {
+    it('puja el que hi havia al dispositiu si encara no s\'havia sincronitzat mai', async () => {
+      localStorage.setItem(LEGACY_SHOWN_KEY,   JSON.stringify({ patro_setmanal: TODAY }));
+      localStorage.setItem(LEGACY_DISMISS_KEY, JSON.stringify({ tendencia_volum: TODAY }));
+      localStorage.setItem(LEGACY_ONCE_KEY,    JSON.stringify(['ratxa_assolida:2025-04-14']));
+
+      await build();
+
+      expect(updateSpy).toHaveBeenCalled();
+      expect(mockSettings().insightShownAt).toEqual({ patro_setmanal: TODAY });
+      expect(mockSettings().insightDismissedAt).toEqual({ tendencia_volum: TODAY });
+      expect(mockSettings().insightCelebrated).toEqual(['ratxa_assolida:2025-04-14']);
+      // I la clau antiga marxa: la migració es fa un sol cop.
+      for (const key of LEGACY_KEYS) expect(localStorage.getItem(key)).toBeNull();
+    });
+
+    it('una fita ja celebrada en aquest dispositiu no es torna a celebrar', async () => {
+      localStorage.setItem(LEGACY_ONCE_KEY, JSON.stringify(['ratxa_assolida:2025-04-14']));
+      await build();
+      mockInsights.set([
+        makeInsight('ratxa_assolida', { once: 'ratxa_assolida:2025-04-14' }),
+        makeInsight('equilibri_gym'),
+      ]);
+
+      expect(component.insight()!.type).toBe('equilibri_gym');
+    });
+
+    it('no reviu res si la configuració ja mana, però igualment neteja', async () => {
+      localStorage.setItem(LEGACY_SHOWN_KEY, JSON.stringify({ patro_setmanal: YESTERDAY }));
+      mockSettings.set({ insightShownAt: { patro_setmanal: '2025-04-01' } });
+
+      await build();
+
+      expect(mockSettings().insightShownAt).toEqual({ patro_setmanal: '2025-04-01' });
+      for (const key of LEGACY_KEYS) expect(localStorage.getItem(key)).toBeNull();
     });
   });
 

@@ -55,6 +55,10 @@ export class UserSettingsService {
   readonly catalogSyncedVersion    = computed(() => this._settings().catalogSyncedVersion ?? 0);
   readonly dismissedBuiltInTemplateIds = computed(() => this._settings().dismissedBuiltInTemplateIds ?? []);
   readonly dismissedHints              = computed(() => this._settings().dismissedHints ?? []);
+  readonly insightDismissedAt          = computed(() => this._settings().insightDismissedAt ?? {});
+  readonly insightShownAt              = computed(() => this._settings().insightShownAt ?? {});
+  readonly insightCelebrated           = computed(() => this._settings().insightCelebrated ?? []);
+  readonly dismissedProposalDates      = computed(() => this._settings().dismissedProposalDates ?? []);
   readonly guidedTourDone              = computed(() => this._settings().guidedTourDone ?? false);
 
   constructor() {

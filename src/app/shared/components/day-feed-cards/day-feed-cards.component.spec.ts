@@ -278,13 +278,13 @@ describe('DayFeedCardsComponent', () => {
       }],
     });
 
-    it('es llegeix com un pla: xapa "Planificat" i targeta de pla', () => {
+    it('es llegeix com un pla per la targeta, sense cap xapa que ho repeteixi', () => {
       fixture.componentRef.setInput('day', plannedDay('2024-03-05'));
       fixture.detectChanges();
 
       const el = fixture.nativeElement as HTMLElement;
-      expect(el.querySelector('.ac-tag')?.textContent?.trim()).toBe('Planificat');
       expect(el.querySelector('.act-card')?.classList).toContain('act-card--planned');
+      expect(el.querySelector('.ac-tag')).toBeNull();
     });
 
     it('ofereix registrar-lo i eliminar-lo quan el dia ja ha arribat', () => {
