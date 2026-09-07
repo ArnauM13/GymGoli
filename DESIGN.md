@@ -330,11 +330,19 @@ l'activitat sencera.
 | Detall | `app-workout-detail` — exercicis, sèries, drop sets i PRs | `app-sport-detail` — dades de la sessió, rècords i context |
 | Botó del peu | «Obrir entrenament» → `/train?workout=` | «Obrir sessió» → `/sport/:id` |
 
-Les dues activitats tenen **pàgina pròpia**, i s'hi arriba des del feed: un
-entrenament a `/train?workout=` (mode pantalla sencera de la pàgina d'Entrenar)
-i una sessió d'esport a `/sport/:id`. Cap de les dues s'obre en un full flotant
-—això queda per a triar coses (`bottom sheet`, §8), no per a mirar una
-activitat.
+Les dues activitats tenen **pàgina pròpia**, i s'hi arriba igual des del feed
+i des d'Entrenar: un entrenament a `/train?workout=` (mode pantalla sencera de
+la pàgina d'Entrenar) i una sessió d'esport a `/sport/:id`. Cap de les dues
+s'obre en un full flotant —això queda per a triar coses (`bottom sheet`, §8),
+no per a mirar ni omplir una activitat.
+
+**Registrar-les també és el mateix gest.** A Entrenar, tocar un tipus
+d'entrenament crea l'activitat i n'obre la pàgina; tocar un esport fa
+exactament això. Un dia que encara ha de venir es planifica en comptes de
+registrar-se, a totes dues. La sessió acabada de crear arriba a la seva pàgina
+amb el formulari ja obert (`?nova=1`): hi véns a omplir-la, no a mirar-la.
+El gimnàs hi té, a més, un pas de preconfiguració (buit · com l'últim ·
+plantilla); l'esport encara no.
 
 **El feed no modifica res.** Ni una targeta ni el seu detall porten cap camp,
 cap selector ni cap botó de guardar: es llegeixen. Tocar dades vol dir sortir
@@ -612,8 +620,8 @@ Use `cubic-bezier(0.34, 1.4, 0.64, 1)` for cards (subtle overshoot) and
 
 ### Floating bottom sheet
 
-Every bottom-anchored dropdown/picker/logger/editor (fatiga, notes, workout
-picker, sport logger, save-as-template, template editor…) uses **one shared
+Every bottom-anchored dropdown/picker/editor (fatiga, notes, workout picker,
+save-as-template, template editor…) uses **one shared
 global shell** defined in `styles.scss` — never re-implement its positioning or
 animation per component. With the floating capsule nav, sheets float *above* the
 nav pill (inset side margins, all four corners rounded) and slide up from below.

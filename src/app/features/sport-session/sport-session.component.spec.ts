@@ -37,11 +37,14 @@ describe('SportSessionComponent', () => {
   let confirm: jasmine.Spy;
   let goBack: jasmine.Spy;
 
-  function build(sessionId = 'sess1'): void {
+  function build(sessionId = 'sess1', query: Record<string, string> = {}): void {
     TestBed.overrideProvider(ActivatedRoute, {
       useValue: {
         paramMap: of(convertToParamMap({ id: sessionId })),
-        snapshot: { paramMap: convertToParamMap({ id: sessionId }) },
+        snapshot: {
+          paramMap: convertToParamMap({ id: sessionId }),
+          queryParamMap: convertToParamMap(query),
+        },
       },
     });
     fixture = TestBed.createComponent(SportSessionComponent);
@@ -66,7 +69,10 @@ describe('SportSessionComponent', () => {
           provide: ActivatedRoute,
           useValue: {
             paramMap: of(convertToParamMap({ id: 'sess1' })),
-            snapshot: { paramMap: convertToParamMap({ id: 'sess1' }) },
+            snapshot: {
+              paramMap: convertToParamMap({ id: 'sess1' }),
+              queryParamMap: convertToParamMap({}),
+            },
           },
         },
         {
@@ -126,6 +132,17 @@ describe('SportSessionComponent', () => {
   });
 
   describe('editar', () => {
+    // Registrar un esport et deixa aquí amb la sessió acabada de crear: hi
+    // véns a omplir-la, no a mirar-la.
+    it("una sessió acabada de registrar arriba amb el formulari obert", () => {
+      const session = makeSession({ duration: 60 });
+      allSessions.set([session]);
+      build('sess1', { nova: '1' });
+
+      expect(component.editOpen()).toBeTrue();
+      expect(component.editDuration()).toBe(60);
+    });
+
     it('el formulari arrenca plegat i es carrega amb el que la sessió porta', () => {
       const session = makeSession({ duration: 75, subtypeId: 'dobles', feeling: 4, notes: 'Bé', metrics: { sets_won: 2 } });
       allSessions.set([session]);

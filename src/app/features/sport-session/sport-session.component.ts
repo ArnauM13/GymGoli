@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs/operators';
@@ -408,6 +408,10 @@ export class SportSessionComponent {
     { initialValue: this.route.snapshot.paramMap.get('id') },
   );
 
+  /** Una sessió acabada de registrar arriba amb `?nova=1`: hi véns a omplir-la,
+   *  així que el formulari ja t'espera obert. */
+  private readonly isNew = this.route.snapshot.queryParamMap.get('nova') === '1';
+
   /** Fals només mentre encara pot aparèixer: un cop l'historial hi és tot i la
    *  sessió no hi és, ja no arribarà. */
   readonly loading = computed(() =>
@@ -452,6 +456,16 @@ export class SportSessionComponent {
 
   constructor() {
     this.sportService.ensureLoaded();
+    // El formulari es carrega amb la sessió, que pot arribar més tard que la
+    // pàgina: s'obre al primer moment que la tenim, i només aquell cop.
+    let openedForNew = false;
+    effect(() => {
+      const p = this.pair();
+      if (!p || !this.isNew || openedForNew) return;
+      openedForNew = true;
+      untracked(() => this.toggleEdit(p));
+    });
+
     // La pàgina s'obre per l'URL i no sap de quin mes és la sessió: l'única
     // manera de trobar-la sempre és tenir-les totes. El detall ja les demana
     // per als rècords, i la crida es guarda de repetir-se.
