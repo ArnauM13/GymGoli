@@ -82,8 +82,18 @@ export class SportService {
 
   // ── Sessions cache ────────────────────────────────────────────────────────
   private readonly _monthCache = new Map<string, SportSession[]>();
+  /** Mesos demanats sencers al servidor: tenir-ne alguna sessió a la cau no
+   *  vol dir tenir-les totes. */
+  private readonly _fullMonths = new Set<string>();
+  /** Peticions de mes en marxa, per no demanar-lo dos cops alhora. */
+  private readonly _monthLoads = new Map<string, Promise<void>>();
   private readonly _sessions   = signal<SportSession[]>([]);
   private _allLoaded = false;
+  private _lastRefreshAt = 0;
+
+  /** Marge mínim entre refrescos automàtics (tornar a l'app dispara alhora
+   *  `focus` i `visibilitychange`). */
+  private static readonly REFRESH_THROTTLE_MS = 10_000;
   private _isFlushing = false;
   private _retryTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -129,6 +139,8 @@ export class SportService {
       this._sports.set([]);
       this._sportsLoaded.set(false);
       this._monthCache.clear();
+      this._fullMonths.clear();
+      this._monthLoads.clear();
       this._sessions.set([]);
       this._allLoaded = false;
       this.isLoaded.set(false);
@@ -146,10 +158,38 @@ export class SportService {
     });
 
     if (typeof window !== 'undefined') {
-      window.addEventListener('online', () => this._flushPending());
-      document.addEventListener('visibilitychange', () => { if (!document.hidden) this._flushPending(); });
+      window.addEventListener('online', () => { this._flushPending(); this.refreshLoaded(true); });
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) return;
+        this._flushPending();
+        this.refreshLoaded();
+      });
+      window.addEventListener('focus', () => this.refreshLoaded());
       window.addEventListener('pagehide', () => this._flushPending());
     }
+  }
+
+  /**
+   * Torna a demanar els mesos que ja tenim carregats.
+   *
+   * Les sessions d'esport no tenen realtime: sense això, una pestanya oberta
+   * es quedava amb la foto del moment en què la vas obrir i ensenyava una
+   * cosa diferent del que veies al mòbil.
+   */
+  async refreshLoaded(immediate = false): Promise<void> {
+    if (!this.auth.uid()) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+
+    const now = Date.now();
+    if (!immediate && now - this._lastRefreshAt < SportService.REFRESH_THROTTLE_MS) return;
+    this._lastRefreshAt = now;
+
+    if (this._allLoaded) { this._allLoaded = false; await this.loadAllSessions(); return; }
+
+    await Promise.all([...this._monthCache.keys()].map(key => {
+      const [y, m] = key.split('-').map(Number);
+      return this.ensureMonthLoaded(y, m - 1, true);
+    }));
   }
 
   // ── Lazy initialisation — call once per feature that needs sport definitions
@@ -297,20 +337,35 @@ export class SportService {
     this.ensureMonthLoaded(now.getFullYear(), now.getMonth());
   }
 
-  async ensureMonthLoaded(year: number, month: number): Promise<void> {
+  /** Carrega un mes, i el torna a demanar si `force` — que un mes només es
+   *  demanés un cop per sessió és el que feia que dos dispositius ensenyessin
+   *  coses diferents. */
+  async ensureMonthLoaded(year: number, month: number, force = false): Promise<void> {
     const key = `${year}-${String(month + 1).padStart(2, '0')}`;
-    if (this._monthCache.has(key) || this._allLoaded) return;
+    if (!force && (this._fullMonths.has(key) || this._allLoaded)) return;
 
-    const uid = this._uid();
+    const inFlight = this._monthLoads.get(key);
+    if (inFlight) return inFlight;
+
+    const load = this._loadMonth(year, month, key).finally(() => this._monthLoads.delete(key));
+    this._monthLoads.set(key, load);
+    return load;
+  }
+
+  private async _loadMonth(year: number, month: number, key: string): Promise<void> {
+    const uid = this.auth.uid();
+    if (!uid) return;
 
     // ── Step 1: serve from localStorage immediately (no spinner if cached) ──
-    const cached = this._readSessionsFromStorage(uid, key);
-    if (cached) {
-      this._monthCache.set(key, cached);
-      this._rebuild();
-    } else {
-      this._monthCache.set(key, []); // mark loading
-      this.isLoading.set(true);
+    if (!this._monthCache.has(key)) {
+      const cached = this._readSessionsFromStorage(uid, key);
+      if (cached) {
+        this._monthCache.set(key, cached);
+        this._rebuild();
+      } else {
+        this._monthCache.set(key, []); // mark loading
+        this.isLoading.set(true);
+      }
     }
 
     // ── Step 2: background refresh from Supabase ────────────────────────────
@@ -322,8 +377,11 @@ export class SportService {
       // Què hi havia abans de demanar-ho: el que aparegui mentre la consulta
       // viatja s'ha registrat ara mateix i encara no pot sortir a la resposta.
       const known = new Set((this._monthCache.get(key) ?? []).map(s => s.id));
+      // Qui esperava torn quan vam preguntar: si puja mentre la consulta
+      // viatja, la resposta encara no el porta i desapareixeria de la vista.
+      const queuedBefore = new Set(this._readPending(uid).map(o => o.id));
 
-      const { data } = await this.supabase
+      const { data, error } = await this.supabase
         .from('sport_sessions')
         .select('*')
         .eq('user_id', uid)
@@ -331,21 +389,44 @@ export class SportService {
         .lte('date', end)
         .order('date', { ascending: false });
 
-      const fetched    = (data ?? []).map(r => toSportSession(r as Record<string, unknown>));
-      const fetchedIds = new Set(fetched.map(s => s.id));
-      // Registrar un esport d'un mes que s'estava carregant feia desaparèixer
-      // la sessió de la pantalla: la resposta arribava després i s'ho enduia
-      // tot. Ara les altes fetes mentrestant es conserven.
-      const justAdded = (this._monthCache.get(key) ?? [])
-        .filter(s => !known.has(s.id) && !fetchedIds.has(s.id));
-      this._monthCache.set(key, [...fetched, ...justAdded]);
-      this._rebuild();
+      if (error) return; // es manté el que ja teníem
+
+      const fetched = (data ?? []).map(r => toSportSession(r as Record<string, unknown>));
+      this._mergeMonth(uid, key, fetched, known, queuedBefore);
+      this._fullMonths.add(key);
       this._writeSessionsToStorage(uid, key, this._monthCache.get(key)!);
     } catch {
       // Network failure — keep whatever we have from localStorage/local state
     } finally {
       this.isLoading.set(false);
     }
+  }
+
+  /**
+   * Fusiona la resposta d'un mes sencer amb el que hi ha a la cau.
+   *
+   * El servidor mana: del que teníem només es conserva el que encara espera a
+   * la cua d'enviament i el que s'ha registrat mentre la consulta viatjava
+   * (registrar un esport just abans que arribés la resposta el feia
+   * desaparèixer de la pantalla). El que el servidor ja no retorna s'ha
+   * esborrat des d'un altre dispositiu i ha de marxar també d'aquí.
+   */
+  private _mergeMonth(
+    uid: string, key: string, fetched: SportSession[],
+    knownBefore: Set<string>, queuedBefore: Set<string>,
+  ): void {
+    const pending = this._readPending(uid);
+    const queued  = new Set(pending.filter(o => o.op !== 'delete').map(o => o.id));
+    const erased  = new Set(pending.filter(o => o.op === 'delete').map(o => o.id));
+
+    const byId = new Map(fetched.filter(s => !erased.has(s.id)).map(s => [s.id, s]));
+    for (const s of this._monthCache.get(key) ?? []) {
+      if (erased.has(s.id)) continue;
+      if (queued.has(s.id) || queuedBefore.has(s.id) || !knownBefore.has(s.id)) byId.set(s.id, s);
+    }
+
+    this._monthCache.set(key, [...byId.values()]);
+    this._rebuild();
   }
 
   /** Loads the user's entire sport-session history into the cache in a single
@@ -358,18 +439,35 @@ export class SportService {
     if (!uid) return;
     this.isLoading.set(true);
     try {
-      const { data } = await this.supabase
+      const known        = new Set([...this._monthCache.values()].flat().map(s => s.id));
+      const queuedBefore = new Set(this._readPending(uid).map(o => o.id));
+      const { data, error } = await this.supabase
         .from('sport_sessions')
         .select('*')
         .eq('user_id', uid)
         .order('date', { ascending: false });
 
-      for (const row of data ?? []) {
-        const s   = toSportSession(row as Record<string, unknown>);
+      if (error) return; // es manté el que ja teníem
+
+      const fetched = (data ?? []).map(r => toSportSession(r as Record<string, unknown>));
+      const pending = this._readPending(uid);
+      const queued  = new Set(pending.filter(o => o.op !== 'delete').map(o => o.id));
+      const erased  = new Set(pending.filter(o => o.op === 'delete').map(o => o.id));
+
+      // Igual que a `_mergeMonth`: la resposta mana, i la versió local només
+      // es conserva mentre esperi torn per pujar.
+      const byId = new Map(fetched.filter(s => !erased.has(s.id)).map(s => [s.id, s]));
+      for (const s of [...this._monthCache.values()].flat()) {
+        if (erased.has(s.id)) continue;
+        if (queued.has(s.id) || queuedBefore.has(s.id) || !known.has(s.id)) byId.set(s.id, s);
+      }
+
+      this._monthCache.clear();
+      this._fullMonths.clear();
+      for (const s of byId.values()) {
         const key = s.date.substring(0, 7);
-        const bucket = this._monthCache.get(key) ?? [];
-        if (!bucket.find(x => x.id === s.id)) bucket.push(s);
-        this._monthCache.set(key, bucket);
+        this._monthCache.set(key, [...(this._monthCache.get(key) ?? []), s]);
+        this._fullMonths.add(key);
       }
       this._rebuild();
       this._allLoaded = true;
