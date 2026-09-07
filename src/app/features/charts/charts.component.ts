@@ -3,11 +3,12 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 
-import { CATEGORY_COLORS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
+import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
 import { setMaxWeight } from '../../core/models/workout.model';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { TrainingTypeService } from '../../core/services/training-type.service';
 import { SportService } from '../../core/services/sport.service';
+import { TodayService } from '../../core/services/today.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { addDays, mondayOf } from '../../shared/utils/calendar-utils';
@@ -15,6 +16,18 @@ import { kgToDisplay } from '../../shared/utils/weight.utils';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { ExerciseProgressInlineComponent } from '../../shared/components/exercise-progress-inline.component';
 import { FilterBarComponent } from '../../shared/components/filter-bar/filter-bar.component';
+
+/** Una fila de «Setmana actual». `target` a `null` = recompte sense objectiu. */
+interface WeekBar {
+  icon: string;
+  label: string;
+  count: number;
+  target: number | null;
+  pct: number;
+  done: boolean;
+  /** Desglossa la fila de sobre en comptes de dir una cosa nova. */
+  sub: boolean;
+}
 
 @Component({
   selector: 'app-charts',
@@ -24,69 +37,50 @@ import { FilterBarComponent } from '../../shared/components/filter-bar/filter-ba
     <div class="page">
       <app-page-header title="Progrés" [showBack]="true" />
 
-      <!-- Summary strip (only when there is data) -->
       @if (!isLoadingRecords() && totalWorkouts() > 0) {
-        <div class="summary-card">
-          <div class="summary-block">
-            <div class="summary-section">
-              <span class="summary-section-title">Resum</span>
-              <div class="summary-grid">
-                <div class="summary-tile">
-                  <span class="summary-val">{{ totalWorkouts() }}</span>
-                  <span class="summary-lbl">Entrenaments</span>
-                </div>
-                <div class="summary-tile">
-                  <span class="summary-val">
-                    @if (weekStreak() > 0) { 🔥 }{{ weekStreak() }}
-                  </span>
-                  <span class="summary-lbl">Set. consecutives</span>
-                </div>
-              </div>
+        <!-- ── Resum ── -->
+        <div class="card-section">
+          <div class="section-header">
+            <span class="material-symbols-outlined section-icon" aria-hidden="true">insights</span>
+            <h2 class="section-title">Resum</h2>
+          </div>
+          <div class="stat-grid">
+            <div class="stat-tile">
+              <span class="stat-val">{{ totalWorkouts() }}</span>
+              <span class="stat-lbl">Entrenaments</span>
             </div>
-            <div class="summary-section">
-              <span class="summary-section-title">Setmana actual</span>
-              @if (goalMode() === 'separate') {
-                <div class="summary-grid">
-                  <div class="summary-tile">
-                    <span class="summary-val">
-                      {{ thisWeekCount() }}
-                      @if (weeklyGymGoal()) { <span class="summary-sub">/ {{ weeklyGymGoal() }}</span> }
-                    </span>
-                    <span class="summary-lbl">Gimnàs</span>
-                  </div>
-                  <div class="summary-tile">
-                    <span class="summary-val">
-                      {{ thisWeekSportCount() }}
-                      @if (weeklySportGoal()) { <span class="summary-sub">/ {{ weeklySportGoal() }}</span> }
-                    </span>
-                    <span class="summary-lbl">Esport</span>
-                  </div>
-                </div>
-              } @else {
-                <div class="summary-grid">
-                  <div class="summary-tile">
-                    <span class="summary-val">{{ thisWeekCount() }}</span>
-                    <span class="summary-lbl">Gimnàs</span>
-                  </div>
-                  <div class="summary-tile">
-                    <span class="summary-val">{{ thisWeekSportCount() }}</span>
-                    <span class="summary-lbl">Esport</span>
-                  </div>
-                </div>
-                @if (weeklyGoal()) {
-                  <div class="summary-combined-goal">
-                    <div class="scg-track">
-                      <div class="scg-fill" [style.width.%]="combinedWeeklyBarPct()"></div>
-                    </div>
-                    <span class="scg-label">
-                      {{ thisWeekCount() + thisWeekSportCount() }}/{{ weeklyGoal() }} activitats
-                      @if (combinedWeeklyMet()) { ✓ }
-                    </span>
-                  </div>
+            <div class="stat-tile">
+              <span class="stat-val">
+                @if (weekStreak() > 0) {
+                  <span class="material-symbols-outlined stat-flame" aria-hidden="true">local_fire_department</span>
                 }
-              }
+                {{ weekStreak() }}
+              </span>
+              <span class="stat-lbl">Setmanes seguides</span>
             </div>
           </div>
+        </div>
+
+        <!-- ── Setmana actual ── -->
+        <div class="card-section">
+          <div class="section-header">
+            <span class="material-symbols-outlined section-icon" aria-hidden="true">calendar_view_week</span>
+            <h2 class="section-title">Setmana actual</h2>
+          </div>
+          @for (bar of weekBars(); track bar.label) {
+            <div class="goal-row" [class.goal-row--done]="bar.done" [class.goal-row--sub]="bar.sub">
+              <span class="material-symbols-outlined goal-icon" aria-hidden="true">{{ bar.icon }}</span>
+              <span class="goal-name">{{ bar.label }}</span>
+              @if (bar.target) {
+                <div class="goal-track">
+                  <div class="goal-fill" [style.width.%]="bar.pct"></div>
+                </div>
+              }
+              <span class="goal-badge">
+                {{ bar.count }}@if (bar.target) {<span class="goal-target">/{{ bar.target }}</span>}
+              </span>
+            </div>
+          }
         </div>
       }
 
@@ -102,151 +96,238 @@ import { FilterBarComponent } from '../../shared/components/filter-bar/filter-ba
       <!-- Exercise list: all exercises with data load up-front, expand inline for stats -->
       @if (exerciseGroups().length > 0) {
         @for (group of exerciseGroups(); track group.cat) {
-          <div class="pr-section" [style.--pr-g]="group.color">
-            <h3 class="pr-title">{{ group.label }}</h3>
+          <div class="card-section">
+            <div class="section-header">
+              <span class="material-symbols-outlined section-icon"
+                    [style.color]="group.color" aria-hidden="true">{{ group.icon }}</span>
+              <h2 class="section-title">{{ group.label }}</h2>
+              <span class="section-count">{{ group.records.length }}</span>
+            </div>
+
             @for (r of group.records; track r.exercise.id) {
-              <div class="pr-item" [id]="'ex-' + r.exercise.id">
-                <button class="pr-row" [class.expanded]="expandedExerciseId() === r.exercise.id"
-                        (click)="toggleExercise(r.exercise.id)">
-                  <span class="pr-bar" [style.background]="r.color"></span>
-                  <span class="pr-name">{{ r.exercise.name }}</span>
+              <div class="item-card" [class.item-card--open]="expandedExerciseId() === r.exercise.id"
+                   [id]="'ex-' + r.exercise.id">
+                <button class="ic-row" (click)="toggleExercise(r.exercise.id)"
+                        [attr.aria-expanded]="expandedExerciseId() === r.exercise.id">
+                  <span class="ic-bar" [style.background]="r.color" aria-hidden="true"></span>
+                  <span class="ic-name">{{ r.exercise.name }}</span>
                   @if (r.display !== null) {
-                    <span class="pr-weight">{{ r.display }} {{ unit() }}</span>
+                    <span class="ic-pr">{{ r.display }} {{ unit() }}</span>
                   }
-                  <span class="material-symbols-outlined pr-chevron"
-                        [class.pr-chevron--open]="expandedExerciseId() === r.exercise.id">expand_more</span>
+                  <span class="material-symbols-outlined ic-chevron" aria-hidden="true">expand_more</span>
                 </button>
 
                 @if (expandedExerciseId() === r.exercise.id) {
-                  <app-exercise-progress-inline [exerciseId]="r.exercise.id" [exerciseName]="r.exercise.name" />
+                  <div class="ic-panel">
+                    <app-exercise-progress-inline
+                      [exerciseId]="r.exercise.id" [exerciseName]="r.exercise.name" />
+                  </div>
                 }
               </div>
             }
           </div>
         }
       } @else if (isLoadingRecords()) {
-        <div class="empty-state">
-          <span class="material-symbols-outlined empty-icon loading-icon">bar_chart</span>
-          <p style="color:var(--c-text-2)">Carregant exercicis...</p>
+        <!-- Skeleton: same shape as the real list, so nothing jumps on arrival -->
+        <div class="card-section">
+          <div class="section-header">
+            <div class="sk sk-icon"></div>
+            <div class="sk sk-title"></div>
+            <div class="sk sk-count"></div>
+          </div>
+          @for (sk of [1,2,3,4]; track sk) {
+            <div class="item-card sk-card">
+              <div class="ic-bar sk"></div>
+              <div class="sk-body"><div class="sk sk-line"></div></div>
+            </div>
+          }
         </div>
       } @else if (hasActiveFilter()) {
-        <div class="filter-empty">
-          <span class="material-symbols-outlined">search_off</span>
-          <p>Cap exercici trobat</p>
+        <div class="card-section">
+          <div class="empty-state">
+            <span class="material-symbols-outlined empty-icon" aria-hidden="true">search_off</span>
+            <p>Cap exercici trobat</p>
+          </div>
         </div>
       } @else {
         <!-- New user empty state -->
-        <div class="empty-state">
-          <span class="material-symbols-outlined empty-icon">fitness_center</span>
-          <h2>Comença a entrenar</h2>
-          <p>Registra els teus primers entrenaments per veure aquí les gràfiques de progrés</p>
-          <a class="btn-cta" routerLink="/train">Anar a Entrena</a>
+        <div class="card-section">
+          <div class="empty-state">
+            <span class="material-symbols-outlined empty-icon" aria-hidden="true">monitoring</span>
+            <p>Registra els teus primers entrenaments i aquí hi sortirà com evoluciones</p>
+            <div class="empty-actions">
+              <a class="btn-primary" routerLink="/train">Anar a Entrena</a>
+            </div>
+          </div>
         </div>
       }
     </div>
-
   `,
   styles: [`
-    /* Generous bottom safe area so the last exercise clears the floating nav
-       and stays fully tappable (was 16px, which left it under the pill). */
-    .page { padding: 0 0 84px; }
+    .page { padding: 0 0 88px; }
 
-    /* ── Summary card ─────────────────────────────────────── */
-    .summary-card {
-      margin: 12px 16px 0; padding: 14px 14px 16px;
+    /* ── Section card ── */
+    .card-section {
+      margin: 12px 16px 0; padding: 14px 14px 10px;
       background: var(--c-card); border-radius: 18px;
       box-shadow: 0 2px 10px var(--c-shadow);
     }
-    .summary-block { display: flex; flex-direction: column; gap: 12px; }
-    .summary-section { display: flex; flex-direction: column; gap: 6px; }
-    .summary-section-title {
-      font-size: 11px; font-weight: 600; color: var(--c-text-2);
-      text-transform: uppercase; letter-spacing: 0.05em;
+    .section-header { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; }
+    .section-icon {
+      font-size: 18px; color: var(--c-text-2);
+      font-variation-settings: 'FILL' 0, 'wght' 300;
     }
-    .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .summary-tile {
-      background: var(--c-subtle); border: 1px solid var(--c-border-2); border-radius: 12px;
-      padding: 12px 8px; text-align: center;
-      display: flex; flex-direction: column; gap: 4px;
+    .section-title {
+      margin: 0; flex: 1;
+      font-size: 14px; font-weight: 700; color: var(--c-text-2); letter-spacing: 0.2px;
     }
-    .summary-val {
-      font-size: 20px; font-weight: 700; color: var(--c-text);
-      display: flex; align-items: baseline; justify-content: center; gap: 2px;
+    .section-count {
+      font-size: 11px; font-weight: 700; color: var(--c-text-2);
+      background: var(--c-border-2); border-radius: 10px; padding: 2px 8px;
     }
-    .summary-sub { font-size: 14px; font-weight: 400; color: var(--c-text-2); }
-    .summary-lbl { font-size: 10px; color: var(--c-text-2); font-weight: 500; }
-    .summary-combined-goal {
-      margin-top: 6px; display: flex; align-items: center; gap: 8px;
-    }
-    .scg-track {
-      flex: 1; height: 4px; background: var(--c-border); border-radius: 2px; overflow: hidden;
-    }
-    .scg-fill {
-      height: 100%; background: var(--c-brand); border-radius: 2px; transition: width 0.4s ease;
-    }
-    .scg-label { font-size: 11px; font-weight: 600; color: var(--c-text-2); white-space: nowrap; }
 
-    /* ── Filter bar spacing (match History's gaps) ───────── */
+    /* ── Resum ── */
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-bottom: 4px; }
+    .stat-tile {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 12px 8px; text-align: center;
+      background: var(--c-subtle); border: 1.5px solid var(--c-border-2); border-radius: 14px;
+    }
+    .stat-val {
+      display: flex; align-items: center; justify-content: center; gap: 3px;
+      font-size: 22px; font-weight: 700; color: var(--c-text); line-height: 1;
+    }
+    .stat-flame {
+      font-size: 19px; color: #f57c00;
+      font-variation-settings: 'FILL' 1, 'wght' 400;
+    }
+    .stat-lbl { font-size: 11px; font-weight: 500; color: var(--c-text-2); }
+
+    /* ── Setmana actual ── */
+    .goal-row {
+      display: flex; align-items: center; gap: 9px;
+      padding: 9px 2px;
+    }
+    .goal-row + .goal-row:not(.goal-row--sub) { border-top: 1px solid var(--c-border-2); }
+    /* El desglossament s'arrenglera sota el nom de la barra i afluixa el pes:
+       no és un objectiu més, és d'on surt la xifra de dalt. */
+    .goal-row--sub {
+      padding: 4px 2px 4px 26px;
+      .goal-icon  { font-size: 15px; }
+      .goal-name  { font-size: 12px; font-weight: 500; color: var(--c-text-2); }
+      .goal-badge { font-size: 12px; font-weight: 600; color: var(--c-text-2); }
+    }
+    .goal-row--sub:first-of-type { padding-top: 8px; }
+    .goal-icon {
+      font-size: 17px; color: var(--c-text-3); flex-shrink: 0;
+      font-variation-settings: 'FILL' 0, 'wght' 300;
+    }
+    .goal-name { font-size: 13px; font-weight: 600; color: var(--c-text); flex-shrink: 0; }
+    .goal-track {
+      flex: 1; height: 5px; border-radius: 3px; overflow: hidden;
+      background: var(--c-border);
+    }
+    .goal-fill {
+      height: 100%; border-radius: 3px; max-width: 100%;
+      background: linear-gradient(90deg, var(--c-brand) 0%, color-mix(in srgb, var(--c-brand) 75%, white) 100%);
+      transition: width 0.4s ease;
+    }
+    .goal-badge {
+      margin-left: auto; flex-shrink: 0;
+      font-size: 13px; font-weight: 700; color: var(--c-text);
+    }
+    .goal-target { font-size: 12px; font-weight: 500; color: var(--c-text-3); }
+    /* Assolit: el verd va a la barra i a la xifra, i la icona s'omple —el
+       color mai és l'únic senyal. */
+    .goal-row--done {
+      .goal-icon  { color: #43a047; font-variation-settings: 'FILL' 1, 'wght' 400; }
+      .goal-fill  { background: #43a047; }
+      .goal-badge { color: #43a047; }
+    }
+
+    /* ── Filter bar ── */
     app-filter-bar { display: block; margin-top: 14px; margin-bottom: -12px; }
 
-    /* ── Exercise list ────────────────────────────────────── */
-    .pr-section {
-      margin: 18px 16px 0; background: var(--c-card);
-      border-radius: 14px; box-shadow: 0 2px 8px var(--c-shadow);
-      overflow: hidden;
+    /* ── Exercise item card ── */
+    .item-card {
+      margin-bottom: 6px; overflow: hidden;
+      border: 1.5px solid var(--c-border-2); border-radius: 14px;
+      background: var(--c-card);
+      transition: box-shadow 0.15s, border-color 0.15s;
+      &:last-child { margin-bottom: 4px; }
+      &:hover { box-shadow: 0 2px 8px var(--c-shadow); border-color: var(--c-border); }
+      &--open { border-color: var(--c-border); }
     }
-    .pr-title {
-      margin: 0; padding: 14px 16px 10px;
-      font-size: 13px; font-weight: 600; color: var(--c-text-2);
-      text-transform: uppercase; letter-spacing: 0.05em;
-      border-bottom: 1px solid var(--c-border);
+    .ic-row {
+      display: flex; align-items: center; gap: 10px;
+      width: 100%; padding: 0 10px 0 0;
+      border: none; background: none; font: inherit; text-align: left;
+      cursor: pointer; touch-action: manipulation;
+      &:focus-visible { outline: 2px solid var(--c-brand); outline-offset: -2px; }
     }
-    .pr-item:last-child .pr-row { border-bottom: none; }
-    .pr-item:last-child:has(.expanded) .pr-row { border-bottom: 1px solid var(--c-border-2); }
-    .pr-row {
-      width: 100%; display: flex; align-items: center; gap: 12px;
-      padding: 15px 14px 15px 0; background: none; border: none;
-      border-bottom: 1px solid var(--c-border-2); cursor: pointer;
-      text-align: left; color: var(--c-text);
-      transition: background 0.15s;
-      &:active { background: var(--c-border-2); }
-      &.expanded { background: var(--c-subtle); }
+    .ic-bar { width: 5px; align-self: stretch; min-height: 44px; flex-shrink: 0; }
+    .ic-name {
+      flex: 1; min-width: 0; padding: 12px 0;
+      font-size: 13px; font-weight: 700; color: var(--c-text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .pr-bar { width: 5px; min-width: 5px; height: 44px; border-radius: 0 3px 3px 0; }
-    .pr-name { flex: 1; font-size: 15px; font-weight: 500; }
-    .pr-weight { font-size: 15px; font-weight: 700; color: #d97706; }
-    .pr-chevron { font-size: 18px; color: var(--c-text-3); transition: transform 0.2s ease; }
-    .pr-chevron--open { transform: rotate(180deg); }
+    /* La marca personal és la xifra que es ve a buscar: xapa ambre, com la
+       nota a la resta de l'app. */
+    .ic-pr {
+      flex-shrink: 0;
+      font-size: 12px; font-weight: 700; color: var(--c-act-note);
+      background: color-mix(in srgb, var(--c-amber) 14%, var(--c-card));
+      border-radius: 7px; padding: 2px 7px;
+    }
+    .ic-chevron {
+      font-size: 18px; color: var(--c-text-3); flex-shrink: 0;
+      transition: transform 0.2s ease;
+    }
+    .item-card--open .ic-chevron { transform: rotate(180deg); }
+    .ic-panel {
+      padding: 2px 10px 10px;
+      border-top: 1px solid var(--c-border-2);
+      animation: panel-in 0.18s ease-out;
+    }
+    @keyframes panel-in {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: none; }
+    }
 
-    /* ── Empty / new-user state ──────────────────────────── */
+    /* ── Empty state ── */
     .empty-state {
-      display: flex; flex-direction: column; align-items: center;
-      gap: 10px; padding: 60px 24px; text-align: center;
-      .empty-icon { font-size: 64px; color: var(--c-border); }
-      h2 { margin: 0; font-size: 20px; font-weight: 600; color: var(--c-text); }
-      p { margin: 0; color: var(--c-text-2); }
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+      padding: 28px 16px; text-align: center; color: var(--c-text-2);
+      .empty-icon {
+        font-size: 48px; color: var(--c-border);
+        font-variation-settings: 'FILL' 0, 'wght' 200;
+      }
+      p { margin: 0; font-size: 14px; font-weight: 500; max-width: 32ch; line-height: 1.4; }
     }
-    .loading-icon { animation: pulse-dot 1.2s ease-in-out infinite; }
-    @keyframes pulse-dot {
-      0%, 100% { opacity: 0.3; transform: scale(0.8); }
-      50%       { opacity: 1;   transform: scale(1.2); }
+    .empty-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+    .btn-primary {
+      padding: 9px 18px; border: none; border-radius: 10px;
+      background: var(--c-brand); color: white; text-decoration: none;
+      font-size: 13px; font-weight: 700; cursor: pointer;
+      transition: background 0.15s; touch-action: manipulation;
+      &:hover { background: var(--c-brand-dk); }
+      &:active { transform: scale(0.97); }
     }
 
-    .filter-empty {
-      display: flex; align-items: center; justify-content: center; flex-direction: column;
-      gap: 8px; padding: 32px 24px; color: var(--c-text-3);
-      .material-symbols-outlined { font-size: 36px; }
-      p { margin: 0; font-size: 14px; }
-    }
+    /* ── Skeleton ── */
+    @keyframes sk-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .sk { background: var(--c-border-2); animation: sk-pulse 1.4s ease-in-out infinite; }
+    .sk-icon  { width: 18px; height: 18px; border-radius: 4px; }
+    .sk-title { flex: 1; max-width: 120px; height: 13px; border-radius: 6px; }
+    .sk-count { width: 28px; height: 18px; border-radius: 10px; }
+    .sk-card  { display: flex; align-items: stretch; pointer-events: none; }
+    .sk-body  { flex: 1; padding: 15px 10px; }
+    .sk-line  { height: 13px; width: 52%; border-radius: 6px; }
 
-    .btn-cta {
-      margin-top: 6px; padding: 12px 28px;
-      background: var(--c-brand); color: white;
-      border: none; border-radius: 12px;
-      font-size: 15px; font-weight: 600;
-      cursor: pointer; text-decoration: none;
-      display: inline-block;
-      &:active { opacity: 0.85; }
+    @media (prefers-reduced-motion: reduce) {
+      .goal-fill, .ic-chevron { transition: none; }
+      .ic-panel { animation: none; }
+      .sk { animation: none; }
     }
   `],
 })
@@ -256,6 +337,7 @@ export class ChartsComponent {
   private settingsService = inject(UserSettingsService);
   private sportService    = inject(SportService);
   private typeService     = inject(TrainingTypeService);
+  private todayService    = inject(TodayService);
   private route           = inject(ActivatedRoute);
 
   private readonly queryExerciseId = toSignal(
@@ -277,10 +359,14 @@ export class ChartsComponent {
 
   readonly totalWorkouts = computed(() => this.workoutService.doneWorkouts().length);
 
+  /** El dilluns i el diumenge de la setmana en curs, en hora local. */
+  private readonly thisWeek = computed(() => {
+    const monday = mondayOf(this.todayService.today());
+    return { monday, sunday: addDays(monday, 6) };
+  });
+
   readonly thisWeekCount = computed(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const monday = mondayOf(today);
-    const sunday = addDays(monday, 6);
+    const { monday, sunday } = this.thisWeek();
     return this.workoutService.doneWorkouts().filter(w => w.date >= monday && w.date <= sunday).length;
   });
 
@@ -290,28 +376,45 @@ export class ChartsComponent {
   readonly weeklySportGoal = computed(() => this.settingsService.weeklySportGoal());
 
   readonly thisWeekSportCount = computed(() => {
-    const today  = new Date().toISOString().slice(0, 10);
-    const monday = mondayOf(today);
-    const sunday = addDays(monday, 6);
+    const { monday, sunday } = this.thisWeek();
     return this.sportService.sessions().filter(s => s.date >= monday && s.date <= sunday).length;
   });
 
-  readonly combinedWeeklyBarPct = computed(() => {
-    const g = this.weeklyGoal();
-    if (!g) return 0;
-    return Math.min(100, Math.round(((this.thisWeekCount() + this.thisWeekSportCount()) / g) * 100));
-  });
-  readonly combinedWeeklyMet = computed(() => {
-    const g = this.weeklyGoal();
-    return !!g && (this.thisWeekCount() + this.thisWeekSportCount()) >= g;
+  /**
+   * Les files de «Setmana actual», amb la mateixa forma tant si l'objectiu és
+   * combinat com si va per separat: icona, nom, barra i xifra. Sense objectiu
+   * la barra desapareix i queda el recompte, que segueix dient alguna cosa.
+   */
+  readonly weekBars = computed((): WeekBar[] => {
+    const gym   = this.thisWeekCount();
+    const sport = this.thisWeekSportCount();
+
+    const bar = (icon: string, label: string, count: number, target: number | null, sub = false): WeekBar => ({
+      icon, label, count, target, sub,
+      pct:  target ? Math.min(100, Math.round((count / target) * 100)) : 0,
+      done: !!target && count >= target,
+    });
+
+    if (this.goalMode() === 'separate') {
+      return [
+        bar('fitness_center', 'Gimnàs', gym,   this.weeklyGymGoal()),
+        bar('sports_soccer',  'Esport', sport, this.weeklySportGoal()),
+      ];
+    }
+    // Objectiu combinat: una sola barra, i el gimnàs i l'esport a sota com el
+    // que són —el desglossament de la xifra de dalt, no dos objectius més.
+    return [
+      bar('bolt',           'Activitats', gym + sport, this.weeklyGoal()),
+      bar('fitness_center', 'Gimnàs',     gym,   null, true),
+      bar('sports_soccer',  'Esport',     sport, null, true),
+    ];
   });
 
   readonly weekStreak = computed(() => {
     const workouts = this.workoutService.doneWorkouts();
     if (workouts.length === 0) return 0;
-    const today = new Date().toISOString().slice(0, 10);
     let streak = 0;
-    let weekStart = mondayOf(today);
+    let weekStart = this.thisWeek().monday;
     for (let i = 0; i < 52; i++) {
       const weekEnd = addDays(weekStart, 6);
       if (!workouts.some(w => w.date >= weekStart && w.date <= weekEnd)) break;
@@ -352,6 +455,7 @@ export class ChartsComponent {
         cat,
         label: CATEGORY_LABELS[cat],
         color: CATEGORY_COLORS[cat],
+        icon:  CATEGORY_ICONS[cat] ?? 'fitness_center',
         records: records.filter(r => r.exercise.category === cat),
       }))
       .filter(g => g.records.length > 0);
