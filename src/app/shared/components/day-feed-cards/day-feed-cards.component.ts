@@ -1,8 +1,9 @@
 import { Component, booleanAttribute, inject, input, output, signal } from '@angular/core';
 
 import { ActivityIconComponent } from '../activity-icon/activity-icon.component';
+import { SportDetailComponent } from '../sport-detail/sport-detail.component';
 import { WorkoutDetailComponent } from '../workout-detail/workout-detail.component';
-import { Sport, SportMetricDef, SportSession } from '../../../core/models/sport.model';
+import { Sport, SportSession } from '../../../core/models/sport.model';
 import { FeelingLevel, Workout } from '../../../core/models/workout.model';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { SportService } from '../../../core/services/sport.service';
@@ -29,14 +30,14 @@ export interface DayFeedEntry {
  * L'activitat d'un dia: entrenaments i esports, amb la mateixa targeta.
  *
  * Les dues activitats es llegeixen igual — barra de color, icona amb el gos,
- * títol que diu què és, detall i xifres — i només canvia el chevron i què
- * passa quan la toques: un entrenament s'obre (o es desplega a l'Historial),
- * un esport es desplega per editar-lo aquí mateix.
+ * títol que diu què és, detall i xifres — i es comporten igual: tocar-les
+ * desplega el detall aquí mateix (les sèries d'un entrenament, les dades
+ * d'una sessió d'esport) i, a sota, un botó porta a l'activitat sencera.
  */
 @Component({
   selector: 'app-day-feed-cards',
   standalone: true,
-  imports: [ActivityIconComponent, WorkoutDetailComponent],
+  imports: [ActivityIconComponent, SportDetailComponent, WorkoutDetailComponent],
   template: `
     @for (w of day()?.workouts ?? []; track w.id) {
       <div class="act-card" [class.act-card--planned]="isPlanned(w)"
@@ -46,7 +47,7 @@ export interface DayFeedEntry {
 
         <div class="ac-head">
           <button class="ac-main" (click)="handleWorkoutClick(w)"
-                  [attr.aria-expanded]="expandWorkouts() && !isPlanned(w) ? expandedWorkoutId() === w.id : null">
+                  [attr.aria-expanded]="isPlanned(w) ? null : expandedWorkoutId() === w.id">
             <app-activity-icon [icon]="workoutPrimaryIcon(w)"
                                [color]="workoutPrimaryColor(w)" mascot="marley" />
             <div class="ac-info">
@@ -87,7 +88,7 @@ export interface DayFeedEntry {
             </span>
             @if (!isPlanned(w)) {
               <span class="material-symbols-outlined ac-chevron" aria-hidden="true">
-                {{ expandWorkouts() ? (expandedWorkoutId() === w.id ? 'expand_less' : 'expand_more') : 'chevron_right' }}
+                {{ expandedWorkoutId() === w.id ? 'expand_less' : 'expand_more' }}
               </span>
             }
           </button>
@@ -105,7 +106,7 @@ export interface DayFeedEntry {
           }
         </div>
 
-        @if (expandWorkouts() && expandedWorkoutId() === w.id && !isPlanned(w)) {
+        @if (expandedWorkoutId() === w.id && !isPlanned(w)) {
           <app-workout-detail [workout]="w" />
           <div class="ac-detail-actions">
             <button class="ac-open-btn" (click)="open.emit(w.id)">
@@ -174,94 +175,12 @@ export interface DayFeedEntry {
         </div>
 
         @if (expandedSportId() === item.session.id) {
-          <div class="sport-detail">
-            <!-- Durada -->
-            <div class="sd-field">
-              <span class="sd-field-label">Durada</span>
-              <div class="sd-row">
-                <div class="sd-quick-btns">
-                  @for (t of durationPresets; track t) {
-                    <button class="sd-quick-btn" [class.active]="editDuration() === t"
-                            (click)="editDuration.set(t)">{{ t }}min</button>
-                  }
-                </div>
-                <div class="sd-stepper">
-                  <button class="sd-step-btn" (click)="adjustDuration(-5)">−5</button>
-                  <span class="sd-step-val">{{ editDuration() }}<small>min</small></span>
-                  <button class="sd-step-btn" (click)="adjustDuration(5)">+5</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Subtipus -->
-            @if (item.sport.subtypes.length) {
-              <div class="sd-field">
-                <span class="sd-field-label">Subtipus</span>
-                <div class="sd-chips">
-                  @for (sub of item.sport.subtypes; track sub.id) {
-                    <button class="sd-chip" [class.active]="editSubtype() === sub.id"
-                            (click)="toggleSubtype(sub.id)">{{ sub.name }}</button>
-                  }
-                </div>
-              </div>
-            }
-
-            <!-- Mètriques -->
-            @for (def of item.sport.metricDefs; track def.key) {
-              <div class="sd-field">
-                <span class="sd-field-label">{{ def.label }}@if (def.unit) { <small>({{ def.unit }})</small> }</span>
-                @if (def.type === 'select') {
-                  <div class="sd-chips">
-                    @for (opt of def.options ?? []; track opt.value) {
-                      <button class="sd-chip"
-                              [class.active]="editMetric(def.key) === opt.value"
-                              (click)="setMetric(def.key, editMetric(def.key) === opt.value ? null : opt.value)">
-                        {{ opt.label }}
-                      </button>
-                    }
-                  </div>
-                } @else {
-                  <div class="sd-stepper">
-                    <button class="sd-step-btn" (click)="adjustMetric(def, -1)">−</button>
-                    <span class="sd-step-val">{{ editMetricNum(def) }}<small>@if (def.unit) { {{ def.unit }} }</small></span>
-                    <button class="sd-step-btn" (click)="adjustMetric(def, 1)">+</button>
-                  </div>
-                }
-              </div>
-            }
-
-            <!-- Sensació -->
-            <div class="sd-field">
-              <span class="sd-field-label">Sensació</span>
-              <div class="sd-feeling-row">
-                @for (level of feelingLevels; track level) {
-                  <button class="sd-feeling-btn" [class.active]="editFeeling() === level"
-                          (click)="toggleFeeling(level)">{{ emojiOf(level) }}</button>
-                }
-              </div>
-            </div>
-
-            <!-- Notes -->
-            <div class="sd-field">
-              <span class="sd-field-label">Notes</span>
-              <textarea class="sd-notes"
-                placeholder="Afegeix una nota opcional..."
-                [value]="editNotes()"
-                (input)="editNotes.set($any($event.target).value)"
-                rows="2"
-              ></textarea>
-            </div>
-
-            <div class="sd-actions">
-              <button class="sd-delete-btn" [disabled]="editSaving()" (click)="deleteSportEdit(item)"
-                      aria-label="Eliminar" title="Eliminar">
-                <span class="material-symbols-outlined" aria-hidden="true">delete</span>
-              </button>
-              <div class="sd-main-actions">
-                <button class="sd-cancel" (click)="collapseSport()">Cancel·lar</button>
-                <button class="sd-save" [disabled]="editSaving()" (click)="saveSportEdit(item)">Guardar</button>
-              </div>
-            </div>
+          <app-sport-detail [sport]="item.sport" [session]="item.session" />
+          <div class="ac-detail-actions">
+            <button class="ac-open-btn" (click)="openSport.emit(item)">
+              <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>
+              Obrir sessió
+            </button>
           </div>
         }
       </div>
@@ -395,95 +314,6 @@ export interface DayFeedEntry {
       &:hover { background: color-mix(in srgb, var(--ac, var(--c-card)) 15%, var(--c-card)); color: var(--c-text); }
     }
 
-    /* ── Sport session inline edit panel ── */
-    .sport-detail {
-      padding: 4px 14px 14px; border-top: 1px solid var(--c-border-2);
-      display: flex; flex-direction: column;
-    }
-    .sd-field { margin-top: 14px; }
-    .sd-field-label {
-      display: block; font-size: 11px; font-weight: 700; color: var(--c-text-2);
-      letter-spacing: 0.3px; text-transform: uppercase; margin-bottom: 8px;
-      small { font-size: 10px; color: var(--c-text-3); font-weight: 400; text-transform: none; margin-left: 4px; }
-    }
-    .sd-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .sd-quick-btns { display: flex; gap: 6px; flex-wrap: wrap; }
-    .sd-quick-btn {
-      padding: 6px 12px; border: 1.5px solid var(--c-border); border-radius: 20px;
-      background: var(--c-card); font-size: 13px; font-weight: 600; color: var(--c-text-2);
-      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      &.active { background: var(--c-brand); color: white; border-color: var(--c-brand); }
-      &:hover:not(.active) { border-color: var(--c-brand); color: var(--c-brand); }
-    }
-    .sd-stepper { display: flex; align-items: center; gap: 6px; }
-    .sd-step-btn {
-      width: 32px; height: 32px; border-radius: 10px;
-      border: 1.5px solid var(--c-border); background: var(--c-card);
-      font-size: 14px; font-weight: 700; color: var(--c-text-2);
-      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      display: flex; align-items: center; justify-content: center;
-      &:hover { border-color: var(--c-brand); color: var(--c-brand); }
-    }
-    .sd-step-val {
-      min-width: 50px; text-align: center;
-      font-size: 16px; font-weight: 800; color: var(--c-text);
-      small { font-size: 11px; color: var(--c-text-3); margin-left: 2px; }
-    }
-    .sd-chips { display: flex; gap: 7px; flex-wrap: wrap; }
-    .sd-chip {
-      padding: 7px 14px; border: 1.5px solid var(--c-border); border-radius: 20px;
-      background: var(--c-card); font-size: 13px; font-weight: 600; color: var(--c-text-2);
-      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      &.active { background: var(--c-brand); color: white; border-color: var(--c-brand); }
-      &:hover:not(.active) { border-color: var(--c-brand); color: var(--c-brand); }
-    }
-    .sd-feeling-row { display: flex; gap: 8px; }
-    .sd-feeling-btn {
-      flex: 1; height: 40px; border-radius: 12px;
-      border: 1.5px solid var(--c-border-2); background: var(--c-subtle);
-      font-size: 20px; cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      display: flex; align-items: center; justify-content: center;
-      &.active { border-color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.08); transform: scale(1.1); }
-      &:hover:not(.active) { border-color: var(--c-border); background: var(--c-hover); }
-    }
-    .sd-notes {
-      width: 100%; box-sizing: border-box;
-      padding: 9px 12px; border: 1.5px solid var(--c-border); border-radius: 10px;
-      font-size: 13px; font-family: inherit; color: var(--c-text); resize: none; background: var(--c-card);
-      outline: none; transition: border-color 0.15s;
-      &:focus { border-color: var(--c-brand); }
-      &::placeholder { color: var(--c-text-3); }
-    }
-    .sd-actions {
-      display: flex; align-items: center; gap: 8px;
-      margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--c-border-2);
-    }
-    .sd-delete-btn {
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-      width: 38px; height: 38px; border-radius: 10px;
-      border: 1.5px solid rgba(239,83,80,0.3); background: rgba(239,83,80,0.06);
-      color: #ef5350;
-      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      .material-symbols-outlined { font-size: 18px; }
-      &:hover { background: rgba(239,83,80,0.12); border-color: #ef5350; }
-      &:disabled { opacity: 0.6; cursor: default; }
-    }
-    .sd-main-actions { display: flex; gap: 8px; flex: 1; justify-content: flex-end; }
-    .sd-cancel {
-      height: 38px; padding: 0 16px; border-radius: 10px;
-      border: 1.5px solid var(--c-border); background: var(--c-card);
-      font-size: 13px; font-weight: 600; color: var(--c-text-2);
-      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      &:hover { border-color: var(--c-text-3); color: var(--c-text); }
-    }
-    .sd-save {
-      height: 38px; padding: 0 18px; border-radius: 10px; border: none;
-      background: var(--c-brand); color: white;
-      font-size: 13px; font-weight: 700;
-      cursor: pointer; transition: background 0.15s; touch-action: manipulation;
-      &:hover { background: var(--c-brand-dk); }
-      &:disabled { opacity: 0.6; cursor: default; }
-    }
   `],
 })
 export class DayFeedCardsComponent {
@@ -498,26 +328,18 @@ export class DayFeedCardsComponent {
   readonly today = inject(TodayService).today;
 
   readonly day  = input<DayFeedEntry | null>(null);
-  /** A l'Historial l'entrenament es desplega aquí mateix amb el desglossament
-   *  de sèries; a Inici la targeta porta directament a l'entrenament. */
-  readonly expandWorkouts = input(false, { transform: booleanAttribute });
   /** El volum és la xifra que menys es mira d'un cop d'ull i la que més
    *  amplada es menja; a Activitat recent, on les targetes s'apilen, se
    *  n'amaga. A la targeta del dia i a l'Historial s'hi queda. */
   readonly hideVolume = input(false, { transform: booleanAttribute });
+  /** Obrir l'entrenament desplegat, a la pàgina d'Entrenar. */
   readonly open = output<string>();
-
-  readonly durationPresets: number[] = [30, 45, 60, 90];
-  readonly feelingLevels: FeelingLevel[] = [1, 2, 3, 4, 5];
+  /** El mateix per a una sessió d'esport: la targeta només la llegeix, i
+   *  canviar-hi res passa per la pàgina que la sap registrar. */
+  readonly openSport = output<{ sport: Sport; session: SportSession }>();
 
   readonly expandedSportId   = signal<string | null>(null);
   readonly expandedWorkoutId = signal<string | null>(null);
-  readonly editSaving      = signal(false);
-  readonly editDuration    = signal(60);
-  readonly editSubtype     = signal<string | null>(null);
-  readonly editFeeling     = signal<FeelingLevel | null>(null);
-  readonly editMetrics     = signal<Record<string, string | number>>({});
-  readonly editNotes       = signal('');
 
   readonly isPlanned          = isWorkoutPlanned;
   readonly workoutPrimaryColor = workoutPrimaryColor;
@@ -558,8 +380,8 @@ export class DayFeedCardsComponent {
   }
 
   /** Registra el pla tal com estava previst — la durada i el subtipus que ja
-   *  portava passen a comptar com a fets. Per canviar-ne res, la targeta es
-   *  desplega com qualsevol altra sessió. */
+   *  portava passen a comptar com a fets. Per canviar-ne res, la sessió
+   *  s'obre des del seu detall. */
   async registerSportPlan(item: { sport: Sport; session: SportSession }): Promise<void> {
     try {
       await this.sportService.startPlannedSession(item.session.id, item.session.date);
@@ -584,11 +406,7 @@ export class DayFeedCardsComponent {
 
   handleWorkoutClick(w: Workout): void {
     if (this.isPlanned(w)) { this.startPlan(w); return; }
-    if (this.expandWorkouts()) {
-      this.expandedWorkoutId.update(id => id === w.id ? null : w.id);
-      return;
-    }
-    this.open.emit(w.id);
+    this.expandedWorkoutId.update(id => id === w.id ? null : w.id);
   }
 
   async startPlan(w: Workout): Promise<void> {
@@ -615,89 +433,15 @@ export class DayFeedCardsComponent {
     }
   }
 
-  // ── Sport session inline expand/edit ────────────────────────────────────
+  // ── Sport session expand ────────────────────────────────────────────────
 
+  /** Tocar la targeta desplega el detall de la sessió, igual que un
+   *  entrenament. Canviar-hi res és un pas a part, a la seva pàgina. */
   toggleSportExpand(item: { sport: Sport; session: SportSession }): void {
-    if (this.expandedSportId() === item.session.id) { this.collapseSport(); return; }
-    this.expandedSportId.set(item.session.id);
-    this.editDuration.set(item.session.duration ?? 60);
-    this.editSubtype.set(item.session.subtypeId ?? null);
-    this.editFeeling.set(item.session.feeling ?? null);
-    this.editMetrics.set({ ...(item.session.metrics ?? {}) });
-    this.editNotes.set(item.session.notes ?? '');
+    this.expandedSportId.update(id => id === item.session.id ? null : item.session.id);
   }
 
   collapseSport(): void {
     this.expandedSportId.set(null);
-  }
-
-  editMetric(key: string): string | number | null {
-    return this.editMetrics()[key] ?? null;
-  }
-
-  editMetricNum(def: SportMetricDef): number {
-    const v = this.editMetrics()[def.key];
-    return typeof v === 'number' ? v : (def.min ?? 0);
-  }
-
-  adjustMetric(def: SportMetricDef, delta: number): void {
-    const step = def.step ?? 1;
-    const next = Math.max(def.min ?? 0, Math.min(def.max ?? 9999, this.editMetricNum(def) + delta * step));
-    this.editMetrics.update(m => ({ ...m, [def.key]: next }));
-  }
-
-  setMetric(key: string, value: string | number | null): void {
-    this.editMetrics.update(m => {
-      const copy = { ...m };
-      if (value === null) delete copy[key]; else copy[key] = value;
-      return copy;
-    });
-  }
-
-  toggleSubtype(id: string): void {
-    this.editSubtype.update(v => v === id ? null : id);
-  }
-
-  adjustDuration(delta: number): void {
-    this.editDuration.update(v => Math.max(5, v + delta));
-  }
-
-  toggleFeeling(level: FeelingLevel): void {
-    this.editFeeling.update(v => v === level ? null : level);
-  }
-
-  async saveSportEdit(item: { sport: Sport; session: SportSession }): Promise<void> {
-    this.editSaving.set(true);
-    try {
-      const metrics = this.editMetrics();
-      // Omplir les dades d'un pla d'avui o d'abans és registrar-lo: si es
-      // quedava 'planned' la sessió no comptava enlloc (ni al calendari ni a
-      // les estadístiques), com al registre d'esport de la pàgina d'Entrenar.
-      const promote = this.isSportPlanned(item) && item.session.date <= this.today();
-      await this.sportService.updateSession(item.session.id, item.session.date, {
-        subtypeId: this.editSubtype() ?? undefined,
-        duration:  this.editDuration() || undefined,
-        feeling:   this.editFeeling() ?? undefined,
-        metrics:   Object.keys(metrics).length ? metrics : undefined,
-        notes:     this.editNotes().trim() || undefined,
-      }, promote ? 'done' : undefined);
-      this.collapseSport();
-    } catch {
-      this.feedback.error('Error en guardar', 2500);
-    } finally {
-      this.editSaving.set(false);
-    }
-  }
-
-  async deleteSportEdit(item: { sport: Sport; session: SportSession }): Promise<void> {
-    this.editSaving.set(true);
-    try {
-      await this.sportService.deleteSession(item.session.id, item.session.date);
-      this.collapseSport();
-    } catch {
-      this.feedback.error('Error en eliminar', 2500);
-    } finally {
-      this.editSaving.set(false);
-    }
   }
 }

@@ -36,7 +36,11 @@ describe('DayFeedCardsComponent', () => {
       imports: [DayFeedCardsComponent],
       providers: [
         { provide: WorkoutService, useValue: { startPlannedWorkout, deleteWorkout } },
-        { provide: SportService, useValue: { updateSession, deleteSession, startPlannedSession } },
+        { provide: SportService, useValue: {
+          updateSession, deleteSession, startPlannedSession,
+          sessions: signal([]), allSessionsLoaded: signal(false),
+          loadAllSessions: jasmine.createSpy().and.resolveTo(undefined),
+        } },
         { provide: UserSettingsService, useValue: { difficultyScale: signal('emoji'), bodyweightKg: signal(null), weightUnit: signal<'kg' | 'lb'>('kg') } },
         { provide: ExerciseService, useValue: { loadTypeOf: () => undefined, getById: () => undefined } },
         { provide: FeedbackService, useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
@@ -65,11 +69,16 @@ describe('DayFeedCardsComponent', () => {
       await fixture.whenStable();
     });
 
-    it('emits open immediately for a done workout', () => {
+    it('desplega un entrenament fet en comptes d\'obrir-lo de dret', () => {
       const openSpy = spyOn(component.open, 'emit');
       component.handleWorkoutClick(makeWorkout());
-      expect(openSpy).toHaveBeenCalledWith('1');
+      expect(component.expandedWorkoutId()).toBe('1');
+      expect(openSpy).not.toHaveBeenCalled();
       expect(startPlannedWorkout).not.toHaveBeenCalled();
+
+      // I el segon clic el plega.
+      component.handleWorkoutClick(makeWorkout());
+      expect(component.expandedWorkoutId()).toBeNull();
     });
   });
 
@@ -187,14 +196,11 @@ describe('DayFeedCardsComponent', () => {
       expect((fixture.nativeElement as HTMLElement).querySelector('.ac-stat--vol')).toBeNull();
     });
 
-    it('points a workout out of the feed by default, and expands it in place when asked to', () => {
+    it('desplega l\'entrenament a la mateixa targeta, a tot arreu', () => {
       fixture.componentRef.setInput('day', day);
       fixture.detectChanges();
       expect((fixture.nativeElement as HTMLElement).querySelector('.ac-chevron')?.textContent?.trim())
-        .toBe('chevron_right');
-
-      fixture.componentRef.setInput('expandWorkouts', true);
-      fixture.detectChanges();
+        .toBe('expand_more');
 
       const row = (fixture.nativeElement as HTMLElement).querySelector('.ac-main') as HTMLElement;
       row.click();
@@ -210,7 +216,6 @@ describe('DayFeedCardsComponent', () => {
     it('still opens the workout from the expanded panel', () => {
       const openSpy = spyOn(component.open, 'emit');
       fixture.componentRef.setInput('day', day);
-      fixture.componentRef.setInput('expandWorkouts', true);
       fixture.detectChanges();
       component.handleWorkoutClick(day.workouts[0]);
       fixture.detectChanges();
@@ -231,7 +236,7 @@ describe('DayFeedCardsComponent', () => {
       }],
     };
 
-    it('expands inline in place of navigating away when clicked, and collapses on a second click', () => {
+    it('desplega el detall de la sessió, i el plega al segon clic', () => {
       fixture.componentRef.setInput('day', day);
       fixture.detectChanges();
 
@@ -239,32 +244,37 @@ describe('DayFeedCardsComponent', () => {
       row.click();
       fixture.detectChanges();
       expect(component.expandedSportId()).toBe('sess1');
-      expect((fixture.nativeElement as HTMLElement).querySelector('.sport-detail')).toBeTruthy();
+      expect((fixture.nativeElement as HTMLElement).querySelector('app-sport-detail')).toBeTruthy();
 
       row.click();
       fixture.detectChanges();
       expect(component.expandedSportId()).toBeNull();
     });
 
-    it('saveSportEdit() updates the session with the edited fields and collapses', async () => {
-      component.toggleSportExpand(day.sports[0]);
-      component.editDuration.set(45);
+    // El feed és de lectura, com el d'un entrenament: cap camp, cap botó de
+    // guardar i cap manera de tocar la sessió sense sortir d'aquí.
+    it('no deixa modificar res des de la targeta', () => {
+      fixture.componentRef.setInput('day', day);
+      fixture.detectChanges();
+      (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('.ac-main')!.click();
+      fixture.detectChanges();
 
-      await component.saveSportEdit(day.sports[0]);
-
-      // Una sessió ja feta es guarda sense tocar-ne l'estat.
-      expect(updateSession).toHaveBeenCalledWith(
-        'sess1', '2024-03-05', jasmine.objectContaining({ duration: 45 }), undefined);
-      expect(component.expandedSportId()).toBeNull();
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('input, textarea, select')).toBeNull();
+      expect(el.querySelector('.sport-edit')).toBeNull();
+      expect(el.querySelector('.sd-save')).toBeNull();
+      expect(updateSession).not.toHaveBeenCalled();
     });
 
-    it('deleteSportEdit() deletes the session and collapses', async () => {
-      component.toggleSportExpand(day.sports[0]);
+    it('obre la sessió des del panell desplegat', () => {
+      const openSportSpy = spyOn(component.openSport, 'emit');
+      fixture.componentRef.setInput('day', day);
+      fixture.detectChanges();
+      (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('.ac-main')!.click();
+      fixture.detectChanges();
 
-      await component.deleteSportEdit(day.sports[0]);
-
-      expect(deleteSession).toHaveBeenCalledWith('sess1', '2024-03-05');
-      expect(component.expandedSportId()).toBeNull();
+      (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('.ac-open-btn')!.click();
+      expect(openSportSpy).toHaveBeenCalledWith(day.sports[0]);
     });
   });
 
@@ -320,27 +330,6 @@ describe('DayFeedCardsComponent', () => {
       confirm.and.resolveTo(false);
       await component.deleteSportPlan(plannedDay('2024-03-05').sports[0]);
       expect(deleteSession).not.toHaveBeenCalled();
-    });
-
-    it('guardar-ne les dades el registra si el dia ja ha passat', async () => {
-      const item = plannedDay('2024-03-05').sports[0];
-      component.toggleSportExpand(item);
-      component.editDuration.set(90);
-
-      await component.saveSportEdit(item);
-
-      expect(updateSession).toHaveBeenCalledWith(
-        'sess1', '2024-03-05', jasmine.objectContaining({ duration: 90 }), 'done');
-    });
-
-    it('guardar-ne les dades el manté planificat si el dia encara ha de venir', async () => {
-      const item = plannedDay('2999-01-01').sports[0];
-      component.toggleSportExpand(item);
-
-      await component.saveSportEdit(item);
-
-      expect(updateSession).toHaveBeenCalledWith(
-        'sess1', '2999-01-01', jasmine.any(Object), undefined);
     });
   });
 });

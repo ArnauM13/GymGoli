@@ -141,6 +141,18 @@ export const CARD_METRIC_PRIORITY: string[] = [
   'yoga_style', 'terrain', 'environment', 'match_type',
 ];
 
+/**
+ * Les mètriques on una xifra alta és una fita, i per tant es poden coronar
+ * com a rècord al detall d'una sessió.
+ *
+ * Hi ha d'anar només el que millora quan puja: els sets perduts no hi són, i
+ * cap tria (`select`) tampoc — guanyar un partit és una alegria, no un rècord
+ * a batre. La durada es tracta a part: val per a qualsevol esport.
+ */
+export const RECORD_METRICS: string[] = [
+  'distance_km', 'distance_m', 'goals', 'points', 'sets_won',
+];
+
 function _m(key: string): SportMetricDef {
   const def = METRIC_CATALOGUE.find(m => m.key === key);
   if (!def) throw new Error(`Metric key "${key}" not found in catalogue`);

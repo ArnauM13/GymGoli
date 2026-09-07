@@ -319,14 +319,26 @@ content in the middle, action buttons on the right.
 
 ### 4a. Activity card (`app-day-feed-cards`)
 
-Una activitat registrada — entrenament o esport — es llegeix **sempre igual**.
-La targeta és la mateixa a Inici i a Historial i viu en un sol component
-(`app-day-feed-cards`); només canvien dues coses:
+Una activitat registrada — entrenament o esport — es llegeix **sempre igual**
+i **es comporta sempre igual**. La targeta és la mateixa a Inici i a Historial
+i viu en un sol component (`app-day-feed-cards`): tocar-la desplega el detall
+allà mateix (`expand_more` → `expand_less`) i, sota el detall, un botó porta a
+l'activitat sencera.
 
 | | Entrenament | Esport |
 | --- | --- | --- |
-| Chevron | `chevron_right` (o `expand_more` a Historial) | `expand_more` |
-| Clic | obre l'entrenament / el desplega | desplega l'edició en línia |
+| Detall | `app-workout-detail` — exercicis, sèries, drop sets i PRs | `app-sport-detail` — dades de la sessió, rècords i context |
+| Botó del peu | «Obrir entrenament» → `/train?workout=` | «Obrir sessió» → `/train?sport=&date=` |
+
+**El feed no modifica res.** Ni una targeta ni el seu detall porten cap camp,
+cap selector ni cap botó de guardar: es llegeixen. Tocar dades vol dir sortir
+del feed i anar a la pàgina que sap registrar-les. Les úniques accions que hi
+queden són les d'una activitat **planificada** (eliminar i començar/registrar),
+iguals per a gimnàs i esport.
+
+Una activitat **planificada** no es desplega: la targeta porta les seves dues
+accions (eliminar i començar/registrar) i prou, perquè encara no hi ha res a
+mirar.
 
 L'estructura, de fora cap a dins:
 
@@ -362,6 +374,17 @@ Regles que la fan llegible:
   el mateix marge esquerre a totes dues targetes.
 - **La barra de 5px** és absoluta (`position: absolute; left: 0; top: 0;
   bottom: 0`) perquè acompanyi també el panell desplegat.
+- **El detall és una lectura, no un formulari**: blocs amb títol (`Sessió`,
+  `Com ha anat`), files `etiqueta → valor` alineades a la dreta, notes a part i
+  un peu que resumeix. Editar és el pas següent, amb el seu botó, i passa en
+  una altra pàgina.
+- **El detall d'un esport hi posa el que la sessió no porta.** Una sessió
+  d'esport és plana (durada, un parell de mètriques) i un entrenament no ho és,
+  així que la substància ve del context: com se situa la durada respecte de la
+  teva mitjana, quines xifres són la teva millor marca (xapa `RÈCORD`, el
+  germà del `PR` d'una sèrie) i quantes en portes d'aquell esport. Es calcula
+  sobre l'historial **sencer** (`loadAllSessions`) i no surt fins que hi és
+  tot: una fita comptada a mitges enganya més que no dir-ne res.
 
 
 ---

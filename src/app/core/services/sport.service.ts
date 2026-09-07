@@ -91,7 +91,12 @@ export class SportService {
   /** Peticions de mes en marxa, per no demanar-lo dos cops alhora. */
   private readonly _monthLoads = new Map<string, Promise<void>>();
   private readonly _sessions   = signal<SportSession[]>([]);
-  private _allLoaded = false;
+  /** Senyal, i no un booleà a seques, perquè qui depèn de tenir *tot*
+   *  l'historial a mà (els rècords del detall d'una sessió) se n'assabenti
+   *  quan acaba d'arribar, i no ensenyi una fita calculada a mitges. */
+  private readonly _allLoaded = signal(false);
+  /** Cert quan `loadAllSessions()` ja ha portat l'historial sencer. */
+  readonly allSessionsLoaded = this._allLoaded.asReadonly();
   private _lastRefreshAt = 0;
 
   /** Marge mínim entre refrescos automàtics (tornar a l'app dispara alhora
@@ -147,7 +152,7 @@ export class SportService {
       this._fullMonths.clear();
       this._monthLoads.clear();
       this._sessions.set([]);
-      this._allLoaded = false;
+      this._allLoaded.set(false);
       this.isLoaded.set(false);
       this._loadPromise = null;
       if (uid) {
@@ -189,7 +194,7 @@ export class SportService {
     if (!immediate && now - this._lastRefreshAt < SportService.REFRESH_THROTTLE_MS) return;
     this._lastRefreshAt = now;
 
-    if (this._allLoaded) { this._allLoaded = false; await this.loadAllSessions(); return; }
+    if (this._allLoaded()) { this._allLoaded.set(false); await this.loadAllSessions(); return; }
 
     await Promise.all([...this._monthCache.keys()].map(key => {
       const [y, m] = key.split('-').map(Number);
@@ -347,7 +352,7 @@ export class SportService {
    *  coses diferents. */
   async ensureMonthLoaded(year: number, month: number, force = false): Promise<void> {
     const key = `${year}-${String(month + 1).padStart(2, '0')}`;
-    if (!force && (this._fullMonths.has(key) || this._allLoaded)) return;
+    if (!force && (this._fullMonths.has(key) || this._allLoaded())) return;
 
     const inFlight = this._monthLoads.get(key);
     if (inFlight) return inFlight;
@@ -439,7 +444,7 @@ export class SportService {
    *  workout suggestion), which the lazy per-month loading can't guarantee.
    *  Cached after the first successful run. */
   async loadAllSessions(): Promise<void> {
-    if (this._allLoaded) return;
+    if (this._allLoaded()) return;
     const uid = this.auth.uid();
     if (!uid) return;
     this.isLoading.set(true);
@@ -475,7 +480,7 @@ export class SportService {
         this._fullMonths.add(key);
       }
       this._rebuild();
-      this._allLoaded = true;
+      this._allLoaded.set(true);
     } catch {
       // best-effort; keep whatever we already have
     } finally {

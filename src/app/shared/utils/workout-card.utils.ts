@@ -94,14 +94,31 @@ function _metricRank(key: string): number {
   return i === -1 ? CARD_METRIC_PRIORITY.length : i;
 }
 
-/** Una mètrica amb valor es converteix en xifra; sense valor, no hi és. */
-function _metricStat(def: SportMetricDef, v: string | number | undefined): ActivityStat | null {
+/**
+ * El valor d'una mètrica tal com es llegeix («Guanyat 🏆», «5km»).
+ *
+ * Una mètrica sense valor no existeix: retorna `null` i qui la demana la
+ * salta, tant a la xifra de la targeta com al detall de la sessió.
+ */
+export function sportMetricValue(def: SportMetricDef, v: string | number | undefined | null): string | null {
   if (v === undefined || v === null || v === '') return null;
   if (def.type === 'select') {
     const opt = (def.options ?? []).find(o => o.value === v);
-    return { icon: 'label', text: opt?.label ?? String(v) };
+    return opt?.label ?? String(v);
   }
-  return { icon: 'insights', text: `${v}${def.unit ?? ''}` };
+  return `${v}${def.unit ?? ''}`;
+}
+
+/** La icona que acompanya una mètrica: una tria és una etiqueta, un número
+ *  és una dada. */
+export function sportMetricIcon(def: SportMetricDef): string {
+  return def.type === 'select' ? 'label' : 'insights';
+}
+
+/** Una mètrica amb valor es converteix en xifra; sense valor, no hi és. */
+function _metricStat(def: SportMetricDef, v: string | number | undefined): ActivityStat | null {
+  const text = sportMetricValue(def, v);
+  return text === null ? null : { icon: sportMetricIcon(def), text };
 }
 
 export function workoutCardColor(w: Workout): string {
