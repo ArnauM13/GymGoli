@@ -15,6 +15,14 @@ function sportRow(overrides: Partial<Record<string, unknown>> = {}): Record<stri
   };
 }
 
+function sessionRow(id: string, date: string, overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
+  return {
+    id, date, sport_id: 'sport-1', status: 'done',
+    created_at: `${date}T08:00:00.000Z`,
+    ...overrides,
+  };
+}
+
 describe('SportService', () => {
   let uid: ReturnType<typeof signal<string | null>>;
   let sportsData: Record<string, unknown>[];
@@ -315,6 +323,80 @@ describe('SportService', () => {
       tick();
 
       expect(JSON.parse(localStorage.getItem(LS_PENDING_KEY('user-1'))!).length).toBe(0);
+    }));
+  });
+
+  // ── Sincronització entre dispositius ──────────────────────────────────────
+  //
+  // Un mes només es demanava un cop per sessió, i el que hi havia a la cau i
+  // el servidor ja no retornava es quedava enganxat: dos dispositius podien
+  // ensenyar coses diferents tot el dia.
+  describe('sincronització entre dispositius', () => {
+    it('torna a demanar els mesos carregats i treu el que ja no hi és', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+
+      sessionsData = [sessionRow('s1', '2024-03-06')];
+      void service.ensureMonthLoaded(2024, 2);
+      tick();
+      expect(service.sessions().some(s => s.id === 's1')).toBeTrue();
+
+      sessionsData = []; // esborrada des d'un altre dispositiu
+      void service.refreshLoaded(true);
+      tick();
+
+      expect(service.sessions().some(s => s.id === 's1')).toBeFalse();
+    }));
+
+    it('conserva una sessió que encara espera torn per pujar', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+      insertShouldFail = true;
+
+      void service.logSession('2024-03-08', 'sport-1', {}, 'done');
+      tick();
+
+      sessionsData = [];
+      void service.ensureMonthLoaded(2024, 2, true);
+      tick();
+
+      expect(service.sessions().some(s => s.date === '2024-03-08')).toBeTrue();
+      discardPeriodicTasks();
+    }));
+
+    it('no fa reaparèixer el que s\'ha esborrat aquí i encara no ha sortit', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+
+      sessionsData = [sessionRow('s1', '2024-03-06')];
+      void service.ensureMonthLoaded(2024, 2);
+      tick();
+
+      insertShouldFail = true; // l'esborrat es queda a la cua
+      void service.deleteSession('s1', '2024-03-06');
+      tick();
+
+      void service.ensureMonthLoaded(2024, 2, true); // el servidor encara la retorna
+      tick();
+
+      expect(service.sessions().some(s => s.id === 's1')).toBeFalse();
+      discardPeriodicTasks();
+    }));
+
+    it('no demana el mateix mes dos cops alhora', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+      const calls = supabaseMock.fromSpy.calls.count();
+
+      void service.ensureMonthLoaded(2024, 2);
+      void service.ensureMonthLoaded(2024, 2);
+      tick();
+
+      expect(supabaseMock.fromSpy.calls.count()).toBe(calls + 1);
     }));
   });
 });
