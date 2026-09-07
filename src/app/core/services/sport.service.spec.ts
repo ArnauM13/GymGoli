@@ -28,6 +28,9 @@ describe('SportService', () => {
   let sportsData: Record<string, unknown>[];
   let sessionsData: Record<string, unknown>[];
   let insertShouldFail: boolean;
+  /** Quant triga el servidor a contestar una escriptura. La finestra que obre
+   *  aquesta espera és on es poden perdre canvis fets mentrestant. */
+  let writeDelayMs: number;
   let service: SportService;
   let supabaseMock: ReturnType<typeof buildMock>;
 
@@ -49,10 +52,11 @@ describe('SportService', () => {
       return chain;
     };
 
-    const writeResult = () => ({
-      then: (resolve: (v: { error: unknown }) => void) =>
-        resolve(insertShouldFail ? { error: new Error('network error') } : { error: null }),
-    });
+    const writeResult = (): any => {
+      const value = () => insertShouldFail ? { error: new Error('network error') } : { error: null };
+      if (writeDelayMs > 0) return new Promise(resolve => setTimeout(() => resolve(value()), writeDelayMs));
+      return { then: (resolve: (v: { error: unknown }) => void) => resolve(value()) };
+    };
     insertSpy.and.callFake(writeResult);
     upsertSpy.and.callFake(writeResult);
 
@@ -85,6 +89,7 @@ describe('SportService', () => {
     sportsData = [sportRow()];
     sessionsData = [];
     insertShouldFail = false;
+    writeDelayMs = 0;
     supabaseMock = buildMock();
 
     TestBed.configureTestingModule({
@@ -287,6 +292,44 @@ describe('SportService', () => {
       window.dispatchEvent(new Event('online'));
       tick();
       expect(JSON.parse(localStorage.getItem(LS_PENDING_KEY('user-1'))!).length).toBe(0);
+    }));
+
+    // La mateixa pèrdua que hi havia als entrenaments: la tanda d'enviaments
+    // reescrivia la cua amb el que havia fallat, i s'emportava per davant el
+    // que s'hi havia encuat mentre les peticions viatjaven.
+    it('no perd una edició encuada mentre la tanda d\'enviaments estava en marxa', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+
+      void service.logSession('2024-03-08', 'running', { duration: 30 }, 'done');
+      tick();
+      const id = service.sessions().find(s => s.sportId === 'running')!.id;
+
+      // Una edició que no ha pogut sortir espera a la cua.
+      insertShouldFail = true;
+      void service.updateSession(id, '2024-03-08', { duration: 45 });
+      tick();
+      expect(JSON.parse(localStorage.getItem(LS_PENDING_KEY('user-1'))!).length).toBe(1);
+
+      // Arrenca la tanda, i el servidor triga a contestar.
+      insertShouldFail = false;
+      writeDelayMs = 500;
+      void (service as unknown as { _flushPending(): Promise<void> })._flushPending();
+
+      // Enmig de l'espera, una edició nova que tampoc pot sortir.
+      tick(200);
+      insertShouldFail = true;
+      writeDelayMs = 0;
+      void service.updateSession(id, '2024-03-08', { duration: 60 });
+      tick(600);   // la tanda acaba i reescriu la cua
+
+      // L'edició nova no pot haver desaparegut sense arribar al servidor.
+      const pending = JSON.parse(localStorage.getItem(LS_PENDING_KEY('user-1'))!);
+      expect(pending.length).toBe(1);
+      expect(pending[0].row.duration).toBe(60);
+      expect(service.sessions().find(s => s.id === id)?.duration).toBe(60);
+      discardPeriodicTasks();
     }));
 
     it('folds an edit into an alta that has not gone out yet', fakeAsync(() => {

@@ -33,7 +33,7 @@ import { OnboardingTourService } from './core/services/onboarding-tour.service';
 
       <main class="app-content" [class.page-anim-a]="!pageAnimToggle()" [class.page-anim-b]="pageAnimToggle()">
         <router-outlet />
-        @if (offlineService.isOffline() && !isTrainRoute()) {
+        @if (offlineService.isOffline() && !worksOffline()) {
           <div class="offline-page-overlay">
             <span class="material-symbols-outlined">wifi_off</span>
             <p>Disponible només amb connexió</p>
@@ -130,9 +130,10 @@ export class AppComponent {
     return !!user && loaded && !settings.onboardingDone;
   });
 
-  isTrainRoute(): boolean {
-    const path = this.router.url.split('?')[0];
-    return path === '/train' || path.startsWith('/train/');
+  /** Si la pàgina d'ara es pot fer servir sense connexió. Entrenar i la resta
+   *  del que viu al dispositiu sí; l'historial sencer i el progrés no. */
+  worksOffline(): boolean {
+    return this.offlineService.worksOffline(this.router.url);
   }
 
   constructor() {

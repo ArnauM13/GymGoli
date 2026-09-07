@@ -5,57 +5,10 @@ import { ExerciseService } from './exercise.service';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { TodayService } from './today.service';
+import { OfflineService } from './offline.service';
 import { SyncService } from './sync.service';
-import { FeelingLevel, PlannedSource, Workout, WorkoutEntry, WorkoutSet, WorkoutStatus, setMaxWeight } from '../models/workout.model';
-
-// Entries come straight from a stored JSON column, so an old/partial row can
-// carry an entry whose `sets` is missing or null. Normalising here — at the one
-// boundary every workout passes through — guarantees `entry.sets` is always an
-// array, so no render expression (`entry.sets.length`, `@for (set of …)`) or
-// derivation downstream can throw on it and blank the page.
-function normalizeEntries(raw: unknown): WorkoutEntry[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.map((e): WorkoutEntry => ({
-    ...(e as WorkoutEntry),
-    sets: Array.isArray((e as WorkoutEntry)?.sets) ? (e as WorkoutEntry).sets : [],
-  }));
-}
-
-// ── Supabase row → typed Workout (snake_case keys) ──────────────────────────
-function toWorkout(row: Record<string, unknown>): Workout {
-  return {
-    id:               row['id'] as string,
-    date:             row['date'] as string,
-    category:         (row['category'] as string | undefined) ?? undefined,
-    categories:       (row['categories'] as string[] | undefined) ?? [],
-    entries:          normalizeEntries(row['entries']),
-    notes:            (row['notes'] as string | undefined) ?? undefined,
-    feeling:          (row['feeling'] as FeelingLevel | undefined) ?? undefined,
-    sourceProposalId: (row['source_proposal_id'] as string | null | undefined) ?? undefined,
-    createdAt:        new Date(row['created_at'] as string),
-    updatedAt:        row['updated_at'] ? new Date(row['updated_at'] as string) : undefined,
-    status:           (row['status'] as WorkoutStatus | undefined) ?? 'done',
-    plannedSource:    (row['planned_source'] as PlannedSource | undefined) ?? undefined,
-  };
-}
-
-// ── localStorage cache row → typed Workout (camelCase keys) ─────────────────
-function workoutFromCache(raw: Record<string, unknown>): Workout {
-  return {
-    id:               raw['id'] as string,
-    date:             raw['date'] as string,
-    category:         (raw['category'] as string | undefined) ?? undefined,
-    categories:       (raw['categories'] as string[] | undefined) ?? [],
-    entries:          normalizeEntries(raw['entries']),
-    notes:            (raw['notes'] as string | undefined) ?? undefined,
-    feeling:          (raw['feeling'] as FeelingLevel | undefined) ?? undefined,
-    sourceProposalId: (raw['sourceProposalId'] as string | null | undefined) ?? undefined,
-    createdAt:        new Date(raw['createdAt'] as string),
-    updatedAt:        raw['updatedAt'] ? new Date(raw['updatedAt'] as string) : undefined,
-    status:           (raw['status'] as WorkoutStatus | undefined) ?? 'done',
-    plannedSource:    (raw['plannedSource'] as PlannedSource | undefined) ?? undefined,
-  };
-}
+import { WorkoutStoreService, toWorkout } from './workout-store.service';
+import { FeelingLevel, PlannedSource, Workout, WorkoutEntry, WorkoutSet, setMaxWeight } from '../models/workout.model';
 
 /** The filters the Historial list can have active at once. */
 export interface HistoryFilters {
@@ -102,28 +55,38 @@ export class WorkoutService {
   private auth            = inject(AuthService);
   private exerciseService = inject(ExerciseService);
   private syncService     = inject(SyncService);
+  private offline         = inject(OfflineService);
+  /** Tot el que aquest dispositiu sap dels entrenaments. És el primer lloc on
+   *  va a parar el que fa l'usuari, i el que llegeix aquest servei. */
+  private store           = inject(WorkoutStoreService);
 
   /** Avui, mirat cada cop: guardar-lo al constructor deixava l'app clavada al
    *  dia d'ahir quan passava la mitjanit amb la pestanya oberta. */
   private get _todayStr(): string { return this.today.today(); }
 
-  // ── Single unified cache (all dates including today) ─────────────────────
-  private readonly _monthCache = new Map<string, Workout[]>();
-  /** Mesos demanats sencers al servidor. Un mes pot ser a `_monthCache` amb
-   *  només part de les sessions (una càrrega per exercici, un canvi rebut per
-   *  realtime): comptar-lo com a carregat deixava el calendari a mitges. */
+  /** Mesos demanats sencers al servidor. Un mes pot tenir sessions al
+   *  magatzem sense estar carregat del tot (una càrrega per exercici, un canvi
+   *  rebut per realtime): comptar-lo com a carregat deixava el calendari a
+   *  mitges. */
   private readonly _fullMonths = new Set<string>();
   /** Peticions de mes en marxa, per no demanar el mateix mes dos cops alhora
    *  quan dues pantalles (o dos efectes) el demanen a la vegada. */
   private readonly _monthLoads = new Map<string, Promise<void>>();
-  private readonly _historical = signal<Workout[]>([]);
+  /** Mesos que ja s'han mirat al dispositiu, tinguessin res o no. */
+  private readonly _monthsSeen = new Set<string>();
   private _allLoaded = false;
   private _realtimeChannel: RealtimeChannel | null = null;
   private _lastRefreshAt = 0;
+  /** Fins on s'han demanat canvis (`updated_at` del servidor). */
+  private _lastPulledAt: string | null = null;
+  private _lastFullPullAt = 0;
 
   /** Marge mínim entre refrescos automàtics: tornar a l'app dispara alhora
    *  `focus` i `visibilitychange`, i no cal demanar-ho tot dos cops. */
   private static readonly REFRESH_THROTTLE_MS = 10_000;
+  /** Cada quant es fa la comprovació sencera, l'única que veu els esborrats
+   *  fets des d'un altre dispositiu. */
+  private static readonly FULL_PULL_EVERY_MS = 5 * 60_000;
 
   // Per-exercise load tracking (for progress/charts lazy loading)
   private readonly _exLoadedIds      = new Set<string>();
@@ -133,13 +96,14 @@ export class WorkoutService {
 
   // ── Public signals ───────────────────────────────────────────────────────
 
+  /** Tot el que hi ha al dispositiu, ja ordenat del més recent al més antic. */
+  private readonly _historical = this.store.workouts;
+
   readonly todayWorkout = computed((): Workout | null =>
     this._historical().find(w => w.date === this._todayStr) ?? null
   );
 
-  readonly workouts = computed((): Workout[] =>
-    [...this._historical()].sort((a, b) => b.date.localeCompare(a.date))
-  );
+  readonly workouts = this.store.workouts;
 
   readonly pastWorkouts = computed(() =>
     this.workouts().filter(w => w.date !== this._todayStr)
@@ -190,17 +154,23 @@ export class WorkoutService {
 
       this._realtimeChannel?.unsubscribe();
       this._realtimeChannel = null;
-      this._monthCache.clear();
       this._fullMonths.clear();
       this._monthLoads.clear();
+      this._monthsSeen.clear();
+      this._lastPulledAt  = null;
+      this._lastFullPullAt = 0;
       this._allLoaded = false;
-      this._historical.set([]);
       this._exLoadedIds.clear();
       this._exLoadPromises.clear();
 
       if (uid) {
+        // Primer el dispositiu: l'app queda utilitzable (entrenar, veure els
+        // últims dies) abans i independentment que hi hagi connexió.
+        this.store.hydrate(uid);
         this._subscribeToChanges(uid);
         this._preloadCurrentMonth();
+      } else {
+        this.store.reset();
       }
     });
 
@@ -247,23 +217,75 @@ export class WorkoutService {
    */
   async refreshLoaded(immediate = false): Promise<void> {
     if (!this.auth.uid()) return;
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    if (this.offline.isOffline()) return;
 
     const now = Date.now();
     if (!immediate && now - this._lastRefreshAt < WorkoutService.REFRESH_THROTTLE_MS) return;
     this._lastRefreshAt = now;
 
+    // Primer el que ha canviat des de l'últim cop: és una consulta petita i
+    // porta de seguida el que s'ha registrat des d'un altre dispositiu.
+    await this._pullChanges();
+
+    // I de tant en tant, la comprovació sencera. És l'única que veu el que ha
+    // desaparegut: una sessió esborrada des d'un altre dispositiu ja no surt a
+    // cap consulta de canvis, perquè no hi ha cap fila que ho digui.
+    const dueFullPull = now - this._lastFullPullAt > WorkoutService.FULL_PULL_EVERY_MS;
+    if (!dueFullPull && this._lastPulledAt) return;
+    this._lastFullPullAt = now;
+
     if (this._allLoaded) { await this._fetchAll(true); return; }
 
-    await Promise.all([...this._monthCache.keys()].map(key => {
+    await Promise.all([...this._monthsSeen].map(key => {
       const [y, m] = key.split('-').map(Number);
       return this.ensureMonthLoaded(y, m - 1, true);
     }));
   }
 
+  /**
+   * Demana només el que ha canviat des de l'últim cop.
+   *
+   * És el patró que fan servir els sistemes de sincronització provats: un
+   * marcador d'on es va quedar (aquí, `updated_at`) i, a partir d'aquí, només
+   * les files noves. Tornar a demanar mesos sencers cada cop que tornaves a
+   * l'app era car i lent, i sobretot arribava tard.
+   */
+  private async _pullChanges(): Promise<void> {
+    const uid = this.auth.uid();
+    if (!uid) return;
+
+    const since = this._lastPulledAt;
+    const askedAt = new Date().toISOString();
+    try {
+      let q = this.supabase
+        .from('workouts')
+        .select('*')
+        .eq('user_id', uid)
+        .order('updated_at', { ascending: true });
+      if (since) q = q.gt('updated_at', since);
+      else       q = q.gte('date', this._retentionStart());
+
+      const { data, error } = await q;
+      if (error) return;
+
+      for (const r of data ?? []) this.store.applyServerRow(toWorkout(r as Record<string, unknown>));
+      this._lastPulledAt = askedAt;
+    } catch {
+      // Sense xarxa: el marcador no es mou i la propera vegada es reprèn aquí.
+    }
+  }
+
+  /** Des de quan es demanen canvis el primer cop: la finestra que l'app fa
+   *  servir sense connexió, no tot l'historial. */
+  private _retentionStart(): string {
+    const d = new Date();
+    const from = new Date(d.getFullYear(), d.getMonth() - 2, 1);
+    return `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}-01`;
+  }
+
   // ── Realtime subscription (every date, not just today) ──────────────────
   private _subscribeToChanges(uid: string): void {
-    this._fetchToday(uid);
+    if (!this.offline.isOffline()) this._fetchToday(uid);
 
     this._realtimeChannel = this.supabase
       .channel(`workouts-${uid}`)
@@ -283,48 +305,27 @@ export class WorkoutService {
    * molt que l'esdeveniment hi fos.
    */
   private _applyRemoteChange(payload: RealtimePostgresChangesPayload<Record<string, unknown>>): void {
-    const pending = new Set(this.syncService.pendingIds());
-    const row     = payload.new as Record<string, unknown> | undefined;
-    const oldId   = (payload.old as Record<string, unknown> | undefined)?.['id'] as string | undefined;
+    const row   = payload.new as Record<string, unknown> | undefined;
+    const oldId = (payload.old as Record<string, unknown> | undefined)?.['id'] as string | undefined;
 
     if (payload.eventType === 'DELETE') {
       // Sense id (la taula no replica la fila sencera) no sabem quina ha
       // marxat: es torna a demanar el que tenim carregat.
       if (!oldId) { this.refreshLoaded(true); return; }
-      if (!pending.has(oldId)) this._removeFromCache(oldId);
+      this.store.removeFromServer(oldId);
       return;
     }
 
     if (!row?.['id'] || !row?.['date']) { this.refreshLoaded(true); return; }
-    const w = toWorkout(row);
-    // El que encara no s'ha pogut enviar mana: no el trepitgem amb la versió
-    // del servidor, que és justament la que estem substituint.
-    if (pending.has(w.id)) return;
-    this._upsertIntoCache(w);
-  }
-
-  /** Desa una sessió a la cau del seu mes, tregui-la d'on fos (una sessió pot
-   *  haver canviat de data, i per tant de mes, des d'un altre dispositiu). */
-  private _upsertIntoCache(w: Workout): void {
-    const key = w.date.substring(0, 7);
-    for (const [k, list] of this._monthCache) {
-      if (k === key) continue;
-      if (list.some(x => x.id === w.id)) this._monthCache.set(k, list.filter(x => x.id !== w.id));
-    }
-    const bucket = (this._monthCache.get(key) ?? []).filter(x => x.id !== w.id);
-    this._monthCache.set(key, [w, ...bucket]);
-    this._rebuildHistorical();
+    // El magatzem ja protegeix el que espera pujar: aquest esdeveniment també
+    // arriba pels canvis fets aquí mateix, i acceptar-lo tornaria a posar la
+    // versió d'abans d'acabar d'editar.
+    this.store.applyServerRow(toWorkout(row));
   }
 
   private async _fetchToday(uid: string): Promise<void> {
     const today = this._todayStr;
-    const key   = today.substring(0, 7);
-    // Què hi havia abans de demanar-ho: el que aparegui mentre la consulta
-    // viatja s'acaba de registrar aquí i encara no pot sortir a la resposta.
-    const known = new Set((this._monthCache.get(key) ?? []).map(w => w.id));
-    // El que estava pendent d'enviar quan vam preguntar: si s'envia mentre la
-    // consulta viatja, la resposta encara no el porta i el perdríem de vista.
-    const wasPending = new Set(this.syncService.pendingIds());
+    const since = this.store.mark();
 
     const { data, error } = await this.supabase
       .from('workouts')
@@ -334,19 +335,8 @@ export class WorkoutService {
 
     if (error) return; // xarxa o servidor KO: millor el que tenim que no res
 
-    const fresh   = (data ?? []).map(r => toWorkout(r as Record<string, unknown>));
-    const pending = new Set(this.syncService.pendingIds());
-    const byId    = new Map(fresh.map(w => [w.id, w]));
-
-    for (const w of this._monthCache.get(key) ?? []) {
-      if (w.date !== today) { byId.set(w.id, w); continue; } // altres dies: no els toca
-      // La resposta del servidor mana per a la resta: el que ja no hi surt
-      // s'ha esborrat des d'un altre dispositiu i ha de marxar d'aquí.
-      if (pending.has(w.id) || wasPending.has(w.id) || !known.has(w.id)) byId.set(w.id, w);
-    }
-
-    this._monthCache.set(key, [...byId.values()]);
-    this._rebuildHistorical();
+    const fresh = (data ?? []).map(r => toWorkout(r as Record<string, unknown>));
+    this.store.mergeServerScope(fresh, w => w.date === today, since);
   }
 
   // ── Load API ─────────────────────────────────────────────────────────────
@@ -377,32 +367,21 @@ export class WorkoutService {
     const uid = this.auth.uid();
     if (!uid) return;
 
-    // ── Step 1: serve from localStorage immediately (no spinner if cached) ──
-    if (!this._monthCache.has(key)) {
-      const lsCached = this._readMonthFromStorage(uid, key);
-      const dirtySnaps = this.syncService.pendingIds()
-        .map(id => this.syncService.getSnapshot(id))
-        .filter((w): w is Workout => w !== null && w.date.substring(0, 7) === key);
-      const dirtyMap = new Map(dirtySnaps.map(w => [w.id, w]));
-
-      if (lsCached) {
-        const merged = lsCached.map(w => dirtyMap.get(w.id) ?? w);
-        for (const [id, snap] of dirtyMap) {
-          if (!lsCached.find(w => w.id === id)) merged.push(snap);
-        }
-        this._monthCache.set(key, merged);
-        this._rebuildHistorical();
-      } else {
-        this._monthCache.set(key, [...dirtySnaps]); // show locally-created offline workouts
-        this.isLoading.set(true);
-      }
+    // ── Pas 1: el dispositiu, a l'instant ───────────────────────────────────
+    // El que hi ha guardat aquí ja es pot ensenyar sense esperar ningú, i és
+    // l'única cosa que hi haurà si ara mateix no hi ha connexió.
+    const first = !this._monthsSeen.has(key);
+    this._monthsSeen.add(key);
+    if (first && !this.store.workouts().some(w => w.date.startsWith(key))) {
+      this.isLoading.set(true);
     }
 
-    // ── Step 2: background refresh from Supabase ────────────────────────────
-    // Què hi havia abans de demanar-ho: el que aparegui mentre la consulta
-    // viatja s'acaba de registrar aquí i encara no pot sortir a la resposta.
-    const known      = new Set((this._monthCache.get(key) ?? []).map(w => w.id));
-    const wasPending = new Set(this.syncService.pendingIds());
+    if (this.offline.isOffline()) { this.isLoading.set(false); return; }
+
+    // ── Pas 2: el servidor, de fons ─────────────────────────────────────────
+    // `since` marca quan surt la consulta: el que es confirmi mentre viatja no
+    // pot sortir a la resposta, i el magatzem el conserva per això.
+    const since = this.store.mark();
     try {
       const start   = `${key}-01`;
       const lastDay = new Date(year, month + 1, 0).getDate();
@@ -419,35 +398,14 @@ export class WorkoutService {
       if (error) return; // xarxa o servidor KO: es manté el que ja teníem
 
       const fetched = (data ?? []).map(r => toWorkout(r as Record<string, unknown>));
-      this._mergeMonth(key, fetched, known, wasPending);
+      this.store.mergeServerScope(fetched, w => w.date.startsWith(key), since);
+      this.store.markReconciled(key);
       this._fullMonths.add(key);
-      this._writeMonthToStorage(uid, key, fetched); // persist clean server data
     } catch {
-      // Network failure — keep whatever we have from localStorage/local state
+      // Sense xarxa: es manté el que hi ha al dispositiu, que és el que val.
     } finally {
       this.isLoading.set(false);
     }
-  }
-
-  /**
-   * Fusiona la resposta d'un mes sencer amb el que hi ha a la cau.
-   *
-   * El servidor mana: del que teníem només es conserva el que encara no s'ha
-   * pogut enviar i el que s'ha registrat mentre la consulta viatjava. La resta
-   * — una sessió esborrada des d'un altre dispositiu — ha de marxar, i abans
-   * es quedava enganxada tota la sessió com un fantasma.
-   */
-  private _mergeMonth(key: string, fetched: Workout[], knownBefore?: Set<string>, pendingBefore?: Set<string>): void {
-    const pending = new Set(this.syncService.pendingIds());
-    const byId    = new Map(fetched.map(w => [w.id, w]));
-
-    for (const w of this._monthCache.get(key) ?? []) {
-      const stillLocal = pending.has(w.id) || (pendingBefore?.has(w.id) ?? false);
-      if (stillLocal || (knownBefore && !knownBefore.has(w.id))) byId.set(w.id, w);
-    }
-
-    this._monthCache.set(key, [...byId.values()]);
-    this._rebuildHistorical();
   }
 
   // Loads only the workouts that contain a specific exercise, merging them
@@ -465,6 +423,9 @@ export class WorkoutService {
   }
 
   private async _fetchForExercise(exerciseId: string): Promise<void> {
+    // Sense connexió no es marca com a carregat: quan torni la xarxa, el
+    // progrés d'aquest exercici s'ha de poder demanar de veritat.
+    if (this.offline.isOffline()) return;
     try {
       const { data, error } = await this.supabase
         .from('workouts')
@@ -483,19 +444,10 @@ export class WorkoutService {
         .map(r => toWorkout(r as Record<string, unknown>))
         .filter(w => w.entries.some(e => e.exerciseId === exerciseId));
 
-      const pending = new Set(this.syncService.pendingIds());
-      for (const w of fetched) {
-        const key    = w.date.substring(0, 7);
-        const bucket = [...(this._monthCache.get(key) ?? [])];
-        const idx    = bucket.findIndex(x => x.id === w.id);
-        // La versió del servidor mana. Abans, si la sessió ja era a la cau
-        // (per exemple una còpia vella del localStorage), es descartava la
-        // bona i les gràfiques ensenyaven sèries que ja no existien.
-        if (idx === -1)             bucket.push(w);
-        else if (!pending.has(w.id)) bucket[idx] = w;
-        this._monthCache.set(key, bucket);
-      }
-      this._rebuildHistorical();
+      // Files soltes, no un mes sencer: només s'incorporen, no es dedueix
+      // res del que hi falta. La versió del servidor mana llevat que la
+      // d'aquí encara esperi pujar.
+      for (const w of fetched) this.store.applyServerRow(w);
       this._exLoadedIds.add(exerciseId);
     } catch {
       this._exLoadedIds.add(exerciseId); // prevent retry storm; will refresh on next app session
@@ -511,11 +463,10 @@ export class WorkoutService {
    *  tornar a l'app no ha de fer parpellejar tota la pantalla. */
   private async _fetchAll(silent: boolean): Promise<void> {
     const uid = this.auth.uid();
-    if (!uid) return;
+    if (!uid || this.offline.isOffline()) return;
     if (!silent) this.isLoading.set(true);
 
-    const known      = new Set([...this._monthCache.values()].flat().map(w => w.id));
-    const wasPending = new Set(this.syncService.pendingIds());
+    const since = this.store.mark();
     try {
       const { data, error } = await this.supabase
         .from('workouts')
@@ -526,21 +477,9 @@ export class WorkoutService {
       if (error) return; // es manté el que ja teníem
 
       const fetched = (data ?? []).map(r => toWorkout(r as Record<string, unknown>));
-      const pending = new Set(this.syncService.pendingIds());
-      const byId    = new Map(fetched.map(w => [w.id, w]));
-
-      for (const w of [...this._monthCache.values()].flat()) {
-        if (pending.has(w.id) || wasPending.has(w.id) || !known.has(w.id)) byId.set(w.id, w);
-      }
-
-      this._monthCache.clear();
-      this._fullMonths.clear();
-      for (const w of byId.values()) {
-        const key = w.date.substring(0, 7);
-        this._monthCache.set(key, [...(this._monthCache.get(key) ?? []), w]);
-        this._fullMonths.add(key);
-      }
-      this._rebuildHistorical();
+      this.store.mergeServerScope(fetched, () => true, since);
+      for (const w of fetched) this._monthsSeen.add(w.date.substring(0, 7));
+      for (const key of this._monthsSeen) { this._fullMonths.add(key); this.store.markReconciled(key); }
       this._allLoaded = true;
     } finally {
       if (!silent) this.isLoading.set(false);
@@ -676,10 +615,8 @@ export class WorkoutService {
       createdAt:  new Date(),
       status:     'done',
     };
-    const monthKey = date.substring(0, 7);
-    this._monthCache.set(monthKey, [newWorkout, ...(this._monthCache.get(monthKey) ?? [])]);
-    this._rebuildHistorical();
-    this.syncService.markDirty(id, newWorkout, true);
+    this.store.put(newWorkout);
+    this.syncService.notifyPending(true);
     return id;
   }
 
@@ -697,10 +634,8 @@ export class WorkoutService {
       createdAt:       new Date(),
       status:          'done',
     };
-    const monthKey = date.substring(0, 7);
-    this._monthCache.set(monthKey, [newWorkout, ...(this._monthCache.get(monthKey) ?? [])]);
-    this._rebuildHistorical();
-    this.syncService.markDirty(id, newWorkout, true);
+    this.store.put(newWorkout);
+    this.syncService.notifyPending(true);
     return id;
   }
 
@@ -722,10 +657,8 @@ export class WorkoutService {
       status:        'planned',
       plannedSource,
     };
-    const monthKey = date.substring(0, 7);
-    this._monthCache.set(monthKey, [newWorkout, ...(this._monthCache.get(monthKey) ?? [])]);
-    this._rebuildHistorical();
-    this.syncService.markDirty(id, newWorkout, true);
+    this.store.put(newWorkout);
+    this.syncService.notifyPending(true);
     return id;
   }
 
@@ -740,10 +673,8 @@ export class WorkoutService {
       status:          'planned',
       plannedSource:   'trainer',
     };
-    const monthKey = date.substring(0, 7);
-    this._monthCache.set(monthKey, [newWorkout, ...(this._monthCache.get(monthKey) ?? [])]);
-    this._rebuildHistorical();
-    this.syncService.markDirty(id, newWorkout, true);
+    this.store.put(newWorkout);
+    this.syncService.notifyPending(true);
     return id;
   }
 
@@ -915,17 +846,12 @@ export class WorkoutService {
     return result;
   }
 
+  /** Esborra la sessió del dispositiu ara mateix. Si el servidor l'havia
+   *  arribat a veure, l'esborrat hi va per la mateixa cua que la resta: sense
+   *  cobertura no falla, s'envia quan torni. */
   async deleteWorkout(id: string): Promise<void> {
-    const wasPendingInsert = this.syncService.isInsert(id);
-    this.syncService.cancelDirty(id);
-    this._removeFromCache(id);
-    if (wasPendingInsert) return; // never reached Supabase, nothing to delete
-    const { error } = await this.supabase
-      .from('workouts')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', this._uid());
-    if (error) throw error;
+    this.store.remove(id);
+    this.syncService.notifyPending();
   }
 
   /**
@@ -972,12 +898,15 @@ export class WorkoutService {
     return uid;
   }
 
+  /**
+   * Escriu un canvi. Primer al dispositiu — això no falla ni depèn de res — i
+   * després s'avisa que hi ha feina per pujar.
+   */
   private _updateWorkout(id: string, changes: Partial<Workout>): void {
-    // Any content change refreshes the activity timestamp, so we can tell a
-    // session that's still being trained from one abandoned hours ago.
-    this._patch(id, { ...changes, updatedAt: new Date() });
-    const snap = this._find(id);
-    if (snap) this.syncService.markDirty(id, snap);
+    // Qualsevol canvi de contingut refresca la marca d'activitat, per poder
+    // distingir una sessió que s'està entrenant ara d'una d'abandonada.
+    const next = this.store.patch(id, { ...changes, updatedAt: new Date() });
+    if (next) this.syncService.notifyPending();
   }
 
   private _mergeCategories(existing: string[], newCat?: string): string[] {
@@ -997,56 +926,8 @@ export class WorkoutService {
     return `${y}-${String(m + 1).padStart(2, '0')}`;
   }
 
-  private _rebuildHistorical(): void {
-    const all = Array.from(this._monthCache.values()).flat();
-    all.sort((a, b) => b.date.localeCompare(a.date));
-    this._historical.set(all);
-  }
-
   private _find(id: string): Workout | undefined {
-    return this._historical().find(w => w.id === id);
+    return this.store.get(id);
   }
 
-  private _patch(workoutId: string, changes: Partial<Workout>): void {
-    for (const [key, workouts] of this._monthCache) {
-      const idx = workouts.findIndex(w => w.id === workoutId);
-      if (idx !== -1) {
-        const updated = [...workouts];
-        updated[idx]  = { ...updated[idx], ...changes };
-        this._monthCache.set(key, updated);
-        this._rebuildHistorical();
-        return;
-      }
-    }
-  }
-
-  private _removeFromCache(workoutId: string): void {
-    for (const [key, workouts] of this._monthCache) {
-      const filtered = workouts.filter(w => w.id !== workoutId);
-      if (filtered.length !== workouts.length) {
-        this._monthCache.set(key, filtered);
-        this._rebuildHistorical();
-        return;
-      }
-    }
-  }
-
-  // ── localStorage month cache ──────────────────────────────────────────────
-  private _lsMonthKey(uid: string, monthKey: string): string {
-    return `gymgoli_month_${uid}_${monthKey}`;
-  }
-
-  private _writeMonthToStorage(uid: string, monthKey: string, workouts: Workout[]): void {
-    try {
-      localStorage.setItem(this._lsMonthKey(uid, monthKey), JSON.stringify(workouts));
-    } catch { /* quota exceeded — non-fatal */ }
-  }
-
-  private _readMonthFromStorage(uid: string, monthKey: string): Workout[] | null {
-    try {
-      const raw = localStorage.getItem(this._lsMonthKey(uid, monthKey));
-      if (!raw) return null;
-      return (JSON.parse(raw) as Record<string, unknown>[]).map(workoutFromCache);
-    } catch { return null; }
-  }
 }

@@ -20,12 +20,21 @@ voice rules (short, offer rather than point out gaps, never guilt). It's a
 living document: their characters are meant to grow, so update it there
 rather than only in code.
 
+## Sincronització
+
+**Abans de tocar res del guardat d'entrenaments, llegeix `SYNC.md`.** El
+sistema és local-first: el que l'usuari fa es guarda al dispositiu abans que
+res i el servidor s'assabenta després, amb revisions per entrenament perquè
+cap resposta lenta s'empassi una edició posterior. Les invariants i els
+tests que les subjecten són allà.
+
 ## Stack
 
 - Angular 19, standalone components, signals + `computed()` + `effect()`
 - Supabase for persistence; per-user data with RLS policies
-- `localStorage` is used as a primary fallback for `user_settings` so the
-  app works even before the migration runs
+- `localStorage` és el magatzem principal dels entrenaments, no una còpia:
+  s'hi escriu primer i es puja després (vegeu `SYNC.md`). També és el
+  fallback de `user_settings` perquè l'app funcioni abans de la migració
 - Material Symbols (outlined) via the global font, never `mat-icon`
 
 ## Conventions

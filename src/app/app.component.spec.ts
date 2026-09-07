@@ -34,6 +34,10 @@ describe('AppComponent', () => {
           { path: 'train', component: StubComponent },
           { path: 'train/planner', component: StubComponent },
           { path: 'trainer', component: StubComponent },
+          { path: 'home', component: StubComponent },
+          { path: 'exercises', component: StubComponent },
+          { path: 'calendar', component: StubComponent },
+          { path: 'charts', component: StubComponent },
         ]),
         {
           provide: TrainingTypeService,
@@ -133,28 +137,41 @@ describe('AppComponent', () => {
     });
   });
 
-  // ── isTrainRoute (gates the "offline only available on Train" overlay) ────
+  // ── worksOffline (decideix el cartell d'"només amb connexió") ────────────
 
-  describe('isTrainRoute', () => {
-    it('is true on the Train dashboard itself', async () => {
+  describe('worksOffline', () => {
+    async function at(url: string) {
       const fixture = TestBed.createComponent(AppComponent);
-      const router = TestBed.inject(Router);
-      await router.navigateByUrl('/train');
-      expect(fixture.componentInstance.isTrainRoute()).toBeTrue();
+      await TestBed.inject(Router).navigateByUrl(url);
+      return fixture.componentInstance;
+    }
+
+    it('deixa entrenar sense connexió', async () => {
+      expect((await at('/train')).worksOffline()).toBeTrue();
     });
 
-    it('is true on the weekly planner sub-route, so it stays available offline', async () => {
-      const fixture = TestBed.createComponent(AppComponent);
-      const router = TestBed.inject(Router);
-      await router.navigateByUrl('/train/planner');
-      expect(fixture.componentInstance.isTrainRoute()).toBeTrue();
+    it('deixa el planificador setmanal, que és una subruta d\'Entrenar', async () => {
+      expect((await at('/train/planner')).worksOffline()).toBeTrue();
     });
 
-    it('is false on the unrelated /trainer route', async () => {
-      const fixture = TestBed.createComponent(AppComponent);
-      const router = TestBed.inject(Router);
-      await router.navigateByUrl('/trainer');
-      expect(fixture.componentInstance.isTrainRoute()).toBeFalse();
+    it('deixa Inici: els últims dies són al dispositiu', async () => {
+      expect((await at('/home')).worksOffline()).toBeTrue();
+    });
+
+    it('deixa el catàleg d\'exercicis, que també es guarda al dispositiu', async () => {
+      expect((await at('/exercises')).worksOffline()).toBeTrue();
+    });
+
+    it('no deixa l\'historial sencer: el mes a mes viu a la base de dades', async () => {
+      expect((await at('/calendar')).worksOffline()).toBeFalse();
+    });
+
+    it('no deixa el progrés, que necessita tot l\'historial', async () => {
+      expect((await at('/charts')).worksOffline()).toBeFalse();
+    });
+
+    it('no deixa els clients', async () => {
+      expect((await at('/trainer')).worksOffline()).toBeFalse();
     });
   });
 });

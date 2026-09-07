@@ -2,39 +2,43 @@ import { Component, computed, inject, signal } from '@angular/core';
 
 import { AuthService } from '../../core/services/auth.service';
 import { SupabaseService } from '../../core/services/supabase.service';
+import { SyncLogService } from '../../core/services/sync-log.service';
+import { SyncService } from '../../core/services/sync.service';
+import { WorkoutStoreService } from '../../core/services/workout-store.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
+import { OfflineService } from '../../core/services/offline.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 
 /** Una sessió tal com viu al localStorage, sense passar per cap servei: el que
  *  volem veure aquí és exactament el que hi ha guardat, no el que l'app en fa. */
 interface RawWorkout {
-  id?:         string;
-  date?:       string;
-  entries?:    { exerciseId?: string; exerciseName?: string; sets?: unknown[] }[];
-  categories?: string[];
-  category?:   string;
-  status?:     string;
-  notes?:      string;
-  feeling?:    number;
-  createdAt?:  string;
-  updatedAt?:  string;
+  id?:        string;
+  date?:      string;
+  entries?:   { exerciseId?: string; exerciseName?: string; sets?: unknown[] }[];
+  status?:    string;
+  updatedAt?: string;
+  createdAt?: string;
 }
+
+/** El que hi ha realment a cada mes guardat: la sessió i les seves revisions. */
+interface RawRecord { workout?: RawWorkout; rev?: number; syncedRev?: number; }
 
 /** Una sessió llesta per pintar: comptadors ja calculats i marcada si és buida. */
 interface LocalWorkout {
   id:        string;
   date:      string;
   status:    string;
-  source:    'month' | 'snapshot';
-  /** Clau de localStorage d'on surt, per poder-la buscar a mà. */
+  /** Revisió local i última que el servidor ha confirmat. Iguals = ja és a dalt. */
+  rev:       number;
+  syncedRev: number;
   storeKey:  string;
   entries:   { name: string; id: string; sets: number; detail: string }[];
   setCount:  number;
   updatedAt: string;
-  raw:       RawWorkout;
+  raw:       unknown;
 }
 
-/** El mateix entrenament, vist a localStorage i al servidor. */
+/** El mateix entrenament, vist al dispositiu i al servidor. */
 interface DiffRow {
   id:            string;
   date:          string;
@@ -48,7 +52,7 @@ interface DiffRow {
 const VERDICT_LABEL: Record<DiffRow['verdict'], string> = {
   'ok':             'Coincideix',
   'server-empty':   'Servidor buit',
-  'server-missing': 'Només en local',
+  'server-missing': 'Encara no pujat',
   'local-missing':  'Només al servidor',
   'different':      'Difereixen',
 };
@@ -62,8 +66,8 @@ const VERDICT_LABEL: Record<DiffRow['verdict'], string> = {
       <app-page-header title="Dades locals" [showBack]="true" backFallback="/settings" />
 
       <p class="lead">
-        Tot el que hi ha al <code>localStorage</code> d'aquest dispositiu, llegit en
-        cru. Serveix per comparar-ho amb el que hi ha a la base de dades.
+        Tot el que hi ha guardat en aquest dispositiu, llegit en cru. L'app guarda
+        aquí primer i puja després, així que això és sempre la versió bona.
       </p>
 
       <!-- ── Resum ────────────────────────────────────────────────────── -->
@@ -71,57 +75,62 @@ const VERDICT_LABEL: Record<DiffRow['verdict'], string> = {
         <div class="section-header">
           <span class="material-symbols-outlined section-icon">database</span>
           <h2 class="section-title">Resum</h2>
+          <span class="tag" [class.tag-bad]="offline.isOffline()">
+            {{ offline.isOffline() ? 'sense connexió' : 'amb connexió' }}
+          </span>
         </div>
         <div class="stats">
-          <div class="stat"><b>{{ workouts().length }}</b><span>sessions en local</span></div>
+          <div class="stat"><b>{{ workouts().length }}</b><span>sessions al dispositiu</span></div>
           <div class="stat" [class.bad]="emptyWorkouts().length > 0">
             <b>{{ emptyWorkouts().length }}</b><span>sense cap sèrie</span>
           </div>
-          <div class="stat" [class.warn]="pendingIds().length > 0">
-            <b>{{ pendingIds().length }}</b><span>pendents de pujar</span>
+          <div class="stat" [class.warn]="sync.pendingCount() > 0">
+            <b>{{ sync.pendingCount() }}</b><span>esperant pujar</span>
           </div>
-          <div class="stat"><b>{{ months().length }}</b><span>mesos a la cau</span></div>
+          <div class="stat"><b>{{ totalKb() }}</b><span>KB ocupats</span></div>
         </div>
         <div class="meta">
           <span>Usuari: <code>{{ uid() ?? '—' }}</code></span>
-          <span>Espai ocupat: <code>{{ totalKb() }} KB</code></span>
+          <span>Estat: <code>{{ sync.status() }}</code></span>
         </div>
       </div>
 
-      <!-- ── Cua de sincronització ────────────────────────────────────── -->
+      <!-- ── Cua de pujada ────────────────────────────────────────────── -->
       <div class="card-section">
         <div class="section-header">
           <span class="material-symbols-outlined section-icon">cloud_upload</span>
-          <h2 class="section-title">Cua de sincronització</h2>
-          <span class="section-count">{{ pendingIds().length }}</span>
+          <h2 class="section-title">Esperant pujar</h2>
+          <span class="section-count">{{ sync.pendingCount() }}</span>
         </div>
-        @if (pendingIds().length === 0) {
-          <p class="empty">Res pendent d'enviar al servidor.</p>
+        @if (sync.pendingCount() === 0) {
+          <p class="empty">Tot el que hi ha aquí ja és a la base de dades.</p>
         } @else {
-          @for (id of pendingIds(); track id) {
+          @for (r of pendingRecords(); track r.workout.id) {
             <div class="kv">
-              <code>{{ id }}</code>
-              <span class="tag" [class.tag-new]="insertIds().includes(id)">
-                {{ insertIds().includes(id) ? 'alta' : 'edició' }}
-              </span>
-              <span class="tag" [class.tag-bad]="snapSetCount(id) === 0">
-                {{ snapSetCount(id) }} sèries
-              </span>
+              <code>{{ r.workout.date }} · {{ r.workout.id }}</code>
+              <span class="tag">rev {{ r.rev }} → {{ r.syncedRev }}</span>
+              <span class="tag" [class.tag-bad]="setsOf(r.workout) === 0">{{ setsOf(r.workout) }} sèries</span>
             </div>
           }
+          @for (t of store.tombstones(); track t.id) {
+            <div class="kv"><code>{{ t.date }} · {{ t.id }}</code><span class="tag tag-bad">esborrar</span></div>
+          }
         }
+        <div class="row-actions">
+          <button class="btn-primary" (click)="sync.flush()" [disabled]="sync.pendingCount() === 0">Pujar ara</button>
+        </div>
       </div>
 
       <!-- ── Comparació amb el servidor ───────────────────────────────── -->
       <div class="card-section">
         <div class="section-header">
           <span class="material-symbols-outlined section-icon">compare_arrows</span>
-          <h2 class="section-title">Local contra servidor</h2>
+          <h2 class="section-title">Dispositiu contra base de dades</h2>
           @if (diff().length) { <span class="section-count">{{ mismatches().length }} diferències</span> }
         </div>
         <div class="row-actions">
           <button class="btn-primary" (click)="compare()" [disabled]="comparing()">
-            {{ comparing() ? 'Consultant…' : 'Comparar amb la base de dades' }}
+            {{ comparing() ? 'Consultant…' : 'Comparar' }}
           </button>
           @if (diff().length) {
             <button class="btn-ghost" (click)="onlyMismatches.set(!onlyMismatches())">
@@ -130,9 +139,22 @@ const VERDICT_LABEL: Record<DiffRow['verdict'], string> = {
           }
         </div>
         @if (diffError()) { <p class="err">{{ diffError() }}</p> }
+
+        @if (recoverable().length) {
+          <div class="recover">
+            <p>
+              <b>{{ recoverable().length }} sessions</b> estan més completes en aquest
+              dispositiu que a la base de dades. Pujar-les hi escriurà el que tens aquí.
+            </p>
+            <button class="btn-primary" (click)="recoverAll()" [disabled]="recovering()">
+              {{ recovering() ? 'Pujant…' : 'Pujar-les totes (' + recoverable().length + ')' }}
+            </button>
+          </div>
+        }
+
         @if (diff().length) {
           <div class="table">
-            <div class="tr th"><span>Dia</span><span>Local</span><span>Servidor</span><span>Estat</span></div>
+            <div class="tr th"><span>Dia</span><span>Dispositiu</span><span>Servidor</span><span>Estat</span><span></span></div>
             @for (d of visibleDiff(); track d.id) {
               <div class="tr" [class.bad]="d.verdict !== 'ok'">
                 <span>{{ d.date }}</span>
@@ -142,17 +164,22 @@ const VERDICT_LABEL: Record<DiffRow['verdict'], string> = {
                   @else { {{ d.serverEntries }} ex · {{ d.serverSets }} sèr }
                 </span>
                 <span class="verdict">{{ verdictLabel(d.verdict) }}</span>
+                <span>
+                  @if (canRecover(d)) {
+                    <button class="btn-row" (click)="recoverOne(d.id)" [disabled]="recovering()">Pujar</button>
+                  }
+                </span>
               </div>
             }
           </div>
         }
       </div>
 
-      <!-- ── Sessions en local ────────────────────────────────────────── -->
+      <!-- ── Sessions al dispositiu ───────────────────────────────────── -->
       <div class="card-section">
         <div class="section-header">
           <span class="material-symbols-outlined section-icon">fitness_center</span>
-          <h2 class="section-title">Sessions a localStorage</h2>
+          <h2 class="section-title">Sessions guardades</h2>
           <span class="section-count">{{ visibleWorkouts().length }}</span>
         </div>
         <div class="chips">
@@ -167,9 +194,11 @@ const VERDICT_LABEL: Record<DiffRow['verdict'], string> = {
               <span class="ic-name">
                 {{ w.date }}
                 <span class="tag">{{ w.status }}</span>
-                <span class="tag">{{ w.source === 'snapshot' ? 'pendent' : 'cau' }}</span>
+                <span class="tag" [class.tag-new]="w.rev > w.syncedRev">
+                  {{ w.rev > w.syncedRev ? 'per pujar' : 'sincronitzat' }}
+                </span>
               </span>
-              <span class="ic-detail">{{ w.entries.length }} exercicis · {{ w.setCount }} sèries · {{ w.id }}</span>
+              <span class="ic-detail">{{ w.entries.length }} exercicis · {{ w.setCount }} sèries · rev {{ w.rev }}/{{ w.syncedRev }}</span>
               @if (expanded() === w.id) {
                 <div class="detail">
                   @for (e of w.entries; track e.id) {
@@ -193,6 +222,37 @@ const VERDICT_LABEL: Record<DiffRow['verdict'], string> = {
         @if (!visibleWorkouts().length) {
           <p class="empty">Cap sessió que encaixi amb el filtre.</p>
         }
+      </div>
+
+      <!-- ── Diari de sincronització ──────────────────────────────────── -->
+      <div class="card-section">
+        <div class="section-header">
+          <span class="material-symbols-outlined section-icon">receipt_long</span>
+          <h2 class="section-title">Diari de sincronització</h2>
+          <span class="section-count">{{ syncLog.entries().length }}</span>
+        </div>
+        <p class="empty">
+          El viatge de cada sessió, del més recent al més antic: es guarda aquí,
+          s'encua, s'envia i el servidor contesta.
+        </p>
+        <div class="log">
+          @for (e of syncLog.entries(); track $index) {
+            <div class="log-row" [class.bad]="isBad(e.event)">
+              <span class="log-time">{{ hhmmss(e.at) }}</span>
+              <span class="log-event">{{ e.event }}</span>
+              <span class="log-detail">
+                {{ shortId(e.id) }}
+                @if (e.rev !== undefined) { · rev {{ e.rev }} }
+                @if (e.sets !== undefined) { · {{ e.sets }} sèr }
+                @if (e.note) { · {{ e.note }} }
+              </span>
+            </div>
+          }
+          @if (!syncLog.entries().length) { <p class="empty">Encara no hi ha res anotat.</p> }
+        </div>
+        <div class="row-actions">
+          <button class="btn-ghost" (click)="syncLog.clear()">Buidar el diari</button>
+        </div>
       </div>
 
       <!-- ── Claus en cru ─────────────────────────────────────────────── -->
@@ -251,7 +311,7 @@ const VERDICT_LABEL: Record<DiffRow['verdict'], string> = {
     }
     .ic-bar { width: 5px; align-self: stretch; flex-shrink: 0; }
     .ic-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 10px; }
-    .ic-name { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--c-text); }
+    .ic-name { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 13px; font-weight: 700; color: var(--c-text); }
     .ic-detail { font-size: 11px; color: var(--c-text-3); overflow: hidden; text-overflow: ellipsis; }
     .ic-action {
       width: 36px; height: 36px; flex-shrink: 0; margin: 4px 4px 0 0;
@@ -274,16 +334,39 @@ const VERDICT_LABEL: Record<DiffRow['verdict'], string> = {
 
     .kv { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--c-border-2); font-size: 11px; color: var(--c-text-3); &:last-of-type { border-bottom: none; } code { flex: 1; } }
     .tag { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; background: var(--c-subtle); color: var(--c-text-3); border: 1px solid var(--c-border-2); white-space: nowrap; }
-    .tag-new { color: var(--c-brand); border-color: color-mix(in srgb, var(--c-brand) 45%, transparent); }
+    .tag-new { color: var(--c-amber); border-color: color-mix(in srgb, var(--c-amber) 45%, transparent); }
     .tag-bad { color: var(--c-danger); border-color: color-mix(in srgb, var(--c-danger) 45%, transparent); }
 
     .table { display: flex; flex-direction: column; margin-top: 10px; }
     .tr {
-      display: grid; grid-template-columns: 1fr 1.1fr 1.1fr 0.9fr; gap: 6px;
+      display: grid; grid-template-columns: 0.9fr 1fr 1fr 0.9fr 52px; gap: 6px; align-items: center;
       padding: 7px 6px; border-bottom: 1px solid var(--c-border-2); font-size: 11.5px; color: var(--c-text-2);
       &.th { font-weight: 700; color: var(--c-text-3); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.3px; }
       &.bad { background: color-mix(in srgb, var(--c-danger) 8%, transparent); .verdict { color: var(--c-danger); font-weight: 700; } }
     }
+
+    .recover {
+      margin-top: 12px; padding: 10px 12px; border-radius: 12px;
+      border: 1.5px solid color-mix(in srgb, var(--c-amber) 50%, transparent);
+      background: color-mix(in srgb, var(--c-amber) 8%, var(--c-card));
+      p { margin: 0 0 8px; font-size: 12px; color: var(--c-text-2); line-height: 1.45; }
+    }
+    .btn-row {
+      padding: 4px 9px; border-radius: 8px; border: 1.5px solid var(--c-border-2);
+      background: var(--c-card); color: var(--c-brand); font-size: 10.5px; font-weight: 700; cursor: pointer;
+      &:disabled { opacity: 0.5; cursor: default; }
+    }
+
+    .log { max-height: 320px; overflow: auto; margin-top: 4px; }
+    .log-row {
+      display: grid; grid-template-columns: 62px 92px 1fr; gap: 6px; align-items: baseline;
+      padding: 4px 4px; border-bottom: 1px solid var(--c-border-2);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px; color: var(--c-text-2);
+      &.bad { color: var(--c-danger); }
+    }
+    .log-time  { color: var(--c-text-3); }
+    .log-event { font-weight: 700; }
+    .log-detail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     .row-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
     .btn-primary {
@@ -295,7 +378,7 @@ const VERDICT_LABEL: Record<DiffRow['verdict'], string> = {
       padding: 9px 16px; border-radius: 10px; border: 1.5px solid var(--c-border-2);
       background: var(--c-card); color: var(--c-text-2); font-size: 13px; font-weight: 700; cursor: pointer;
     }
-    .empty { margin: 0; font-size: 12px; color: var(--c-text-3); }
+    .empty { margin: 0; font-size: 12px; color: var(--c-text-3); line-height: 1.4; }
     .err { margin: 10px 0 0; font-size: 12px; color: var(--c-danger); }
   `],
 })
@@ -303,6 +386,11 @@ export class DebugLocalDataComponent {
   private auth     = inject(AuthService);
   private supabase = inject(SupabaseService).client;
   private feedback = inject(FeedbackService);
+
+  readonly store   = inject(WorkoutStoreService);
+  readonly sync    = inject(SyncService);
+  readonly syncLog = inject(SyncLogService);
+  readonly offline = inject(OfflineService);
 
   readonly uid = this.auth.uid;
 
@@ -315,6 +403,7 @@ export class DebugLocalDataComponent {
   readonly comparing      = signal(false);
   readonly diff           = signal<DiffRow[]>([]);
   readonly diffError      = signal<string | null>(null);
+  readonly recovering     = signal(false);
 
   // ── Lectura en cru ────────────────────────────────────────────────────────
   readonly keys = computed(() => {
@@ -333,51 +422,29 @@ export class DebugLocalDataComponent {
     this.keys().reduce((sum, k) => sum + Number(k.kb), 0).toFixed(1)
   );
 
-  readonly months = computed(() =>
-    this.keys().filter(k => k.key.startsWith('gymgoli_month_')).map(k => k.key)
-  );
-
-  readonly pendingIds = computed((): string[] => {
-    this.tick();
-    const uid = this.uid();
-    if (!uid) return [];
-    return this.parse<string[]>(`gymgoli_sync_dirty_${uid}`) ?? [];
-  });
-
-  readonly insertIds = computed((): string[] => {
-    this.tick();
-    const uid = this.uid();
-    if (!uid) return [];
-    return this.parse<string[]>(`gymgoli_sync_inserts_${uid}`) ?? [];
-  });
-
-  /**
-   * Totes les sessions guardades en local: la cau de mesos més les instantànies
-   * de la cua de sincronització. Si un id surt a tots dos llocs mana la
-   * instantània, que és l'última cosa que l'app ha volgut guardar.
-   */
+  /** Les sessions llegides del disc, no de memòria: així es veu el que
+   *  sobreviuria de debò a tancar l'app. */
   readonly workouts = computed((): LocalWorkout[] => {
-    const byId = new Map<string, LocalWorkout>();
-
+    const out: LocalWorkout[] = [];
     for (const { key } of this.keys()) {
       if (!key.startsWith('gymgoli_month_')) continue;
-      for (const raw of this.parse<RawWorkout[]>(key) ?? []) {
-        const w = this.toLocal(raw, 'month', key);
-        if (w) byId.set(w.id, w);
+      for (const raw of this.parse<RawRecord[]>(key) ?? []) {
+        const w = this.toLocal(raw, key);
+        if (w) out.push(w);
       }
     }
-    for (const { key } of this.keys()) {
-      if (!key.startsWith('gymgoli_sync_snap_')) continue;
-      const w = this.toLocal(this.parse<RawWorkout>(key), 'snapshot', key);
-      if (w) byId.set(w.id, w);
-    }
-
-    return [...byId.values()].sort((a, b) => b.date.localeCompare(a.date));
+    return out.sort((a, b) => b.date.localeCompare(a.date));
   });
 
+  readonly pendingRecords  = computed(() => { this.tick(); return this.store.pendingRecords(); });
   readonly emptyWorkouts   = computed(() => this.workouts().filter(w => w.setCount === 0));
   readonly visibleWorkouts = computed(() => this.onlyEmpty() ? this.emptyWorkouts() : this.workouts());
   readonly mismatches      = computed(() => this.diff().filter(d => d.verdict !== 'ok'));
+
+  /** Les sessions que aquí estan més completes que a la base de dades. Són
+   *  les que es poden recuperar: pujar-les no fa perdre res, hi escriu el que
+   *  el dispositiu té i el servidor no. */
+  readonly recoverable = computed(() => this.diff().filter(d => this.canRecover(d)));
   readonly visibleDiff     = computed(() => this.onlyMismatches() ? this.mismatches() : this.diff());
 
   // ── Accions ───────────────────────────────────────────────────────────────
@@ -385,18 +452,16 @@ export class DebugLocalDataComponent {
   refresh(): void { this.tick.update(n => n + 1); }
 
   verdictLabel(v: DiffRow['verdict']): string { return VERDICT_LABEL[v]; }
-
-  snapSetCount(id: string): number {
-    const uid = this.uid();
-    if (!uid) return 0;
-    const snap = this.parse<RawWorkout>(`gymgoli_sync_snap_${uid}_${id}`);
-    return this.countSets(snap);
+  setsOf(w: { entries: { sets: unknown[] }[] }): number {
+    return w.entries.reduce((sum, e) => sum + e.sets.length, 0);
   }
-
   pretty(raw: unknown): string { return JSON.stringify(raw, null, 2); }
+  hhmmss(iso: string): string { return iso.substring(11, 19); }
+  shortId(id?: string): string { return id ? id.substring(0, 8) : '—'; }
+  isBad(event: string): boolean { return event === 'push-fail' || event === 'push-missing'; }
 
   /** Demana al servidor tot l'historial i el posa costat per costat amb el
-   *  que hi ha en local, que és l'única manera de veure què s'ha perdut. */
+   *  que hi ha al dispositiu. */
   async compare(): Promise<void> {
     const uid = this.uid();
     if (!uid) { this.diffError.set('Cal haver iniciat sessió.'); return; }
@@ -445,6 +510,48 @@ export class DebugLocalDataComponent {
     }
   }
 
+  /** Pujar-la té sentit quan aquí hi ha sèries que allà no hi són. Una fila
+   *  que ja coincideix, o que només és al servidor, no s'ha de tocar. */
+  canRecover(d: DiffRow): boolean {
+    if (d.serverSets === null) return d.localSets > 0;  // encara no hi ha arribat
+    return d.localSets > d.serverSets;
+  }
+
+  /**
+   * Torna a posar a la cua el que hi ha al dispositiu, perquè s'escrigui a la
+   * base de dades.
+   *
+   * És la recuperació dels entrenaments que hi van arribar buits: el que tens
+   * aquí és el bo, i això fa que hi torni a pujar amb una marca de temps nova
+   * perquè guanyi. Res que no estigui guardat aquí es pot recuperar així.
+   */
+  async recoverOne(id: string): Promise<void> {
+    await this._recover([id]);
+  }
+
+  async recoverAll(): Promise<void> {
+    await this._recover(this.recoverable().map(d => d.id));
+  }
+
+  private async _recover(ids: string[]): Promise<void> {
+    if (!ids.length) return;
+    this.recovering.set(true);
+    try {
+      const queued = ids.filter(id => this.store.forceResync(id));
+      if (!queued.length) {
+        this.feedback.error('No en queda cap al dispositiu per pujar');
+        return;
+      }
+      await this.sync.flush();
+      await this.compare();   // ensenya com ha quedat, sense haver de recarregar
+      const left = this.recoverable().length;
+      if (left === 0) this.feedback.success(`${queued.length} sessions pujades`);
+      else this.feedback.info(`${queued.length - left} pujades, ${left} pendents de reintentar`);
+    } finally {
+      this.recovering.set(false);
+    }
+  }
+
   async copyAll(): Promise<void> {
     const dump: Record<string, unknown> = {};
     for (const { key } of this.keys()) dump[key] = this.parse(key) ?? localStorage.getItem(key);
@@ -457,8 +564,19 @@ export class DebugLocalDataComponent {
   }
 
   // ── Ajudants ──────────────────────────────────────────────────────────────
-  /** Com queda un entrenament quan es mira als dos llocs alhora. La fila
-   *  interessant és `server-empty`: en local hi ha sèries i al servidor no. */
+  private parse<T>(key: string): T | null {
+    try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) as T : null; }
+    catch { return null; }
+  }
+
+  private countSets(w: RawWorkout | null): number {
+    return (w?.entries ?? []).reduce((sum, e) => sum + (e?.sets?.length ?? 0), 0);
+  }
+
+  /**
+   * Com queda un entrenament quan es mira als dos llocs alhora. La fila que
+   * cal buscar és `server-empty`: aquí hi ha sèries i allà no.
+   */
   private verdict(
     localEntries: number, localSets: number,
     serverEntries: number | null, serverSets: number | null,
@@ -469,30 +587,24 @@ export class DebugLocalDataComponent {
     return 'ok';
   }
 
-  private parse<T>(key: string): T | null {
-    try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) as T : null; }
-    catch { return null; }
-  }
-
-  private countSets(w: RawWorkout | null): number {
-    return (w?.entries ?? []).reduce((sum, e) => sum + (e?.sets?.length ?? 0), 0);
-  }
-
-  private toLocal(raw: RawWorkout | null, source: LocalWorkout['source'], storeKey: string): LocalWorkout | null {
-    if (!raw?.id) return null;
+  private toLocal(raw: RawRecord | null, storeKey: string): LocalWorkout | null {
+    const w = raw?.workout ?? (raw as RawWorkout | null);
+    if (!w?.id) return null;
     return {
-      id:        raw.id,
-      date:      raw.date ?? '—',
-      status:    raw.status ?? 'done',
-      source, storeKey,
-      entries:   (raw.entries ?? []).map(e => ({
+      id:        w.id,
+      date:      w.date ?? '—',
+      status:    w.status ?? 'done',
+      rev:       raw?.rev ?? 0,
+      syncedRev: raw?.syncedRev ?? 0,
+      storeKey,
+      entries:   (w.entries ?? []).map(e => ({
         id:     e?.exerciseId ?? '?',
         name:   e?.exerciseName ?? '',
         sets:   e?.sets?.length ?? 0,
         detail: this.setsDetail(e?.sets),
       })),
-      setCount:  this.countSets(raw),
-      updatedAt: raw.updatedAt ?? raw.createdAt ?? '',
+      setCount:  this.countSets(w),
+      updatedAt: w.updatedAt ?? w.createdAt ?? '',
       raw,
     };
   }

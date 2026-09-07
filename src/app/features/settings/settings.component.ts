@@ -10,6 +10,7 @@ import { ExerciseService } from '../../core/services/exercise.service';
 import { TrainingTypeService } from '../../core/services/training-type.service';
 import { SportService } from '../../core/services/sport.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
+import { OfflineService } from '../../core/services/offline.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { OnboardingTourService } from '../../core/services/onboarding-tour.service';
 import { TrainerService } from '../../core/services/trainer.service';
@@ -484,6 +485,30 @@ function asSectionId(value: string | null): SectionId | null {
                 color="primary"
               />
             </div>
+
+            <div class="setting-divider"></div>
+
+            <!-- Sense connexió i què hi ha guardat -->
+            <div class="setting-row setting-row--top">
+              <div class="setting-info">
+                <span class="setting-label">Simular que no hi ha connexió</span>
+                <span class="setting-desc">Talla les consultes al servidor de debò, per comprovar que entrenar i veure els últims dies funciona igual sense cobertura. El que registris s'enviarà en tornar-ho a desactivar.</span>
+              </div>
+              <mat-slide-toggle
+                [checked]="offlineService.forceOffline()"
+                (change)="offlineService.toggleForceOffline()"
+                color="primary"
+              />
+            </div>
+
+            <a class="nav-row" routerLink="/debug/local">
+              <span class="material-symbols-outlined nav-row-icon">database</span>
+              <div class="setting-info">
+                <span class="setting-label">Dades guardades en aquest dispositiu</span>
+                <span class="setting-desc">Què hi ha guardat aquí, què espera pujar i com queda comparat amb la base de dades. Des d'aquí també pots forçar que hi pugi.</span>
+              </div>
+              <span class="material-symbols-outlined nav-row-arrow">chevron_right</span>
+            </a>
 
           </div>
         }
@@ -1087,6 +1112,7 @@ function asSectionId(value: string | null): SectionId | null {
 export class SettingsComponent {
   readonly authService     = inject(AuthService);
   readonly settingsService = inject(UserSettingsService);
+  readonly offlineService = inject(OfflineService);
   readonly trainerService  = inject(TrainerService);
   readonly exerciseService = inject(ExerciseService);
   private sportService     = inject(SportService);
