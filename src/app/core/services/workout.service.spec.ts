@@ -7,6 +7,7 @@ import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { ExerciseService } from './exercise.service';
 import { SyncService } from './sync.service';
+import { WorkoutStoreService } from './workout-store.service';
 
 interface QueryResult { data?: unknown; count?: number; error?: unknown }
 
@@ -76,13 +77,11 @@ describe('WorkoutService', () => {
         { provide: SupabaseService, useValue: { client: { from: fromSpy, channel: () => channelStub } } },
         { provide: ExerciseService, useValue: { getById: () => undefined } },
         { provide: SyncService,     useValue: {
-          markDirty:    jasmine.createSpy('markDirty'),
-          pendingIds:   () => pendingIds(),
-          pendingCount: signal(0),
+          notifyPending: jasmine.createSpy('notifyPending'),
+          pendingIds:    () => pendingIds(),
+          pendingCount:  signal(0),
           vanished,
-          getSnapshot:  () => null,
-          cancelDirty:  jasmine.createSpy('cancelDirty'),
-          isInsert:     () => false,
+          flush:         jasmine.createSpy('flush'),
         } },
       ],
     });
@@ -546,6 +545,53 @@ describe('WorkoutService', () => {
       expect(service.getWorkoutForDate('2024-03-06')!.notes).toBe('nou');
     });
   });
+  // ── Local primer ─────────────────────────────────────────────────────────
+  // El que l'usuari fa s'ha de guardar al dispositiu abans i independentment
+  // de qualsevol resposta del servidor, i sobreviure a tancar l'app.
+  describe('primer al dispositiu, després al servidor', () => {
+    it('un entrenament registrat sense connexió queda guardat i esperant pujar', async () => {
+      const store = TestBed.inject(WorkoutStoreService);
+      const id = await service.createWorkoutForDate('2024-03-06', 'push');
+      await service.addExerciseToWorkout(id, { exerciseId: 'ex1', exerciseName: 'Press banca', sets: [] });
+      await service.addSetsToEntry(id, 'ex1', [{ weight: 80, reps: 8 }]);
+
+      expect(store.get(id)!.entries[0].sets.length).toBe(1);
+      expect(store.isPending(id)).toBeTrue();
+
+      // I hi continua sent després de tancar i tornar a obrir l'app.
+      store.reset();
+      store.hydrate('user-1');
+      expect(store.get(id)!.entries[0].sets.length).toBe(1);
+    });
+
+    it('una resposta del servidor no esborra les sèries que encara no han pujat', async () => {
+      const store = TestBed.inject(WorkoutStoreService);
+      const id = await service.createWorkoutForDate('2024-03-06');
+      await service.addExerciseToWorkout(id, { exerciseId: 'ex1', exerciseName: 'Press banca', sets: [] });
+      await service.addSetsToEntry(id, 'ex1', [{ weight: 80, reps: 8 }]);
+
+      // El servidor encara té la versió buida del moment de l'alta, i el
+      // realtime ens la torna: acceptar-la seria perdre l'entrenament.
+      onRemoteChange({
+        eventType: 'UPDATE',
+        new: { id, date: '2024-03-06', entries: [], user_id: 'user-1', created_at: '2024-03-06T08:00:00Z' },
+      });
+
+      expect(store.get(id)!.entries[0].sets.length).toBe(1);
+    });
+
+    it('esborrar sense connexió no falla i deixa constància per al servidor', async () => {
+      const store = TestBed.inject(WorkoutStoreService);
+      const id = await service.createWorkoutForDate('2024-03-06');
+      store.ackUpsert(id, store.record(id)!.rev);   // el servidor ja la té
+
+      await service.deleteWorkout(id);
+
+      expect(service.getWorkoutsForDate('2024-03-06').length).toBe(0);
+      expect(store.tombstones().map(t => t.id)).toEqual([id]);
+    });
+  });
+
 });
 
 // ── matchesHistoryFilters() ─────────────────────────────────────────────────

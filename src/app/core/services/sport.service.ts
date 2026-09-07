@@ -16,7 +16,10 @@ import { FeelingLevel, PlannedSource } from '../models/workout.model';
  * miressis.
  */
 type SportOpKind = 'insert' | 'update' | 'delete';
-interface PendingSportOp { op: SportOpKind; id: string; row: Record<string, unknown>; }
+/** `seq` puja cada cop que s'escriu la cua. Una tanda d'enviaments recorda
+ *  quin `seq` va enviar i, si en tornar ja no és el mateix, l'operació s'ha
+ *  tornat a tocar mentrestant i no es pot donar per feta. */
+interface PendingSportOp { op: SportOpKind; id: string; row: Record<string, unknown>; seq?: number; }
 
 // ── Row mappers ──────────────────────────────────────────────────────────────
 
@@ -95,6 +98,8 @@ export class SportService {
    *  `focus` i `visibilitychange`). */
   private static readonly REFRESH_THROTTLE_MS = 10_000;
   private _isFlushing = false;
+  /** Comptador de versions de la cua d'enviaments. */
+  private _opSeq = 0;
   private _retryTimer: ReturnType<typeof setInterval> | null = null;
 
   /** Cada quant es reintenta la cua d'escriptures pendents. */
@@ -736,7 +741,9 @@ export class SportService {
   }
 
   private _writePending(uid: string, ops: PendingSportOp[]): void {
-    try { localStorage.setItem(this._lsPendingKey(uid), JSON.stringify(ops)); } catch { }
+    this._opSeq += 1;
+    const stamped = ops.map(o => ({ ...o, seq: o.seq ?? this._opSeq }));
+    try { localStorage.setItem(this._lsPendingKey(uid), JSON.stringify(stamped)); } catch { }
     if (ops.length) this._armRetry(); else this._stopRetry();
   }
 
@@ -766,6 +773,8 @@ export class SportService {
    * de coses que mai hi van ser.
    */
   private _queuePending(uid: string, op: PendingSportOp): void {
+    this._opSeq += 1;
+    op = { ...op, seq: this._opSeq };   // versió nova: cap tanda antiga la tanca
     const ops     = this._readPending(uid);
     const pending = ops.filter(o => o.id === op.id);
     const others  = ops.filter(o => o.id !== op.id);
@@ -779,12 +788,12 @@ export class SportService {
 
     const insert = pending.find(o => o.op === 'insert');
     if (insert) {
-      this._writePending(uid, [...others, { ...insert, row: { ...insert.row, ...op.row } }]);
+      this._writePending(uid, [...others, { ...insert, row: { ...insert.row, ...op.row }, seq: op.seq }]);
       return;
     }
     const update = pending.find(o => o.op === 'update');
     if (op.op === 'update' && update) {
-      this._writePending(uid, [...others, { ...update, row: { ...update.row, ...op.row } }]);
+      this._writePending(uid, [...others, { ...update, row: { ...update.row, ...op.row }, seq: op.seq }]);
       return;
     }
     this._writePending(uid, [...ops, op]);
@@ -818,6 +827,14 @@ export class SportService {
     if (error) throw error;
   }
 
+  /**
+   * Buida la cua.
+   *
+   * Al final només es treu el que s'ha pogut enviar i, a més, no s'ha tornat a
+   * tocar mentre la petició viatjava (mateix `seq`). Abans es reescrivia la cua
+   * amb el que havia fallat, i el que s'hi encuava durant la tanda hi
+   * desapareixia sense haver arribat mai al servidor.
+   */
   private async _flushPending(): Promise<void> {
     if (this._isFlushing) return;
     const uid = this.auth.uid();
@@ -826,15 +843,18 @@ export class SportService {
     if (ops.length === 0) return;
 
     this._isFlushing = true;
-    const remaining: PendingSportOp[] = [];
+    const done = new Map<string, number | undefined>();
     for (const op of ops) {
       try {
         await this._runOp(uid, op);
+        done.set(op.id, op.seq);
       } catch {
-        remaining.push(op);
+        // Es queda a la cua: el canvi ja és al dispositiu i es reintentarà.
       }
     }
-    this._writePending(uid, remaining);
+
+    const current = this._readPending(uid);
+    this._writePending(uid, current.filter(o => !(done.has(o.id) && done.get(o.id) === o.seq)));
     this._isFlushing = false;
   }
 
