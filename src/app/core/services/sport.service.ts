@@ -529,6 +529,14 @@ export class SportService {
     return (this._sessionsByDate().get(date) ?? []).find(s => s.sportId === sportId);
   }
 
+  /** Una sessió pel seu id, sigui feta o planificada — la pàgina d'una sessió
+   *  hi arriba per l'URL i no sap de quin dia és fins que la troba. Només la
+   *  veurà si el seu mes és carregat: qui hi entra de nou fa
+   *  `loadAllSessions()` abans de donar-la per perduda. */
+  getSessionById(id: string): SportSession | undefined {
+    return this._sessions().find(s => s.id === id);
+  }
+
   hasSportOnDate(date: string, sportId: string): boolean {
     return (this._sessionsByDate().get(date) ?? []).some(s =>
       s.sportId === sportId && (s.status ?? 'done') !== 'planned');
@@ -540,18 +548,21 @@ export class SportService {
 
   // ── Session log / toggle ────────────────────────────────────────────────
 
-  /** Full session create with all metrics. Used by the session logger UI and
+  /** Full session create with all metrics. Used when registering a sport and
    *  by weekly routine planning — writes locally first so it works offline,
    *  then syncs to Supabase in the background (queued for retry if offline).
    *  `plannedSource` only matters for status: 'planned' — 'routine' or
    *  'manual', matching WorkoutService.createPlannedWorkout, so a routine
-   *  and an ad-hoc plan can be retracted independently of each other. */
+   *  and an ad-hoc plan can be retracted independently of each other.
+   *
+   *  Retorna l'id de la sessió, com `createWorkoutForDate`: qui la registra hi
+   *  vol anar tot seguit, i l'id el posa el client. */
   async logSession(
     date: string, sportId: string,
     data: { subtypeId?: string; duration?: number; feeling?: FeelingLevel; metrics?: Record<string, string | number>; notes?: string },
     status: SportSessionStatus = 'done',
     plannedSource?: PlannedSource,
-  ): Promise<void> {
+  ): Promise<string> {
     const uid = this._uid();
     const id  = crypto.randomUUID();
     const session: SportSession = {
@@ -583,6 +594,7 @@ export class SportService {
       planned_source: plannedSource ?? null,
     };
     await this._pushOrQueue(uid, { op: 'insert', id, row });
+    return id;
   }
 
   /** Convert a planned sport session into a done one. */
