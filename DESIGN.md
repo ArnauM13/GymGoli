@@ -328,7 +328,13 @@ l'activitat sencera.
 | | Entrenament | Esport |
 | --- | --- | --- |
 | Detall | `app-workout-detail` — exercicis, sèries, drop sets i PRs | `app-sport-detail` — dades de la sessió, rècords i context |
-| Botó del peu | «Obrir entrenament» → `/train?workout=` | «Obrir sessió» → `/train?sport=&date=` |
+| Botó del peu | «Obrir entrenament» → `/train?workout=` | «Obrir sessió» → `/sport/:id` |
+
+Les dues activitats tenen **pàgina pròpia**, i s'hi arriba des del feed: un
+entrenament a `/train?workout=` (mode pantalla sencera de la pàgina d'Entrenar)
+i una sessió d'esport a `/sport/:id`. Cap de les dues s'obre en un full flotant
+—això queda per a triar coses (`bottom sheet`, §8), no per a mirar una
+activitat.
 
 **El feed no modifica res.** Ni una targeta ni el seu detall porten cap camp,
 cap selector ni cap botó de guardar: es llegeixen. Tocar dades vol dir sortir

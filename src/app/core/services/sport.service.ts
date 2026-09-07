@@ -529,6 +529,14 @@ export class SportService {
     return (this._sessionsByDate().get(date) ?? []).find(s => s.sportId === sportId);
   }
 
+  /** Una sessió pel seu id, sigui feta o planificada — la pàgina d'una sessió
+   *  hi arriba per l'URL i no sap de quin dia és fins que la troba. Només la
+   *  veurà si el seu mes és carregat: qui hi entra de nou fa
+   *  `loadAllSessions()` abans de donar-la per perduda. */
+  getSessionById(id: string): SportSession | undefined {
+    return this._sessions().find(s => s.id === id);
+  }
+
   hasSportOnDate(date: string, sportId: string): boolean {
     return (this._sessionsByDate().get(date) ?? []).some(s =>
       s.sportId === sportId && (s.status ?? 'done') !== 'planned');

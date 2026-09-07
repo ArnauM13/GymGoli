@@ -664,12 +664,9 @@ export class CalendarPageComponent implements OnDestroy {
     this.router.navigate(['/train'], { queryParams: { workout: workoutId } });
   }
 
-  /** Una sessió d'esport s'obre allà on es registra: la pàgina d'Entrenar,
-   *  amb el seu dia i el registre d'aquell esport ja obert. */
-  goToSportSession(item: { sport: Sport; session: SportSession }): void {
-    this.router.navigate(['/train'], {
-      queryParams: { sport: item.sport.id, date: item.session.date },
-    });
+  /** Una sessió d'esport té pàgina pròpia, igual que un entrenament. */
+  goToSportSession(item: { session: SportSession }): void {
+    this.router.navigate(['/sport', item.session.id]);
   }
 
   // ── Visual helpers ───────────────────────────────────────────────────────
