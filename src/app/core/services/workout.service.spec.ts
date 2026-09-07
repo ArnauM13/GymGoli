@@ -67,6 +67,59 @@ describe('WorkoutService', () => {
 
   beforeEach(() => setup());
 
+  describe('ensureMonthLoaded()', () => {
+    /** Fa que la pròxima consulta a `workouts` torni aquestes files. */
+    function respondWith(result: { data?: unknown; error?: unknown }): void {
+      workoutsChain.then = (resolve) => resolve({ count: 0, error: null, ...result });
+    }
+
+    function row(id: string, date: string): Record<string, unknown> {
+      return {
+        id, date, categories: ['push'], entries: [],
+        created_at: `${date}T10:00:00.000Z`, status: 'done',
+      };
+    }
+
+    it('carrega el mes sencer encara que ja hi hagi entrenaments d\'aquell mes al caché', async () => {
+      // Mirar el progrés d'un exercici carrega només els seus entrenaments, i
+      // en deixava alguns escampats pel caché de mesos. El mes es donava per
+      // carregat i el calendari es quedava amb aquells dies i prou.
+      respondWith({ data: [{ ...row('w-1', '2024-02-14'), entries: [{ exerciseId: 'ex-1', exerciseName: 'Press', sets: [] }] }] });
+      await service.loadWorkoutsForExercise('ex-1');
+
+      respondWith({ data: [row('w-1', '2024-02-14'), row('w-2', '2024-02-03'), row('w-3', '2024-02-20')] });
+      await service.ensureMonthLoaded(2024, 1);
+
+      const dates = service.workouts().filter(w => w.date.startsWith('2024-02')).map(w => w.date).sort();
+      expect(dates).toEqual(['2024-02-03', '2024-02-14', '2024-02-20']);
+    });
+
+    it('torna a demanar un mes que ha fallat en comptes de deixar-lo buit', async () => {
+      respondWith({ data: null, error: new Error('network') });
+      await service.ensureMonthLoaded(2024, 1);
+      expect(service.workouts().filter(w => w.date.startsWith('2024-02')).length).toBe(0);
+
+      respondWith({ data: [row('w-1', '2024-02-14')] });
+      await service.ensureMonthLoaded(2024, 1);
+
+      expect(service.workouts().map(w => w.date)).toContain('2024-02-14');
+    });
+
+    it('no escriu un mes en blanc al caché de disc quan la consulta falla', async () => {
+      respondWith({ data: [row('w-1', '2024-02-14')] });
+      await service.ensureMonthLoaded(2024, 1);
+      const cached = localStorage.getItem('gymgoli_month_user-1_2024-02');
+      expect(JSON.parse(cached!).length).toBe(1);
+
+      // Un altre mes que falla no ha de tocar res del que ja hi ha guardat.
+      respondWith({ data: null, error: new Error('network') });
+      await service.ensureMonthLoaded(2024, 2);
+      expect(localStorage.getItem('gymgoli_month_user-1_2024-03')).toBeNull();
+
+      localStorage.removeItem('gymgoli_month_user-1_2024-02');
+    });
+  });
+
   describe('loadWorkoutPage()', () => {
     it('filters by exercise name using a plain ilike on the generated exercise_names column', async () => {
       await service.loadWorkoutPage({ page: 0, pageSize: 20, search: 'press banca' });

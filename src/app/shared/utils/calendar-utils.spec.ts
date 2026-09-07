@@ -1,6 +1,6 @@
 import { Workout } from '../../core/models/workout.model';
 import {
-  addDays, catDotBackground, mondayOf, sportDotBackground, workoutCategories,
+  addDays, catDotBackground, mondayOf, workoutCategories,
 } from './calendar-utils';
 
 function makeWorkout(overrides: Partial<Workout> = {}): Workout {
@@ -85,23 +85,6 @@ describe('calendar-utils', () => {
     it('falls back to gray for an unknown category', () => {
       const result = catDotBackground(['push', 'unknown']);
       expect(result).toContain('#bbb');
-    });
-  });
-
-  describe('sportDotBackground()', () => {
-    it('falls back to the default orange when there are no colors', () => {
-      expect(sportDotBackground([])).toBe('#FB8C00');
-    });
-
-    it('returns the color directly for a single sport', () => {
-      expect(sportDotBackground(['#1E88E5'])).toBe('#1E88E5');
-    });
-
-    it('returns a conic-gradient covering all sports for multiple sports', () => {
-      const result = sportDotBackground(['#1E88E5', '#43A047']);
-      expect(result).toContain('conic-gradient');
-      expect(result).toContain('#1E88E5');
-      expect(result).toContain('#43A047');
     });
   });
 });

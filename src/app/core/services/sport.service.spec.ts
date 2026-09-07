@@ -19,6 +19,7 @@ describe('SportService', () => {
   let uid: ReturnType<typeof signal<string | null>>;
   let sportsData: Record<string, unknown>[];
   let sessionsData: Record<string, unknown>[];
+  let sessionsError: unknown;
   let insertShouldFail: boolean;
   let service: SportService;
   let supabaseMock: ReturnType<typeof buildMock>;
@@ -30,14 +31,16 @@ describe('SportService', () => {
     const deleteSpy = jasmine.createSpy('delete');
     const fromSpy   = jasmine.createSpy('from');
 
-    const selectChain = (data: () => Record<string, unknown>[]): any => {
+    const selectChain = (data: () => Record<string, unknown>[], error: () => unknown = () => null): any => {
       const chain: any = {};
       chain.select = jasmine.createSpy('select').and.returnValue(chain);
       chain.eq     = jasmine.createSpy('eq').and.returnValue(chain);
       chain.gte    = jasmine.createSpy('gte').and.returnValue(chain);
       chain.lte    = jasmine.createSpy('lte').and.returnValue(chain);
-      chain.order  = jasmine.createSpy('order').and.callFake(() =>
-        Promise.resolve({ data: data(), error: null }));
+      chain.order  = jasmine.createSpy('order').and.callFake(() => {
+        const err = error();
+        return Promise.resolve(err ? { data: null, error: err } : { data: data(), error: null });
+      });
       return chain;
     };
 
@@ -63,7 +66,7 @@ describe('SportService', () => {
         return { select: () => selectChain(() => sportsData), ...writers };
       }
       if (table === 'sport_sessions') {
-        return { select: () => selectChain(() => sessionsData), ...writers };
+        return { select: () => selectChain(() => sessionsData, () => sessionsError), ...writers };
       }
       return { select: () => selectChain(() => []), ...writers };
     });
@@ -76,6 +79,7 @@ describe('SportService', () => {
     uid = signal<string | null>(null);
     sportsData = [sportRow()];
     sessionsData = [];
+    sessionsError = null;
     insertShouldFail = false;
     supabaseMock = buildMock();
 
@@ -215,6 +219,86 @@ describe('SportService', () => {
       tick();
 
       expect(service.sessions().some(s => s.date === '2024-02-14')).toBeTrue();
+    }));
+
+    it('carrega el mes sencer encara que ja hi hagi una sessió d\'aquell mes al caché', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+
+      // Registrar un esport d'un mes que no s'ha obert mai hi deixava dades al
+      // caché, i el mes es donava per carregat: la resta del mes no arribava.
+      void service.logSession('2024-02-14', 'running', { duration: 60 }, 'done');
+      tick();
+
+      const logged = service.sessions().find(s => s.date === '2024-02-14')!;
+      sessionsData = [
+        { id: logged.id, date: '2024-02-14', sport_id: 'running', status: 'done', created_at: '2024-02-14T10:00:00.000Z' },
+        { id: 's-1', date: '2024-02-03', sport_id: 'sport-1', status: 'done', created_at: '2024-02-03T10:00:00.000Z' },
+        { id: 's-2', date: '2024-02-20', sport_id: 'sport-1', status: 'done', created_at: '2024-02-20T10:00:00.000Z' },
+      ];
+      void service.ensureMonthLoaded(2024, 1);
+      tick();
+
+      const dates = service.sessions().map(s => s.date).sort();
+      expect(dates).toEqual(['2024-02-03', '2024-02-14', '2024-02-20']);
+    }));
+
+    it('conserva una sessió que encara espera a la cua quan el mes es carrega', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+
+      insertShouldFail = true;
+      void service.logSession('2024-02-14', 'running', {}, 'done');
+      tick();
+
+      // El servidor no la té encara: la càrrega del mes no se l'ha d'endur.
+      sessionsData = [
+        { id: 's-1', date: '2024-02-03', sport_id: 'sport-1', status: 'done', created_at: '2024-02-03T10:00:00.000Z' },
+      ];
+      void service.ensureMonthLoaded(2024, 1);
+      tick();
+
+      expect(service.sessions().map(s => s.date).sort()).toEqual(['2024-02-03', '2024-02-14']);
+      discardPeriodicTasks();
+    }));
+
+    it('només fa una consulta encara que el mes es demani diverses vegades', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+      supabaseMock.fromSpy.calls.reset();
+
+      void service.ensureMonthLoaded(2024, 1);
+      void service.ensureMonthLoaded(2024, 1);
+      tick();
+      void service.ensureMonthLoaded(2024, 1);
+      tick();
+
+      const sessionQueries = supabaseMock.fromSpy.calls.allArgs()
+        .filter(([table]) => table === 'sport_sessions');
+      expect(sessionQueries.length).toBe(1);
+    }));
+
+    it('torna a demanar un mes que ha fallat en comptes de deixar-lo buit', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+
+      sessionsError = new Error('network');
+      void service.ensureMonthLoaded(2024, 1);
+      tick();
+      expect(service.sessions().length).toBe(0);
+
+      sessionsError = null;
+      sessionsData = [
+        { id: 's-1', date: '2024-02-03', sport_id: 'sport-1', status: 'done', created_at: '2024-02-03T10:00:00.000Z' },
+      ];
+      void service.ensureMonthLoaded(2024, 1);
+      tick();
+
+      expect(service.sessions().map(s => s.date)).toEqual(['2024-02-03']);
     }));
   });
 

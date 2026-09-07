@@ -1,4 +1,4 @@
-import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
 import { ExerciseService } from './exercise.service';
@@ -57,6 +57,12 @@ function workoutFromCache(raw: Record<string, unknown>): Workout {
   };
 }
 
+/** Fusiona dues llistes per id, guanyant la primera. */
+function mergeById(primary: Workout[], extra: Workout[]): Workout[] {
+  const ids = new Set(primary.map(w => w.id));
+  return [...primary, ...extra.filter(w => !ids.has(w.id))];
+}
+
 /** The filters the Historial list can have active at once. */
 export interface HistoryFilters {
   category?: string;
@@ -109,6 +115,20 @@ export class WorkoutService {
 
   // ── Single unified cache (all dates including today) ─────────────────────
   private readonly _monthCache = new Map<string, Workout[]>();
+  /**
+   * Quins mesos s'han arribat a llegir **sencers** del servidor.
+   *
+   * Abans això es deduïa de `_monthCache`, i qualsevol càrrega parcial —
+   * la subscripció d'avui, els entrenaments d'un sol exercici, un entrenament
+   * acabat de registrar en un mes que encara no s'havia obert — hi deixava
+   * una clau i feia que el mes ja no es demanés mai més: el calendari es
+   * quedava amb els tres dies que hi havien caigut per casualitat. Les dades
+   * i el «ja està carregat» són dues coses diferents i ara viuen separades.
+   */
+  private readonly _loadedMonths = signal<ReadonlySet<string>>(new Set());
+  /** Càrregues de mes en vol, perquè dos components que demanen el mateix mes
+   *  esperin la mateixa consulta en comptes de fer-ne dues. */
+  private readonly _monthLoads = new Map<string, Promise<void>>();
   private readonly _historical = signal<Workout[]>([]);
   private _allLoaded = false;
   private _realtimeChannel: RealtimeChannel | null = null;
@@ -179,6 +199,8 @@ export class WorkoutService {
       this._realtimeChannel?.unsubscribe();
       this._realtimeChannel = null;
       this._monthCache.clear();
+      this._loadedMonths.set(new Set());
+      this._monthLoads.clear();
       this._allLoaded = false;
       this._historical.set([]);
       this._exLoadedIds.clear();
@@ -232,9 +254,25 @@ export class WorkoutService {
 
   async ensureMonthLoaded(year: number, month: number): Promise<void> {
     const key = this._monthKey(year, month);
-    if (this._monthCache.has(key) || this._allLoaded) return;
+    // Untracked: `ensureMonthLoaded()` es crida des d'`effect()`s, i llegir
+    // el senyal aquí els faria dependre de cada mes que acaba d'arribar.
+    if (untracked(this._loadedMonths).has(key) || this._allLoaded) return;
 
+    const inFlight = this._monthLoads.get(key);
+    if (inFlight) return inFlight;
+
+    const p = this._loadMonth(year, month, key)
+      .finally(() => this._monthLoads.delete(key));
+    this._monthLoads.set(key, p);
+    return p;
+  }
+
+  private async _loadMonth(year: number, month: number, key: string): Promise<void> {
     const uid = this._uid();
+
+    // El que ja hi hagi al mes ve d'una càrrega parcial (avui, un exercici, un
+    // entrenament acabat de crear). Ha de sobreviure la càrrega sencera.
+    const preloaded = this._monthCache.get(key) ?? [];
 
     // ── Step 1: serve from localStorage immediately (no spinner if cached) ──
     const lsCached = this._readMonthFromStorage(uid, key);
@@ -248,10 +286,11 @@ export class WorkoutService {
       for (const [id, snap] of dirtyMap) {
         if (!lsCached.find(w => w.id === id)) merged.push(snap);
       }
-      this._monthCache.set(key, merged);
+      this._monthCache.set(key, mergeById(merged, preloaded));
       this._rebuildHistorical();
     } else {
-      this._monthCache.set(key, [...dirtySnaps]); // show locally-created offline workouts
+      // show locally-created offline workouts
+      this._monthCache.set(key, mergeById(preloaded, dirtySnaps));
       this.isLoading.set(true);
     }
 
@@ -261,7 +300,7 @@ export class WorkoutService {
       const lastDay = new Date(year, month + 1, 0).getDate();
       const end     = `${key}-${String(lastDay).padStart(2, '0')}`;
 
-      const { data } = await this.supabase
+      const { data, error } = await this.supabase
         .from('workouts')
         .select('*')
         .eq('user_id', uid)
@@ -269,14 +308,21 @@ export class WorkoutService {
         .lte('date', end)
         .order('date', { ascending: false });
 
+      // Supabase no llança: un error torna `data: null`. Prendre-ho per «el mes
+      // és buit» buidava el mes a la pantalla i deixava un caché en blanc al
+      // disc. Un mes que no s'ha pogut llegir no es dona per carregat i es
+      // tornarà a demanar.
+      if (error) return;
+
       const fetched  = (data ?? []).map(r => toWorkout(r as Record<string, unknown>));
-      const inFlight = this._monthCache.get(key) ?? [];
+      const current  = this._monthCache.get(key) ?? [];
       const freshDirtyIds = new Set(this.syncService.pendingIds());
-      const dirtyLocal    = inFlight.filter(w => freshDirtyIds.has(w.id));
+      const dirtyLocal    = current.filter(w => freshDirtyIds.has(w.id));
       const fetchedClean  = fetched.filter(w => !freshDirtyIds.has(w.id));
-      const localOnly     = inFlight.filter(w => !fetched.find(f => f.id === w.id) && !freshDirtyIds.has(w.id));
+      const localOnly     = current.filter(w => !fetched.find(f => f.id === w.id) && !freshDirtyIds.has(w.id));
       const final         = [...fetchedClean, ...dirtyLocal, ...localOnly];
       this._monthCache.set(key, final);
+      this._loadedMonths.update(prev => new Set(prev).add(key));
       this._rebuildHistorical();
       this._writeMonthToStorage(uid, key, fetched); // persist clean server data
     } catch {
@@ -284,6 +330,20 @@ export class WorkoutService {
     } finally {
       this.isLoading.set(false);
     }
+  }
+
+  /**
+   * Si el mes ja s'ha llegit sencer. Reactiu: qui en depengui es recalcula sol
+   * quan el mes arriba. Ho fa servir el càlcul de la ratxa, que no pot dir una
+   * xifra mentre encara li falten setmanes per carregar.
+   */
+  isMonthLoaded(year: number, month: number): boolean {
+    return this._allLoaded || this._loadedMonths().has(this._monthKey(year, month));
+  }
+
+  /** Si el mes al qual pertany una data (`YYYY-MM-DD`) ja s'ha llegit sencer. */
+  isDateLoaded(date: string): boolean {
+    return this._allLoaded || this._loadedMonths().has(date.substring(0, 7));
   }
 
   // Loads only the workouts that contain a specific exercise, merging them
@@ -338,11 +398,13 @@ export class WorkoutService {
     if (this._allLoaded) return;
     this.isLoading.set(true);
     try {
-      const { data } = await this.supabase
+      const { data, error } = await this.supabase
         .from('workouts')
         .select('*')
         .eq('user_id', this._uid())
         .order('date', { ascending: false });
+
+      if (error) return;
 
       for (const row of data ?? []) {
         const w   = toWorkout(row as Record<string, unknown>);

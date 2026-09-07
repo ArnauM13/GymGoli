@@ -9,7 +9,7 @@ import { todayStr } from '../../utils/date.utils';
 import { CATEGORY_COLORS, ExerciseCategory } from '../../../core/models/exercise.model';
 import {
   MONTHS_CA, CalDay,
-  mondayOf, addDays, catDotBackground, sportDotBackground, workoutCategories, weekRangeLabel,
+  mondayOf, addDays, catDotBackground, workoutCategories, weekRangeLabel,
 } from '../../utils/calendar-utils';
 
 @Component({
@@ -95,12 +95,12 @@ import {
                           [style.--pc]="getPlanDotColor(cell.plannedCategories)"></span>
                   }
                   @for (icon of cell.sportIcons.slice(0, 2); track icon; let i = $index) {
-                    <span class="week-sport-icon material-symbols-outlined"
+                    <span class="sport-icon material-symbols-outlined"
                           [style.color]="cell.sportColors[i]">{{ icon }}</span>
                   }
                   @if (cell.hasPlannedSport) {
                     @for (icon of cell.plannedSportIcons.slice(0, 2 - cell.sportIcons.length); track icon; let i = $index) {
-                      <span class="week-sport-icon week-sport-icon--planned material-symbols-outlined"
+                      <span class="sport-icon sport-icon--planned material-symbols-outlined"
                             [style.color]="cell.plannedSportColors[i]">{{ icon }}</span>
                     }
                   }
@@ -142,13 +142,15 @@ import {
                       <span class="planned-dot"
                             [style.--pc]="getPlanDotColor(cell.plannedCategories)"></span>
                     }
-                    @if (cell.hasSport) {
-                      <span class="sport-dot"
-                            [style.background]="getSportDotBackground(cell.sportColors)"></span>
+                    @for (icon of cell.sportIcons.slice(0, 2); track icon; let i = $index) {
+                      <span class="sport-icon material-symbols-outlined"
+                            [style.color]="cell.sportColors[i]">{{ icon }}</span>
                     }
-                    @if (cell.hasPlannedSport && !cell.hasSport) {
-                      <span class="sport-dot sport-dot--planned"
-                            [style.--sc]="cell.plannedSportColors[0] || 'var(--c-brand)'"></span>
+                    @if (cell.hasPlannedSport) {
+                      @for (icon of cell.plannedSportIcons.slice(0, 2 - cell.sportIcons.length); track icon; let i = $index) {
+                        <span class="sport-icon sport-icon--planned material-symbols-outlined"
+                              [style.color]="cell.plannedSportColors[i]">{{ icon }}</span>
+                      }
                     }
                   </div>
                 }
@@ -323,33 +325,29 @@ import {
 
     .day-num { line-height: 1; }
 
-    /* ── Dots (shared) ── */
-    .week-sport-icon {
+    /* ── Dots + sport icons (shared by both views) ── */
+    .sport-icon {
       font-size: 11px; line-height: 1; flex-shrink: 0;
       font-variation-settings: 'FILL' 1, 'wght' 400;
     }
-    .is-selected .week-sport-icon { color: rgba(255,255,255,0.9) !important; }
+    /* Les caselles del mes són més estretes que les de la setmana: la icona
+       s'encongeix just el que cal perquè hi càpiguen dues al costat del punt
+       de l'entrenament sense desbordar. */
+    .cal-day .sport-icon { font-size: 10px; }
+    .is-selected .sport-icon { color: rgba(255,255,255,0.9) !important; }
     .dots-row {
       display: flex; align-items: center; justify-content: center; gap: 3px;
       min-height: 13px;
     }
     .workout-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-    .sport-dot   { width: 5px; height: 5px; border-radius: 2px; flex-shrink: 0; }
-    .sport-dot--planned {
-      background: transparent !important;
-      border: 1.5px dashed var(--sc, var(--c-brand));
-      opacity: 0.8;
-    }
-    .week-sport-icon--planned { opacity: 0.45; }
-    .is-selected .week-sport-icon--planned { opacity: 0.65; color: rgba(255,255,255,0.7) !important; }
-    .is-selected .sport-dot--planned { border-color: rgba(255,255,255,0.55) !important; }
+    .sport-icon--planned { opacity: 0.45; }
+    .is-selected .sport-icon--planned { opacity: 0.65; color: rgba(255,255,255,0.7) !important; }
     .planned-dot {
       width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
       background: color-mix(in srgb, var(--pc, var(--c-brand)) 65%, transparent);
       border: 1.5px dashed var(--pc, var(--c-brand));
     }
-    .is-selected .workout-dot,
-    .is-selected .sport-dot { background: rgba(255,255,255,0.85) !important; }
+    .is-selected .workout-dot { background: rgba(255,255,255,0.85) !important; }
     .is-selected .planned-dot {
       background: rgba(255,255,255,0.35) !important;
       border-color: rgba(255,255,255,0.75) !important;
@@ -632,8 +630,7 @@ export class CalendarComponent {
     return this.dayNames[(new Date(dateStr + 'T12:00:00').getDay() + 6) % 7];
   }
 
-  readonly getCatDotBackground  = catDotBackground;
-  readonly getSportDotBackground = sportDotBackground;
+  readonly getCatDotBackground = catDotBackground;
 
   getPlanDotColor(cats: string[]): string {
     const brand = getComputedStyle(document.documentElement).getPropertyValue('--c-brand').trim() || '#006874';

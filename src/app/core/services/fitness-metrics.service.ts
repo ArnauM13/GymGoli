@@ -251,6 +251,20 @@ export class FitnessMetricsService {
   /** Igual que `goalStreak` però només amb setmanes ja tancades. */
   private readonly _closedStreak = computed((): number => this._closedStreakWeeks().length);
 
+  /**
+   * Si tota la setmana té les dades a mà. Una setmana pot començar en un mes i
+   * acabar en un altre, i els mesos es carreguen per separat: mentre en falti
+   * un, la setmana es llegeix a mitges.
+   */
+  private _weekLoaded(week: WeekStat | undefined): boolean {
+    if (!week) return false;
+    for (const d of [week.monday, week.end]) {
+      if (!this.workoutService.isDateLoaded(d)) return false;
+      if (!this.sportService.isDateLoaded(d)) return false;
+    }
+    return true;
+  }
+
   private readonly _goalCfg = computed((): GoalCfg => {
     const s        = this.settingsService.settings();
     const mode     = s.goalMode === 'separate' ? 'separate' : 'combined';
@@ -319,10 +333,16 @@ export class FitnessMetricsService {
     // vista es converteix en una cosa que pots perdre; dita el dia que passa,
     // és el que és — una alegria.
     //
-    // `once` la lliga a la setmana que la fa créixer: es diu una vegada i no
-    // torna mai més per aquella setmana. La següent ja és una altra fita.
+    // `once` la lliga a la setmana que la fa créixer, que és una per setmana en
+    // curs: es diu el primer cop que s'obre l'app en una setmana nova i no
+    // torna fins que n'entri una altra.
     const streakWeeks = this._closedStreakWeeks();
-    if (closedStreak >= 2) {
+    // La felicitació és d'un sol tret per setmana: si surt amb la setmana
+    // passada a mitges (els mesos es carreguen d'un en un i la setmana
+    // passada pot ser a cavall de dos), es gasta dient una xifra falsa i ja
+    // no torna. Millor esperar-se: quan el mes arribi, això es recalcula sol
+    // i la felicitació surt sencera el primer cop que s'obri l'app.
+    if (closedStreak >= 2 && this._weekLoaded(streakWeeks[0])) {
       const lastWeek  = streakWeeks[0];
       const firstWeek = streakWeeks[streakWeeks.length - 1];
       const span      = dateRange(firstWeek.monday, lastWeek.end);

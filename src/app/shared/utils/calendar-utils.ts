@@ -59,10 +59,3 @@ export function catDotBackground(cats: string[]): string {
   const step   = 100 / colors.length;
   return `conic-gradient(${colors.map((c, i) => `${c} ${Math.round(i * step)}% ${Math.round((i + 1) * step)}%`).join(', ')})`;
 }
-
-export function sportDotBackground(colors: string[]): string {
-  if (!colors?.length) return '#FB8C00';
-  if (colors.length === 1) return colors[0];
-  const step = 100 / colors.length;
-  return `conic-gradient(${colors.map((c, i) => `${c} ${Math.round(i * step)}% ${Math.round((i + 1) * step)}%`).join(', ')})`;
-}

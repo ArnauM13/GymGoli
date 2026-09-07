@@ -84,6 +84,8 @@ describe('FitnessMetricsService', () => {
   let mockSports:   ReturnType<typeof signal<Sport[]>>;
   let mockSettings: ReturnType<typeof signal<UserSettings>>;
   let mockToday:    ReturnType<typeof signal<string>>;
+  /** Quins mesos (`YYYY-MM`) es donen per carregats. `null` = tots. */
+  let loadedMonths: ReturnType<typeof signal<string[] | null>>;
 
   const types = (): InsightType[] => service.insights().map(i => i.type);
   const find  = (t: InsightType) => service.insights().find(i => i.type === t);
@@ -94,12 +96,18 @@ describe('FitnessMetricsService', () => {
     mockSports   = signal<Sport[]>([]);
     mockSettings = signal<UserSettings>({ ...DEFAULT_USER_SETTINGS });
     mockToday    = signal(MOCK_DATE);
+    loadedMonths = signal<string[] | null>(null);
+
+    const isDateLoaded = (date: string): boolean => {
+      const months = loadedMonths();
+      return months === null || months.includes(date.substring(0, 7));
+    };
 
     TestBed.configureTestingModule({
       providers: [
         FitnessMetricsService,
-        { provide: WorkoutService,      useValue: { doneWorkouts: mockWorkouts } },
-        { provide: SportService,        useValue: { sessions: mockSessions, sports: mockSports } },
+        { provide: WorkoutService,      useValue: { doneWorkouts: mockWorkouts, isDateLoaded } },
+        { provide: SportService,        useValue: { sessions: mockSessions, sports: mockSports, isDateLoaded } },
         { provide: UserSettingsService, useValue: { settings: mockSettings, bodyweightKg: signal(null) } },
         { provide: TrainingTypeService, useValue: { types: signal(DEFAULT_TRAINING_TYPES) } },
         { provide: ExerciseService,     useValue: { loadTypeOf: () => undefined, bodyweightFactorOf: () => undefined } },
@@ -210,6 +218,19 @@ describe('FitnessMetricsService', () => {
       mockWorkouts.set(spread(1, 3, 2).map(dd => makeWorkout(dd)));
 
       expect(find('ratxa_assolida')!.once).toBe(`ratxa_assolida:${monday(1)}`);
+    });
+
+    it('waits for the closed week to be loaded before congratulating', () => {
+      // La felicitació és d'un sol tret: si surt amb la setmana passada a
+      // mitges es gasta amb una xifra falsa. Mentre falti el mes, calla.
+      withGoal(2);
+      mockWorkouts.set(spread(1, 3, 2).map(dd => makeWorkout(dd)));
+      loadedMonths.set([]);
+
+      expect(types()).not.toContain('ratxa_assolida');
+
+      loadedMonths.set(null);
+      expect(types()).toContain('ratxa_assolida');
     });
 
     it('wins over the streak-at-risk card when both are true', () => {

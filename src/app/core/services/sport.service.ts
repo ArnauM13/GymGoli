@@ -1,4 +1,4 @@
-import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
@@ -82,6 +82,16 @@ export class SportService {
 
   // ── Sessions cache ────────────────────────────────────────────────────────
   private readonly _monthCache = new Map<string, SportSession[]>();
+  /**
+   * Quins mesos s'han llegit **sencers** del servidor. Igual que a
+   * `WorkoutService`: registrar una sessió en un mes que encara no s'havia
+   * obert hi deixava una clau al caché i el mes ja no es demanava mai més,
+   * així que el calendari només ensenyava els dies que hi havien caigut per
+   * casualitat. Les dades i el «ja està carregat» van per separat.
+   */
+  private readonly _loadedMonths = signal<ReadonlySet<string>>(new Set());
+  /** Càrregues de mes en vol, per no fer dues consultes del mateix mes. */
+  private readonly _monthLoads = new Map<string, Promise<void>>();
   private readonly _sessions   = signal<SportSession[]>([]);
   private _allLoaded = false;
   private _isFlushing = false;
@@ -129,6 +139,8 @@ export class SportService {
       this._sports.set([]);
       this._sportsLoaded.set(false);
       this._monthCache.clear();
+      this._loadedMonths.set(new Set());
+      this._monthLoads.clear();
       this._sessions.set([]);
       this._allLoaded = false;
       this.isLoaded.set(false);
@@ -299,17 +311,34 @@ export class SportService {
 
   async ensureMonthLoaded(year: number, month: number): Promise<void> {
     const key = `${year}-${String(month + 1).padStart(2, '0')}`;
-    if (this._monthCache.has(key) || this._allLoaded) return;
+    // Untracked: `ensureMonthLoaded()` es crida des d'`effect()`s, i llegir
+    // el senyal aquí els faria dependre de cada mes que acaba d'arribar.
+    if (untracked(this._loadedMonths).has(key) || this._allLoaded) return;
 
+    const inFlight = this._monthLoads.get(key);
+    if (inFlight) return inFlight;
+
+    const p = this._loadMonth(year, month, key)
+      .finally(() => this._monthLoads.delete(key));
+    this._monthLoads.set(key, p);
+    return p;
+  }
+
+  private async _loadMonth(year: number, month: number, key: string): Promise<void> {
     const uid = this._uid();
+
+    // El que ja hi hagi al mes ve d'una alta feta abans d'obrir-lo: ha de
+    // sobreviure la càrrega sencera.
+    const preloaded = this._monthCache.get(key) ?? [];
 
     // ── Step 1: serve from localStorage immediately (no spinner if cached) ──
     const cached = this._readSessionsFromStorage(uid, key);
     if (cached) {
-      this._monthCache.set(key, cached);
+      const known = new Set(cached.map(s => s.id));
+      this._monthCache.set(key, [...cached, ...preloaded.filter(s => !known.has(s.id))]);
       this._rebuild();
     } else {
-      this._monthCache.set(key, []); // mark loading
+      this._monthCache.set(key, preloaded);
       this.isLoading.set(true);
     }
 
@@ -323,7 +352,7 @@ export class SportService {
       // viatja s'ha registrat ara mateix i encara no pot sortir a la resposta.
       const known = new Set((this._monthCache.get(key) ?? []).map(s => s.id));
 
-      const { data } = await this.supabase
+      const { data, error } = await this.supabase
         .from('sport_sessions')
         .select('*')
         .eq('user_id', uid)
@@ -331,14 +360,23 @@ export class SportService {
         .lte('date', end)
         .order('date', { ascending: false });
 
+      // Supabase no llança: un error torna `data: null`. Donar-ho per bo
+      // buidava el mes i en deixava un caché en blanc al disc. Un mes que no
+      // s'ha pogut llegir no es dona per carregat: es tornarà a demanar.
+      if (error) return;
+
       const fetched    = (data ?? []).map(r => toSportSession(r as Record<string, unknown>));
       const fetchedIds = new Set(fetched.map(s => s.id));
       // Registrar un esport d'un mes que s'estava carregant feia desaparèixer
       // la sessió de la pantalla: la resposta arribava després i s'ho enduia
       // tot. Ara les altes fetes mentrestant es conserven.
+      // El mateix val per a una sessió que encara espera a la cua d'escriptures:
+      // el servidor encara no la coneix, però és de l'usuari i ha de quedar-se.
+      const queued = new Set(this._readPending(uid).map(o => o.id));
       const justAdded = (this._monthCache.get(key) ?? [])
-        .filter(s => !known.has(s.id) && !fetchedIds.has(s.id));
+        .filter(s => !fetchedIds.has(s.id) && (!known.has(s.id) || queued.has(s.id)));
       this._monthCache.set(key, [...fetched, ...justAdded]);
+      this._loadedMonths.update(prev => new Set(prev).add(key));
       this._rebuild();
       this._writeSessionsToStorage(uid, key, this._monthCache.get(key)!);
     } catch {
@@ -346,6 +384,12 @@ export class SportService {
     } finally {
       this.isLoading.set(false);
     }
+  }
+
+  /** Si el mes al qual pertany una data (`YYYY-MM-DD`) ja s'ha llegit sencer.
+   *  Reactiu: qui en depengui es recalcula sol quan el mes arriba. */
+  isDateLoaded(date: string): boolean {
+    return this._allLoaded || this._loadedMonths().has(date.substring(0, 7));
   }
 
   /** Loads the user's entire sport-session history into the cache in a single
@@ -358,11 +402,13 @@ export class SportService {
     if (!uid) return;
     this.isLoading.set(true);
     try {
-      const { data } = await this.supabase
+      const { data, error } = await this.supabase
         .from('sport_sessions')
         .select('*')
         .eq('user_id', uid)
         .order('date', { ascending: false });
+
+      if (error) return;
 
       for (const row of data ?? []) {
         const s   = toSportSession(row as Record<string, unknown>);

@@ -5,7 +5,7 @@ import { WorkoutService } from '../../../core/services/workout.service';
 import { SportService } from '../../../core/services/sport.service';
 import {
   MONTHS_CA, CalDay,
-  mondayOf, addDays, catDotBackground, sportDotBackground,
+  mondayOf, addDays, catDotBackground,
 } from '../../utils/calendar-utils';
 import { todayStr } from '../../utils/date.utils';
 
@@ -92,9 +92,9 @@ import { todayStr } from '../../utils/date.utils';
                         <span class="idp-dot idp-dot--workout"
                               [style.background]="catDotBg(cell.workoutCategories)"></span>
                       }
-                      @if (cell.hasSport) {
-                        <span class="idp-dot idp-dot--sport"
-                              [style.background]="sportDotBg(cell.sportColors)"></span>
+                      @for (icon of cell.sportIcons.slice(0, 1); track icon; let i = $index) {
+                        <span class="idp-sport-icon material-symbols-outlined"
+                              [style.color]="cell.sportColors[i]">{{ icon }}</span>
                       }
                     </div>
                   }
@@ -262,7 +262,6 @@ import { todayStr } from '../../utils/date.utils';
     .idp-dot {
       flex-shrink: 0;
       &--workout { width: 5px; height: 5px; border-radius: 50%; }
-      &--sport   { width: 4px; height: 4px; border-radius: 1.5px; }
     }
     .idp-pip { width: 6px; height: 6px; border-radius: 2px; flex-shrink: 0; }
     .idp-sport-icon {
@@ -551,7 +550,6 @@ export class InlineDatePickerComponent {
   // ── Dot helpers (delegate to shared utils) ────────────────────────────────
 
   readonly catDotBg   = catDotBackground;
-  readonly sportDotBg = sportDotBackground;
 
   catColor(cat: string): string {
     return CATEGORY_COLORS[cat as ExerciseCategory] ?? '#006874';
