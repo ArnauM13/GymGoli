@@ -77,6 +77,21 @@ export function toWorkout(row: Record<string, unknown>): Workout {
   };
 }
 
+/** Les columnes d'una sessió sense les sèries: prou per pintar-ne la targeta i
+ *  per a tot el que mira enrere (quant fa que no toques empenta, quantes
+ *  setmanes seguides), sense baixar el gruix de l'historial. */
+export const WORKOUT_SUMMARY_COLUMNS =
+  'id,date,category,categories,notes,feeling,status,planned_source,source_proposal_id,created_at,updated_at,exercise_names';
+
+/** Fila de Supabase demanada en mode targeta → entrenament sense sèries. */
+export function toWorkoutSummary(row: Record<string, unknown>): Workout {
+  return {
+    ...toWorkout({ ...row, entries: [] }),
+    entriesLoaded: false,
+    exerciseNames: (row['exercise_names'] as string | null | undefined) ?? undefined,
+  };
+}
+
 /** Entrenament → fila de Supabase. */
 export function toRow(w: Workout, uid: string): Record<string, unknown> {
   const row: Record<string, unknown> = {
@@ -206,6 +221,12 @@ export class WorkoutStoreService {
    *  és a dalt, i per tant només aquests es poden alliberar. */
   private readonly _reconciled = new Set<string>();
 
+  /** Profunditat de `batch()`. Mentre sigui > 0, les escriptures al dispositiu
+   *  i els avisos als senyals s'ajornen fins al final. */
+  private _batchDepth = 0;
+  private readonly _pendingMonths = new Set<string>();
+  private _pendingBump = false;
+
   constructor() {
     // Sense això el navegador pot alliberar l'espai d'aquest lloc quan el
     // dispositiu va just, i s'endú l'entrenament que encara no ha pujat. Els
@@ -267,6 +288,37 @@ export class WorkoutStoreService {
   /** El servidor ha contestat sencer per aquest mes i el que hi ha aquí ja
    *  quadra amb el que hi ha allà. */
   markReconciled(monthKey: string): void { this._reconciled.add(monthKey); }
+
+  /**
+   * Agrupa moltes escriptures en una de sola.
+   *
+   * Cada entrenament que s'incorpora tocava el disc i avisava els senyals pel
+   * seu compte, i una resposta de dos-cents entrenaments volien dir dos-cents
+   * `JSON.stringify` del mes sencer, dos-cents `localStorage.setItem` —que són
+   * síncrons i bloquegen la pàgina— i dos-centes recomposicions de tota la
+   * interfície. D'aquí venien les pampallugues mentre carregava: la pantalla es
+   * repintava una vegada per fila que arribava.
+   *
+   * Aquí dins l'escriptura és una per mes tocat i l'avís, un de sol al final.
+   * Fora d'aquí res no canvia: registrar una sèrie continua guardant-se a
+   * l'instant, que és la regla que aguanta tot el sistema.
+   */
+  batch<T>(fn: () => T): T {
+    this._batchDepth++;
+    try {
+      return fn();
+    } finally {
+      this._batchDepth--;
+      if (this._batchDepth === 0) this._flushBatch();
+    }
+  }
+
+  private _flushBatch(): void {
+    const months = [...this._pendingMonths];
+    this._pendingMonths.clear();
+    for (const month of months) this._persistMonth(month);
+    if (this._pendingBump) { this._pendingBump = false; this._bump(); }
+  }
 
   // ── Lectura ───────────────────────────────────────────────────────────────
 
@@ -419,6 +471,11 @@ export class WorkoutStoreService {
    * versió que estem a punt d'enviar-li, i acceptar-la voldria dir perdre-la.
    */
   applyServerRow(w: Workout): void {
+    // Una sessió demanada en mode targeta no té sèries, i tot el que entra
+    // aquí és candidat a pujar-se: deixar-la passar voldria dir pujar-la
+    // buida i esborrar del servidor l'entrenament de debò. Les targetes
+    // d'aquestes sessions es pinten fora del magatzem.
+    if (w.entriesLoaded === false) return;
     if (this._tombstones.has(w.id)) return; // esborrada aquí, encara no allà
     const rec = this._byId.get(w.id);
     if (rec && rec.rev > rec.syncedRev) {
@@ -460,21 +517,30 @@ export class WorkoutStoreService {
    * viatjava també — `since` és el `mark()` pres just abans de llançar-la.
    */
   mergeServerScope(rows: Workout[], scope: (w: Workout) => boolean, since: number): void {
-    const fetched = new Map(rows.filter(w => !this._tombstones.has(w.id)).map(w => [w.id, w]));
+    this.batch(() => {
+      const fetched = new Map(rows.filter(w => !this._tombstones.has(w.id)).map(w => [w.id, w]));
 
-    for (const rec of [...this._byId.values()]) {
-      const w = rec.workout;
-      if (!scope(w)) continue;
-      if (fetched.has(w.id)) continue;
-      if (rec.rev > rec.syncedRev) continue;  // espera torn per pujar
-      if (rec.syncedTick > since) continue;   // confirmada mentre preguntàvem
-      this._byId.delete(w.id);
-      this._persist(w.date);
-      this.syncLog.log('pull-remove', { id: w.id, note: 'ja no hi és al servidor' });
-    }
+      for (const rec of [...this._byId.values()]) {
+        const w = rec.workout;
+        if (!scope(w)) continue;
+        if (fetched.has(w.id)) continue;
+        if (rec.rev > rec.syncedRev) continue;  // espera torn per pujar
+        if (rec.syncedTick > since) continue;   // confirmada mentre preguntàvem
+        this._byId.delete(w.id);
+        this._persist(w.date);
+        this.syncLog.log('pull-remove', { id: w.id, note: 'ja no hi és al servidor' });
+      }
 
-    for (const w of fetched.values()) this.applyServerRow(w);
-    this._bump();
+      for (const w of fetched.values()) this.applyServerRow(w);
+      this._bump();
+    });
+  }
+
+  /** Un grapat de files soltes del servidor, en una sola escriptura i un sol
+   *  avís. És el camí del pull incremental, que pot portar-ne moltes de cop. */
+  applyServerRows(rows: Workout[]): void {
+    if (!rows.length) return;
+    this.batch(() => { for (const w of rows) this.applyServerRow(w); });
   }
 
   // ── Espai ─────────────────────────────────────────────────────────────────
@@ -510,7 +576,10 @@ export class WorkoutStoreService {
 
   // ── Privat ────────────────────────────────────────────────────────────────
 
-  private _bump(): void { this._version.update(n => n + 1); }
+  private _bump(): void {
+    if (this._batchDepth > 0) { this._pendingBump = true; return; }
+    this._version.update(n => n + 1);
+  }
 
   private _retainedMonths(): Set<string> {
     const out = new Date();
@@ -542,9 +611,14 @@ export class WorkoutStoreService {
    * la resta ja és a la base de dades i no cal duplicar-la aquí.
    */
   private _persist(date: string): void {
+    const month = date.substring(0, 7);
+    if (this._batchDepth > 0) { this._pendingMonths.add(month); return; }
+    this._persistMonth(month);
+  }
+
+  private _persistMonth(month: string): void {
     const uid = this.uid;
     if (!uid) return;
-    const month   = date.substring(0, 7);
     const records = [...this._byId.values()].filter(r => r.workout.date.startsWith(month));
     const key     = this._monthKey(uid, month);
 

@@ -60,6 +60,14 @@ export const routes: Routes = [
       import('./features/exercises/exercises.component').then(m => m.ExercisesComponent),
   },
   {
+    // Una sessió d'esport té pàgina pròpia, com un entrenament: s'hi arriba
+    // des del feed i s'hi llegeix i s'hi edita, sense cap full que tapi res.
+    path: 'sport/:id',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/sport-session/sport-session.component').then(m => m.SportSessionComponent),
+  },
+  {
     path: 'sports-config',
     canActivate: [authGuard],
     loadComponent: () =>

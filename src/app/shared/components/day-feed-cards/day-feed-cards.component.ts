@@ -4,7 +4,7 @@ import { ActivityIconComponent } from '../activity-icon/activity-icon.component'
 import { SportDetailComponent } from '../sport-detail/sport-detail.component';
 import { WorkoutDetailComponent } from '../workout-detail/workout-detail.component';
 import { Sport, SportSession } from '../../../core/models/sport.model';
-import { FeelingLevel, Workout } from '../../../core/models/workout.model';
+import { FeelingLevel, Workout, hasFullEntries } from '../../../core/models/workout.model';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { SportService } from '../../../core/services/sport.service';
 import { TodayService } from '../../../core/services/today.service';
@@ -56,6 +56,17 @@ export interface DayFeedEntry {
                 @if (w.notes?.trim(); as note) { <span class="ac-detail">{{ note }}</span> }
               </div>
               @if (!isPlanned(w)) {
+                @if (!hasFullEntries(w)) {
+                  <!-- De l'historial vell només se n'ha baixat el resum: les
+                       xifres surten en obrir la sessió, i posar-hi zeros
+                       mentrestant seria mentir. -->
+                  <div class="ac-stats">
+                    <span class="ac-stat ac-stat--pending">
+                      <span class="material-symbols-outlined" aria-hidden="true">unfold_more</span>
+                      Obre per veure les sèries
+                    </span>
+                  </div>
+                } @else {
                 <div class="ac-stats">
                   <span class="ac-stat">
                     <span class="material-symbols-outlined" aria-hidden="true">fitness_center</span>
@@ -81,6 +92,7 @@ export interface DayFeedEntry {
                     </span>
                   }
                 </div>
+                }
               }
             </div>
             <span class="ac-feeling">
@@ -275,6 +287,7 @@ export interface DayFeedEntry {
       .material-symbols-outlined { font-size: 11px; color: #ff9800; font-variation-settings: 'FILL' 1, 'wght' 400; }
     }
     .ac-stat-sep { flex-shrink: 0; color: var(--c-border); }
+    .ac-stat--pending { font-style: italic; color: var(--c-text-3); opacity: 0.85; }
     .ac-stat--vol strong { color: var(--ac, var(--c-brand)); }
     .ac-chevron {
       flex-shrink: 0; margin-right: 4px; font-size: 20px; color: var(--c-text-3);
@@ -342,6 +355,8 @@ export class DayFeedCardsComponent {
   readonly expandedWorkoutId = signal<string | null>(null);
 
   readonly isPlanned          = isWorkoutPlanned;
+  /** Fals quan de la sessió només en tenim el resum de la targeta. */
+  readonly hasFullEntries      = hasFullEntries;
   readonly workoutPrimaryColor = workoutPrimaryColor;
   readonly workoutPrimaryIcon  = workoutPrimaryIcon;
 

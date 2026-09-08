@@ -124,4 +124,32 @@ export interface Workout {
   /** 'done' (default) or 'planned' (future/scheduled) */
   status?: WorkoutStatus;
   plannedSource?: PlannedSource;
+  /**
+   * Fals quan la sessió s'ha demanat en mode targeta: hi ha el dia, el tipus,
+   * la sensació i la nota, però `entries` encara és buit perquè les sèries no
+   * s'han baixat. Es demanen en obrir-la (`ensureWorkoutEntries`).
+   *
+   * Absent vol dir sencera — és el cas de tot el que escriu l'usuari i de tot
+   * el que arriba d'una consulta normal.
+   */
+  entriesLoaded?: boolean;
+  /** Els noms dels exercicis separats per espais, tal com els manté el
+   *  servidor. És el que permet buscar dins una sessió que encara no s'ha
+   *  baixat sencera. */
+  exerciseNames?: string;
+}
+
+/** Cert si la sessió porta les sèries; fals si només se n'ha demanat el
+ *  resum per pintar-ne la targeta. */
+export function hasFullEntries(w: Workout): boolean {
+  return w.entriesLoaded !== false;
+}
+
+/** Els noms dels exercicis d'una sessió, separats per espais. Els llegeix de
+ *  les entrades quan hi són i, si la sessió només s'ha demanat en mode
+ *  targeta, de la còpia que en manté el servidor: així buscar per exercici
+ *  troba també el que encara no s'ha baixat sencer. */
+export function workoutExerciseNames(w: Workout): string {
+  if (hasFullEntries(w)) return w.entries.map(e => e.exerciseName).join(' ');
+  return w.exerciseNames ?? '';
 }

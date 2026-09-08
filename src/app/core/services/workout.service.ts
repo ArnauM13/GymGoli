@@ -8,8 +8,10 @@ import { TodayService } from './today.service';
 import { OfflineService } from './offline.service';
 import { SyncService } from './sync.service';
 import { SUPABASE_PAGE_SIZE, fetchAllRows } from './supabase-page.util';
-import { WORKOUT_COLUMNS, WorkoutStoreService, toWorkout } from './workout-store.service';
-import { FeelingLevel, PlannedSource, Workout, WorkoutEntry, WorkoutSet, setMaxWeight } from '../models/workout.model';
+import {
+  WORKOUT_COLUMNS, WORKOUT_SUMMARY_COLUMNS, WorkoutStoreService, toWorkout, toWorkoutSummary,
+} from './workout-store.service';
+import { FeelingLevel, PlannedSource, Workout, WorkoutEntry, WorkoutSet, setMaxWeight, workoutExerciseNames } from '../models/workout.model';
 
 /** The filters the Historial list can have active at once. */
 export interface HistoryFilters {
@@ -31,8 +33,7 @@ export function matchesHistoryFilters(w: Workout, f: HistoryFilters): boolean {
     if (!cats.includes(f.category)) return false;
   }
   if (f.search) {
-    const names = w.entries.map(e => e.exerciseName).join(' ').toLowerCase();
-    if (!names.includes(f.search.toLowerCase())) return false;
+    if (!workoutExerciseNames(w).toLowerCase().includes(f.search.toLowerCase())) return false;
   }
   return true;
 }
@@ -86,6 +87,11 @@ export class WorkoutService {
    *  quedava condemnat a la comprovació sencera a cada refresc. */
   private _pulledOnce = false;
   private _lastFullPullAt = 0;
+  /** Consultes senceres en marxa. Sense això, qualsevol canvi als senyals
+   *  mentre una viatjava en disparava una altra, i l'arrencada acabava
+   *  baixant l'historial sencer tres o quatre vegades alhora. */
+  private _fullLoad: Promise<void> | null = null;
+  private _pullLoad: Promise<void> | null = null;
 
   /** Marge mínim entre refrescos automàtics: tornar a l'app dispara alhora
    *  `focus` i `visibilitychange`, i no cal demanar-ho tot dos cops. */
@@ -98,18 +104,51 @@ export class WorkoutService {
   private readonly _exLoadedIds      = new Set<string>();
   private readonly _exLoadPromises   = new Map<string, Promise<void>>();
 
+  /**
+   * L'historial demanat en mode targeta: el dia, el tipus, la sensació i els
+   * noms dels exercicis, sense cap sèrie.
+   *
+   * Viu aquí i no al magatzem a posta. El magatzem és la còpia bona del
+   * dispositiu i tot el que hi entra és candidat a pujar-se al servidor: una
+   * sessió sense sèries que hi entrés podria acabar sobreescrivint-ne una de
+   * plena. Aquí no pot fer cap mal —no es guarda al dispositiu, no es puja, no
+   * es pot editar— i, quan es demana sencera, la versió del magatzem la tapa.
+   */
+  private readonly _summaries = signal<Map<string, Workout>>(new Map());
+  private _summariesLoaded = false;
+  private _summaryLoad: Promise<void> | null = null;
+  /** Sessions que ara mateix s'estan baixant senceres, per id. */
+  private readonly _entryLoads = new Map<string, Promise<void>>();
+
   readonly isLoading = signal(false);
 
   // ── Public signals ───────────────────────────────────────────────────────
 
-  /** Tot el que hi ha al dispositiu, ja ordenat del més recent al més antic. */
-  private readonly _historical = this.store.workouts;
+  /**
+   * Tot el que se sap dels entrenaments, del més recent al més antic: el que
+   * hi ha al dispositiu i, per sota, els resums de l'historial que encara no
+   * s'ha demanat sencer. El magatzem sempre mana — un resum només surt si
+   * d'aquella sessió no en tenim res de millor.
+   */
+  readonly workouts = computed((): Workout[] => {
+    const stored  = this.store.workouts();
+    const summary = this._summaries();
+    if (!summary.size) return stored;
+
+    const known = new Set(stored.map(w => w.id));
+    const extra = [...summary.values()]
+      .filter(w => !known.has(w.id) && !this.store.isDeleted(w.id));
+    if (!extra.length) return stored;
+
+    return [...stored, ...extra].sort((a, b) => b.date.localeCompare(a.date));
+  });
+
+  /** El mateix que `workouts()`, amb el nom que fa servir el codi de sempre. */
+  private readonly _historical = this.workouts;
 
   readonly todayWorkout = computed((): Workout | null =>
     this._historical().find(w => w.date === this._todayStr) ?? null
   );
-
-  readonly workouts = this.store.workouts;
 
   readonly pastWorkouts = computed(() =>
     this.workouts().filter(w => w.date !== this._todayStr)
@@ -207,6 +246,14 @@ export class WorkoutService {
       this._allLoaded = false;
       this._exLoadedIds.clear();
       this._exLoadPromises.clear();
+      // Cap consulta de l'usuari anterior no pot fer de resposta per a qui
+      // demani les dades ara.
+      this._fullLoad = null;
+      this._pullLoad = null;
+      this._summaryLoad = null;
+      this._summariesLoaded = false;
+      this._entryLoads.clear();
+      this._summaries.set(new Map());
 
       if (uid) {
         // Primer el dispositiu: l'app queda utilitzable (entrenar, veure els
@@ -309,9 +356,16 @@ export class WorkoutService {
    * aplicar una fila que ja teníem no costa res — `applyServerRow()` és
    * idempotent i no toca el que espera pujar.
    */
-  private async _pullChanges(): Promise<void> {
+  private _pullChanges(): Promise<void> {
+    if (this._pullLoad) return this._pullLoad;
+    const p = this._fetchChanges().finally(() => { this._pullLoad = null; });
+    this._pullLoad = p;
+    return p;
+  }
+
+  private async _fetchChanges(): Promise<void> {
     const uid = this.auth.uid();
-    if (!uid) return;
+    if (!uid || this.offline.isOffline()) return;
 
     let cursor = this._lastPulledAt;
     try {
@@ -333,7 +387,7 @@ export class WorkoutService {
         if (error) return;
 
         const rows = (data ?? []) as Record<string, unknown>[];
-        for (const r of rows) this.store.applyServerRow(toWorkout(r));
+        this.store.applyServerRows(rows.map(r => toWorkout(r)));
 
         const newest = rows.reduce<string | null>((max, r) => {
           const at = r['updated_at'] as string | undefined;
@@ -414,6 +468,7 @@ export class WorkoutService {
 
     const fresh = (data ?? []).map(r => toWorkout(r as Record<string, unknown>));
     this.store.mergeServerScope(fresh, w => w.date === today, since);
+    this._dropSummaries(w => w.date === today);
   }
 
   // ── Load API ─────────────────────────────────────────────────────────────
@@ -476,6 +531,7 @@ export class WorkoutService {
 
       const fetched = (data ?? []).map(r => toWorkout(r as Record<string, unknown>));
       this.store.mergeServerScope(fetched, w => w.date.startsWith(key), since);
+      this._dropSummaries(w => w.date.startsWith(key));
       this.store.markReconciled(key);
       this._fullMonths.add(key);
     } catch {
@@ -538,11 +594,133 @@ export class WorkoutService {
       // Files soltes, no un mes sencer: només s'incorporen, no es dedueix
       // res del que hi falta. La versió del servidor mana llevat que la
       // d'aquí encara esperi pujar.
-      for (const w of fetched) this.store.applyServerRow(w);
+      this.store.applyServerRows(fetched);
       this._exLoadedIds.add(exerciseId);
     } catch {
       this._exLoadedIds.add(exerciseId); // prevent retry storm; will refresh on next app session
     }
+  }
+
+  /**
+   * L'historial en dos temps: la finestra recent sencera i, de la resta, només
+   * el resum de cada sessió.
+   *
+   * És el que passa a l'arrencada. Abans es demanava `select('*')` de tota la
+   * vida de l'usuari —centenars de sessions amb totes les sèries— per acabar
+   * fent servir la data i el tipus: d'aquí venia bona part de l'estona que
+   * l'app trigava a estar a to.
+   *
+   * Els mesos recents sí que arriben sencers, perquè és on miren les xifres
+   * que compten sèries i volum. Les sèries de l'historial vell es demanen quan
+   * de veritat es miren: el mes que s'obre al calendari (`ensureMonthLoaded`),
+   * l'exercici que es desplega (`loadWorkoutsForExercise`) o la sessió que
+   * s'obre (`ensureWorkoutEntries`).
+   */
+  loadHistorySummaries(): Promise<void> {
+    if (this._summariesLoaded || this._allLoaded) return Promise.resolve();
+    if (this._summaryLoad) return this._summaryLoad;
+    const p = this._fetchHistorySummaries().finally(() => { this._summaryLoad = null; });
+    this._summaryLoad = p;
+    return p;
+  }
+
+  private async _fetchHistorySummaries(): Promise<void> {
+    const uid = this.auth.uid();
+    if (!uid || this.offline.isOffline()) return;
+
+    // La finestra recent va sencera i no passa per aquí: és on miren les
+    // targetes d'Inici i del calendari i les xifres que compten sèries i
+    // volum, i una targeta que primer surt sense xifres i després amb elles és
+    // justament la pampallugueig que s'està traient del mig.
+    const recentFrom = this._retentionStart();
+
+    try {
+      // Per trams, i amb un ordre total. És la consulta de l'arrencada i
+      // cobreix tota la vida de l'usuari: demanada d'una tacada, PostgREST la
+      // tallaria al seu topall de files i l'historial vell quedaria escapçat
+      // sense que res ho digués. I amb l'ordre només per data, dues sessions
+      // del mateix dia poden caure entre dos trams i no sortir a cap.
+      const [, res] = await Promise.all([
+        // `_pullChanges()` porta la finestra recent sencera el primer cop, i
+        // després ja només el que ha canviat.
+        this._pullChanges(),
+        fetchAllRows<Record<string, unknown>>(() =>
+          this.supabase
+            .from('workouts')
+            .select(WORKOUT_SUMMARY_COLUMNS)
+            .eq('user_id', uid)
+            .lt('date', recentFrom)
+            .order('date',       { ascending: false })
+            .order('created_at', { ascending: false })
+            .order('id',         { ascending: false })
+        ),
+      ]);
+
+      if (res.error) return; // es manté el que ja teníem
+
+      const map = new Map<string, Workout>();
+      for (const r of res.rows) {
+        const w = toWorkoutSummary(r);
+        // El que ja tenim sencer no es degrada mai a resum.
+        if (!this.store.has(w.id)) map.set(w.id, w);
+      }
+      this._summaries.set(map);
+      // Només es dóna per fet si s'ha arribat al final: amb un tram a mitges,
+      // el que hi ha ja es pot ensenyar, però queda per tornar-ho a provar.
+      this._summariesLoaded = res.complete;
+    } catch {
+      // Sense xarxa: es manté el que hi ha al dispositiu, que és el que val.
+    }
+  }
+
+  /**
+   * Baixa les sèries d'una sessió que només tenim en mode targeta.
+   *
+   * És el segon temps del carregat: la targeta es pinta amb el resum i, en
+   * obrir-la, es demana la sessió sencera. A partir d'aquí entra al magatzem
+   * com qualsevol altra i ja es pot editar.
+   */
+  async ensureWorkoutEntries(id: string): Promise<void> {
+    if (this.store.has(id) || this.store.isDeleted(id)) return;
+    const inFlight = this._entryLoads.get(id);
+    if (inFlight) return inFlight;
+    const p = this._fetchWorkoutEntries(id).finally(() => this._entryLoads.delete(id));
+    this._entryLoads.set(id, p);
+    return p;
+  }
+
+  private async _fetchWorkoutEntries(id: string): Promise<void> {
+    const uid = this.auth.uid();
+    if (!uid || this.offline.isOffline()) return;
+    try {
+      const { data, error } = await this.supabase
+        .from('workouts')
+        .select(WORKOUT_COLUMNS)
+        .eq('user_id', uid)
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error || !data) return;
+      this.store.applyServerRow(toWorkout(data as Record<string, unknown>));
+      this._dropSummaries(w => w.id === id);
+    } catch {
+      // Sense xarxa: la targeta es queda amb el resum, que ja diu què va ser.
+    }
+  }
+
+  /**
+   * Treu resums de la llista quan el magatzem ja mana sobre el seu abast.
+   *
+   * Un resum vell d'un mes que acaba d'arribar sencer ressuscitaria una sessió
+   * esborrada des d'un altre dispositiu: la resposta sencera l'hauria tret del
+   * magatzem i el resum la tornaria a ensenyar.
+   */
+  private _dropSummaries(inScope: (w: Workout) => boolean): void {
+    const map = this._summaries();
+    if (!map.size) return;
+    const next = new Map(map);
+    for (const w of map.values()) if (inScope(w)) next.delete(w.id);
+    if (next.size !== map.size) this._summaries.set(next);
   }
 
   async loadAllWorkouts(): Promise<void> {
@@ -552,7 +730,14 @@ export class WorkoutService {
 
   /** `silent` per als refrescos de fons: no encén l'indicador de càrrega, que
    *  tornar a l'app no ha de fer parpellejar tota la pantalla. */
-  private async _fetchAll(silent: boolean): Promise<void> {
+  private _fetchAll(silent: boolean): Promise<void> {
+    if (this._fullLoad) return this._fullLoad;
+    const p = this._runFetchAll(silent).finally(() => { this._fullLoad = null; });
+    this._fullLoad = p;
+    return p;
+  }
+
+  private async _runFetchAll(silent: boolean): Promise<void> {
     const uid = this.auth.uid();
     if (!uid || this.offline.isOffline()) return;
     if (!silent) this.isLoading.set(true);
@@ -579,6 +764,9 @@ export class WorkoutService {
 
       const fetched = rows.map(r => toWorkout(r));
       this.store.mergeServerScope(fetched, () => true, since);
+      // Ja no hi ha res que el magatzem no sàpiga: cap resum no hi pinta res.
+      this._summaries.set(new Map());
+      this._summariesLoaded = true;
       for (const w of fetched) this._monthsSeen.add(w.date.substring(0, 7));
       for (const key of this._monthsSeen) { this._fullMonths.add(key); this.store.markReconciled(key); }
       this._allLoaded = true;
@@ -963,7 +1151,16 @@ export class WorkoutService {
    *  arribat a veure, l'esborrat hi va per la mateixa cua que la resta: sense
    *  cobertura no falla, s'envia quan torni. */
   async deleteWorkout(id: string): Promise<void> {
+    // D'una sessió que només tenim en mode targeta el magatzem no en sap res,
+    // i treure-la d'allà no faria res. Es demana sencera primer, i així
+    // l'esborrat viatja per la mateixa cua que la resta.
+    if (!this.store.has(id)) await this.ensureWorkoutEntries(id);
+    // Si no s'ha pogut baixar (sense connexió), no hi ha res a esborrar: fer-la
+    // desaparèixer de la pantalla sense treure-la d'enlloc seria pitjor, que
+    // tornaria a sortir sola a la propera càrrega.
+    if (!this.store.has(id)) return;
     this.store.remove(id);
+    this._dropSummaries(w => w.id === id);
     this.syncService.notifyPending();
   }
 

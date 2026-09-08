@@ -105,6 +105,9 @@ export class SportService {
   private readonly _allLoaded = signal(false);
   /** Cert quan `loadAllSessions()` ja ha portat l'historial sencer. */
   readonly allSessionsLoaded = this._allLoaded.asReadonly();
+  /** La consulta de tot l'historial que hi ha en marxa, si n'hi ha cap. Qui la
+   *  demani mentre viatja s'hi enganxa en comptes de llançar-ne una altra. */
+  private _allLoad: Promise<void> | null = null;
   private _lastRefreshAt = 0;
 
   /** Marge mínim entre refrescos automàtics (tornar a l'app dispara alhora
@@ -163,6 +166,9 @@ export class SportService {
       this._allLoaded.set(false);
       this.isLoaded.set(false);
       this._loadPromise = null;
+      // Una consulta de l'usuari anterior no pot quedar-se com la que espera
+      // qui demani l'historial ara.
+      this._allLoad = null;
       if (uid) {
         const cached = this._readSportsFromStorage(uid);
         if (cached) {
@@ -208,9 +214,11 @@ export class SportService {
     // `getSportsForDate()` descarta la sessió si no en troba la definició.
     const sports = this._loadSports(uid);
 
+    // Es torna a demanar sencer sense tombar `allSessionsLoaded`: qui en depèn
+    // (els rècords del detall d'una sessió) tornaria a pintar-se a mitges cada
+    // cop que l'app recupera el focus, i això és part de les pampallugues.
     if (this._allLoaded()) {
-      this._allLoaded.set(false);
-      await Promise.all([sports, this.loadAllSessions()]);
+      await Promise.all([sports, this._fetchAllSessions()]);
       return;
     }
 
@@ -469,8 +477,21 @@ export class SportService {
    *  query. Needed by features that reason over all-time recency (e.g. the
    *  workout suggestion), which the lazy per-month loading can't guarantee.
    *  Cached after the first successful run. */
-  async loadAllSessions(): Promise<void> {
-    if (this._allLoaded()) return;
+  loadAllSessions(): Promise<void> {
+    if (this._allLoaded()) return Promise.resolve();
+    return this._fetchAllSessions();
+  }
+
+  /** La consulta de debò, amb guarda de petició en marxa: qui la demani
+   *  mentre una viatja espera aquella en comptes de llançar-ne una altra. */
+  private _fetchAllSessions(): Promise<void> {
+    if (this._allLoad) return this._allLoad;
+    const p = this._runFetchAllSessions().finally(() => { this._allLoad = null; });
+    this._allLoad = p;
+    return p;
+  }
+
+  private async _runFetchAllSessions(): Promise<void> {
     const uid = this.auth.uid();
     if (!uid) return;
     this.isLoading.set(true);
@@ -564,6 +585,14 @@ export class SportService {
     return (this._sessionsByDate().get(date) ?? []).find(s => s.sportId === sportId);
   }
 
+  /** Una sessió pel seu id, sigui feta o planificada — la pàgina d'una sessió
+   *  hi arriba per l'URL i no sap de quin dia és fins que la troba. Només la
+   *  veurà si el seu mes és carregat: qui hi entra de nou fa
+   *  `loadAllSessions()` abans de donar-la per perduda. */
+  getSessionById(id: string): SportSession | undefined {
+    return this._sessions().find(s => s.id === id);
+  }
+
   hasSportOnDate(date: string, sportId: string): boolean {
     return (this._sessionsByDate().get(date) ?? []).some(s =>
       s.sportId === sportId && (s.status ?? 'done') !== 'planned');
@@ -575,18 +604,21 @@ export class SportService {
 
   // ── Session log / toggle ────────────────────────────────────────────────
 
-  /** Full session create with all metrics. Used by the session logger UI and
+  /** Full session create with all metrics. Used when registering a sport and
    *  by weekly routine planning — writes locally first so it works offline,
    *  then syncs to Supabase in the background (queued for retry if offline).
    *  `plannedSource` only matters for status: 'planned' — 'routine' or
    *  'manual', matching WorkoutService.createPlannedWorkout, so a routine
-   *  and an ad-hoc plan can be retracted independently of each other. */
+   *  and an ad-hoc plan can be retracted independently of each other.
+   *
+   *  Retorna l'id de la sessió, com `createWorkoutForDate`: qui la registra hi
+   *  vol anar tot seguit, i l'id el posa el client. */
   async logSession(
     date: string, sportId: string,
     data: { subtypeId?: string; duration?: number; feeling?: FeelingLevel; metrics?: Record<string, string | number>; notes?: string },
     status: SportSessionStatus = 'done',
     plannedSource?: PlannedSource,
-  ): Promise<void> {
+  ): Promise<string> {
     const uid = this._uid();
     const id  = crypto.randomUUID();
     const session: SportSession = {
@@ -618,6 +650,7 @@ export class SportService {
       planned_source: plannedSource ?? null,
     };
     await this._pushOrQueue(uid, { op: 'insert', id, row });
+    return id;
   }
 
   /** Convert a planned sport session into a done one. */

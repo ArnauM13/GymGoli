@@ -1,3 +1,4 @@
+import { computed } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { WorkoutStoreService, mergeWorkouts } from './workout-store.service';
@@ -274,6 +275,70 @@ describe('WorkoutStoreService', () => {
       store.prune();
 
       expect(localStorage.getItem(key)).not.toBeNull();
+    });
+  });
+
+  // Una resposta de dos-cents entrenaments escrivia el mes sencer al disc i
+  // repintava la interfície dues-centes vegades: d'aquí venien les
+  // pampallugues mentre carregava.
+  describe('escriptures agrupades', () => {
+    it('una fusió sencera escriu una vegada i avisa una vegada', () => {
+      const writes = spyOn(Storage.prototype, 'setItem').and.callThrough();
+      let recomputes = 0;
+      TestBed.runInInjectionContext(() => {
+        const seen = computed(() => { recomputes++; return store.workouts().length; });
+        seen();   // primera lectura, ja comptada
+
+        const rows = Array.from({ length: 20 }, (_, i) =>
+          makeWorkout(`w${i}`, thisMonth(String(10 + (i % 10)).padStart(2, '0'))));
+        writes.calls.reset();
+        store.mergeServerScope(rows, w => w.date.startsWith(thisMonth().substring(0, 7)), store.mark());
+
+        expect(seen()).toBe(20);
+      });
+
+      // Un mes tocat, una escriptura; i una sola recomposició per als vint.
+      expect(writes.calls.count()).toBe(1);
+      expect(recomputes).toBe(2);
+    });
+
+    it('el mateix per a un grapat de files soltes', () => {
+      const writes = spyOn(Storage.prototype, 'setItem').and.callThrough();
+      store.applyServerRows([
+        makeWorkout('a', thisMonth('11')),
+        makeWorkout('b', thisMonth('12')),
+        makeWorkout('c', thisMonth('13')),
+      ]);
+
+      expect(writes.calls.count()).toBe(1);
+      expect(store.workouts().length).toBe(3);
+    });
+
+    it('registrar una sèrie continua guardant-se a l\'instant', () => {
+      const writes = spyOn(Storage.prototype, 'setItem').and.callThrough();
+      store.put(makeWorkout('w1', thisMonth(), [{ weight: 80, reps: 8 }]));
+
+      expect(writes.calls.count()).toBeGreaterThan(0);
+      expect(store.get('w1')!.entries[0].sets.length).toBe(1);
+    });
+  });
+
+  // El magatzem és la còpia bona i tot el que hi entra és candidat a pujar-se:
+  // una sessió sense sèries que hi entrés la buidaria al servidor.
+  describe('sessions en mode targeta', () => {
+    it('no deixa entrar una sessió sense sèries', () => {
+      const summary: Workout = { ...makeWorkout('w1', thisMonth()), entries: [], entriesLoaded: false };
+      store.applyServerRow(summary);
+
+      expect(store.has('w1')).toBeFalse();
+    });
+
+    it('no trepitja la versió sencera que ja hi ha', () => {
+      store.put(makeWorkout('w1', thisMonth(), [{ weight: 80, reps: 8 }]));
+      store.ackUpsert('w1', 1);
+      store.applyServerRow({ ...makeWorkout('w1', thisMonth()), entries: [], entriesLoaded: false });
+
+      expect(store.get('w1')!.entries[0].sets.length).toBe(1);
     });
   });
 });

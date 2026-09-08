@@ -15,7 +15,7 @@ import {
   Exercise, ExerciseCategory,
 } from '../../core/models/exercise.model';
 import { MASCOTS, Mascot, MascotMeta } from '../../core/models/mascot.model';
-import { Sport, SportMetricDef, SportSessionStatus } from '../../core/models/sport.model';
+import { Sport } from '../../core/models/sport.model';
 import { WorkoutTemplate } from '../../core/models/template.model';
 import { FeelingLevel, Workout, WorkoutEntry, setMaxWeight } from '../../core/models/workout.model';
 import { TemplateService } from '../../core/services/template.service';
@@ -387,8 +387,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
               @for (sport of sportService.sports(); track sport.id) {
                 <button class="type-btn"
                   [style.--cat-color]="sport.color"
-                  [class.type-btn--active]="loggerSport()?.id === sport.id"
-                  (click)="openSessionLogger(sport)"
+                  (click)="startSportSession(sport)"
                   [disabled]="sportToggling()">
                   <span class="material-symbols-outlined type-btn-add" aria-hidden="true">add</span>
                   <span class="material-symbols-outlined type-icon">{{ sport.icon }}</span>
@@ -514,123 +513,6 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
             </div>
           </button>
         }
-      </div>
-    }
-
-    <!-- ── Session logger bottom sheet ── -->
-    @if (loggerSport(); as sport) {
-      <div class="sl-backdrop bottom-sheet-backdrop" (click)="closeSessionLogger()" aria-hidden="true"></div>
-      <div class="sl-sheet bottom-sheet" role="dialog" aria-modal="true"
-           aria-labelledby="sl-title" cdkTrapFocus cdkTrapFocusAutoCapture>
-        <span class="bottom-sheet-handle" aria-hidden="true"></span>
-        <div class="sl-header">
-          <div class="sl-header-left">
-            <span class="material-symbols-outlined sl-sport-icon" [style.color]="sport.color" aria-hidden="true">
-              {{ sport.icon }}
-            </span>
-            <span class="sl-sport-name" id="sl-title">{{ sport.name }}</span>
-          </div>
-          <button class="sl-close" (click)="closeSessionLogger()" aria-label="Tancar">
-            <span class="material-symbols-outlined">close</span>
-          </button>
-        </div>
-
-        <!-- Duration -->
-        <div class="sl-field">
-          <span class="sl-field-label">Durada</span>
-          <div class="sl-row">
-            <div class="sl-quick-btns">
-              @for (t of durationPresets; track t) {
-                <button class="sl-quick-btn" [class.active]="loggerDuration() === t"
-                        (click)="loggerDuration.set(t)">{{ t }}min</button>
-              }
-            </div>
-            <div class="sl-stepper">
-              <button class="sl-step-btn" (click)="adjustDuration(-5)">−5</button>
-              <span class="sl-step-val">{{ loggerDuration() }}<small>min</small></span>
-              <button class="sl-step-btn" (click)="adjustDuration(5)">+5</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Subtypes (if any) -->
-        @if (sport.subtypes.length) {
-          <div class="sl-field">
-            <span class="sl-field-label">Subtipus</span>
-            <div class="sl-chips">
-              @for (sub of sport.subtypes; track sub.id) {
-                <button class="sl-chip" [class.active]="loggerSubtype() === sub.id"
-                        (click)="toggleSubtype(sub.id)">{{ sub.name }}</button>
-              }
-            </div>
-          </div>
-        }
-
-        <!-- Metric fields -->
-        @for (def of sport.metricDefs; track def.key) {
-          <div class="sl-field">
-            <span class="sl-field-label">{{ def.label }}@if (def.unit) { <small>({{ def.unit }})</small> }</span>
-            @if (def.type === 'select') {
-              <div class="sl-chips">
-                @for (opt of def.options ?? []; track opt.value) {
-                  <button class="sl-chip"
-                          [class.active]="loggerMetric(def.key) === opt.value"
-                          (click)="setMetric(def.key, loggerMetric(def.key) === opt.value ? null : opt.value)">
-                    {{ opt.label }}
-                  </button>
-                }
-              </div>
-            } @else {
-              <div class="sl-stepper">
-                <button class="sl-step-btn" (click)="adjustMetric(def, -1)">−</button>
-                <span class="sl-step-val">{{ loggerMetricNum(def) }}<small>@if (def.unit) { {{ def.unit }} }</small></span>
-                <button class="sl-step-btn" (click)="adjustMetric(def, 1)">+</button>
-              </div>
-            }
-          </div>
-        }
-
-        <!-- Feeling (only when logging a real session, not when planning) -->
-        @if (!isSelectedFuture()) {
-          <div class="sl-field">
-            <span class="sl-field-label">Sensació</span>
-            <div class="sl-feeling-row">
-              @for (level of feelingLevels; track level) {
-                <button class="sl-feeling-btn" [class.active]="loggerFeeling() === level"
-                        (click)="toggleFeeling(level)">
-                  {{ feelingEmoji(level) }}
-                </button>
-              }
-            </div>
-          </div>
-        }
-
-        <!-- Notes -->
-        <div class="sl-field">
-          <span class="sl-field-label">Notes</span>
-          <textarea class="sl-notes"
-            placeholder="Afegeix una nota opcional..."
-            [value]="loggerNotes()"
-            (input)="loggerNotes.set($any($event.target).value)"
-            rows="2"
-          ></textarea>
-        </div>
-
-        <!-- Footer actions -->
-        <div class="sl-actions">
-          @if (loggerSessionId()) {
-            <button class="sl-delete-btn" (click)="deleteLoggerSession()">
-              <span class="material-symbols-outlined">delete</span>
-              Eliminar
-            </button>
-          }
-          <div class="sl-main-actions">
-            <button class="sl-cancel" (click)="closeSessionLogger()">Cancel·lar</button>
-            <button class="sl-save" (click)="saveSession()" [disabled]="sportToggling()">
-              {{ isSelectedFuture() ? 'Planificar' : 'Guardar' }}
-            </button>
-          </div>
-        </div>
       </div>
     }
 
@@ -1276,110 +1158,6 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
     .spin { animation: spin 1s linear infinite; }
 
 
-    /* ── Session logger bottom sheet ── */
-    .sl-sheet { padding: 8px 16px 16px; }
-    .sl-header {
-      display: flex; align-items: center;
-      padding: 4px 0 12px; border-bottom: 1px solid var(--c-border-2); margin-bottom: 12px;
-    }
-    .sl-header-left { flex: 1; display: flex; align-items: center; gap: 10px; }
-    .sl-sport-icon {
-      font-size: 26px;
-      font-variation-settings: 'FILL' 1, 'wght' 400;
-    }
-    .sl-sport-name { font-size: 17px; font-weight: 800; color: var(--c-text); }
-    .sl-close {
-      width: 34px; height: 34px; border-radius: 50%; border: none;
-      background: var(--c-subtle); cursor: pointer; color: var(--c-text-2);
-      display: flex; align-items: center; justify-content: center;
-      transition: background 0.15s; flex-shrink: 0;
-      .material-symbols-outlined { font-size: 18px; }
-      &:hover { background: var(--c-hover); }
-    }
-
-    .sl-field { margin-bottom: 16px; }
-    .sl-field-label {
-      display: block; font-size: 12px; font-weight: 700; color: var(--c-text-2);
-      letter-spacing: 0.3px; text-transform: uppercase; margin-bottom: 8px;
-      small { font-size: 11px; color: var(--c-text-3); font-weight: 400; text-transform: none; margin-left: 4px; }
-    }
-    .sl-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .sl-quick-btns { display: flex; gap: 6px; flex-wrap: wrap; }
-    .sl-quick-btn {
-      padding: 6px 12px; border: 1.5px solid var(--c-border); border-radius: 20px;
-      background: var(--c-card); font-size: 13px; font-weight: 600; color: var(--c-text-2);
-      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      &.active { background: var(--c-brand); color: white; border-color: var(--c-brand); }
-      &:hover:not(.active) { border-color: var(--c-brand); color: var(--c-brand); }
-    }
-    .sl-stepper { display: flex; align-items: center; gap: 6px; }
-    .sl-step-btn {
-      width: 34px; height: 34px; border-radius: 10px;
-      border: 1.5px solid var(--c-border); background: var(--c-card);
-      font-size: 14px; font-weight: 700; color: var(--c-text-2);
-      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      display: flex; align-items: center; justify-content: center;
-      &:hover { border-color: var(--c-brand); color: var(--c-brand); }
-    }
-    .sl-step-val {
-      min-width: 52px; text-align: center;
-      font-size: 18px; font-weight: 800; color: var(--c-text);
-      small { font-size: 11px; color: var(--c-text-3); margin-left: 2px; }
-    }
-    .sl-chips { display: flex; gap: 7px; flex-wrap: wrap; }
-    .sl-chip {
-      padding: 7px 14px; border: 1.5px solid var(--c-border); border-radius: 20px;
-      background: var(--c-card); font-size: 13px; font-weight: 600; color: var(--c-text-2);
-      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      &.active { background: var(--c-brand); color: white; border-color: var(--c-brand); }
-      &:hover:not(.active) { border-color: var(--c-brand); color: var(--c-brand); }
-    }
-    .sl-feeling-row { display: flex; gap: 8px; }
-    .sl-feeling-btn {
-      flex: 1; height: 44px; border-radius: 12px;
-      border: 1.5px solid var(--c-border-2); background: var(--c-subtle);
-      font-size: 22px; cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      display: flex; align-items: center; justify-content: center;
-      &.active { border-color: var(--c-brand); background: rgba(var(--c-brand-rgb), 0.08); transform: scale(1.1); }
-      &:hover:not(.active) { border-color: var(--c-border); background: var(--c-hover); }
-    }
-    .sl-notes {
-      width: 100%; box-sizing: border-box;
-      padding: 9px 12px; border: 1.5px solid var(--c-border); border-radius: 10px;
-      font-size: 13px; font-family: inherit; color: var(--c-text); resize: none; background: var(--c-card);
-      outline: none; transition: border-color 0.15s;
-      &:focus { border-color: var(--c-brand); }
-      &::placeholder { color: var(--c-text-3); }
-    }
-    .sl-actions {
-      display: flex; align-items: center; gap: 8px;
-      padding: 12px 0 4px; border-top: 1px solid var(--c-border-2); margin-top: 4px;
-    }
-    .sl-delete-btn {
-      display: flex; align-items: center; gap: 4px;
-      padding: 0 12px; height: 40px; border-radius: 10px;
-      border: 1.5px solid rgba(239,83,80,0.3); background: rgba(239,83,80,0.06);
-      color: #ef5350; font-size: 12px; font-weight: 700;
-      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      .material-symbols-outlined { font-size: 15px; }
-      &:hover { background: rgba(239,83,80,0.12); border-color: #ef5350; }
-    }
-    .sl-main-actions { display: flex; gap: 8px; flex: 1; justify-content: flex-end; }
-    .sl-cancel {
-      height: 40px; padding: 0 18px; border-radius: 10px;
-      border: 1.5px solid var(--c-border); background: var(--c-card);
-      font-size: 14px; font-weight: 600; color: var(--c-text-2);
-      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      &:hover { border-color: var(--c-text-3); color: var(--c-text); }
-    }
-    .sl-save {
-      height: 40px; padding: 0 22px; border-radius: 10px;
-      border: none; background: var(--c-brand); color: white;
-      font-size: 14px; font-weight: 700;
-      cursor: pointer; transition: background 0.15s; touch-action: manipulation;
-      &:hover:not(:disabled) { background: var(--c-brand-dk); }
-      &:disabled { opacity: 0.5; cursor: default; }
-    }
   `],
 })
 export class TrainComponent implements OnDestroy {
@@ -1431,15 +1209,6 @@ export class TrainComponent implements OnDestroy {
    *  via ?workout=<id> renders straight into the editor on first paint,
    *  without a flash of the dashboard first. */
   readonly activeWorkoutId = signal<string | null>(this.route.snapshot.queryParamMap.get('workout'));
-  readonly loggerSport     = signal<Sport | null>(null);
-  readonly loggerSessionId = signal<string | null>(null);
-  /** Estat de la sessió que s'està editant, si ja existia. */
-  readonly loggerSessionStatus = signal<SportSessionStatus | null>(null);
-  readonly loggerDuration  = signal<number>(60);
-  readonly loggerSubtype   = signal<string | null>(null);
-  readonly loggerFeeling   = signal<FeelingLevel | null>(null);
-  readonly loggerMetrics   = signal<Record<string, string | number>>({});
-  readonly loggerNotes     = signal<string>('');
   readonly creating          = signal(false);
   readonly awFeelingOpen     = signal(false);
   readonly feelingLevels5: FeelingLevel[] = [1, 2, 3, 4, 5];
@@ -1577,7 +1346,7 @@ export class TrainComponent implements OnDestroy {
 
   handleSuggestionClick(s: TodaySuggestion): void {
     if (s.type === 'gym') this.selectType(s.category);
-    else this.openSessionLogger(s.sport);
+    else void this.startSportSession(s.sport);
   }
 
   readonly isSelectedFuture = computed(() => this.selectedDate() > this.today());
@@ -1766,29 +1535,10 @@ export class TrainComponent implements OnDestroy {
       if (d) untracked(() => this.selectedDate.set(d));
     });
 
-    const querySportId = toSignal(this.route.queryParamMap.pipe(map(params => params.get('sport'))));
-    let handledSportQueryId: string | null = null;
-    effect(() => {
-      const sportId = querySportId();
-      const sports  = this.sportService.sports();
-      if (!sportId || sportId === handledSportQueryId) return;
-      const sport = sports.find(s => s.id === sportId);
-      if (!sport) return;
-      handledSportQueryId = sportId;
-      untracked(() => {
-        const date = this.route.snapshot.queryParamMap.get('date');
-        if (date && date !== this.selectedDate()) {
-          suppressNextDateReset = true;
-          this.selectedDate.set(date);
-        }
-        this.openSessionLogger(sport);
-      });
-    });
-
     let firstDateEffectRun = true;
-    // Set right before a deep-link (e.g. the sport effect above) changes
+    // Set right before a deep-link (obrir un entrenament) changes
     // selectedDate on purpose, so this effect's reset below doesn't
-    // immediately close the picker/logger it just opened.
+    // immediately close what it just opened.
     let suppressNextDateReset = false;
 
     // ...i entrar-hi *sense* `?date=` vol dir avui. La ruta es manté viva
@@ -1809,9 +1559,9 @@ export class TrainComponent implements OnDestroy {
         const params = this.route.snapshot.queryParamMap;
         if (validDateParam(params.get('date'))) return;
         if (this.selectedDate() === this.today()) return;
-        // Si s'arriba per obrir un entrenament o un esport concret, el salt de
-        // dia és només de context: no ha de tancar el que s'acaba d'obrir.
-        if (params.get('workout') || params.get('sport')) suppressNextDateReset = true;
+        // Si s'arriba per obrir un entrenament concret, el salt de dia és
+        // només de context: no ha de tancar el que s'acaba d'obrir.
+        if (params.get('workout')) suppressNextDateReset = true;
         this.selectedDate.set(this.today());
       });
 
@@ -1827,7 +1577,6 @@ export class TrainComponent implements OnDestroy {
         if (suppressNextDateReset) { suppressNextDateReset = false; return; }
         this.activeWorkoutId.set(null);
         this.pickerCat.set(null);
-        this.loggerSport.set(null);
       });
     });
 
@@ -1887,6 +1636,10 @@ export class TrainComponent implements OnDestroy {
   // ── Workout navigation ────────────────────────────────────────────────────
 
   openWorkout(id: string): void {
+    // De l'historial vell només se n'ha baixat el resum de la targeta. Obrir
+    // la sessió és el moment de demanar-ne les sèries: sense elles l'editor
+    // ensenyaria una sessió buida i cap canvi hi arribaria.
+    void this.workoutService.ensureWorkoutEntries(id);
     this.activeWorkoutId.set(id);
     this.pickerCat.set(null);
   }
@@ -2042,7 +1795,6 @@ export class TrainComponent implements OnDestroy {
 
   selectType(category: ExerciseCategory): void {
     if (this.pickerCat() === category) { this.closePicker(); return; }
-    this.loggerSport.set(null);
     this.pickerCat.set(category);
   }
 
@@ -2052,14 +1804,13 @@ export class TrainComponent implements OnDestroy {
 
   closePicker(): void { this.pickerCat.set(null); }
 
-  /** Dismiss the top-most open overlay with Escape (picker · logger · save
-   *  sheet · action menu), for keyboard and accessibility. Skips while a
-   *  Material dialog is open so its own Escape handling wins. */
+  /** Dismiss the top-most open overlay with Escape (picker · save sheet ·
+   *  action menu), for keyboard and accessibility. Skips while a Material
+   *  dialog is open so its own Escape handling wins. */
   @HostListener('document:keydown.escape')
   onEscape(): void {
     if (this.dialog.openDialogs.length) return;
     if (this.saveTemplateOpen()) { this.saveTemplateOpen.set(false); return; }
-    if (this.loggerSport())      { this.closeSessionLogger(); return; }
     if (this.pickerCat())        { this.closePicker(); return; }
     if (this.workoutMenuOpen())  { this.workoutMenuOpen.set(false); }
   }
@@ -2200,113 +1951,48 @@ export class TrainComponent implements OnDestroy {
     return parts.length ? parts.join(' ') : null;
   }
 
-  // ── Session logger ────────────────────────────────────────────────────────
+  // ── Registrar un esport ───────────────────────────────────────────────────
 
-  readonly durationPresets: number[] = [30, 45, 60, 90];
-  readonly feelingLevels: FeelingLevel[] = [1, 2, 3, 4, 5];
+  /** La durada que es dona per feta en registrar un esport. La sessió neix
+   *  amb una xifra raonable perquè la pàgina no s'obri buida, i canviar-la és
+   *  el primer camp del formulari. */
+  private static readonly DEFAULT_MINUTES = 60;
 
-  openSessionLogger(sport: Sport): void {
-    if (this.loggerSport()?.id === sport.id) { this.closeSessionLogger(); return; }
-    const existing = this.sportService.getSessionForDate(this.selectedDate(), sport.id);
+  /**
+   * Tocar un esport el registra i porta a la seva pàgina — exactament el que
+   * fa triar un tipus d'entrenament: es crea l'activitat i s'obre.
+   *
+   * Si el dia ja en té una, no se'n crea una altra: s'hi va. I un dia que
+   * encara ha de venir es planifica en comptes de registrar-se, com passa amb
+   * els entrenaments.
+   */
+  async startSportSession(sport: Sport): Promise<void> {
     this.pickerCat.set(null);
-    this.loggerSport.set(sport);
-    this.loggerSessionId.set(existing?.id ?? null);
-    this.loggerSessionStatus.set(existing?.status ?? null);
-    this.loggerDuration.set(existing?.duration ?? 60);
-    this.loggerSubtype.set(existing?.subtypeId ?? null);
-    this.loggerFeeling.set(existing?.feeling ?? null);
-    this.loggerMetrics.set({ ...(existing?.metrics ?? {}) });
-    this.loggerNotes.set(existing?.notes ?? '');
-  }
 
-  closeSessionLogger(): void { this.loggerSport.set(null); }
+    const date     = this.selectedDate();
+    const existing = this.sportService.getSessionForDate(date, sport.id);
+    if (existing) { this._openSportSession(existing.id); return; }
 
-  feelingEmoji(level: FeelingLevel): string {
-    return formatFeeling(level, this.settingsService.difficultyScale());
-  }
-
-  loggerMetric(key: string): string | number | null {
-    return this.loggerMetrics()[key] ?? null;
-  }
-
-  loggerMetricNum(def: SportMetricDef): number {
-    const v = this.loggerMetrics()[def.key];
-    return typeof v === 'number' ? v : (def.min ?? 0);
-  }
-
-  adjustMetric(def: SportMetricDef, delta: number): void {
-    const step = def.step ?? 1;
-    const next = Math.max(def.min ?? 0, Math.min(def.max ?? 9999, this.loggerMetricNum(def) + delta * step));
-    this.loggerMetrics.update(m => ({ ...m, [def.key]: next }));
-  }
-
-  setMetric(key: string, value: string | number | null): void {
-    this.loggerMetrics.update(m => {
-      const copy = { ...m };
-      if (value === null) delete copy[key]; else copy[key] = value;
-      return copy;
-    });
-  }
-
-  toggleSubtype(id: string): void {
-    this.loggerSubtype.update(v => v === id ? null : id);
-  }
-
-  adjustDuration(delta: number): void {
-    this.loggerDuration.update(v => Math.max(5, v + delta));
-  }
-
-  toggleFeeling(level: FeelingLevel): void {
-    this.loggerFeeling.update(v => v === level ? null : level);
-  }
-
-  async saveSession(): Promise<void> {
-    const sport = this.loggerSport();
-    if (!sport) return;
+    const planning = this.isSelectedFuture();
     this.sportToggling.set(true);
     try {
-      const date = this.selectedDate();
-      const metrics = this.loggerMetrics();
-      const data = {
-        subtypeId: this.loggerSubtype() ?? undefined,
-        duration:  this.loggerDuration() || undefined,
-        feeling:   this.loggerFeeling() ?? undefined,
-        metrics:   Object.keys(metrics).length ? metrics : undefined,
-        notes:     this.loggerNotes().trim() || undefined,
-      };
-      const existingId = this.loggerSessionId();
-      if (existingId) {
-        // Guardar un pla d'un dia que ja ha passat és registrar-lo: si es
-        // quedava 'planned' la sessió no sortia enlloc i semblava que el
-        // botó no hagués fet res.
-        const promote = this.loggerSessionStatus() === 'planned' && !this.isSelectedFuture();
-        await this.sportService.updateSession(existingId, date, data, promote ? 'done' : undefined);
-      } else {
-        await this.sportService.logSession(
-          date, sport.id, data,
-          this.isSelectedFuture() ? 'planned' : 'done',
-          this.isSelectedFuture() ? 'manual' : undefined,
-        );
-      }
-      this.closeSessionLogger();
+      const id = await this.sportService.logSession(
+        date, sport.id,
+        { duration: TrainComponent.DEFAULT_MINUTES },
+        planning ? 'planned' : 'done',
+        planning ? 'manual' : undefined,
+      );
+      this._openSportSession(id, true);
     } catch {
-      this.feedback.error('Error en guardar', 2500);
+      this.feedback.error('Error en registrar', 2500);
     } finally {
       this.sportToggling.set(false);
     }
   }
 
-  async deleteLoggerSession(): Promise<void> {
-    const id = this.loggerSessionId();
-    if (!id) return;
-    this.sportToggling.set(true);
-    try {
-      await this.sportService.deleteSession(id, this.selectedDate());
-      this.closeSessionLogger();
-    } catch {
-      this.feedback.error('Error en eliminar', 2500);
-    } finally {
-      this.sportToggling.set(false);
-    }
+  /** Una sessió acabada de crear s'obre amb el formulari desplegat: hi vas a
+   *  omplir-la, no a mirar-la. */
+  private _openSportSession(id: string, isNew = false): void {
+    this.router.navigate(['/sport', id], isNew ? { queryParams: { nova: 1 } } : {});
   }
 }

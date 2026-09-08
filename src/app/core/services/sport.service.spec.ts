@@ -41,14 +41,17 @@ describe('SportService', () => {
     const deleteSpy = jasmine.createSpy('delete');
     const fromSpy   = jasmine.createSpy('from');
 
+    // Es comporta com un constructor de consultes de debò: els filtres tornen
+    // la mateixa cadena, esperar-la la resol sencera, i `.range()` en serveix
+    // un tram — que és com les consultes d'abast obert recorren l'historial.
     const selectChain = (data: () => Record<string, unknown>[]): any => {
       const chain: any = {};
-      chain.select = jasmine.createSpy('select').and.returnValue(chain);
-      chain.eq     = jasmine.createSpy('eq').and.returnValue(chain);
-      chain.gte    = jasmine.createSpy('gte').and.returnValue(chain);
-      chain.lte    = jasmine.createSpy('lte').and.returnValue(chain);
-      chain.order  = jasmine.createSpy('order').and.callFake(() =>
-        Promise.resolve({ data: data(), error: null }));
+      for (const method of ['select', 'eq', 'neq', 'gte', 'lte', 'lt', 'gt', 'order', 'limit', 'contains']) {
+        chain[method] = jasmine.createSpy(method).and.returnValue(chain);
+      }
+      chain.range = jasmine.createSpy('range').and.callFake((from: number, to: number) =>
+        Promise.resolve({ data: data().slice(from, to + 1), error: null }));
+      chain.then = (resolve: (v: unknown) => void) => resolve({ data: data(), error: null });
       return chain;
     };
 
@@ -440,6 +443,43 @@ describe('SportService', () => {
       tick();
 
       expect(supabaseMock.fromSpy.calls.count()).toBe(calls + 1);
+    }));
+
+    // Cada senyal que canviava mentre la consulta viatjava en disparava una
+    // altra, i l'app arrencava baixant l'historial diverses vegades alhora.
+    it('dues peticions alhora de tot l\'historial són una sola consulta', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+      const calls = supabaseMock.fromSpy.calls.count();
+
+      void service.loadAllSessions();
+      void service.loadAllSessions();
+      tick();
+
+      expect(supabaseMock.fromSpy.calls.count()).toBe(calls + 1);
+    }));
+
+    // Tombar-ho i tornar-ho a aixecar feia que els rècords del detall d'una
+    // sessió es tornessin a pintar a mitges cada cop que l'app agafava el
+    // focus: part de les pampallugues que es veien mentre carregava.
+    it('refrescar no tomba mai «ja tinc tot l\'historial»', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+      void service.loadAllSessions();
+      tick();
+      expect(service.allSessionsLoaded()).toBeTrue();
+
+      const seen: boolean[] = [];
+      const stop = setInterval(() => seen.push(service.allSessionsLoaded()), 1);
+      void service.refreshLoaded(true);
+      tick(10);
+      clearInterval(stop);
+
+      expect(seen.every(v => v)).toBeTrue();
+      expect(service.allSessionsLoaded()).toBeTrue();
+      discardPeriodicTasks();
     }));
   });
 });
