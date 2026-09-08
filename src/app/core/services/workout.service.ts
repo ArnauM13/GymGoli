@@ -2,6 +2,7 @@ import { Injectable, computed, effect, inject, signal, untracked } from '@angula
 import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 import { ActivityFeedService } from './activity-feed.service';
+import { ROUTINE_HORIZON_DAYS, RoutineProjectionService, isRoutineProjection } from './routine-projection.service';
 import { ExerciseService } from './exercise.service';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
@@ -12,6 +13,7 @@ import { SUPABASE_PAGE_SIZE, fetchAllRows } from './supabase-page.util';
 import { WORKOUT_COLUMNS, WorkoutStoreService, toWorkout } from './workout-store.service';
 import { FeelingLevel, PlannedSource, Workout, WorkoutEntry, WorkoutSet, setMaxWeight, workoutExerciseNames } from '../models/workout.model';
 import { toDateStr } from '../../shared/utils/date.utils';
+import { addDays, workoutCategories } from '../../shared/utils/calendar-utils';
 
 /** The filters the Historial list can have active at once. */
 export interface HistoryFilters {
@@ -61,6 +63,9 @@ export class WorkoutService {
   /** Qui demana l'activitat per trams al servidor. Vegeu `ActivityFeedService`:
    *  una sola crida per tram, entrenaments i esports junts, sense cap sèrie. */
   private activityFeed    = inject(ActivityFeedService);
+  /** La rutina recurrent, projectada al calendari en comptes d'escrita com a
+   *  91 files. Vegeu `RoutineProjectionService`. */
+  private routine         = inject(RoutineProjectionService);
   /** Tot el que aquest dispositiu sap dels entrenaments. És el primer lloc on
    *  va a parar el que fa l'usuari, i el que llegeix aquest servei. */
   private store           = inject(WorkoutStoreService);
@@ -157,20 +162,67 @@ export class WorkoutService {
     this.workouts().filter(w => w.date !== this._todayStr)
   );
 
-  readonly plannedWorkouts = computed(() =>
+  /** Els planificats que són files de debò: els que l'usuari ha triat dia a
+   *  dia. La rutina no n'és cap — vegeu `plannedByDate`. */
+  private readonly _realPlanned = computed(() =>
     this._historical().filter(w => w.status === 'planned')
+  );
+
+  /** Tots els planificats, els reals i els que proposa la rutina. */
+  readonly plannedWorkouts = computed((): Workout[] =>
+    [...this.plannedByDate().values()].flat()
   );
 
   readonly doneWorkouts = computed((): Workout[] =>
     this.workouts().filter(w => (w.status ?? 'done') !== 'planned')
   );
 
+  /**
+   * Els planificats de cada dia: els que són files de debò i, a sobre, el que
+   * proposa la rutina.
+   *
+   * La rutina no s'escriu: establir-ne una escrivia 91 entrenaments
+   * planificats a la base de dades —tretze setmanes per set dies— i els
+   * tornava a escriure a cada canvi, per dir una cosa que ja consta a
+   * `user_settings.weeklyPlan`. Aquí es calcula, i el que es guarda de debò és
+   * el que l'usuari acaba fent.
+   *
+   * Un dia que la rutina proposa i que ja té un entrenament d'aquell tipus
+   * —fet o planificat a mà— no es proposa dues vegades.
+   */
   readonly plannedByDate = computed(() => {
     const map = new Map<string, Workout[]>();
-    for (const w of this.plannedWorkouts()) {
+    for (const w of this._realPlanned()) {
       const bucket = map.get(w.date) ?? [];
       bucket.push(w);
       map.set(w.date, bucket);
+    }
+
+    if (!this.routine.hasRoutine()) return map;
+
+    const byDate = this.byDate();
+    const today  = this._todayStr;
+    for (let i = 0; i <= ROUTINE_HORIZON_DAYS; i++) {
+      const date = addDays(today, i);
+      const proposed = this.routine.projectedFor(date).gym;
+      if (!proposed.length) continue;
+
+      const already = byDate.get(date) ?? [];
+      const bucket  = map.get(date) ?? [];
+      for (const p of proposed) {
+        if (already.some(w => workoutCategories(w).includes(p.category))) continue;
+        bucket.push({
+          id:            p.id,
+          date,
+          entries:       p.entries,
+          category:      p.category,
+          categories:    [p.category],
+          createdAt:     new Date(`${date}T00:00:00`),
+          status:        'planned',
+          plannedSource: 'routine',
+        });
+      }
+      if (bucket.length) map.set(date, bucket);
     }
     return map;
   });
@@ -868,8 +920,32 @@ export class WorkoutService {
     return id;
   }
 
-  async startPlannedWorkout(workoutId: string): Promise<void> {
-    await this._updateWorkout(workoutId, { status: 'done' });
+  /**
+   * Comença un planificat. Torna l'id de l'entrenament que s'ha de obrir, que
+   * no sempre és el que se li ha passat.
+   *
+   * Un planificat de la rutina no és cap fila: és el que la rutina proposa per
+   * aquell dia. Començar-lo és **el moment** en què passa a existir — es crea
+   * l'entrenament amb els seus exercicis i es guarda, i el dia queda retirat
+   * de la proposta perquè no surti dues vegades. És tot el sentit de no
+   * materialitzar la rutina: a la base de dades hi va el que has fet.
+   */
+  async startPlannedWorkout(workoutId: string): Promise<string> {
+    if (!isRoutineProjection(workoutId)) {
+      this._updateWorkout(workoutId, { status: 'done' });
+      return workoutId;
+    }
+
+    const proposed = this._find(workoutId) ?? this._findPlanned(workoutId);
+    const id = await this.createWorkoutForDate(proposed?.date ?? this._todayStr, proposed?.category);
+    if (proposed?.entries.length) {
+      this._updateWorkout(id, {
+        entries:    proposed.entries.map(e => ({ ...e, sets: [...e.sets] })),
+        categories: proposed.categories ?? (proposed.category ? [proposed.category] : []),
+      });
+    }
+    await this.routine.materialized(workoutId);
+    return id;
   }
 
   async createWorkoutFromTemplate(date: string, category: string, templateEntries: WorkoutEntry[]): Promise<string> {
@@ -1040,6 +1116,11 @@ export class WorkoutService {
    *  arribat a veure, l'esborrat hi va per la mateixa cua que la resta: sense
    *  cobertura no falla, s'envia quan torni. */
   async deleteWorkout(id: string): Promise<void> {
+    // Un planificat de la rutina no és cap fila: treure'l vol dir dir que
+    // aquell dia no compta. Si només desaparegués de la pantalla, la regla que
+    // el genera el tornaria a proposar tot seguit.
+    if (isRoutineProjection(id)) { await this.routine.dismiss(id); return; }
+
     // D'una sessió que només tenim en mode targeta el magatzem no en sap res,
     // i treure-la d'allà no faria res. Es demana sencera primer, i així
     // l'esborrat viatja per la mateixa cua que la resta.
@@ -1125,6 +1206,16 @@ export class WorkoutService {
 
   private _find(id: string): Workout | undefined {
     return this.store.get(id);
+  }
+
+  /** Busca entre els planificats, projeccions incloses. Una projecció no és a
+   *  cap magatzem: només existeix a `plannedByDate()`. */
+  private _findPlanned(id: string): Workout | undefined {
+    for (const bucket of this.plannedByDate().values()) {
+      const found = bucket.find(w => w.id === id);
+      if (found) return found;
+    }
+    return undefined;
   }
 
 }

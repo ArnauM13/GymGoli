@@ -31,6 +31,7 @@ describe('WeeklyPlannerComponent', () => {
   let savedPlan: ReturnType<typeof signal<WeeklyPlan>>;
   let updateWeeklyPlan: jasmine.Spy;
   let retractRemoved: jasmine.Spy;
+  let dismissRoutineWeek: jasmine.Spy;
   let applyPlan: jasmine.Spy;
   let confirm: jasmine.Spy;
   let chooseAction: jasmine.Spy;
@@ -55,6 +56,7 @@ describe('WeeklyPlannerComponent', () => {
     savedPlan = signal(EMPTY_WEEKLY_PLAN);
     updateWeeklyPlan = jasmine.createSpy('updateWeeklyPlan').and.resolveTo(undefined);
     retractRemoved = jasmine.createSpy('retractRemoved').and.resolveTo(undefined);
+    dismissRoutineWeek = jasmine.createSpy('dismissRoutineWeek').and.resolveTo(undefined);
     applyPlan = jasmine.createSpy('apply').and.resolveTo(undefined);
     confirm = jasmine.createSpy('confirm').and.resolveTo(true);
     chooseAction = jasmine.createSpy('chooseAction').and.resolveTo(null);
@@ -74,7 +76,7 @@ describe('WeeklyPlannerComponent', () => {
       providers: [
         { provide: UserSettingsService, useValue: { weeklyPlan: savedPlan, updateWeeklyPlan } },
         { provide: TrainingTypeService, useValue: { types: signal(DEFAULT_TRAINING_TYPES) } },
-        { provide: WeeklyPlanService,   useValue: { apply: applyPlan, retractRemoved } },
+        { provide: WeeklyPlanService,   useValue: { apply: applyPlan, retractRemoved, dismissRoutineWeek } },
         { provide: WorkoutService,      useValue: { getPlannedForDate, getWorkoutsForDate } },
         { provide: SportService,        useValue: { sports: signal([]), ensureLoaded: jasmine.createSpy(), getSportSessionsForDate, getPlannedSportSessionsForDate } },
         { provide: TemplateService,     useValue: { forCategory } },
@@ -295,14 +297,17 @@ describe('WeeklyPlannerComponent', () => {
   });
 
   describe('save() in settings mode (weekMonday is null)', () => {
-    it('always saves as a recurring plan across the full recurring horizon, tagged source "routine"', async () => {
+    // Desar la rutina és desar la regla i prou: abans, a més, escrivia 91
+    // entrenaments planificats i els reescrivia a cada canvi. Ara el calendari
+    // la projecta des d'aquest mateix pla.
+    it('desa la rutina com a regla, sense escriure cap entrenament', async () => {
       component.toggleGym(0, 'push');
 
       await component.save();
 
       expect(updateWeeklyPlan).toHaveBeenCalledWith(jasmine.objectContaining({ recurring: true }));
-      expect(retractRemoved).toHaveBeenCalledWith(jasmine.objectContaining({ recurring: true }), WEEKS_RECURRING, undefined, 'routine');
-      expect(applyPlan).toHaveBeenCalledWith(jasmine.objectContaining({ recurring: true }), WEEKS_RECURRING, undefined, 'routine');
+      expect(applyPlan).not.toHaveBeenCalled();
+      expect(retractRemoved).not.toHaveBeenCalled();
     });
   });
 
@@ -310,14 +315,15 @@ describe('WeeklyPlannerComponent', () => {
     it('does nothing when the confirmation is declined', async () => {
       confirm.and.resolveTo(false);
       await component.deletePlan();
-      expect(retractRemoved).not.toHaveBeenCalled();
+      expect(updateWeeklyPlan).not.toHaveBeenCalled();
     });
 
-    it('clears the plan and retracts stale routine items across the recurring horizon once confirmed', async () => {
+    it('buida el pla un cop confirmat, sense haver d\'esborrar cap fila', async () => {
       savedPlan.set({ recurring: true, days: [[], [], [], [], [], [], []] });
       await component.deletePlan();
 
-      expect(retractRemoved).toHaveBeenCalledWith(EMPTY_WEEKLY_PLAN, WEEKS_RECURRING, undefined, 'routine');
+      expect(updateWeeklyPlan).toHaveBeenCalledWith(EMPTY_WEEKLY_PLAN);
+      expect(retractRemoved).not.toHaveBeenCalled();
       expect(component.plan().days.every(items => items.length === 0)).toBeTrue();
     });
   });
@@ -489,7 +495,7 @@ describe('WeeklyPlannerComponent', () => {
         await component.save();
 
         expect(retractRemoved).toHaveBeenCalledWith(component.plan(), WEEKS_SINGLE, '2024-03-04', 'manual');
-        expect(retractRemoved).not.toHaveBeenCalledWith(EMPTY_WEEKLY_PLAN, WEEKS_SINGLE, '2024-03-04', 'routine');
+        expect(dismissRoutineWeek).not.toHaveBeenCalled();
         expect(applyPlan).toHaveBeenCalledWith(component.plan(), WEEKS_SINGLE, '2024-03-04', 'manual');
       });
 
@@ -499,7 +505,8 @@ describe('WeeklyPlannerComponent', () => {
 
         await component.save();
 
-        expect(retractRemoved).toHaveBeenCalledWith(EMPTY_WEEKLY_PLAN, WEEKS_SINGLE, '2024-03-04', 'routine');
+        // La rutina d'aquella setmana no són files: es retira dia a dia.
+        expect(dismissRoutineWeek).toHaveBeenCalledWith('2024-03-04');
         expect(retractRemoved).toHaveBeenCalledWith(component.plan(), WEEKS_SINGLE, '2024-03-04', 'manual');
         expect(applyPlan).toHaveBeenCalledWith(component.plan(), WEEKS_SINGLE, '2024-03-04', 'manual');
       });

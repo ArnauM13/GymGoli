@@ -9,6 +9,8 @@ import { ExerciseService } from './exercise.service';
 import { SyncService } from './sync.service';
 import { WorkoutStoreService } from './workout-store.service';
 import { ActivityFeedService } from './activity-feed.service';
+import { ProjectedGym, RoutineProjectionService, routineGymId } from './routine-projection.service';
+import { addDays } from '../../shared/utils/calendar-utils';
 
 interface QueryResult { data?: unknown; count?: number; error?: unknown }
 
@@ -75,6 +77,9 @@ describe('WorkoutService', () => {
   /** `activity_feed`: la consulta per trams. `feedRows` és el que contesta. */
   let rpcSpy: jasmine.Spy;
   let feedRows: Record<string, unknown>[];
+  /** El que la rutina proposa per a cada dia, per data. Buit = cap rutina. */
+  let routinePlan: Map<string, ProjectedGym[]>;
+  let dismissRoutine: jasmine.Spy;
   let vanished: ReturnType<typeof signal<{ id: string; date: string; at: number } | null>>;
   /** The realtime callback the service registered, so a test can play the part
    *  of the other device. */
@@ -88,6 +93,8 @@ describe('WorkoutService', () => {
     feedRows = [];
     rpcSpy = jasmine.createSpy('rpc').and.callFake(() =>
       Promise.resolve({ data: feedRows, error: null }));
+    routinePlan    = new Map();
+    dismissRoutine = jasmine.createSpy('dismiss').and.resolveTo(undefined);
 
     fromSpy = jasmine.createSpy('from').and.callFake((table: string) =>
       table === 'workouts' ? workoutsChain : makeQueryChain({ data: [], count: 0, error: null }));
@@ -108,6 +115,12 @@ describe('WorkoutService', () => {
           client: { from: fromSpy, channel: () => channelStub, rpc: rpcSpy },
         } },
         { provide: ExerciseService, useValue: { getById: () => undefined } },
+        { provide: RoutineProjectionService, useValue: {
+          hasRoutine:   () => routinePlan.size > 0,
+          projectedFor: (date: string) => ({ gym: routinePlan.get(date) ?? [], sport: [] }),
+          dismiss:      dismissRoutine,
+          materialized: dismissRoutine,
+        } },
         { provide: SyncService,     useValue: {
           notifyPending: jasmine.createSpy('notifyPending'),
           pendingIds:    () => pendingIds(),
@@ -939,6 +952,92 @@ describe('WorkoutService', () => {
     });
   });
 
+
+  // ── La rutina, projectada ────────────────────────────────────────────────
+  //
+  // Establir una rutina escrivia 91 entrenaments planificats —tretze setmanes
+  // per set dies— i els reescrivia a cada canvi, per dir una cosa que ja
+  // consta a `user_settings.weeklyPlan`. Ara es calcula, i el que s'escriu és
+  // el que l'usuari acaba fent.
+  describe('la rutina es projecta, no s\'escriu', () => {
+    /** Una data futura: la projecció només mira endavant, i una rutina que no
+     *  vas complir el mes passat no és un planificat pendent. */
+    function future(days = 2): string {
+      return addDays(service.todayDateString(), days);
+    }
+
+    /** El que la rutina proposa per a un dia. */
+    function routineOn(date: string, category: string): void {
+      routinePlan.set(date, [{
+        id: routineGymId(date, category), date, category,
+        entries: [{ exerciseId: 'ex1', exerciseName: 'Press banca', sets: [] }],
+      }]);
+    }
+
+    it('el que proposa la rutina surt com a planificat sense ser cap fila', () => {
+      const date = future();
+      routineOn(date, 'push');
+
+      const planned = service.getPlannedForDate(date);
+      expect(planned.length).toBe(1);
+      expect(planned[0].category).toBe('push');
+      expect(planned[0].plannedSource).toBe('routine');
+      expect(TestBed.inject(WorkoutStoreService).has(planned[0].id)).toBeFalse();
+    });
+
+    it('un dia que ja té aquell tipus no es proposa dues vegades', async () => {
+      const date = future();
+      await service.createWorkoutForDate(date, 'push');
+      routineOn(date, 'push');
+
+      expect(service.getPlannedForDate(date).length).toBe(0);
+    });
+
+    it('un altre tipus el mateix dia sí que es proposa', async () => {
+      const date = future();
+      await service.createWorkoutForDate(date, 'pull');
+      routineOn(date, 'push');
+
+      expect(service.getPlannedForDate(date).map(w => w.category)).toEqual(['push']);
+    });
+
+    // Una rutina que no vas complir el mes passat no és un planificat pendent:
+    // és un dia que no vas entrenar.
+    it('no es proposa res cap enrere', () => {
+      const past = addDays(service.todayDateString(), -3);
+      routineOn(past, 'push');
+
+      expect(service.getPlannedForDate(past).length).toBe(0);
+    });
+
+    // És tot el sentit del canvi: a la base de dades hi va el que has fet.
+    it('començar-lo el converteix en un entrenament de debò', async () => {
+      const date = future();
+      routineOn(date, 'push');
+      const projected = service.getPlannedForDate(date)[0];
+
+      const id = await service.startPlannedWorkout(projected.id);
+
+      expect(id).not.toBe(projected.id);
+      const store = TestBed.inject(WorkoutStoreService);
+      expect(store.has(id)).toBeTrue();
+      expect(store.get(id)!.date).toBe(date);
+      expect(store.get(id)!.entries.map(e => e.exerciseId)).toEqual(['ex1']);
+      // I el dia queda retirat de la proposta, per no sortir dues vegades.
+      expect(dismissRoutine).toHaveBeenCalledWith(projected.id);
+    });
+
+    it('esborrar-lo és treure el dia de la rutina, no esborrar cap fila', async () => {
+      const date = future();
+      routineOn(date, 'push');
+      const projected = service.getPlannedForDate(date)[0];
+
+      await service.deleteWorkout(projected.id);
+
+      expect(dismissRoutine).toHaveBeenCalledWith(projected.id);
+      expect(workoutsChain.delete).not.toHaveBeenCalled();
+    });
+  });
 });
 
 // ── matchesHistoryFilters() ─────────────────────────────────────────────────

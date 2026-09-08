@@ -77,6 +77,7 @@ export class UserSettingsService {
   readonly insightShownAt              = computed(() => this._settings().insightShownAt ?? {});
   readonly insightCelebrated           = computed(() => this._settings().insightCelebrated ?? []);
   readonly dismissedProposalDates      = computed(() => this._settings().dismissedProposalDates ?? []);
+  readonly dismissedRoutinePlans       = computed(() => this._settings().dismissedRoutinePlans ?? []);
   readonly guidedTourDone              = computed(() => this._settings().guidedTourDone ?? false);
 
   constructor() {

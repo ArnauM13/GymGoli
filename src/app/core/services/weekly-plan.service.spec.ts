@@ -4,6 +4,7 @@ import { WeeklyPlanService } from './weekly-plan.service';
 import { WorkoutService } from './workout.service';
 import { SportService } from './sport.service';
 import { TemplateService } from './template.service';
+import { RoutineProjectionService } from './routine-projection.service';
 import { WeeklyPlan } from '../models/weekly-plan.model';
 import { Workout } from '../models/workout.model';
 import { SportSession } from '../models/sport.model';
@@ -40,6 +41,7 @@ describe('WeeklyPlanService', () => {
   let logSession: jasmine.Spy;
   let deleteSession: jasmine.Spy;
   let templates: WorkoutTemplate[];
+  let dismissRoutine: jasmine.Spy;
   let service: WeeklyPlanService;
 
   beforeEach(() => {
@@ -58,6 +60,7 @@ describe('WeeklyPlanService', () => {
     logSession                = jasmine.createSpy().and.resolveTo(undefined);
     deleteSession             = jasmine.createSpy().and.resolveTo(undefined);
     templates                 = [];
+    dismissRoutine            = jasmine.createSpy().and.resolveTo(undefined);
 
     TestBed.configureTestingModule({
       providers: [
@@ -85,6 +88,13 @@ describe('WeeklyPlanService', () => {
           provide: TemplateService,
           useValue: { templates: () => templates },
         },
+        {
+          provide: RoutineProjectionService,
+          useValue: {
+            projectedFor: () => ({ gym: [], sport: [] }),
+            dismiss:      dismissRoutine,
+          },
+        },
       ],
     });
     service = TestBed.inject(WeeklyPlanService);
@@ -107,13 +117,13 @@ describe('WeeklyPlanService', () => {
 
     it('creates a planned workout for a future day with a gym item', async () => {
       await service.apply(planWithGymOn(4 /* Friday, 2024-03-08 */, 'push'), 1);
-      expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-08', 'push', [], 'routine');
+      expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-08', 'push', [], 'manual');
     });
 
     it('creates a planned workout for today itself', async () => {
       // "today" (mocked) is Wednesday 2024-03-06 -> dayIndex 2
       await service.apply(planWithGymOn(2, 'legs'), 1);
-      expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-06', 'legs', [], 'routine');
+      expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-06', 'legs', [], 'manual');
     });
 
     it('skips days that already passed this week', async () => {
@@ -143,7 +153,7 @@ describe('WeeklyPlanService', () => {
     it('logs a planned sport session for a future day with a sport item', async () => {
       await service.apply(planWithSportOn(4, 'running'), 1);
       expect(logSession).toHaveBeenCalledWith(
-        '2024-03-08', 'running', { subtypeId: undefined, duration: undefined }, 'planned', 'routine');
+        '2024-03-08', 'running', { subtypeId: undefined, duration: undefined }, 'planned', 'manual');
     });
 
     it('does not duplicate a sport session that already exists for that day', async () => {
@@ -154,22 +164,22 @@ describe('WeeklyPlanService', () => {
 
     it('applies to every week within the requested horizon', async () => {
       await service.apply(planWithGymOn(2 /* Wednesday */, 'push', true), 3);
-      expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-06', 'push', [], 'routine'); // week 0
-      expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-13', 'push', [], 'routine'); // week 1
-      expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-20', 'push', [], 'routine'); // week 2
+      expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-06', 'push', [], 'manual'); // week 0
+      expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-13', 'push', [], 'manual'); // week 1
+      expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-20', 'push', [], 'manual'); // week 2
       expect(createPlannedWorkout).toHaveBeenCalledTimes(3);
     });
 
     it('targets an explicit startMonday instead of the current week when given one', async () => {
       // Explicit week starting 2024-03-11 (the week after the mocked "today"), Friday -> 2024-03-15
       await service.apply(planWithGymOn(4, 'push'), 1, '2024-03-11');
-      expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-15', 'push', [], 'routine');
-      expect(createPlannedWorkout).not.toHaveBeenCalledWith('2024-03-08', 'push', [], 'routine');
+      expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-15', 'push', [], 'manual');
+      expect(createPlannedWorkout).not.toHaveBeenCalledWith('2024-03-08', 'push', [], 'manual');
     });
 
-    it('defaults to source "routine" when none is given', async () => {
+    it('defaults to source "manual" when none is given', async () => {
       await service.apply(planWithGymOn(4, 'push'), 1);
-      expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-08', 'push', [], 'routine');
+      expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-08', 'push', [], 'manual');
     });
 
     it('tags created items with an explicit "manual" source when given (single-week planning)', async () => {
@@ -190,7 +200,7 @@ describe('WeeklyPlanService', () => {
         category === 'push' ? Promise.reject(new Error('network error')) : Promise.resolve('new-id'));
 
       await expectAsync(service.apply(plan, 1)).toBeResolved();
-      expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-06', 'legs', [], 'routine');
+      expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-06', 'legs', [], 'manual');
     });
 
     it('materializes a template\'s exercises when the gym item references one (plan in detail)', async () => {
@@ -206,13 +216,13 @@ describe('WeeklyPlanService', () => {
       expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-08', 'push', [
         { exerciseId: 'ex1', exerciseName: 'Press banca', sets: [{ weight: 60, reps: 8 }, { weight: 60, reps: 8 }, { weight: 60, reps: 8 }] },
         { exerciseId: 'ex2', exerciseName: 'Press militar', sets: [] },
-      ], 'routine');
+      ], 'manual');
     });
 
     it('falls back to an empty workout if the referenced template no longer exists', async () => {
       templates = [];
       await service.apply(planWithGymOn(4, 'push', false, 'missing-tpl'), 1);
-      expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-08', 'push', [], 'routine');
+      expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-08', 'push', [], 'manual');
     });
 
     it('prioritizes a custom entries list over a template id when both are present', async () => {
@@ -230,7 +240,7 @@ describe('WeeklyPlanService', () => {
 
       expect(createPlannedWorkout).toHaveBeenCalledWith('2024-03-08', 'push', [
         { exerciseId: 'custom1', exerciseName: 'Custom exercise', sets: [] },
-      ], 'routine');
+      ], 'manual');
     });
 
     it('passes a sport item\'s subtype and duration through to logSession', async () => {
@@ -240,14 +250,25 @@ describe('WeeklyPlanService', () => {
       await service.apply(plan, 1);
 
       expect(logSession).toHaveBeenCalledWith(
-        '2024-03-08', 'running', { subtypeId: 'sub1', duration: 45 }, 'planned', 'routine');
+        '2024-03-08', 'running', { subtypeId: 'sub1', duration: 45 }, 'planned', 'manual');
+    });
+  });
+
+  // La rutina recurrent ja no es materialitza: es projecta al calendari des de
+  // `user_settings.weeklyPlan`. Desar-la escrivia 91 entrenaments planificats
+  // —tretze setmanes per set dies— i els reescrivia a cada canvi.
+  describe('la rutina no escriu cap fila', () => {
+    it('no crea res quan la font és la rutina', async () => {
+      await service.apply(planWithGymOn(4, 'push', true), 13, undefined, 'routine');
+      expect(createPlannedWorkout).not.toHaveBeenCalled();
+      expect(logSession).not.toHaveBeenCalled();
     });
   });
 
   describe('retractRemoved()', () => {
-    it('deletes a future routine-planned workout whose category is no longer wanted (default source)', async () => {
+    it('deletes a future manually-planned workout whose category is no longer wanted (default source)', async () => {
       getPlannedForDate.and.returnValue([
-        { id: 'w1', categories: ['push'], plannedSource: 'routine' } as unknown as Workout,
+        { id: 'w1', categories: ['push'], plannedSource: 'manual' } as unknown as Workout,
       ]);
       await service.retractRemoved(emptyPlan(), 1); // nothing wanted on any day
       expect(deleteWorkout).toHaveBeenCalledWith('w1');
@@ -255,7 +276,7 @@ describe('WeeklyPlanService', () => {
 
     it('keeps a workout whose category is still in the plan', async () => {
       getPlannedForDate.and.callFake((date: string) =>
-        date === '2024-03-06' ? [{ id: 'w1', categories: ['push'], plannedSource: 'routine' } as unknown as Workout] : []);
+        date === '2024-03-06' ? [{ id: 'w1', categories: ['push'], plannedSource: 'manual' } as unknown as Workout] : []);
       await service.retractRemoved(planWithGymOn(2 /* Wednesday, today */, 'push'), 1);
       expect(deleteWorkout).not.toHaveBeenCalled();
     });
@@ -265,14 +286,6 @@ describe('WeeklyPlanService', () => {
         { id: 'w1', categories: ['push'], plannedSource: 'trainer' } as unknown as Workout,
       ]);
       await service.retractRemoved(emptyPlan(), 1);
-      expect(deleteWorkout).not.toHaveBeenCalled();
-    });
-
-    it('never touches a manually-planned workout when retracting the routine (independent sources)', async () => {
-      getPlannedForDate.and.returnValue([
-        { id: 'w1', categories: ['push'], plannedSource: 'manual' } as unknown as Workout,
-      ]);
-      await service.retractRemoved(emptyPlan(), 1); // default source: 'routine'
       expect(deleteWorkout).not.toHaveBeenCalled();
     });
 
@@ -303,7 +316,7 @@ describe('WeeklyPlanService', () => {
 
     it('skips days that already passed this week', async () => {
       getPlannedForDate.and.returnValue([
-        { id: 'w1', categories: ['push'], plannedSource: 'routine' } as unknown as Workout,
+        { id: 'w1', categories: ['push'], plannedSource: 'manual' } as unknown as Workout,
       ]);
       await service.retractRemoved(emptyPlan(), 1);
       // Monday (2024-03-04) is in the past relative to mocked "today" (2024-03-06)
@@ -312,7 +325,7 @@ describe('WeeklyPlanService', () => {
 
     it('deletes a planned sport session whose sport is no longer wanted (default source)', async () => {
       getPlannedSportSessionsForDate.and.returnValue([
-        { sport: { id: 'running' }, session: { id: 's1', plannedSource: 'routine' } },
+        { sport: { id: 'running' }, session: { id: 's1', plannedSource: 'manual' } },
       ]);
       await service.retractRemoved(emptyPlan(), 1);
       expect(deleteSession).toHaveBeenCalledWith('s1', jasmine.any(String));
@@ -320,22 +333,30 @@ describe('WeeklyPlanService', () => {
 
     it('keeps a planned sport session whose sport is still in the plan', async () => {
       getPlannedSportSessionsForDate.and.callFake((date: string) =>
-        date === '2024-03-06' ? [{ sport: { id: 'running' }, session: { id: 's1', plannedSource: 'routine' } }] : []);
+        date === '2024-03-06' ? [{ sport: { id: 'running' }, session: { id: 's1', plannedSource: 'manual' } }] : []);
       await service.retractRemoved(planWithSportOn(2, 'running'), 1);
       expect(deleteSession).not.toHaveBeenCalled();
     });
 
-    it('never touches a manually-planned sport session when retracting the routine', async () => {
+    it('never touches a routine-planned sport session when retracting a manual plan', async () => {
       getPlannedSportSessionsForDate.and.returnValue([
-        { sport: { id: 'running' }, session: { id: 's1', plannedSource: 'manual' } },
+        { sport: { id: 'running' }, session: { id: 's1', plannedSource: 'routine' } },
       ]);
-      await service.retractRemoved(emptyPlan(), 1); // default source: 'routine'
+      await service.retractRemoved(emptyPlan(), 1);
       expect(deleteSession).not.toHaveBeenCalled();
+    });
+
+    it('no esborra res quan es retira la rutina: no en té cap, de fila', async () => {
+      getPlannedForDate.and.returnValue([
+        { id: 'w1', categories: ['push'], plannedSource: 'routine' } as unknown as Workout,
+      ]);
+      await service.retractRemoved(emptyPlan(), 1, undefined, 'routine');
+      expect(deleteWorkout).not.toHaveBeenCalled();
     });
 
     it('keeps going when one deletion fails', async () => {
       getPlannedForDate.and.returnValue([
-        { id: 'w1', categories: ['push'], plannedSource: 'routine' } as unknown as Workout,
+        { id: 'w1', categories: ['push'], plannedSource: 'manual' } as unknown as Workout,
       ]);
       deleteWorkout.and.rejectWith(new Error('network error'));
       await expectAsync(service.retractRemoved(emptyPlan(), 1)).toBeResolved();

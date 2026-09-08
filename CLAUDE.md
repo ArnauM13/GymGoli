@@ -35,6 +35,10 @@ tests que les subjecten són allà.
 - `localStorage` és el magatzem principal dels entrenaments, no una còpia:
   s'hi escriu primer i es puja després (vegeu `SYNC.md`). També és el
   fallback de `user_settings` perquè l'app funcioni abans de la migració
+- **L'activitat es demana per trams, no per mesos**: una sola crida
+  (`activity_feed`) porta entrenaments i esports d'un rang de dies amb el
+  que necessita la targeta plegada i cap sèrie. Passa per
+  `WorkoutService.ensureRange()`; les sèries es demanen en obrir la sessió
 - Material Symbols (outlined) via the global font, never `mat-icon`
 
 ## Conventions

@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 
 import { WorkoutService } from './workout.service';
 import { SportService } from './sport.service';
+import { RoutineProjectionService } from './routine-projection.service';
 import { TemplateService } from './template.service';
 import { addDays, mondayOf, workoutCategories } from '../../shared/utils/calendar-utils';
 import { WeeklyPlan } from '../models/weekly-plan.model';
@@ -11,8 +12,8 @@ import { TemplateEntry } from '../models/template.model';
 import { todayStr } from '../../shared/utils/date.utils';
 
 export const WEEKS_SINGLE    = 1;
-/** ~3 months — the routine is materialized this far ahead once, when saved
- *  (see Configuració > Estableix rutines), not re-applied on every visit. */
+/** Fins on arriba la rutina recurrent. Ja no s'escriu res: és l'horitzó fins
+ *  al qual es **projecta** (vegeu `RoutineProjectionService`). */
 export const WEEKS_RECURRING = 13;
 
 /**
@@ -27,22 +28,29 @@ export type PlanSource = 'routine' | 'manual';
 const TODAY = (): string => todayStr();
 
 /**
- * Materializes a weekly plan template into real planned workouts / sport
- * sessions, using the exact same creation calls as the manual "plan a
- * future day" flow in TrainComponent — so entries show up on the calendar
- * indistinguishable from anything the user scheduled themselves.
+ * Converteix un pla setmanal en planificacions de debò.
+ *
+ * **Només per a les manuals.** La rutina recurrent ja no s'escriu: desar-la
+ * escrivia 91 entrenaments planificats a la base de dades i els tornava a
+ * escriure a cada canvi, per dir una cosa que ja consta a
+ * `user_settings.weeklyPlan`. Ara es projecta al calendari des d'allà
+ * (`RoutineProjectionService`) i el que es guarda és el que l'usuari acaba
+ * fent. Una planificació manual —un dia concret triat a mà— no surt de cap
+ * regla i no es pot deduir de res, així que aquella sí que és una fila.
  */
 @Injectable({ providedIn: 'root' })
 export class WeeklyPlanService {
   private workoutService  = inject(WorkoutService);
   private sportService    = inject(SportService);
   private templateService = inject(TemplateService);
+  private routine         = inject(RoutineProjectionService);
 
   /** `startMonday` lets a caller target a specific week (e.g. "plan the week
    *  I'm viewing right now") instead of always anchoring to the current one.
    *  `source` tags every workout/session this creates so it can later be
    *  retracted independently of the other source (see `PlanSource`). */
-  async apply(plan: WeeklyPlan, weeks: number, startMonday?: string, source: PlanSource = 'routine'): Promise<void> {
+  async apply(plan: WeeklyPlan, weeks: number, startMonday?: string, source: PlanSource = 'manual'): Promise<void> {
+    if (source === 'routine') return;   // la rutina es projecta, no s'escriu
     const hasAnyItem = plan.days.some(items => items.length > 0);
     if (!hasAnyItem) return;
 
@@ -102,7 +110,8 @@ export class WeeklyPlanService {
    * before the routine/manual split existed) are left alone either way,
    * since there's no way to know which of the two they came from.
    */
-  async retractRemoved(plan: WeeklyPlan, weeks: number, startMonday?: string, source: PlanSource = 'routine'): Promise<void> {
+  async retractRemoved(plan: WeeklyPlan, weeks: number, startMonday?: string, source: PlanSource = 'manual'): Promise<void> {
+    if (source === 'routine') return;   // la rutina no té cap fila a retirar
     const today  = TODAY();
     const monday = startMonday ?? mondayOf(today);
 
@@ -131,6 +140,23 @@ export class WeeklyPlanService {
           }
         }
       }
+    }
+  }
+
+  /**
+   * Treu la rutina d'una setmana sencera, dia a dia.
+   *
+   * Ho fa el planificador quan l'usuari tria sobreescriure la rutina fixa amb
+   * un pla d'una setmana. Com que la rutina no són files, «treure-la» vol dir
+   * apuntar que aquells dies no compten — o la regla els tornaria a proposar.
+   */
+  async dismissRoutineWeek(monday: string): Promise<void> {
+    const today = TODAY();
+    for (let i = 0; i < 7; i++) {
+      const date = addDays(monday, i);
+      if (date < today) continue;
+      const { gym, sport } = this.routine.projectedFor(date);
+      for (const item of [...gym, ...sport]) await this.routine.dismiss(item.id);
     }
   }
 

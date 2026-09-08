@@ -1,6 +1,7 @@
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 
 import { ActivityFeedService, FeedScope } from './activity-feed.service';
+import { RoutineProjectionService, isRoutineProjection } from './routine-projection.service';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { TodayService } from './today.service';
@@ -86,6 +87,9 @@ export class SportService {
    *  Vegeu `ActivityFeedService`: demanar un mes d'esports ja no és cap
    *  petició — el tram que el calendari o Inici ja han demanat el porta. */
   private activityFeed = inject(ActivityFeedService);
+  /** La rutina recurrent, projectada en comptes d'escrita. Vegeu
+   *  `RoutineProjectionService`. */
+  private routine      = inject(RoutineProjectionService);
 
   /** Igual que a WorkoutService: avui es mira, no es recorda. */
   private get _todayStr(): string { return this.today.today(); }
@@ -718,9 +722,42 @@ export class SportService {
     return this._pairsForDate(date, s => (s.status ?? 'done') !== 'planned');
   }
 
-  /** Returns sport + PLANNED session pairs for a given date. */
+  /**
+   * Els esports planificats d'un dia: els que són files de debò i, a sobre, el
+   * que proposa la rutina.
+   *
+   * La rutina no s'escriu (vegeu `RoutineProjectionService`): es calcula. Un
+   * esport que aquell dia ja té sessió —feta o planificada a mà— no es proposa
+   * dues vegades.
+   */
   getPlannedSportSessionsForDate(date: string): Array<{ sport: Sport; session: SportSession }> {
-    return this._pairsForDate(date, s => s.status === 'planned');
+    const real = this._pairsForDate(date, s => s.status === 'planned');
+    if (!this.routine.hasRoutine()) return real;
+
+    const proposed = this.routine.projectedFor(date).sport;
+    if (!proposed.length) return real;
+
+    const sportsMap = this._sportsById();
+    const already   = new Set((this._sessionsByDate().get(date) ?? []).map(s => s.sportId));
+
+    const projected: Array<{ sport: Sport; session: SportSession }> = [];
+    for (const p of proposed) {
+      if (already.has(p.sportId)) continue;
+      const sport = sportsMap.get(p.sportId);
+      if (!sport) continue;   // esport esborrat: la regla ja no vol dir res
+      projected.push({
+        sport,
+        session: {
+          id: p.id, date, sportId: p.sportId,
+          subtypeId: p.subtypeId,
+          duration:  p.duration,
+          status:    'planned',
+          plannedSource: 'routine',
+          createdAt: new Date(`${date}T00:00:00`),
+        },
+      });
+    }
+    return [...real, ...projected];
   }
 
   private _pairsForDate(
@@ -809,8 +846,26 @@ export class SportService {
     return id;
   }
 
-  /** Convert a planned sport session into a done one. */
-  async startPlannedSession(id: string, date: string): Promise<void> {
+  /**
+   * Converteix una sessió planificada en una de feta.
+   *
+   * Una sessió projectada de la rutina no és cap fila: començar-la és el
+   * moment en què passa a existir. Torna l'id de la sessió de debò, que en
+   * aquest cas no és el que se li ha passat.
+   */
+  async startPlannedSession(id: string, date: string): Promise<string> {
+    if (isRoutineProjection(id)) {
+      const proposed = this.getPlannedSportSessionsForDate(date).find(p => p.session.id === id);
+      const newId = await this.logSession(
+        date,
+        proposed?.sport.id ?? '',
+        { subtypeId: proposed?.session.subtypeId, duration: proposed?.session.duration },
+        'done',
+      );
+      await this.routine.materialized(id);
+      return newId;
+    }
+
     const uid = this._uid();
 
     const key    = date.substring(0, 7);
@@ -820,6 +875,7 @@ export class SportService {
     this._writeSessionsToStorage(uid, key, this._monthCache.get(key)!);
 
     await this._pushOrQueue(uid, { op: 'update', id, row: { status: 'done' } });
+    return id;
   }
 
   /**
@@ -862,6 +918,9 @@ export class SportService {
   }
 
   async deleteSession(id: string, date: string): Promise<void> {
+    // Una sessió projectada de la rutina no és cap fila: treure-la vol dir dir
+    // que aquell dia no compta, o la regla la tornaria a proposar tot seguit.
+    if (isRoutineProjection(id)) { await this.routine.dismiss(id); return; }
     await this._deleteSession(id, date);
   }
 
