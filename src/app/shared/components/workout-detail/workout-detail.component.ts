@@ -64,72 +64,80 @@ import { kgToDisplay } from '../../utils/weight.utils';
 
       } @else {
 
-        <!-- ── Els exercicis, sèrie a sèrie ── -->
+        <!-- ── Els exercicis, sèrie a sèrie ──
+             Cada exercici és una targeta pròpia (la mateixa forma que
+             l'item-card, barra de color a l'esquerra) en comptes d'una fila
+             més dins una llista contínua: així es distingeix d'un cop d'ull
+             on acaba un exercici i comença el següent. -->
         <section class="wd-block">
           <span class="wd-block-title">Exercicis</span>
           @if (workout().entries.length) {
-            @for (entry of workout().entries; track entry.exerciseId) {
-              <div class="entry-row" [style.--ec]="getEntryCatColor(entry)">
-                <div class="entry-name-row">
-                  <span class="entry-cat-dot"></span>
-                  <span class="entry-name">{{ entry.exerciseName }}</span>
-                  @if (getEntrySubLabel(entry); as sub) {
-                    <span class="entry-sub-badge" [style.color]="getEntryCatColor(entry)"
-                          [style.background]="'color-mix(in srgb, ' + getEntryCatColor(entry) + ' 12%, var(--c-card))'">{{ sub }}</span>
-                  }
-                  @if (entry.feeling) {
-                    <span class="entry-feeling">{{ getFeelingEmoji(entry.feeling) }}</span>
-                  }
-                  <!-- El resum de l'exercici al costat del nom: el que en
-                       diries en veu alta abans d'entrar a mirar sèrie a sèrie. -->
-                  <span class="entry-sum">{{ entrySummary(entry) }}</span>
-                </div>
-                @if (entry.sets.length > 0) {
-                  <div class="entry-sets-col">
-                    @for (set of entry.sets; track $index) {
-                      <div class="entry-set-line" [class.entry-set-line--max]="isMaxSet(entry, set)"
-                           [class.entry-set-line--warmup]="set.warmup">
-                        @if (set.warmup) {
-                          <span class="esl-num esl-num--warmup material-symbols-outlined"
-                                title="Sèrie d'escalfament">local_fire_department</span>
-                        } @else {
-                          <span class="esl-num">{{ workingSetNumber(entry, $index) }}</span>
-                        }
-                        <span class="esl-weight-group">
-                          @if (set.weightLeft != null) {
-                            <span class="esl-weight">E {{ dispW(set.weightLeft) }}<small>{{ unit() }}</small></span>
-                            <span class="esl-weight">D {{ dispW(set.weightRight!) }}<small>{{ unit() }}</small></span>
-                          } @else {
-                            <span class="esl-weight">{{ dispW(set.weight) }}<small>{{ unit() }}</small></span>
-                          }
-                        </span>
-                        <span class="esl-x">×</span>
-                        <span class="esl-reps-group">
-                          <span class="esl-reps">{{ set.reps }}</span>
-                          @for (d of (set.drops ?? []); track $index) {
-                            <span class="esl-drop-stage">
-                              <span class="esl-drop-sep">→</span>
-                              <span class="esl-weight drop">{{ dispW(d.weight) }}<small>{{ unit() }}</small></span>
-                              <span class="esl-x">×</span>
-                              <span class="esl-reps">{{ d.reps }}</span>
+            <div class="wd-entries">
+              @for (entry of workout().entries; track entry.exerciseId) {
+                <div class="entry-card" [style.--ec]="getEntryCatColor(entry)">
+                  <div class="entry-bar"></div>
+                  <div class="entry-body">
+                    <div class="entry-name-row">
+                      <span class="entry-name">{{ entry.exerciseName }}</span>
+                      @if (getEntrySubLabel(entry); as sub) {
+                        <span class="entry-sub-badge" [style.color]="getEntryCatColor(entry)"
+                              [style.background]="'color-mix(in srgb, ' + getEntryCatColor(entry) + ' 12%, var(--c-card))'">{{ sub }}</span>
+                      }
+                      @if (entry.feeling) {
+                        <span class="entry-feeling">{{ getFeelingEmoji(entry.feeling) }}</span>
+                      }
+                      <!-- El resum de l'exercici al costat del nom: el que en
+                           diries en veu alta abans d'entrar a mirar sèrie a sèrie. -->
+                      <span class="entry-sum">{{ entrySummary(entry) }}</span>
+                    </div>
+                    @if (entry.sets.length > 0) {
+                      <div class="entry-sets-col">
+                        @for (set of entry.sets; track $index) {
+                          <div class="entry-set-line" [class.entry-set-line--max]="isMaxSet(entry, set)"
+                               [class.entry-set-line--warmup]="set.warmup">
+                            @if (set.warmup) {
+                              <span class="esl-num esl-num--warmup material-symbols-outlined"
+                                    title="Sèrie d'escalfament">local_fire_department</span>
+                            } @else {
+                              <span class="esl-num">{{ workingSetNumber(entry, $index) }}</span>
+                            }
+                            <span class="esl-weight-group">
+                              @if (set.weightLeft != null) {
+                                <span class="esl-weight">E {{ dispW(set.weightLeft) }}<small>{{ unit() }}</small></span>
+                                <span class="esl-weight">D {{ dispW(set.weightRight!) }}<small>{{ unit() }}</small></span>
+                              } @else {
+                                <span class="esl-weight">{{ dispW(set.weight) }}<small>{{ unit() }}</small></span>
+                              }
                             </span>
-                          }
-                        </span>
-                        @if (isMaxSet(entry, set)) { <span class="esl-pr">PR</span> }
+                            <span class="esl-x">×</span>
+                            <span class="esl-reps-group">
+                              <span class="esl-reps">{{ set.reps }}</span>
+                              @for (d of (set.drops ?? []); track $index) {
+                                <span class="esl-drop-stage">
+                                  <span class="esl-drop-sep">→</span>
+                                  <span class="esl-weight drop">{{ dispW(d.weight) }}<small>{{ unit() }}</small></span>
+                                  <span class="esl-x">×</span>
+                                  <span class="esl-reps">{{ d.reps }}</span>
+                                </span>
+                              }
+                            </span>
+                            @if (isMaxSet(entry, set)) { <span class="esl-pr">PR</span> }
+                          </div>
+                        }
+                      </div>
+                    } @else {
+                      <span class="no-sets">Cap sèrie registrada</span>
+                    }
+                    @if (entry.notes) {
+                      <div class="entry-note">
+                        <span class="material-symbols-outlined entry-note-icon" aria-hidden="true">sticky_note_2</span>
+                        <span class="entry-note-text">{{ entry.notes }}</span>
                       </div>
                     }
                   </div>
-                } @else {
-                  <span class="no-sets">Cap sèrie registrada</span>
-                }
-                @if (entry.notes) {
-                  <div class="entry-note">
-                    <span class="material-symbols-outlined entry-note-icon" aria-hidden="true">sticky_note_2</span>
-                    <span class="entry-note-text">{{ entry.notes }}</span>
-                  </div>
-                }
-              </div>
-            }
+                </div>
+              }
+            </div>
           } @else {
             <span class="no-sets">Cap exercici registrat</span>
           }
@@ -169,8 +177,8 @@ import { kgToDisplay } from '../../utils/weight.utils';
   `,
   styles: [`
     .workout-detail {
-      display: flex; flex-direction: column; gap: 12px;
-      padding: 10px 12px 10px 14px;
+      display: flex; flex-direction: column; gap: 18px;
+      padding: 16px;
       border-top: 1px solid color-mix(in srgb, var(--ac, var(--c-border-2)) 18%, var(--c-border-2));
       background: var(--c-card);
     }
@@ -191,10 +199,10 @@ import { kgToDisplay } from '../../utils/weight.utils';
     @media (prefers-reduced-motion: reduce) { .wd-spinner { animation-duration: 2s; } }
 
     /* ── Blocs, com al detall d'una sessió d'esport ── */
-    .wd-block { display: flex; flex-direction: column; gap: 8px; }
+    .wd-block { display: flex; flex-direction: column; gap: 10px; }
     .wd-block-title {
-      font-size: 10.5px; font-weight: 700; color: var(--c-text-3);
-      text-transform: uppercase; letter-spacing: 0.3px;
+      font-size: 13px; font-weight: 700; color: var(--c-text-3);
+      text-transform: uppercase; letter-spacing: 0.4px;
     }
 
     /* ── L'ullada: una línia per exercici ── */
@@ -215,79 +223,88 @@ import { kgToDisplay } from '../../utils/weight.utils';
       flex-shrink: 0; font-size: 12.5px; font-weight: 700; color: var(--c-text); line-height: 1.3;
     }
 
-    .entry-row {
-      display: flex; flex-direction: column; gap: 8px;
-      padding-bottom: 12px; border-bottom: 1px solid var(--c-border-2);
-      &:last-child { border-bottom: none; padding-bottom: 0; }
+    /* Un exercici, una targeta: mateixa forma que l'item-card (barra de
+       color a l'esquerra, contingut a la dreta) perquè cada exercici es
+       distingeixi del següent sense haver de llegir-se'ls tots seguits. */
+    .wd-entries { display: flex; flex-direction: column; gap: 10px; }
+    .entry-card {
+      display: flex; align-items: stretch;
+      border: 1.5px solid var(--c-border-2); border-radius: 14px;
+      background: var(--c-card); overflow: hidden;
     }
-    .entry-name-row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
-    .entry-cat-dot { width: 4px; height: 16px; border-radius: 2px; flex-shrink: 0; background: var(--ec, var(--c-border)); }
-    .entry-name { flex: 1; min-width: 0; font-size: 13px; font-weight: 700; color: var(--c-text); line-height: 1.25; }
-    .entry-sub-badge {
-      flex-shrink: 0; padding: 1px 6px; border-radius: 8px;
-      font-size: 10px; font-weight: 600; line-height: 1.4;
-    }
-    .entry-feeling { font-size: 16px; line-height: 1; }
-    .entry-sum { flex-shrink: 0; font-size: 11.5px; font-weight: 700; color: var(--c-text-3); }
+    .entry-bar { width: 5px; flex-shrink: 0; background: var(--ec, var(--c-border)); }
+    .entry-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; }
 
-    .entry-sets-col { display: flex; flex-direction: column; gap: 2px; padding-left: 11px; }
+    .entry-name-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .entry-name { flex: 1; min-width: 0; font-size: 15px; font-weight: 800; color: var(--c-text); line-height: 1.3; }
+    .entry-sub-badge {
+      flex-shrink: 0; padding: 2px 7px; border-radius: 8px;
+      font-size: 11px; font-weight: 600; line-height: 1.4;
+    }
+    .entry-feeling { font-size: 18px; line-height: 1; }
+    .entry-sum { flex-shrink: 0; font-size: 13px; font-weight: 700; color: var(--c-text-2); }
+
+    .entry-sets-col { display: flex; flex-direction: column; }
     .entry-set-line {
-      display: grid; grid-template-columns: 16px auto auto auto auto;
-      justify-content: start; align-items: baseline; gap: 5px;
-      padding: 3px 6px; border-radius: 6px; transition: background 0.15s;
+      display: grid; grid-template-columns: 22px auto auto auto auto;
+      justify-content: start; align-items: baseline; gap: 8px;
+      padding: 8px 6px; border-bottom: 1px solid var(--c-border-2); transition: background 0.15s;
+      &:last-child { border-bottom: none; padding-bottom: 4px; }
+      &:nth-child(odd) { background: color-mix(in srgb, var(--ec, var(--c-subtle)) 4%, transparent); }
     }
-    .entry-set-line--max { background: color-mix(in srgb, var(--ec, var(--c-brand)) 8%, transparent); }
+    .entry-set-line--max { background: color-mix(in srgb, var(--ec, var(--c-brand)) 10%, transparent); }
     .entry-set-line--warmup { opacity: 0.7; }
-    .esl-num { font-size: 10px; font-weight: 700; color: var(--c-text-3); text-align: right; }
-    .esl-num--warmup { font-size: 13px; color: #ff9800; font-variation-settings: 'FILL' 1, 'wght' 400; }
+    .esl-num { font-size: 12px; font-weight: 700; color: var(--c-text-3); text-align: right; }
+    .esl-num--warmup { font-size: 15px; color: #ff9800; font-variation-settings: 'FILL' 1, 'wght' 400; }
     .esl-weight {
-      font-size: 13px; font-weight: 700; color: var(--c-text);
-      small { font-size: 9px; font-weight: 400; color: var(--c-text-3); margin-left: 1px; }
+      font-size: 15px; font-weight: 800; color: var(--c-text);
+      small { font-size: 10px; font-weight: 500; color: var(--c-text-3); margin-left: 1px; }
     }
-    .esl-x { font-size: 11px; color: var(--c-text-3); }
-    .esl-reps { font-size: 12px; font-weight: 600; color: var(--c-text-2); }
-    .esl-weight-group, .esl-reps-group { display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; }
-    .esl-drop-stage { display: inline-flex; align-items: baseline; gap: 5px; }
-    .esl-weight.drop { font-size: 11px; font-weight: 600; opacity: 0.75; }
-    .esl-drop-sep { font-size: 11px; color: var(--c-text-3); }
+    .esl-x { font-size: 12px; color: var(--c-text-3); }
+    .esl-reps { font-size: 14px; font-weight: 700; color: var(--c-text-2); }
+    .esl-weight-group, .esl-reps-group { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+    .esl-drop-stage { display: inline-flex; align-items: baseline; gap: 6px; }
+    .esl-weight.drop { font-size: 12px; font-weight: 600; opacity: 0.75; }
+    .esl-drop-sep { font-size: 12px; color: var(--c-text-3); }
     .esl-pr {
-      padding: 1px 6px; border-radius: 6px; line-height: 1.3;
-      font-size: 9px; font-weight: 800; letter-spacing: 0.3px;
+      padding: 2px 7px; border-radius: 6px; line-height: 1.3;
+      font-size: 10px; font-weight: 800; letter-spacing: 0.3px;
       color: #b88500; background: rgba(255, 193, 7, 0.18);
     }
     .entry-set-line--max .esl-weight { color: color-mix(in srgb, var(--ec, var(--c-brand)) 75%, var(--c-text)); }
-    .no-sets { padding-left: 12px; font-size: 12px; color: var(--c-text-3); font-style: italic; }
+    .no-sets { padding-left: 2px; font-size: 13px; color: var(--c-text-3); font-style: italic; }
 
     .entry-note {
-      display: flex; align-items: flex-start; gap: 5px;
-      margin-top: 4px; padding: 5px 8px; border-radius: 7px;
+      display: flex; align-items: flex-start; gap: 6px;
+      margin-top: 2px; padding: 7px 10px; border-radius: 8px;
       background: rgba(var(--c-brand-rgb), 0.06);
     }
-    .entry-note-icon { font-size: 13px; color: var(--c-brand); flex-shrink: 0; margin-top: 1px; }
-    .entry-note-text { font-size: 12px; color: var(--c-text-2); font-style: italic; line-height: 1.4; }
+    .entry-note-icon { font-size: 14px; color: var(--c-brand); flex-shrink: 0; margin-top: 1px; }
+    .entry-note-text { font-size: 13px; color: var(--c-text-2); font-style: italic; line-height: 1.45; }
 
     /* La sensació, amb la mateixa forma de fila que les dades d'un esport. */
     .wd-feeling-row {
-      display: flex; align-items: center; gap: 7px; min-height: 20px;
-      padding: 5px 6px; border-radius: 7px;
+      display: flex; align-items: center; gap: 8px; min-height: 24px;
+      padding: 8px 10px; border-radius: 10px;
       background: color-mix(in srgb, var(--ac, var(--c-subtle)) 5%, var(--c-subtle));
     }
-    .wd-feeling-icon { flex-shrink: 0; font-size: 14px; color: var(--c-text-3); }
-    .wd-feeling-label { flex: 1; min-width: 0; font-size: 12px; font-weight: 600; color: var(--c-text-2); }
-    .wd-feeling-value { flex-shrink: 0; font-size: 13px; font-weight: 700; color: var(--c-text); }
+    .wd-feeling-icon { flex-shrink: 0; font-size: 16px; color: var(--c-text-3); }
+    .wd-feeling-label { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: var(--c-text-2); }
+    .wd-feeling-value { flex-shrink: 0; font-size: 15px; font-weight: 700; color: var(--c-text); }
 
     .workout-notes {
-      display: flex; align-items: flex-start; gap: 7px;
-      padding: 8px 10px; border-radius: 8px; background: var(--c-subtle);
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 10px 12px; border-radius: 10px; background: var(--c-subtle);
       border-left: 3px solid color-mix(in srgb, var(--ac, var(--c-border)) 45%, var(--c-border-2));
-      font-size: 12px; color: var(--c-text-2); line-height: 1.45;
-      .material-symbols-outlined { font-size: 15px; color: var(--c-text-3); flex-shrink: 0; margin-top: 1px; }
+      font-size: 13px; color: var(--c-text-2); line-height: 1.5;
+      .material-symbols-outlined { font-size: 16px; color: var(--c-text-3); flex-shrink: 0; margin-top: 1px; }
     }
     .workout-notes-text { flex: 1; min-width: 0; font-style: italic; overflow-wrap: anywhere; }
 
     .workout-volume-footer {
-      display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap;
-      padding-top: 2px; font-size: 11px; font-weight: 600; color: var(--c-text-3);
+      display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap;
+      padding-top: 10px; border-top: 1px solid var(--c-border-2);
+      font-size: 13px; font-weight: 600; color: var(--c-text-3);
       .wvf-sep { color: var(--c-border-2); }
       .wvf-warmup { color: #ff9800; margin-left: 3px; }
     }
