@@ -1614,8 +1614,10 @@ export class TrainComponent implements OnDestroy {
 
   async startPlan(w: Workout): Promise<void> {
     try {
-      await this.workoutService.startPlannedWorkout(w.id);
-      this.openWorkout(w.id);
+      // Un planificat de la rutina no és cap fila fins que el comences: el
+      // que s'obre és l'entrenament que s'acaba de crear, no el projectat.
+      const id = await this.workoutService.startPlannedWorkout(w.id);
+      this.openWorkout(id);
     } catch {
       this.feedback.error('Error en iniciar el pla', 2500);
     }

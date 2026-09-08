@@ -1,4 +1,4 @@
-import { Component, computed, inject, input } from '@angular/core';
+import { Component, computed, effect, inject, input } from '@angular/core';
 
 import { RECORD_METRICS, Sport, SportMetricDef, SportSession } from '../../../core/models/sport.model';
 import { FeelingLevel } from '../../../core/models/workout.model';
@@ -32,9 +32,11 @@ interface SportDetailRow {
  * situa la durada respecte del que sols fer, quines xifres són la teva millor
  * marca, i quantes en portes d'aquest esport.
  *
- * Els rècords i les mitjanes surten de l'historial sencer (`loadAllSessions`),
- * mai dels mesos que hi hagi carregats: una fita calculada a mitges és pitjor
- * que no dir-ne res, i per això no surt fins que l'historial hi és tot.
+ * Els rècords i les mitjanes surten de totes les sessions **d'aquest esport**
+ * (`loadSessionsForSport`), mai dels mesos que hi hagi carregats: una fita
+ * calculada a mitges és pitjor que no dir-ne res, i per això no surt fins que
+ * han arribat. Abans es baixaven les de tots els esports, i qui obria una
+ * sessió de córrer s'enduia també cada partit de pàdel que hagués jugat mai.
  */
 @Component({
   selector: 'app-sport-detail',
@@ -175,23 +177,23 @@ export class SportDetailComponent {
 
   constructor() {
     // El detall només es dibuixa quan algú desplega la targeta, i llavors sí
-    // que val la pena tenir l'historial sencer: és una crida i prou, que la
-    // resta de vegades es queda al primer `if`.
-    this.sportService.loadAllSessions();
+    // que val la pena demanar l'historial d'aquest esport: és una crida i
+    // prou, i la resta de vegades es queda a la guarda de «ja el tinc».
+    effect(() => { void this.sportService.loadSessionsForSport(this.sport().id); });
   }
 
   /** Les sessions fetes d'aquest esport, l'actual a part: el llistó contra el
    *  qual es mesura. Buit mentre l'historial no hi sigui tot. */
   private readonly history = computed((): SportSession[] => {
-    if (!this.sportService.allSessionsLoaded()) return [];
     const sportId = this.sport().id;
+    if (!this.sportService.sportHistoryLoaded(sportId)) return [];
     const own     = this.session().id;
     return this.sportService.sessions().filter(s => s.sportId === sportId && s.id !== own);
   });
 
   /** Quantes sessions d'aquest esport porta el compte, aquesta inclosa. */
   private readonly sessionNumber = computed(() => {
-    if (!this.sportService.allSessionsLoaded()) return 0;
+    if (!this.sportService.sportHistoryLoaded(this.sport().id)) return 0;
     const date = this.session().date;
     // Es compta per data, no pel total: una sessió de fa mig any és la 12a
     // d'aleshores, no la 30a d'ara.

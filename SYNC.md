@@ -114,10 +114,68 @@ El que es demana al servidor va per necessitat, no per costum:
 
 | Què es demana | Quan | Què porta |
 | --- | --- | --- |
-| La finestra recent (`_pullChanges`) | En arrencar i en tornar a l'app | Les sessions senceres dels últims mesos |
-| L'historial vell (`loadHistorySummaries`) | En arrencar | Dia, tipus, sensació i noms d'exercicis. **Cap sèrie** |
-| Un mes (`ensureMonthLoaded`) | En obrir-lo al calendari | Aquell mes sencer |
+| Un tram de dies (`activity_feed`) | En arrencar (tres mesos) i quan l'usuari va més enrere | Entrenaments **i** esports del tram: dia, tipus, sensació, noms d'exercicis i les xifres de la targeta. **Cap sèrie** |
+| La finestra recent (`_pullChanges`) | En arrencar i en tornar a l'app | El que ha canviat, amb les sessions senceres dels últims mesos |
+| Una sessió (`ensureWorkoutEntries`) | En obrir-la | Aquella sessió sencera |
 | Un exercici (`loadWorkoutsForExercise`) | En obrir-ne el progrés | Totes les sessions on surt |
+| Un esport (`loadSessionsForSport`) | En desplegar-ne una targeta | Totes les sessions d'aquell esport |
+| Una sessió d'esport (`ensureSessionLoaded`) | En obrir-la per l'URL | Aquella fila |
+| Una cerca (`searchHistory`) | En escriure a l'historial | Només les coincidències, de tot l'historial |
+| Els rècords (`WorkoutStatsService`) | En obrir Gràfiques | Una fila per exercici: sessions, màxim i última data |
+
+**Una pregunta per tram, no una per mes.** `ActivityFeedService` recorda quins
+trams ja han arribat i fusiona els que es toquen, així que demanar un mes que
+ja hi cap no és cap petició — i com que la resposta porta les dues activitats,
+un mes d'esports tampoc. Abans eren dues consultes per mes visible, cadascuna
+amb totes les sèries de cada sessió, perquè per pintar «6 exerc · 21 sèr ·
+4.2t» calia el `jsonb` sencer. Ara aquestes xifres les compta el servidor
+(migració 031) i viatgen com tres números.
+
+### El que veu els esborrats
+
+Una consulta de canvis mai no diu què ha **desaparegut**: no hi ha cap fila que
+ho digui. La consulta de tram sí, perquè cobreix el tram sencer — el que aquí
+consta com a pujat i allà no hi surt s'ha esborrat des d'un altre dispositiu
+(`store.reconcileScope()`, amb les mateixes guardes que `mergeServerScope()`).
+
+Per això el refresc en tornar a l'app són **dues consultes, sempre dues**:
+què ha canviat, i qui hi ha d'haver al tram calent. Abans, un cop alguna
+pantalla havia demanat tot l'historial —i el perfil ho feia en entrar,
+sempre— cada canvi de pestanya passats cinc minuts en baixava una còpia
+sencera; i quan no, una petició per cada mes que haguessis arribat a mirar.
+
+### Res no baixa «tot»
+
+Cap consulta de l'app es porta la vida sencera de l'usuari. La regla és que
+**una consulta ha d'estar acotada per alguna cosa**: un tram de dies, un
+exercici, un esport, una fila, o un filtre. Les tres que no ho estaven ja no
+hi són:
+
+| Què es preguntava | Com es contestava | Com es contesta |
+| --- | --- | --- |
+| «Quin és el meu rècord de cada exercici?» | Baixar tota la vida amb totes les sèries i calcular-ho aquí | `exercise_records()`: una fila per exercici |
+| «On surt "dominades" a l'historial?» | Igual, i filtrar-ho aquí | `activity_feed(..., p_search)`: només les coincidències |
+| «Quantes sessions d'aquest esport porto?» | Baixar les de **tots** els esports | `loadSessionsForSport()`: les d'aquell |
+
+El patró és sempre el mateix: **agregar i filtrar és feina del servidor**. Sap
+fer-ho amb índexs i torna el resultat, no les dades per calcular-lo. El que
+viatja deixa de créixer amb l'historial: qui porta vuit anys entrenant rep el
+mateix que qui en porta dos.
+
+### El que no es guarda
+
+La rutina recurrent **no és cap fila**. Establir-ne una escrivia 91
+entrenaments planificats —tretze setmanes per set dies— i els reescrivia a
+cada canvi, per dir una cosa que ja consta a `user_settings.weeklyPlan`: un
+sol `jsonb` que ja se sincronitza sol. `RoutineProjectionService` la projecta
+al calendari des d'allà, i el dia que la comences és el moment en què
+l'entrenament passa a existir i es guarda.
+
+El que es guarda, doncs, és el que l'usuari ha **fet** — més les
+planificacions manuals, que no surten de cap regla i no es poden deduir de
+res. Treure un dia concret de la rutina («avui no») s'apunta a
+`user_settings.dismissedRoutinePlans`: si no, la regla el tornaria a proposar
+tot seguit.
 | Una sessió (`ensureWorkoutEntries`) | En desplegar-ne el detall | Les seves sèries |
 | Tot (`loadAllWorkouts`) | Progrés, i buscar al calendari | L'historial sencer, amb indicador de càrrega |
 

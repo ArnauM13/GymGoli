@@ -60,20 +60,25 @@ export class WorkoutProfileService {
   private auth            = inject(AuthService);
 
   constructor() {
-    // «Dies des de l'últim <tipus>» només és cert si es mira tot l'historial:
-    // un tipus entrenat en un mes que encara no s'ha demanat sembla que no
-    // s'hagi fet mai. D'aquí només calen les dates i els tipus, així que es
-    // demana el resum i no les sèries de tota la vida de l'usuari.
+    // «Dies des de l'últim <tipus>» necessita mirar enrere, i abans això volia
+    // dir **tot l'historial**: el resum de cada entrenament de tota la vida de
+    // l'usuari, més totes les sessions d'esport senceres, demanat en entrar i
+    // per a tothom, l'hagués de mirar o no. Era la petició més cara de
+    // l'arrencada, i a més deixava l'app en mode «ja ho tinc tot», cosa que
+    // feia que cada tornada a l'app en tornés a baixar una còpia.
+    //
+    // Amb la finestra recent n'hi ha prou, i és la que ja hi és per als altres
+    // motius: aquest perfil no distingeix entre «fa 95 dies» i «no ho has fet
+    // mai» —les dues coses es tallen a 99 i donen la mateixa suggerència— i
+    // tres mesos de sessions són de sobres per calcular la cadència d'algú que
+    // entrena. Qui entrena menys d'un cop cada tres mesos ja surt com a
+    // «encara no l'has entrenat», que és exactament el que vol dir.
     //
     // Es mira `uid()` i no la llista d'entrenaments: llegint la llista, cada
-    // fila que arribava tornava a disparar l'efecte, i com que la guarda de
-    // «ja està carregat» no es tanca fins al final, l'app engegava tres o
-    // quatre descàrregues de l'historial sencer a la vegada. Amb l'usuari n'hi
-    // ha prou: el que ha de tornar a passar és entrar-hi, no cada canvi.
+    // fila que arribava tornava a disparar l'efecte.
     effect(() => {
       if (!this.auth.uid()) return;
-      this.workoutService.loadHistorySummaries();
-      this.sportService.loadAllSessions();
+      void this.workoutService.ensureRecentWindow();
     });
   }
 

@@ -161,7 +161,10 @@ const RECENT_DAYS = 30;
 
         @if (historyOpen()) {
           <div class="history-body">
-            @if ((workoutService.isLoading() || !sportService.sportsLoaded()) && historyFeedDays().length === 0) {
+            <!-- L'esquelet només mentre falti la finestra que aquesta secció
+                 ensenya. Abans mirava «hi ha alguna consulta en marxa», i
+                 parpellejava per consultes que no tenien res a veure. -->
+            @if ((!workoutService.hasRecentWindow() || !sportService.sportsLoaded()) && historyFeedDays().length === 0) {
               <div class="feed-sk">
                 @for (_ of [1,2,3]; track $index) {
                   <div class="sk-card-ph">

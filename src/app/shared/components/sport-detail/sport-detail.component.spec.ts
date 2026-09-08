@@ -28,7 +28,7 @@ function makeSession(overrides: Partial<SportSession> = {}): SportSession {
 describe('SportDetailComponent', () => {
   let sessions: ReturnType<typeof signal<SportSession[]>>;
   let allLoaded: ReturnType<typeof signal<boolean>>;
-  let loadAllSessions: jasmine.Spy;
+  let loadSessionsForSport: jasmine.Spy;
   let scale: ReturnType<typeof signal<'emoji' | 'numeric'>>;
 
   function build(sport: Sport, session: SportSession): HTMLElement {
@@ -50,22 +50,28 @@ describe('SportDetailComponent', () => {
 
   beforeEach(async () => {
     sessions        = signal<SportSession[]>([]);
-    allLoaded       = signal(false);
-    loadAllSessions = jasmine.createSpy().and.resolveTo(undefined);
-    scale           = signal<'emoji' | 'numeric'>('emoji');
+    allLoaded            = signal(false);
+    loadSessionsForSport = jasmine.createSpy().and.resolveTo(undefined);
+    scale                = signal<'emoji' | 'numeric'>('emoji');
 
     await TestBed.configureTestingModule({
       imports: [SportDetailComponent],
       providers: [
         { provide: UserSettingsService, useValue: { difficultyScale: scale } },
-        { provide: SportService, useValue: { sessions, allSessionsLoaded: allLoaded, loadAllSessions } },
+        { provide: SportService, useValue: {
+          sessions,
+          sportHistoryLoaded:   () => allLoaded(),
+          loadSessionsForSport,
+        } },
       ],
     }).compileComponents();
   });
 
-  it("demana l'historial sencer en obrir-se", () => {
+  // Les d'aquest esport, no les de tots: qui obria una sessió de córrer
+  // s'enduia també cada partit de pàdel que hagués jugat mai.
+  it("demana l'historial d'aquest esport en obrir-se", () => {
     build(makeSport(), makeSession({ duration: 40 }));
-    expect(loadAllSessions).toHaveBeenCalled();
+    expect(loadSessionsForSport).toHaveBeenCalledWith('run');
   });
 
   describe('les dades de la sessió', () => {

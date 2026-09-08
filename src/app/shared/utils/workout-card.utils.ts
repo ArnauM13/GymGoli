@@ -1,5 +1,5 @@
 import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, ExerciseCategory, LoadType } from '../../core/models/exercise.model';
-import { FEELING_EMOJI, FeelingLevel, Workout, setVolume } from '../../core/models/workout.model';
+import { FEELING_EMOJI, FeelingLevel, Workout, hasFullEntries, setVolume } from '../../core/models/workout.model';
 import { DifficultyScale } from '../../core/models/user-settings.model';
 import { CARD_METRIC_PRIORITY, Sport, SportMetricDef } from '../../core/models/sport.model';
 import { workoutCategories } from './calendar-utils';
@@ -148,13 +148,32 @@ export function workoutPrimaryIcon(w: Workout): string {
   return (cats.length && CATEGORY_ICONS[cats[0] as ExerciseCategory]) || 'fitness_center';
 }
 
+/**
+ * Quants exercicis té la sessió.
+ *
+ * Quan les sèries hi són es compten les de debò —són les que l'usuari acaba de
+ * tocar i potser encara no ha pujat—; quan la sessió només s'ha demanat en
+ * mode targeta, val el que n'ha comptat el servidor.
+ *
+ * Aquest parell de camins és el que fa que una targeta plegada es pugui pintar
+ * sencera sense baixar-se cap sèrie. Abans, per ensenyar «6 exerc · 21 sèr ·
+ * 4.2t» calia el `jsonb` complet de la sessió, i per això l'app es baixava
+ * tres mesos d'entrenaments per acabar ensenyant-ne tres números.
+ */
+export function workoutExerciseCount(w: Workout): number {
+  if (!hasFullEntries(w)) return w.exerciseCount ?? 0;
+  return w.entries.length;
+}
+
 export function workoutSetsCount(w: Workout): number {
+  if (!hasFullEntries(w)) return w.setCount ?? 0;
   return w.entries.reduce((sum, e) => sum + e.sets.filter(s => !s.warmup).length, 0);
 }
 
 /** Warm-up sets across the whole workout — counted separately so they can be
  *  surfaced ("3 sèr + 1 esc") without inflating the working-set total. */
 export function workoutWarmupSetsCount(w: Workout): number {
+  if (!hasFullEntries(w)) return w.warmupCount ?? 0;
   return w.entries.reduce((sum, e) => sum + e.sets.filter(s => s.warmup).length, 0);
 }
 
@@ -169,6 +188,10 @@ export interface WorkoutVolumeContext {
 }
 
 export function workoutVolume(w: Workout, ctx?: WorkoutVolumeContext): number {
+  // Sense les sèries, el número el porta el servidor: `activity_feed` fa la
+  // mateixa matemàtica que hi ha aquí sota (pes corporal i tipus de càrrega
+  // inclosos) i la migració 031 la documenta al costat.
+  if (!hasFullEntries(w)) return w.volume ?? 0;
   return w.entries.reduce((sum, e) => {
     const setCtx = {
       bodyweightKg: ctx?.bodyweightKg,

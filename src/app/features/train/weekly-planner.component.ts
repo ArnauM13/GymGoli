@@ -727,7 +727,8 @@ export class WeeklyPlannerComponent {
     this.saving.set(true);
     try {
       if (overwriteRoutine) {
-        await this.weeklyPlanService.retractRemoved(EMPTY_WEEKLY_PLAN, WEEKS_SINGLE, monday, 'routine');
+        // La rutina d'aquella setmana no són files: es retiren dia a dia.
+        await this.weeklyPlanService.dismissRoutineWeek(monday);
       }
       await this.weeklyPlanService.retractRemoved(plan, WEEKS_SINGLE, monday, 'manual');
       await this.weeklyPlanService.apply(plan, WEEKS_SINGLE, monday, 'manual');
@@ -739,13 +740,20 @@ export class WeeklyPlannerComponent {
     }
   }
 
+  /**
+   * Desar la rutina és desar **la regla**, i prou.
+   *
+   * Abans, a més, s'escrivien 91 entrenaments planificats —tretze setmanes per
+   * set dies— i es tornaven a escriure a cada canvi. La rutina ja és aquest
+   * `weeklyPlan`, i el calendari la projecta des d'aquí
+   * (`RoutineProjectionService`): el que es guarda a la base de dades és el
+   * que l'usuari acaba fent, no el que es proposava.
+   */
   private async _saveRoutine(plan: WeeklyPlan): Promise<void> {
     this.saving.set(true);
     try {
       const recurringPlan: WeeklyPlan = { ...plan, recurring: true };
       await this.settingsService.updateWeeklyPlan(recurringPlan);
-      await this.weeklyPlanService.retractRemoved(recurringPlan, WEEKS_RECURRING, undefined, 'routine');
-      await this.weeklyPlanService.apply(recurringPlan, WEEKS_RECURRING, undefined, 'routine');
       this.feedback.success('Planificació desada', 2000);
     } catch {
       this.feedback.error('Error en desar la planificació', 3000);
@@ -764,7 +772,6 @@ export class WeeklyPlannerComponent {
     this.plan.set(this._clone(EMPTY_WEEKLY_PLAN));
     try {
       await this.settingsService.updateWeeklyPlan(EMPTY_WEEKLY_PLAN);
-      await this.weeklyPlanService.retractRemoved(EMPTY_WEEKLY_PLAN, WEEKS_RECURRING, undefined, 'routine');
       this.feedback.success('Planificació eliminada', 2000);
     } catch {
       this.feedback.error('Error en eliminar la planificació', 3000);

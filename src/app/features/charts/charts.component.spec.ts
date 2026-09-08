@@ -4,6 +4,7 @@ import { provideRouter } from '@angular/router';
 
 import { ChartsComponent } from './charts.component';
 import { WorkoutService } from '../../core/services/workout.service';
+import { ExerciseRecord, WorkoutStatsService } from '../../core/services/workout-stats.service';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
@@ -46,7 +47,7 @@ describe('ChartsComponent', () => {
   let component: ChartsComponent;
   let mockGetWorkoutsForExercise: jasmine.Spy;
   let mockExercisesWithData: ReturnType<typeof signal<Set<string>>>;
-  let mockLoadAllWorkouts: jasmine.Spy;
+  let mockEnsureStats: jasmine.Spy;
   let mockDoneWorkouts: jasmine.Spy;
   let mockSessions: jasmine.Spy;
 
@@ -59,7 +60,25 @@ describe('ChartsComponent', () => {
     TestBed.resetTestingModule();
     mockGetWorkoutsForExercise = jasmine.createSpy().and.callFake((id: string) => workoutsByExercise[id] ?? []);
     mockExercisesWithData      = signal(withData);
-    mockLoadAllWorkouts        = jasmine.createSpy();
+    mockEnsureStats            = jasmine.createSpy().and.resolveTo(undefined);
+
+    // El rècord de cada exercici el compta ara el servidor
+    // (`exercise_records`, migració 033). El mock fa la mateixa feina amb els
+    // entrenaments que el test declara, així els casos es continuen escrivint
+    // en termes de sèries.
+    const records = new Map<string, ExerciseRecord>();
+    for (const id of withData) {
+      const weights = (workoutsByExercise[id] ?? [])
+        .flatMap(w => w.entries.filter(e => e.exerciseId === id)
+          .flatMap(e => e.sets.filter(x => !x.warmup).map(x => x.weight)))
+        .filter(x => x > 0);
+      records.set(id, {
+        exerciseId: id,
+        sessions:   (workoutsByExercise[id] ?? []).length,
+        maxWeight:  weights.length ? Math.max(...weights) : 0,
+        lastDate:   null,
+      });
+    }
 
     mockDoneWorkouts = jasmine.createSpy().and.returnValue(opts.done ?? []);
     mockSessions     = jasmine.createSpy().and.returnValue(opts.sessions ?? []);
@@ -69,7 +88,16 @@ describe('ChartsComponent', () => {
       doneWorkouts:           mockDoneWorkouts,
       exercisesWithData:      mockExercisesWithData,
       getWorkoutsForExercise: mockGetWorkoutsForExercise,
-      loadAllWorkouts:        mockLoadAllWorkouts,
+      ensureRange:            jasmine.createSpy().and.resolveTo(undefined),
+      todayDateString:        () => MONDAY,
+    };
+
+    const mockStatsService = {
+      records:      signal(records),
+      totals:       signal({ totalDone: (opts.done ?? []).length, firstDate: null, lastDate: null }),
+      loading:      signal(false),
+      loaded:       signal(true),
+      ensureLoaded: mockEnsureStats,
     };
 
     const mockExerciseService = {
@@ -102,6 +130,7 @@ describe('ChartsComponent', () => {
       providers: [
         provideRouter([]),
         { provide: WorkoutService,      useValue: mockWorkoutService },
+        { provide: WorkoutStatsService, useValue: mockStatsService },
         { provide: ExerciseService,     useValue: mockExerciseService },
         { provide: SportService,        useValue: mockSportService },
         { provide: UserSettingsService, useValue: mockSettingsService },
@@ -121,8 +150,10 @@ describe('ChartsComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('loads the full workout history up-front instead of a manual "load more" step', () => {
-    expect(mockLoadAllWorkouts).toHaveBeenCalled();
+  // Abans es baixava tota la vida de l'usuari amb totes les sèries per
+  // acabar quedant-se, de cada exercici, amb un sol número.
+  it('demana els rècords comptats al servidor, no l\'historial per comptar-los', () => {
+    expect(mockEnsureStats).toHaveBeenCalled();
   });
 
   it('defaults expandedExerciseId to null', () => {

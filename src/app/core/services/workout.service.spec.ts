@@ -7,7 +7,10 @@ import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { ExerciseService } from './exercise.service';
 import { SyncService } from './sync.service';
-import { WORKOUT_SUMMARY_COLUMNS, WorkoutStoreService } from './workout-store.service';
+import { WorkoutStoreService } from './workout-store.service';
+import { ActivityFeedService } from './activity-feed.service';
+import { ProjectedGym, RoutineProjectionService, routineGymId } from './routine-projection.service';
+import { addDays } from '../../shared/utils/calendar-utils';
 
 interface QueryResult { data?: unknown; count?: number; error?: unknown }
 
@@ -71,6 +74,12 @@ describe('WorkoutService', () => {
   let workoutsChain: ReturnType<typeof makeQueryChain>;
   let service: WorkoutService;
   let pendingIds: ReturnType<typeof signal<string[]>>;
+  /** `activity_feed`: la consulta per trams. `feedRows` és el que contesta. */
+  let rpcSpy: jasmine.Spy;
+  let feedRows: Record<string, unknown>[];
+  /** El que la rutina proposa per a cada dia, per data. Buit = cap rutina. */
+  let routinePlan: Map<string, ProjectedGym[]>;
+  let dismissRoutine: jasmine.Spy;
   let vanished: ReturnType<typeof signal<{ id: string; date: string; at: number } | null>>;
   /** The realtime callback the service registered, so a test can play the part
    *  of the other device. */
@@ -81,6 +90,11 @@ describe('WorkoutService', () => {
     pendingIds = signal<string[]>([]);
     vanished = signal<{ id: string; date: string; at: number } | null>(null);
     workoutsChain = makeQueryChain({ data: [], count: 0, error: null });
+    feedRows = [];
+    rpcSpy = jasmine.createSpy('rpc').and.callFake(() =>
+      Promise.resolve({ data: feedRows, error: null }));
+    routinePlan    = new Map();
+    dismissRoutine = jasmine.createSpy('dismiss').and.resolveTo(undefined);
 
     fromSpy = jasmine.createSpy('from').and.callFake((table: string) =>
       table === 'workouts' ? workoutsChain : makeQueryChain({ data: [], count: 0, error: null }));
@@ -97,8 +111,16 @@ describe('WorkoutService', () => {
     TestBed.configureTestingModule({
       providers: [
         { provide: AuthService,     useValue: { uid } },
-        { provide: SupabaseService, useValue: { client: { from: fromSpy, channel: () => channelStub } } },
+        { provide: SupabaseService, useValue: {
+          client: { from: fromSpy, channel: () => channelStub, rpc: rpcSpy },
+        } },
         { provide: ExerciseService, useValue: { getById: () => undefined } },
+        { provide: RoutineProjectionService, useValue: {
+          hasRoutine:   () => routinePlan.size > 0,
+          projectedFor: (date: string) => ({ gym: routinePlan.get(date) ?? [], sport: [] }),
+          dismiss:      dismissRoutine,
+          materialized: dismissRoutine,
+        } },
         { provide: SyncService,     useValue: {
           notifyPending: jasmine.createSpy('notifyPending'),
           pendingIds:    () => pendingIds(),
@@ -112,7 +134,14 @@ describe('WorkoutService', () => {
     TestBed.flushEffects();
   }
 
-  beforeEach(() => { localStorage.clear(); setup(); });
+  beforeEach(async () => {
+    localStorage.clear();
+    setup();
+    // En arrencar ja surten la consulta de canvis i el tram recent. Si un test
+    // comença amb elles encara en vol, la guarda de «consulta en marxa» li fa
+    // tornar la resposta d'abans i el test mesura una altra cosa.
+    await new Promise(resolve => setTimeout(resolve, 0));
+  });
   afterEach(() => localStorage.clear());
 
   describe('loadWorkoutPage()', () => {
@@ -447,42 +476,66 @@ describe('WorkoutService', () => {
   // realtime només refrescava «avui» i el que hi havia a la cau i el servidor
   // ja no retornava es quedava enganxat.
   describe('sincronització entre dispositius', () => {
+    /** Quantes consultes de tram (`activity_feed`) s'han fet. */
+    function feedCallCount(): number {
+      return rpcSpy.calls.allArgs().filter(args => args[0] === 'activity_feed').length;
+    }
+
     it('no torna a demanar un mes ja carregat, però sí quan es força', async () => {
       await service.ensureMonthLoaded(2024, 2);
-      const calls = workoutsChain.gte.calls.count();
+      const calls = feedCallCount();
 
       await service.ensureMonthLoaded(2024, 2);
-      expect(workoutsChain.gte.calls.count()).toBe(calls);
+      expect(feedCallCount()).toBe(calls);
 
       await service.ensureMonthLoaded(2024, 2, true);
-      expect(workoutsChain.gte.calls.count()).toBe(calls + 1);
+      expect(feedCallCount()).toBe(calls + 1);
     });
 
-    it('refreshLoaded() torna a demanar els mesos carregats', async () => {
+    it('refreshLoaded() torna a demanar el que ja tenim carregat', async () => {
       await service.ensureMonthLoaded(2024, 2);
-      const calls = workoutsChain.gte.calls.count();
+      const calls = feedCallCount();
 
       await service.refreshLoaded(true);
 
-      expect(workoutsChain.gte.calls.count()).toBeGreaterThan(calls);
+      expect(feedCallCount()).toBeGreaterThan(calls);
     });
 
     it('refreshLoaded() es conté si s\'acaba de refrescar', async () => {
       await service.ensureMonthLoaded(2024, 2);
       await service.refreshLoaded(true);
-      const calls = workoutsChain.gte.calls.count();
+      const calls = feedCallCount();
 
       await service.refreshLoaded(); // tornar a l'app dispara focus i visibilitychange alhora
 
-      expect(workoutsChain.gte.calls.count()).toBe(calls);
+      expect(feedCallCount()).toBe(calls);
+    });
+
+    // El refresc era una petició **per cada mes** que haguessis arribat a
+    // mirar, i dues si comptem els esports: scrollar el calendari mig any
+    // enrere deixava l'app fent-ne una dotzena a cada canvi de pestanya.
+    it('refrescar no creix amb els mesos que has mirat', async () => {
+      for (let m = 0; m < 6; m++) await service.ensureMonthLoaded(2024, m);
+      const before = feedCallCount();
+
+      await service.refreshLoaded(true);
+
+      expect(feedCallCount()).toBe(before + 1);
     });
 
     it('treu una sessió que el servidor ja no retorna (esborrada des d\'un altre dispositiu)', async () => {
-      workoutsChain.result = { data: [row('w1', '2024-03-06')], count: 1, error: null };
+      feedRows = [{
+        kind: 'workout', item_id: 'w1', item_date: '2024-03-06', item_status: 'done',
+        planned_source: null, feeling: null, notes: null,
+        created_at: '2024-03-06T08:00:00.000Z', updated_at: null,
+        category: null, categories: [], exercise_names: null,
+        exercise_count: 0, set_count: 0, warmup_count: 0, volume: 0,
+        sport_id: null, subtype_id: null, duration: null, metrics: null,
+      }];
       await service.ensureMonthLoaded(2024, 2);
       expect(service.getWorkoutsForDate('2024-03-06').length).toBe(1);
 
-      workoutsChain.result = { data: [], count: 0, error: null };
+      feedRows = [];
       await service.ensureMonthLoaded(2024, 2, true);
 
       expect(service.getWorkoutsForDate('2024-03-06').length).toBe(0);
@@ -507,10 +560,17 @@ describe('WorkoutService', () => {
     });
 
     it('es queda amb el que té si la consulta falla', async () => {
-      workoutsChain.result = { data: [row('w1', '2024-03-06')], count: 1, error: null };
+      feedRows = [{
+        kind: 'workout', item_id: 'w1', item_date: '2024-03-06', item_status: 'done',
+        planned_source: null, feeling: null, notes: null,
+        created_at: '2024-03-06T08:00:00.000Z', updated_at: null,
+        category: null, categories: [], exercise_names: null,
+        exercise_count: 0, set_count: 0, warmup_count: 0, volume: 0,
+        sport_id: null, subtype_id: null, duration: null, metrics: null,
+      }];
       await service.ensureMonthLoaded(2024, 2);
 
-      workoutsChain.result = { data: null, count: 0, error: new Error('network') };
+      rpcSpy.and.callFake(() => Promise.resolve({ data: null, error: new Error('network') }));
       await service.ensureMonthLoaded(2024, 2, true);
 
       expect(service.getWorkoutsForDate('2024-03-06').length).toBe(1);
@@ -558,12 +618,13 @@ describe('WorkoutService', () => {
       expect(service.getWorkoutForDate('2024-03-06')!.entries[0].sets[0].weight).toBe(60);
     });
 
-    it('loadAllWorkouts() també refresca el que ja era a la cau', async () => {
+    it('un tram tornat a demanar refresca el que ja era al dispositiu', async () => {
       workoutsChain.result = { data: [row('w1', '2024-03-06', { notes: 'vell' })], count: 1, error: null };
-      await service.ensureMonthLoaded(2024, 2);
+      await service.refreshLoaded(true);
+      expect(service.getWorkoutForDate('2024-03-06')!.notes).toBe('vell');
 
-      workoutsChain.result = { data: [row('w1', '2024-03-06', { notes: 'nou' })], count: 1, error: null };
-      await service.loadAllWorkouts();
+      workoutsChain.result = { data: [row('w1', '2024-03-06', { notes: 'nou', updated_at: '2030-01-01T00:00:00.000Z' })], count: 1, error: null };
+      await service.refreshLoaded(true);
 
       expect(service.getWorkoutForDate('2024-03-06')!.notes).toBe('nou');
     });
@@ -580,32 +641,42 @@ describe('WorkoutService', () => {
       expect(workoutsChain.filter).not.toHaveBeenCalled();
     });
 
-    it('recorre l\'historial sencer per trams i amb un ordre total', async () => {
-      await service.loadAllWorkouts();
+    it('les sessions d\'un exercici es recorren per trams i amb un ordre total', async () => {
+      await service.loadWorkoutsForExercise('ex-1');
 
       expect(workoutsChain.range).toHaveBeenCalled();
       // Amb l'ordre només per data, dues sessions del mateix dia poden caure
       // entre dos trams i no sortir a cap.
-      expect(workoutsChain.order).toHaveBeenCalledWith('date', { ascending: false });
-      expect(workoutsChain.order).toHaveBeenCalledWith('created_at', { ascending: false });
-      expect(workoutsChain.order).toHaveBeenCalledWith('id', { ascending: false });
+      expect(workoutsChain.order).toHaveBeenCalledWith('date', { ascending: true });
+      expect(workoutsChain.order).toHaveBeenCalledWith('created_at', { ascending: true });
+      expect(workoutsChain.order).toHaveBeenCalledWith('id', { ascending: true });
     });
 
-    it('no dedueix cap esborrat d\'una resposta que ha fallat a mig recórrer', async () => {
-      workoutsChain.result = { data: [row('w1', '2024-03-06')], count: 1, error: null };
-      await service.ensureMonthLoaded(2024, 2);
-      expect(service.getWorkoutsForDate('2024-03-06').length).toBe(1);
+    // Cap consulta d'aquesta pàgina baixa ja tot l'historial: la cerca la
+    // contesta el servidor filtrada, i els rècords els compta ell.
+    it('buscar a l\'historial no baixa cap sèrie: va per l\'endpoint filtrat', async () => {
+      rpcSpy.calls.reset();
 
-      workoutsChain.result = { data: null, count: 0, error: new Error('network') };
-      await service.loadAllWorkouts();
+      await service.searchHistory({ search: 'dominades' });
 
-      // La sessió continua al dispositiu: una resposta incompleta no és prova
-      // que s'hagi esborrat des d'un altre lloc.
-      expect(service.getWorkoutsForDate('2024-03-06').length).toBe(1);
+      const call = rpcSpy.calls.allArgs().find(args => args[0] === 'activity_feed')!;
+      expect(call[1]).toEqual(jasmine.objectContaining({ p_search: 'dominades' }));
+      // Un filtre no diu qui hi ha d'haver, només qui coincideix: no pot
+      // treure del dispositiu el que no encaixi amb la cerca.
+      expect(service.workouts().length).toBe(0);
+    });
+
+    it('una cerca no es repeteix mentre l\'usuari escriu i esborra', async () => {
+      await service.searchHistory({ search: 'press' });
+      const calls = rpcSpy.calls.allArgs().filter(a => a[0] === 'activity_feed').length;
+
+      await service.searchHistory({ search: 'press' });
+
+      expect(rpcSpy.calls.allArgs().filter(a => a[0] === 'activity_feed').length).toBe(calls);
     });
 
     it('no s\'endú columnes que ningú llegeix', async () => {
-      await service.ensureMonthLoaded(2024, 2);
+      await service.refreshLoaded(true);
 
       const columns = workoutsChain.select.calls.mostRecent().args[0] as string;
       expect(columns).not.toContain('*');
@@ -698,47 +769,90 @@ describe('WorkoutService', () => {
     });
   });
 
-  // ── Carregat en dos temps ───────────────────────────────────────────────
+  // ── Carregat per trams ──────────────────────────────────────────────────
   //
-  // L'arrencada demanava `select('*')` de tota la vida de l'usuari per acabar
-  // fent servir la data i el tipus. Ara l'historial vell arriba en mode
-  // targeta i les sèries es demanen quan s'obre la sessió.
-  describe('carregat en dos temps', () => {
-    it('l\'historial vell es demana sense les sèries', async () => {
-      await service.loadHistorySummaries();
+  // L'arrencada demanava un mes per consulta —i per duplicat, perquè els
+  // esports viuen a una altra taula— amb totes les sèries de cada sessió, per
+  // acabar ensenyant la data, el tipus i tres xifres. Ara hi ha una sola
+  // pregunta per tram, sense cap sèrie, i les sèries es demanen en obrir la
+  // sessió.
+  describe('carregat per trams', () => {
+    /** Una fila d'`activity_feed` tal com la torna el servidor. */
+    function feedRow(id: string, date: string, extra: Record<string, unknown> = {}): Record<string, unknown> {
+      return {
+        kind: 'workout', item_id: id, item_date: date, item_status: 'done',
+        planned_source: null, feeling: null, notes: null,
+        created_at: `${date}T08:00:00.000Z`, updated_at: null,
+        category: null, categories: [], exercise_names: null,
+        exercise_count: 0, set_count: 0, warmup_count: 0, volume: 0,
+        sport_id: null, subtype_id: null, duration: null, metrics: null,
+        ...extra,
+      };
+    }
 
-      expect(workoutsChain.select).toHaveBeenCalledWith(WORKOUT_SUMMARY_COLUMNS);
-      expect(workoutsChain.lt).toHaveBeenCalledWith('date', jasmine.any(String));
+    function feedCalls(): unknown[][] {
+      return rpcSpy.calls.allArgs().filter(args => args[0] === 'activity_feed');
+    }
+
+    it('un tram es demana amb l\'endpoint de rang, no taula a taula', async () => {
+      rpcSpy.calls.reset();
+      await service.ensureRange('2024-01-01', '2024-03-31');
+
+      const call = feedCalls().at(-1)!;
+      expect(call[0]).toBe('activity_feed');
+      expect(call[1]).toEqual(jasmine.objectContaining({
+        p_from: '2024-01-01', p_to: '2024-03-31',
+      }));
     });
 
-    it('un resum es veu a la llista però no entra al magatzem', async () => {
-      workoutsChain.resultBySelect = {
-        [WORKOUT_SUMMARY_COLUMNS]: { data: [row('vella', '2019-05-04')], count: 1, error: null },
-      };
-      await service.loadHistorySummaries();
+    it('el que torna no porta cap sèrie: es veu a la llista però no entra al magatzem', async () => {
+      feedRows = [feedRow('vella', '2019-05-04', { set_count: 21, exercise_count: 6, volume: 4200 })];
+      await service.ensureRange('2019-05-01', '2019-05-31');
 
       const found = service.workouts().find(w => w.id === 'vella');
       expect(found).toBeTruthy();
       expect(found!.entriesLoaded).toBeFalse();
+      // Les xifres de la targeta hi són sense haver baixat cap sèrie: és tot
+      // el sentit del canvi.
+      expect(found!.setCount).toBe(21);
+      expect(found!.exerciseCount).toBe(6);
+      expect(found!.volume).toBe(4200);
       // El magatzem és la còpia bona i tot el que hi entra es puja: una sessió
       // sense sèries que hi entrés la buidaria al servidor.
       expect(TestBed.inject(WorkoutStoreService).has('vella')).toBeFalse();
     });
 
-    it('no torna a demanar-lo un cop el té', async () => {
-      await service.loadHistorySummaries();
-      const calls = workoutsChain.select.calls.count();
+    it('no torna a demanar un tram que ja té', async () => {
+      await service.ensureRange('2024-01-01', '2024-03-31');
+      const calls = feedCalls().length;
 
-      await service.loadHistorySummaries();
+      await service.ensureRange('2024-02-01', '2024-02-29');
 
-      expect(workoutsChain.select.calls.count()).toBe(calls);
+      expect(feedCalls().length).toBe(calls);
+    });
+
+    it('dues pantalles que demanen el mateix tram alhora són una sola consulta', async () => {
+      rpcSpy.calls.reset();
+      await Promise.all([
+        service.ensureRange('2024-01-01', '2024-03-31'),
+        service.ensureRange('2024-01-01', '2024-03-31'),
+      ]);
+
+      expect(feedCalls().length).toBe(1);
+    });
+
+    it('demanar un mes d\'esports no és cap petició si el tram ja hi és', async () => {
+      await service.ensureRange('2024-01-01', '2024-03-31');
+      const calls = feedCalls().length;
+
+      await service.ensureMonthLoaded(2024, 1); // febrer
+
+      expect(feedCalls().length).toBe(calls);
     });
 
     it('ensureWorkoutEntries() baixa la sessió sencera i la deixa editable', async () => {
-      workoutsChain.resultBySelect = {
-        [WORKOUT_SUMMARY_COLUMNS]: { data: [row('vella', '2019-05-04')], count: 1, error: null },
-      };
-      await service.loadHistorySummaries();
+      feedRows = [feedRow('vella', '2019-05-04')];
+      await service.ensureRange('2019-05-01', '2019-05-31');
 
       workoutsChain.singleResult = {
         data: row('vella', '2019-05-04', {
@@ -764,26 +878,31 @@ describe('WorkoutService', () => {
       expect(workoutsChain.maybeSingle.calls.count()).toBe(calls);
     });
 
-    // Cada senyal que canviava mentre la consulta viatjava en disparava una
-    // altra, i l'app arrencava baixant l'historial tres o quatre vegades.
-    it('dues peticions alhora de tot l\'historial són una sola consulta', async () => {
-      const calls = workoutsChain.select.calls.count();
+    // Una resposta de tram cobreix el tram sencer, o sigui que diu qui hi ha
+    // de ser: és l'única cosa que veu el que s'ha esborrat des d'un altre
+    // dispositiu, perquè una fila esborrada no surt a cap consulta de canvis.
+    it('el que ja no hi és al tram marxa del dispositiu', async () => {
+      const store = TestBed.inject(WorkoutStoreService);
+      const id = await service.createWorkoutForDate('2024-03-06');
+      store.ackUpsert(id, store.record(id)!.rev);
+      expect(store.has(id)).toBeTrue();
 
-      await Promise.all([service.loadAllWorkouts(), service.loadAllWorkouts()]);
+      feedRows = [];
+      await service.ensureRange('2024-03-01', '2024-03-31', true);
+      TestBed.flushEffects();
 
-      expect(workoutsChain.select.calls.count()).toBe(calls + 1);
+      expect(store.has(id)).toBeFalse();
     });
 
-    it('quan arriba tot l\'historial, els resums deixen de pintar res', async () => {
-      workoutsChain.resultBySelect = {
-        [WORKOUT_SUMMARY_COLUMNS]: { data: [row('vella', '2019-05-04')], count: 1, error: null },
-      };
-      await service.loadHistorySummaries();
-      expect(service.workouts().some(w => w.entriesLoaded === false)).toBeTrue();
+    it('el que encara espera pujar no el treu ningú', async () => {
+      const store = TestBed.inject(WorkoutStoreService);
+      const id = await service.createWorkoutForDate('2024-03-06');
 
-      await service.loadAllWorkouts();
+      feedRows = [];
+      await service.ensureRange('2024-03-01', '2024-03-31', true);
+      TestBed.flushEffects();
 
-      expect(service.workouts().some(w => w.entriesLoaded === false)).toBeFalse();
+      expect(store.has(id)).toBeTrue();
     });
   });
 
@@ -834,6 +953,92 @@ describe('WorkoutService', () => {
     });
   });
 
+
+  // ── La rutina, projectada ────────────────────────────────────────────────
+  //
+  // Establir una rutina escrivia 91 entrenaments planificats —tretze setmanes
+  // per set dies— i els reescrivia a cada canvi, per dir una cosa que ja
+  // consta a `user_settings.weeklyPlan`. Ara es calcula, i el que s'escriu és
+  // el que l'usuari acaba fent.
+  describe('la rutina es projecta, no s\'escriu', () => {
+    /** Una data futura: la projecció només mira endavant, i una rutina que no
+     *  vas complir el mes passat no és un planificat pendent. */
+    function future(days = 2): string {
+      return addDays(service.todayDateString(), days);
+    }
+
+    /** El que la rutina proposa per a un dia. */
+    function routineOn(date: string, category: string): void {
+      routinePlan.set(date, [{
+        id: routineGymId(date, category), date, category,
+        entries: [{ exerciseId: 'ex1', exerciseName: 'Press banca', sets: [] }],
+      }]);
+    }
+
+    it('el que proposa la rutina surt com a planificat sense ser cap fila', () => {
+      const date = future();
+      routineOn(date, 'push');
+
+      const planned = service.getPlannedForDate(date);
+      expect(planned.length).toBe(1);
+      expect(planned[0].category).toBe('push');
+      expect(planned[0].plannedSource).toBe('routine');
+      expect(TestBed.inject(WorkoutStoreService).has(planned[0].id)).toBeFalse();
+    });
+
+    it('un dia que ja té aquell tipus no es proposa dues vegades', async () => {
+      const date = future();
+      await service.createWorkoutForDate(date, 'push');
+      routineOn(date, 'push');
+
+      expect(service.getPlannedForDate(date).length).toBe(0);
+    });
+
+    it('un altre tipus el mateix dia sí que es proposa', async () => {
+      const date = future();
+      await service.createWorkoutForDate(date, 'pull');
+      routineOn(date, 'push');
+
+      expect(service.getPlannedForDate(date).map(w => w.category)).toEqual(['push']);
+    });
+
+    // Una rutina que no vas complir el mes passat no és un planificat pendent:
+    // és un dia que no vas entrenar.
+    it('no es proposa res cap enrere', () => {
+      const past = addDays(service.todayDateString(), -3);
+      routineOn(past, 'push');
+
+      expect(service.getPlannedForDate(past).length).toBe(0);
+    });
+
+    // És tot el sentit del canvi: a la base de dades hi va el que has fet.
+    it('començar-lo el converteix en un entrenament de debò', async () => {
+      const date = future();
+      routineOn(date, 'push');
+      const projected = service.getPlannedForDate(date)[0];
+
+      const id = await service.startPlannedWorkout(projected.id);
+
+      expect(id).not.toBe(projected.id);
+      const store = TestBed.inject(WorkoutStoreService);
+      expect(store.has(id)).toBeTrue();
+      expect(store.get(id)!.date).toBe(date);
+      expect(store.get(id)!.entries.map(e => e.exerciseId)).toEqual(['ex1']);
+      // I el dia queda retirat de la proposta, per no sortir dues vegades.
+      expect(dismissRoutine).toHaveBeenCalledWith(projected.id);
+    });
+
+    it('esborrar-lo és treure el dia de la rutina, no esborrar cap fila', async () => {
+      const date = future();
+      routineOn(date, 'push');
+      const projected = service.getPlannedForDate(date)[0];
+
+      await service.deleteWorkout(projected.id);
+
+      expect(dismissRoutine).toHaveBeenCalledWith(projected.id);
+      expect(workoutsChain.delete).not.toHaveBeenCalled();
+    });
+  });
 });
 
 // ── matchesHistoryFilters() ─────────────────────────────────────────────────

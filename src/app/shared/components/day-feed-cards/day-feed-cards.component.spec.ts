@@ -25,7 +25,9 @@ describe('DayFeedCardsComponent', () => {
   let confirm: jasmine.Spy;
 
   beforeEach(async () => {
-    startPlannedWorkout = jasmine.createSpy().and.resolveTo(undefined);
+    // Torna l'id de l'entrenament que s'ha d'obrir: un planificat de la
+    // rutina no és cap fila fins que es comença, i llavors n'és una de nova.
+    startPlannedWorkout = jasmine.createSpy().and.callFake((id: string) => Promise.resolve(id));
     deleteWorkout = jasmine.createSpy().and.resolveTo(undefined);
     updateSession = jasmine.createSpy().and.resolveTo(undefined);
     deleteSession = jasmine.createSpy().and.resolveTo(undefined);
@@ -38,8 +40,9 @@ describe('DayFeedCardsComponent', () => {
         { provide: WorkoutService, useValue: { startPlannedWorkout, deleteWorkout } },
         { provide: SportService, useValue: {
           updateSession, deleteSession, startPlannedSession,
-          sessions: signal([]), allSessionsLoaded: signal(false),
-          loadAllSessions: jasmine.createSpy().and.resolveTo(undefined),
+          sessions: signal([]),
+          sportHistoryLoaded: () => false,
+          loadSessionsForSport: jasmine.createSpy().and.resolveTo(undefined),
         } },
         { provide: UserSettingsService, useValue: { difficultyScale: signal('emoji'), bodyweightKg: signal(null), weightUnit: signal<'kg' | 'lb'>('kg') } },
         { provide: ExerciseService, useValue: { loadTypeOf: () => undefined, getById: () => undefined } },

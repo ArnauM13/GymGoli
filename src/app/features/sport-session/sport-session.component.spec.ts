@@ -30,7 +30,7 @@ describe('SportSessionComponent', () => {
   let fixture: ReturnType<typeof TestBed.createComponent<SportSessionComponent>>;
   let allSessions: ReturnType<typeof signal<SportSession[]>>;
   let allLoaded: ReturnType<typeof signal<boolean>>;
-  let loadAllSessions: jasmine.Spy;
+  let ensureSessionLoaded: jasmine.Spy;
   let updateSession: jasmine.Spy;
   let deleteSession: jasmine.Spy;
   let startPlannedSession: jasmine.Spy;
@@ -55,7 +55,7 @@ describe('SportSessionComponent', () => {
   beforeEach(async () => {
     allSessions         = signal<SportSession[]>([makeSession()]);
     allLoaded           = signal(true);
-    loadAllSessions     = jasmine.createSpy().and.resolveTo(undefined);
+    ensureSessionLoaded = jasmine.createSpy().and.resolveTo(undefined);
     updateSession       = jasmine.createSpy().and.resolveTo(undefined);
     deleteSession       = jasmine.createSpy().and.resolveTo(undefined);
     startPlannedSession = jasmine.createSpy().and.resolveTo(undefined);
@@ -82,10 +82,14 @@ describe('SportSessionComponent', () => {
             sportsLoaded: signal(true),
             sessions: computed(() => allSessions().filter(s => s.status !== 'planned')),
             plannedSessions: computed(() => allSessions().filter(s => s.status === 'planned')),
-            allSessionsLoaded: allLoaded,
+            sessionLookupDone: () => allLoaded(),
+            // El detall de la sessió, que la pàgina inclou, demana l'historial
+            // d'aquell esport per als seus rècords.
+            sportHistoryLoaded:   () => allLoaded(),
+            loadSessionsForSport: jasmine.createSpy().and.resolveTo(undefined),
             getSessionById: (id: string) => allSessions().find(s => s.id === id),
             ensureLoaded: jasmine.createSpy().and.resolveTo(undefined),
-            loadAllSessions, updateSession, deleteSession, startPlannedSession,
+            ensureSessionLoaded, updateSession, deleteSession, startPlannedSession,
           },
         },
         { provide: TodayService, useValue: { today: signal(TODAY) } },
@@ -109,9 +113,11 @@ describe('SportSessionComponent', () => {
     expect(el.querySelector('.ss-subtype')?.textContent?.trim()).toBe('Dobles');
   });
 
-  it("demana l'historial sencer: hi arriba per l'URL i no sap de quin mes és", () => {
+  // Abans, l'única manera de trobar-la era tenir-les totes. Ara es demana
+  // aquella fila, que és una consulta d'una fila.
+  it("demana la sessió pel seu id: hi arriba per l'URL i no sap de quin mes és", () => {
     build();
-    expect(loadAllSessions).toHaveBeenCalled();
+    expect(ensureSessionLoaded).toHaveBeenCalledWith('sess1');
   });
 
   it('diu que no hi és quan la sessió no existeix i ja ho tenim tot', () => {
@@ -122,7 +128,7 @@ describe('SportSessionComponent', () => {
     expect((fixture.nativeElement as HTMLElement).querySelector('.empty-state')).toBeTruthy();
   });
 
-  it('espera abans de dir que no hi és, si encara falta historial', () => {
+  it('espera abans de dir que no hi és, mentre encara la pot estar buscant', () => {
     allSessions.set([]);
     allLoaded.set(false);
     build('sess1');

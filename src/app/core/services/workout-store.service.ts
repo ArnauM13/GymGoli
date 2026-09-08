@@ -536,6 +536,36 @@ export class WorkoutStoreService {
     });
   }
 
+  /**
+   * Treu del dispositiu el que un tram sencer del servidor ja no porta.
+   *
+   * És el bessó de `mergeServerScope()` per a la consulta per rangs
+   * (`activity_feed`): aquella resposta no porta cap sèrie, o sigui que no s'hi
+   * pot incorporar res —una sessió sense sèries que entrés aquí es pujaria
+   * buida i esborraria l'entrenament de debò—, però **sí** que diu qui hi ha
+   * de ser. El que aquí consta com a pujat i allà no hi és, s'ha esborrat des
+   * d'un altre dispositiu.
+   *
+   * Les tres guardes són les de sempre: el que espera pujar es queda, el que
+   * s'ha confirmat mentre la consulta viatjava també (`since`), i el que ja
+   * està marcat per esborrar no s'hi torna a mirar.
+   */
+  reconcileScope(ids: Set<string>, from: string, to: string, since: number): void {
+    this.batch(() => {
+      for (const rec of [...this._byId.values()]) {
+        const w = rec.workout;
+        if (w.date < from || w.date > to) continue;
+        if (ids.has(w.id)) continue;
+        if (rec.rev > rec.syncedRev) continue;  // espera torn per pujar
+        if (rec.syncedTick > since) continue;   // confirmada mentre preguntàvem
+        this._byId.delete(w.id);
+        this._persist(w.date);
+        this.syncLog.log('pull-remove', { id: w.id, note: 'ja no hi és al servidor (tram)' });
+      }
+      this._bump();
+    });
+  }
+
   /** Un grapat de files soltes del servidor, en una sola escriptura i un sol
    *  avís. És el camí del pull incremental, que pot portar-ne moltes de cop. */
   applyServerRows(rows: Workout[]): void {

@@ -47,6 +47,17 @@ export interface UserSettings {
   weeklyPlan: WeeklyPlan | null;
   /** User asked to stop seeing the "set up a routine" reminder on Train. */
   routineHintDismissed: boolean;
+  /**
+   * Dies concrets que l'usuari ha tret de la rutina («avui no»), per id de
+   * projecció (`routine:<data>:gym:<tipus>`).
+   *
+   * La rutina ja no s'escriu com a 91 entrenaments planificats: es projecta al
+   * calendari des d'aquest mateix `weeklyPlan` (vegeu
+   * `RoutineProjectionService`). Esborrar-ne un dia, doncs, no és esborrar cap
+   * fila — és dir que aquell dia no compta, i ha de quedar apuntat en algun
+   * lloc o la regla el tornaria a proposar tot seguit.
+   */
+  dismissedRoutinePlans: string[];
   /** Built-in template suggestions (Plantilles page) the user dismissed. */
   dismissedBuiltInTemplateIds: string[];
   /** Ids of one-off discovery hints/nudges the user has dismissed
@@ -108,6 +119,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   fitnessGoal: null,
   weeklyPlan: null,
   routineHintDismissed: false,
+  dismissedRoutinePlans: [],
   dismissedBuiltInTemplateIds: [],
   dismissedHints: [],
   insightDismissedAt: {},

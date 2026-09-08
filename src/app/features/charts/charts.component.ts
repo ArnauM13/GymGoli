@@ -4,16 +4,20 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 
 import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS, ExerciseCategory } from '../../core/models/exercise.model';
-import { setMaxWeight } from '../../core/models/workout.model';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { TrainingTypeService } from '../../core/services/training-type.service';
 import { SportService } from '../../core/services/sport.service';
 import { TodayService } from '../../core/services/today.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
+import { WorkoutStatsService } from '../../core/services/workout-stats.service';
 import { addDays, mondayOf } from '../../shared/utils/calendar-utils';
 import { kgToDisplay } from '../../shared/utils/weight.utils';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+
+/** Fins on mira enrere la ratxa de setmanes, i per tant quin tram de resums
+ *  necessita la pàgina. */
+const STREAK_WEEKS = 52;
 import { ExerciseProgressInlineComponent } from '../../shared/components/exercise-progress-inline.component';
 import { FilterBarComponent } from '../../shared/components/filter-bar/filter-bar.component';
 
@@ -334,6 +338,8 @@ interface WeekBar {
 export class ChartsComponent {
   private exerciseService = inject(ExerciseService);
   private workoutService  = inject(WorkoutService);
+  /** Els rècords i el total, comptats al servidor. Vegeu `WorkoutStatsService`. */
+  private stats           = inject(WorkoutStatsService);
   private settingsService = inject(UserSettingsService);
   private sportService    = inject(SportService);
   private typeService     = inject(TrainingTypeService);
@@ -347,7 +353,7 @@ export class ChartsComponent {
 
   readonly unit = this.settingsService.weightUnit;
 
-  readonly isLoadingRecords = this.workoutService.isLoading;
+  readonly isLoadingRecords = computed(() => this.stats.loading() || !this.stats.loaded());
 
   readonly expandedExerciseId = signal<string | null>(null);
 
@@ -357,7 +363,9 @@ export class ChartsComponent {
 
   // ── Summary strip ────────────────────────────────────────────────────────
 
-  readonly totalWorkouts = computed(() => this.workoutService.doneWorkouts().length);
+  /** De tota la vida de l'usuari, no dels mesos carregats: és un `count` al
+   *  servidor (`workout_totals`), no baixar-se l'historial per comptar-lo. */
+  readonly totalWorkouts = computed(() => this.stats.totals()?.totalDone ?? 0);
 
   /** El dilluns i el diumenge de la setmana en curs, en hora local. */
   private readonly thisWeek = computed(() => {
@@ -415,7 +423,7 @@ export class ChartsComponent {
     if (workouts.length === 0) return 0;
     let streak = 0;
     let weekStart = this.thisWeek().monday;
-    for (let i = 0; i < 52; i++) {
+    for (let i = 0; i < STREAK_WEEKS; i++) {
       const weekEnd = addDays(weekStart, 6);
       if (!workouts.some(w => w.date >= weekStart && w.date <= weekEnd)) break;
       streak++;
@@ -426,20 +434,30 @@ export class ChartsComponent {
 
   // ── Exercise list (all exercises with logged data, grouped by category) ───
 
+  /**
+   * La llista d'exercicis amb el seu rècord.
+   *
+   * El rècord el compta el servidor (`exercise_records`, migració 033): és una
+   * fila per exercici. Abans, per treure'l, es baixava tota la vida de
+   * l'usuari amb totes les sèries de tots els exercicis — i un rècord calculat
+   * amb el que hi hagués carregat no hauria estat un rècord, així que no hi
+   * havia manera de fer-ho a mitges.
+   */
   readonly exerciseGroups = computed(() => {
     const exercises = this.exerciseService.exercises();
-    const withData  = this.workoutService.exercisesWithData();
+    const stats     = this.stats.records();
     const unit      = this.unit();
     const query     = this.searchQuery().trim().toLowerCase();
     const records = exercises
-      .filter(e => withData.has(e.id))
+      .filter(e => stats.has(e.id))
       .filter(e => !query || e.name.toLowerCase().includes(query))
       .map(ex => {
-        const allWeights = this.workoutService.getWorkoutsForExercise(ex.id)
-          .flatMap(w => w.entries.filter(e => e.exerciseId === ex.id).flatMap(e => e.sets.filter(s => !s.warmup).map(s => setMaxWeight(s))))
-          .filter(w => w > 0);
-        const display = allWeights.length ? kgToDisplay(Math.max(...allWeights), unit) : null;
-        return { exercise: ex, display, color: CATEGORY_COLORS[ex.category] };
+        const max = stats.get(ex.id)?.maxWeight ?? 0;
+        return {
+          exercise: ex,
+          display:  max > 0 ? kgToDisplay(max, unit) : null,
+          color:    CATEGORY_COLORS[ex.category],
+        };
       });
 
     const catFilter = this.filterCat();
@@ -468,9 +486,16 @@ export class ChartsComponent {
   constructor() {
     this.exerciseService.ensureLoaded();
     this.sportService.ensureLoaded();
-    // Load full workout history up-front — the exercise list always shows
-    // everything, there's no "load more" step.
-    this.workoutService.loadAllWorkouts();
+    // Els rècords i el total: dues consultes que tornen números i que no
+    // creixen amb l'historial. Abans, aquí es baixava tota la vida de
+    // l'usuari amb totes les sèries.
+    void this.stats.ensureLoaded();
+    // I la ratxa de setmanes, que sí que necessita saber quins dies vas
+    // entrenar: un any de resums, sense cap sèrie.
+    void this.workoutService.ensureRange(
+      addDays(this.workoutService.todayDateString(), -STREAK_WEEKS * 7),
+      this.workoutService.todayDateString(),
+    );
 
     // Deep-link support: expand the requested exercise when navigated here
     // via ?exerciseId=... (e.g. from the "veure gràfiques avançades" button).
