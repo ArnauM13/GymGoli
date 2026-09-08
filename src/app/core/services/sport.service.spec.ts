@@ -441,5 +441,42 @@ describe('SportService', () => {
 
       expect(supabaseMock.fromSpy.calls.count()).toBe(calls + 1);
     }));
+
+    // Cada senyal que canviava mentre la consulta viatjava en disparava una
+    // altra, i l'app arrencava baixant l'historial diverses vegades alhora.
+    it('dues peticions alhora de tot l\'historial són una sola consulta', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+      const calls = supabaseMock.fromSpy.calls.count();
+
+      void service.loadAllSessions();
+      void service.loadAllSessions();
+      tick();
+
+      expect(supabaseMock.fromSpy.calls.count()).toBe(calls + 1);
+    }));
+
+    // Tombar-ho i tornar-ho a aixecar feia que els rècords del detall d'una
+    // sessió es tornessin a pintar a mitges cada cop que l'app agafava el
+    // focus: part de les pampallugues que es veien mentre carregava.
+    it('refrescar no tomba mai «ja tinc tot l\'historial»', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+      void service.loadAllSessions();
+      tick();
+      expect(service.allSessionsLoaded()).toBeTrue();
+
+      const seen: boolean[] = [];
+      const stop = setInterval(() => seen.push(service.allSessionsLoaded()), 1);
+      void service.refreshLoaded(true);
+      tick(10);
+      clearInterval(stop);
+
+      expect(seen.every(v => v)).toBeTrue();
+      expect(service.allSessionsLoaded()).toBeTrue();
+      discardPeriodicTasks();
+    }));
   });
 });

@@ -15,7 +15,7 @@ part del codi i trenques això, s'ha trencat el sistema.
 | --- | --- | --- |
 | **Magatzem** | `core/services/workout-store.service.ts` | El que aquest dispositiu sap. Escriu i llegeix `localStorage`. No parla mai amb la xarxa. |
 | **Sincronització** | `core/services/sync.service.ts` | Puja al servidor el que el magatzem té pendent, i ho reintenta fins que hi arriba. |
-| **Domini** | `core/services/workout.service.ts` | La lògica d'entrenaments i els senyals que consumeix la interfície. Escriu al magatzem i avisa la sincronització. |
+| **Domini** | `core/services/workout.service.ts` | La lògica d'entrenaments i els senyals que consumeix la interfície. Escriu al magatzem i avisa la sincronització. També decideix què es demana al servidor i quan (§4). |
 
 El camí d'una sèrie és sempre el mateix:
 
@@ -107,6 +107,68 @@ El cas que demanava l'usuari — «hi ha dades al núvol i no en local» — sur
 sol d'aquí: una fila que el magatzem no coneix s'adopta tal qual.
 
 ---
+
+### Carregat en dos temps
+
+El que es demana al servidor va per necessitat, no per costum:
+
+| Què es demana | Quan | Què porta |
+| --- | --- | --- |
+| La finestra recent (`_pullChanges`) | En arrencar i en tornar a l'app | Les sessions senceres dels últims mesos |
+| L'historial vell (`loadHistorySummaries`) | En arrencar | Dia, tipus, sensació i noms d'exercicis. **Cap sèrie** |
+| Un mes (`ensureMonthLoaded`) | En obrir-lo al calendari | Aquell mes sencer |
+| Un exercici (`loadWorkoutsForExercise`) | En obrir-ne el progrés | Totes les sessions on surt |
+| Una sessió (`ensureWorkoutEntries`) | En desplegar-ne el detall | Les seves sèries |
+| Tot (`loadAllWorkouts`) | Progrés, i buscar al calendari | L'historial sencer, amb indicador de càrrega |
+
+Abans l'arrencada demanava `select('*')` de tota la vida de l'usuari —centenars
+de sessions amb totes les sèries— per acabar fent servir la data i el tipus:
+quant fa que no toques empenta, quantes setmanes seguides has entrenat.
+
+Els resums **no entren al magatzem**, i això no és un detall. El magatzem és la
+còpia bona del dispositiu i tot el que hi entra és candidat a pujar-se: una
+sessió sense sèries que hi entrés podria acabar buidant al servidor
+l'entrenament de debò. Viuen a part, a `WorkoutService._summaries`, i
+`workouts()` els posa **per sota** del magatzem — un resum només es veu si
+d'aquella sessió no en tenim res de millor. `applyServerRow()` també els rebutja
+explícitament, per si algun camí nou ho intentés.
+
+Una targeta pintada amb un resum no ensenya zeros: diu que cal obrir-la. En
+obrir-la es demanen les sèries amb l'indicador de càrrega, la sessió entra al
+magatzem i a partir d'aquí ja s'edita com qualsevol altra.
+
+La finestra recent queda fora dels resums a posta: és on miren les targetes
+d'Inici i les xifres que compten sèries i volum, i una targeta que primer surt
+sense xifres i després amb elles és pampallugueig.
+
+### Una resposta, una escriptura
+
+`store.batch()` agrupa una fusió sencera: **una escriptura per mes tocat i un
+sol avís als senyals**. Cada entrenament que s'incorporava tocava el disc i
+avisava pel seu compte, i una resposta de dos-cents entrenaments volien dir
+dos-cents `JSON.stringify` del mes sencer, dos-cents `localStorage.setItem`
+—que són síncrons i bloquegen la pàgina— i dues-centes recomposicions de tota
+la interfície: la pantalla es repintava una vegada per fila que arribava. El
+diari (§8) fa el mateix, ajornant la desada al final de la tanda.
+
+Fora d'aquí no canvia res: registrar una sèrie continua guardant-se a
+l'instant, que és la regla que aguanta tot el sistema.
+
+### Una consulta de cada, no quatre
+
+Les consultes senceres porten guarda de petició en marxa (`_fullLoad`,
+`_pullLoad`, `_summaryLoad`, `_allLoad` als esports): qui en demani una mentre
+viatja s'hi enganxa en comptes de llançar-ne una altra.
+
+Sense això, un `effect()` que llegia la llista d'entrenaments per tornar a
+carregar després d'entrar es redisparava a cada fila que arribava, i com que la
+guarda de «ja està carregat» no es tanca fins al final, l'app arrencava baixant
+l'historial sencer tres o quatre vegades a la vegada. Els efectes que han de
+reaccionar a entrar-hi miren `auth.uid()`, no les dades.
+
+Pel mateix motiu, refrescar els esports ja no tomba `allSessionsLoaded`: qui en
+depèn (els rècords del detall d'una sessió) es tornava a pintar a mitges cada
+cop que l'app recuperava el focus.
 
 ### Pull incremental
 
@@ -210,6 +272,8 @@ una sessió es va guardar bé aquí i què va contestar el servidor.
 - Cap ack pot tancar res sense comparar la revisió.
 - Cap resposta del servidor pot substituir una sessió pendent.
 - Un esborrat sense cobertura ha de deixar làpida.
+- Cap sessió sense sèries pot entrar al magatzem.
+- Cap consulta sencera es pot llançar dues vegades alhora.
 - Els tests que ho subjecten són `workout-store.service.spec.ts` i
   `sync.service.spec.ts`. Si en trenques un, és el sistema el que has
   trencat, no el test.

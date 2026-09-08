@@ -7,7 +7,7 @@ import {
   CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS,
   ExerciseCategory,
 } from '../../core/models/exercise.model';
-import { Workout } from '../../core/models/workout.model';
+import { Workout, workoutExerciseNames } from '../../core/models/workout.model';
 import { Sport, SportSession } from '../../core/models/sport.model';
 import { WorkoutService } from '../../core/services/workout.service';
 import { ExerciseService } from '../../core/services/exercise.service';
@@ -517,8 +517,9 @@ export class CalendarPageComponent implements OnDestroy {
   private _matchesWorkout(w: Workout, cat: ExerciseCategory | null, search: string): boolean {
     if (cat && !workoutCategoryList(w).includes(cat)) return false;
     if (search) {
-      const haystack = w.entries.map(e => e.exerciseName).join(' ').toLowerCase();
-      if (!haystack.includes(search)) return false;
+      // Els noms surten del resum quan la sessió encara no s'ha baixat
+      // sencera, així la cerca arriba a tot l'historial igualment.
+      if (!workoutExerciseNames(w).toLowerCase().includes(search)) return false;
     }
     return true;
   }
@@ -631,11 +632,20 @@ export class CalendarPageComponent implements OnDestroy {
     ]);
   }
 
+  /** Buscar o filtrar mira tot l'historial, sèries incloses: és el que fa
+   *  falta perquè les targetes trobades surtin amb les seves xifres. Com que
+   *  és la consulta grossa de la pàgina, va amb el mateix indicador que
+   *  l'infinite scroll. */
   private async _loadEverything(): Promise<void> {
-    await Promise.all([
-      this.workoutService.loadAllWorkouts(),
-      this.sportService.loadAllSessions(),
-    ]);
+    this.isLoadingMore.set(true);
+    try {
+      await Promise.all([
+        this.workoutService.loadAllWorkouts(),
+        this.sportService.loadAllSessions(),
+      ]);
+    } finally {
+      this.isLoadingMore.set(false);
+    }
     this._reachedEnd.set(true);
   }
 

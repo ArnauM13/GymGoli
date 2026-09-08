@@ -66,6 +66,7 @@ describe('TrainComponent', () => {
       getPlannedForDate:          jasmine.createSpy().and.returnValue([]),
       getLastWorkoutByCategory:   jasmine.createSpy().and.returnValue(null),
       ensureMonthLoaded:          jasmine.createSpy(),
+      ensureWorkoutEntries:       jasmine.createSpy().and.resolveTo(undefined),
       createWorkoutForDate:       jasmine.createSpy().and.resolveTo('new-id'),
       createWorkoutFromTemplate:  jasmine.createSpy().and.resolveTo('new-id'),
       addExerciseToWorkout:       jasmine.createSpy().and.resolveTo(undefined),

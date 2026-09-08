@@ -1,8 +1,9 @@
-import { Component, computed, inject, input } from '@angular/core';
+import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 
 import { CATEGORY_COLORS, ExerciseCategory, SUBCATEGORY_LABELS } from '../../../core/models/exercise.model';
-import { FeelingLevel, Workout, WorkoutEntry, WorkoutSet, setMaxWeight, setVolume } from '../../../core/models/workout.model';
+import { FeelingLevel, Workout, WorkoutEntry, WorkoutSet, hasFullEntries, setMaxWeight, setVolume } from '../../../core/models/workout.model';
 import { ExerciseService } from '../../../core/services/exercise.service';
+import { WorkoutService } from '../../../core/services/workout.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 import { formatFeeling } from '../../utils/workout-card.utils';
 import { kgToDisplay } from '../../utils/weight.utils';
@@ -13,12 +14,27 @@ import { kgToDisplay } from '../../utils/weight.utils';
  * Viu apart de la targeta perquè la targeta és la mateixa a tot arreu i el
  * detall només s'obre on té sentit (Historial). Abans estava incrustat a la
  * pàgina d'Historial i no es podia reaprofitar.
+ *
+ * És també on es demanen les sèries: de l'historial vell només se'n baixa el
+ * resum que necessita la targeta, i obrir el detall és el moment en què les
+ * sèries fan falta de debò. Mentre arriben, hi ha l'indicador de càrrega.
  */
 @Component({
   selector: 'app-workout-detail',
   standalone: true,
   template: `
     <div class="workout-detail">
+      @if (!isFull()) {
+        <div class="wd-pending" role="status">
+          @if (loadingEntries()) {
+            <span class="wd-spinner" aria-hidden="true"></span>
+            <span>Carregant les sèries…</span>
+          } @else {
+            <span class="material-symbols-outlined" aria-hidden="true">cloud_off</span>
+            <span>Les sèries d'aquesta sessió necessiten connexió</span>
+          }
+        </div>
+      } @else {
       @for (entry of workout().entries; track entry.exerciseId) {
         <div class="entry-row" [style.--ec]="getEntryCatColor(entry)">
           <div class="entry-name-row">
@@ -91,6 +107,7 @@ import { kgToDisplay } from '../../utils/weight.utils';
         <span class="wvf-sep">·</span>
         <span>{{ dispW(totalVolume()) }} {{ unit() }} volum</span>
       </div>
+      }
     </div>
   `,
   styles: [`
@@ -100,6 +117,21 @@ import { kgToDisplay } from '../../utils/weight.utils';
       border-top: 1px solid color-mix(in srgb, var(--ac, var(--c-border-2)) 18%, var(--c-border-2));
       background: var(--c-card);
     }
+
+    /* Mentre les sèries viatgen: una línia sola, de la mida d'una entrada,
+     * perquè el desplegable no salti d'alçada quan arribin. */
+    .wd-pending {
+      display: flex; align-items: center; gap: 8px; min-height: 34px;
+      font-size: 12px; font-weight: 600; color: var(--c-text-3);
+      .material-symbols-outlined { font-size: 16px; }
+    }
+    .wd-spinner {
+      width: 14px; height: 14px; flex-shrink: 0; border-radius: 50%;
+      border: 2px solid var(--c-border-2); border-top-color: var(--c-brand);
+      animation: wd-spin 0.7s linear infinite;
+    }
+    @keyframes wd-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .wd-spinner { animation-duration: 2s; } }
 
     .entry-row {
       display: flex; flex-direction: column; gap: 8px;
@@ -167,8 +199,27 @@ import { kgToDisplay } from '../../utils/weight.utils';
 export class WorkoutDetailComponent {
   private exerciseService = inject(ExerciseService);
   private settingsService = inject(UserSettingsService);
+  private workoutService  = inject(WorkoutService);
 
   readonly workout = input.required<Workout>();
+
+  /** Cert quan la sessió porta les sèries. Fals mentre només en tenim el
+   *  resum amb què s'ha pintat la targeta. */
+  readonly isFull = computed(() => hasFullEntries(this.workout()));
+  /** Cert mentre les sèries viatgen. */
+  readonly loadingEntries = signal(false);
+
+  constructor() {
+    effect(() => {
+      const w = this.workout();
+      if (hasFullEntries(w)) { untracked(() => this.loadingEntries.set(false)); return; }
+      untracked(() => {
+        this.loadingEntries.set(true);
+        this.workoutService.ensureWorkoutEntries(w.id)
+          .finally(() => this.loadingEntries.set(false));
+      });
+    });
+  }
 
   readonly unit = this.settingsService.weightUnit;
   dispW(kg: number): number { return kgToDisplay(kg, this.unit()); }
