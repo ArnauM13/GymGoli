@@ -173,8 +173,18 @@ cop que l'app recuperava el focus.
 ### Pull incremental
 
 `refreshLoaded()` demana primer **només el que ha canviat** des de l'últim
-cop (`updated_at > lastPulledAt`). És una consulta petita i porta de seguida
+cop (`updated_at >= lastPulledAt`). És una consulta petita i porta de seguida
 el que s'ha registrat des d'un altre dispositiu.
+
+**El marcador surt de les files, no del rellotge d'aquest dispositiu.**
+`updated_at` l'escriu qui fa el canvi, o sigui que la taula barreja les hores
+de tots els dispositius de l'usuari. Posant el marcador a «ara segons aquest»,
+un mòbil amb el rellotge dos minuts endarrerit escrivia files amb una hora ja
+passada: quedaven per sota del marcador per sempre i la consulta de canvis no
+les veia mai més. El marcador és l'`updated_at` **més alt que ha arribat de
+debò en una resposta**, i així viu al mateix rellotge que les dades que
+compara. Es demana amb `>=` i no `>` per no perdre els empats a la frontera
+d'un tram; tornar a aplicar una fila que ja hi era no costa res.
 
 Aquesta consulta no pot veure el que ha **desaparegut**: una fila esborrada
 ja no surt enlloc, i la taula no té cap marca de baixa. Per això la
@@ -182,6 +192,93 @@ comprovació sencera (mes a mes, o tot l'historial) es continua fent, però
 espaiada — cada 5 minuts, no a cada canvi de pestanya.
 
 ---
+
+## 4b. Consultes d'abast obert: sempre per trams
+
+PostgREST talla la resposta a un màxim de files (1.000 per defecte a Supabase)
+i **no ho diu enlloc**: arriba un 200 amb menys dades de les que hi ha. Aquí
+això no és ensenyar l'historial a mitges — `mergeServerScope()` dedueix dels
+forats que la resta s'ha esborrat des d'un altre dispositiu, i les treu del
+magatzem. Un usuari amb prou història es quedava sense la seva pròpia còpia.
+
+Per això tota consulta d'abast obert (tot l'historial, totes les sessions d'un
+exercici, la consulta de canvis) passa per `fetchAllRows()`
+(`supabase-page.util.ts`), que demana trams fins que un torna incomplet. Dues
+regles que van juntes:
+
+- **Ordre total i estable** (`date` + `created_at` + `id`, mai només la data):
+  si dues files empaten, PostgreSQL les pot resoldre diferent a cada tram i
+  n'hi ha que no surten a cap pàgina.
+- **`complete: false` no és una resposta.** Si un tram ha fallat, el que s'ha
+  recollit és un tros i no s'hi pot deduir cap esborrat: es manté el que hi
+  havia.
+
+Un mes és l'excepció: no hi cap prou entrenament per topar amb el topall, i
+s'estalvia la petició de comprovació.
+
+### Els esports també
+
+`WorkoutProfileService` demana tot l'historial d'esports en entrar —li cal per
+dir «fa X dies que no corres»— i des d'aquell moment `refreshLoaded()` el
+tornava a baixar **sencer** cada cop que l'app recuperava el focus: cada canvi
+de pestanya, anys de sessions, per assabentar-se de si n'hi havia una de nova.
+
+Ara segueix la mateixa forma que els entrenaments: consulta de canvis a cada
+tornada, comprovació sencera cada 5 minuts. La marca la posa un **disparador
+del servidor** (migració 030) i no el client, al revés que a `workouts`: aquí
+no hi ha cap guarda de concurrència que depengui que la marca sigui la del
+dispositiu, i posant-la el servidor no hi ha manera que un client se la deixi.
+
+El primer refresc de cada sessió no demana cap delta: encara no hi ha marcador,
+i qui porta les dades és la comprovació sencera que ve tot seguit. Només mira
+per on va el rellotge del servidor, que és una fila.
+
+Mentre la migració 030 no s'executi, el servidor contesta `42703` («la columna
+no hi és»), el client se'n desdiu sol i continua amb la comprovació sencera de
+sempre.
+
+## 4c. Què es demana, i què no
+
+Les consultes d'entrenaments porten una llista de columnes (`WORKOUT_COLUMNS`),
+no `select('*')`. La columna generada `exercise_names` repeteix en text pla els
+noms que ja venen dins d'`entries`: existeix perquè el servidor hi pugui cercar
+(migració 020), i `toWorkout()` ni la mira. En la consulta de tot l'historial
+—la que fan el progrés i el calendari— són desenes de kilobytes de xarxa i de
+memòria per no res. `user_id` tampoc cal: és el filtre de la consulta.
+
+Les sessions d'esport igual (`SPORT_SESSION_COLUMNS`), que a més s'enduien
+`duration_minutes`, la columna que `duration` va substituir fa migracions.
+
+## 4d. Índexs que sostenen aquestes consultes
+
+| Consulta | Índex |
+| --- | --- |
+| Canvis des de l'últim cop | `workouts (user_id, updated_at desc)` |
+| Sessions d'un exercici (`entries @> [{"exerciseId": …}]`) | `workouts` GIN `(entries jsonb_path_ops)` |
+| Historial per mes i paginat | `workouts (user_id, date desc)` |
+| Cerca per nom d'exercici | `workouts` GIN trigram `(exercise_names)` |
+| Canvis de les sessions d'esport | `sport_sessions (user_id, updated_at desc)` |
+
+Els dos primers són de la migració 029; l'últim, de la 030. La segona consulta abans anava amb
+`entries::text ilike '%"exerciseId":"…"%'`: convertir tot el blob a text obliga
+a llegir i convertir **cada** entrenament de l'usuari a cada consulta, i no hi
+ha índex que hi pugui ajudar. És la mateixa trampa que la migració 020 va
+treure de la cerca de l'historial.
+
+## 4e. El que es processa al dispositiu
+
+`workouts()` és tot l'historial carregat, i preguntar-li coses recorrent-lo
+sencer surt car allà on més mal fa: mentre entrenes. El marcador de rècord
+(`getAllTimeMaxWeight`) i el plafó de l'última sessió (`getLastSessionEntry`)
+són `computed()` que passen per **cada exercici del dia** i es refan **a cada
+sèrie que registres** — desenes de milers de comparacions per cada toc.
+
+`WorkoutService._byExercise` és el calaix per exercici, refet un cop per canvi
+igual que `byDate`, i ja ordenat de la sessió més recent a la més antiga
+(l'hereta de `store.workouts`). Amb això, «què vaig fer l'última vegada» és
+mirar el primer element del calaix, no filtrar i ordenar l'historial sencer.
+
+Si hi afegeixes consultes per exercici, fes-les passar pel calaix.
 
 ## 5. Esborrats
 
@@ -266,16 +363,63 @@ una sessió es va guardar bé aquí i què va contestar el servidor.
 
 ---
 
+## 8b. La resta de dades: catàlegs i paràmetres
+
+Els entrenaments no són l'única cosa que es veu des de dos llocs.
+
+**Els catàlegs** (exercicis, esports, tipus d'entrenament, plantilles) es
+carregaven un cop en entrar i es quedaven amb la foto d'aquell moment:
+l'exercici creat al mòbil no existia a la pestanya oberta a l'ordinador fins
+que no la recarregaves. Ara es tornen a demanar en tornar a l'app
+(`onAppResume()`, `app-resume.util.ts` — els mateixos tres senyals i el mateix
+marge que fan servir entrenaments i esports).
+
+Dues coses que van amb això:
+
+- **Una consulta que ha fallat no és «no en té cap».** Sembrar el catàleg per
+  defecte cada cop que la xarxa cau és ressuscitar el que l'usuari havia
+  esborrat: només es sembra a la primera càrrega (`allowSeed`), i mai amb un
+  error a la resposta.
+- **Sembrar és una operació, no dues.** Mirar quants n'hi ha i inserir-los
+  després deixa segons pel mig: estrenar l'app al mòbil i a l'ordinador alhora
+  feia que tots dos veiessin zero i tots dos sembressin, i el catàleg sortia
+  duplicat. `seed_default_exercises()` (migració 029) ho fa dins la mateixa
+  transacció, amb un pany per usuari.
+
+**Els paràmetres** (`user_settings`) són un sol jsonb, i el client hi escrivia
+tot el que tenia a memòria. Com que només el llegia en entrar, era un bloc
+vell: canviaves l'objectiu setmanal al mòbil i, a la nit, tocant el tema fosc a
+l'ordinador, l'objectiu tornava enrere. Ningú feia res estrany — la segona
+escriptura simplement portava una foto anterior.
+
+Ara puja **només els camps que has canviat** i els fusiona el servidor
+(`merge_user_settings()`, migració 029: `settings || excluded.settings`), i el
+que no ha pujat espera a `gymgoli_settings_pending_<uid>` fins que arriba —
+abans, un canvi fet sense cobertura es perdia en silenci. Mentre esperi, mana
+per damunt del que contesti el servidor, que és la mateixa regla que els
+entrenaments.
+
+**El pany entre pestanyes de la sessió.** Supabase rota el testimoni de refresc
+cada cop que el fa servir. Amb dues pestanyes obertes, les dues hi arriben
+alhora, les dues envien el mateix testimoni i la segona el troba gastat: la
+sessió cau sense que l'usuari hagi tocat res. `SupabaseService` passa un pany
+sobre `navigator.locks` perquè només una hi vagi.
+
+---
+
 ## 9. Si toques això
 
 - Cap escriptura pot passar per la xarxa abans de passar pel magatzem.
 - Cap ack pot tancar res sense comparar la revisió.
 - Cap resposta del servidor pot substituir una sessió pendent.
+- Una resposta incompleta no és prova que res s'hagi esborrat.
 - Un esborrat sense cobertura ha de deixar làpida.
 - Cap sessió sense sèries pot entrar al magatzem.
 - Cap consulta sencera es pot llançar dues vegades alhora.
-- Els tests que ho subjecten són `workout-store.service.spec.ts` i
-  `sync.service.spec.ts`. Si en trenques un, és el sistema el que has
+- Els tests que ho subjecten són `workout-store.service.spec.ts`,
+  `sync.service.spec.ts`, `supabase-page.util.spec.ts` i els blocs
+  «escala», «consulta de canvis» i «índex per exercici» de
+  `workout.service.spec.ts`. Si en trenques un, és el sistema el que has
   trencat, no el test.
 
 L'outbox d'esports (`sport.service.ts`) segueix el mateix criteri amb un

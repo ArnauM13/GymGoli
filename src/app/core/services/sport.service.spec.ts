@@ -41,14 +41,37 @@ describe('SportService', () => {
     const deleteSpy = jasmine.createSpy('delete');
     const fromSpy   = jasmine.createSpy('from');
 
-    const selectChain = (data: () => Record<string, unknown>[]): any => {
+    // Es comporta com un constructor de consultes de debò: els filtres tornen
+    // la mateixa cadena, esperar-la la resol sencera, i `.range()` en serveix
+    // un tram — que és com les consultes d'abast obert recorren l'historial.
+    //
+    // Les cadenes es creen a cada consulta, així que els filtres es van
+    // apuntant en llistes compartides: és l'única manera de mirar després què
+    // s'ha demanat de debò.
+    const selectCalls: string[] = [];
+    const filterCalls: Array<[string, string, unknown]> = [];
+    /** Errors per joc de columnes: així un test pot fer que el servidor digui
+     *  que una columna no hi és sense tocar la resta de consultes. */
+    const selectErrors: Record<string, unknown> = {};
+    const selectChain = (data: () => Record<string, unknown>[], cols?: string): any => {
+      if (cols !== undefined) selectCalls.push(cols);
+      const fail = cols !== undefined ? selectErrors[cols] : undefined;
+      const answer = () => fail ? { data: null, error: fail } : { data: data(), error: null };
       const chain: any = {};
-      chain.select = jasmine.createSpy('select').and.returnValue(chain);
-      chain.eq     = jasmine.createSpy('eq').and.returnValue(chain);
-      chain.gte    = jasmine.createSpy('gte').and.returnValue(chain);
-      chain.lte    = jasmine.createSpy('lte').and.returnValue(chain);
-      chain.order  = jasmine.createSpy('order').and.callFake(() =>
-        Promise.resolve({ data: data(), error: null }));
+      for (const method of ['select', 'neq', 'lte', 'lt', 'order', 'limit', 'contains']) {
+        chain[method] = jasmine.createSpy(method).and.returnValue(chain);
+      }
+      for (const method of ['eq', 'gte', 'gt']) {
+        chain[method] = jasmine.createSpy(method).and.callFake((col: string, value: unknown) => {
+          filterCalls.push([method, col, value]);
+          return chain;
+        });
+      }
+      chain.range = jasmine.createSpy('range').and.callFake((from: number, to: number) => {
+        const res = answer();
+        return Promise.resolve(res.error ? res : { data: res.data!.slice(from, to + 1), error: null });
+      });
+      chain.then = (resolve: (v: unknown) => void) => resolve(answer());
       return chain;
     };
 
@@ -72,15 +95,18 @@ describe('SportService', () => {
     const writers = { insert: insertSpy, upsert: upsertSpy, update: updateSpy, delete: deleteSpy };
     fromSpy.and.callFake((table: string) => {
       if (table === 'sports') {
-        return { select: () => selectChain(() => sportsData), ...writers };
+        return { select: (cols?: string) => selectChain(() => sportsData, cols), ...writers };
       }
       if (table === 'sport_sessions') {
-        return { select: () => selectChain(() => sessionsData), ...writers };
+        return { select: (cols?: string) => selectChain(() => sessionsData, cols), ...writers };
       }
-      return { select: () => selectChain(() => []), ...writers };
+      return { select: (cols?: string) => selectChain(() => [], cols), ...writers };
     });
 
-    return { client: { from: fromSpy }, fromSpy, insertSpy, upsertSpy, updateSpy, deleteSpy };
+    return {
+      client: { from: fromSpy }, fromSpy, insertSpy, upsertSpy, updateSpy, deleteSpy,
+      selectCalls, filterCalls, selectErrors,
+    };
   }
 
   function setup(): void {
@@ -455,6 +481,83 @@ describe('SportService', () => {
       tick();
 
       expect(supabaseMock.fromSpy.calls.count()).toBe(calls + 1);
+    }));
+
+    // ── Consulta de canvis ───────────────────────────────────────────────
+    // `WorkoutProfileService` demana tot l'historial en entrar, i des
+    // d'aleshores cada tornada a l'app el tornava a baixar sencer.
+    it('el primer refresc només mira per on va el rellotge del servidor', fakeAsync(() => {
+      sessionsData = [sessionRow('s1', '2024-03-06', { updated_at: '2024-03-06T10:00:00.000Z' })];
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+      void service.loadAllSessions();
+      tick();
+
+      supabaseMock.selectCalls.length = 0;
+      void service.refreshLoaded(true);
+      tick();
+
+      // Encara no hi ha delta que demanar: qui porta les dades aquest primer
+      // cop és la comprovació sencera, i baixar-ho tot dos cops seguits no
+      // diria res de nou.
+      expect(supabaseMock.selectCalls).toContain('updated_at');
+      discardPeriodicTasks();
+    }));
+
+    it('a partir d\'aleshores demana només el que ha canviat', fakeAsync(() => {
+      sessionsData = [sessionRow('s1', '2024-03-06', { updated_at: '2024-03-06T10:00:00.000Z' })];
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+      void service.loadAllSessions();
+      tick();
+      void service.refreshLoaded(true); // sembra el marcador i fa la sencera
+      tick();
+
+      supabaseMock.filterCalls.length = 0;
+      supabaseMock.selectCalls.length = 0;
+      void service.refreshLoaded(true);
+      tick();
+
+      // El marcador surt de les files, no del rellotge d'aquest dispositiu.
+      expect(supabaseMock.filterCalls
+        .filter(([, col]) => col === 'updated_at')
+        .map(([op, , value]) => [op, value]))
+        .toContain(['gte', '2024-03-06T10:00:00.000Z']);
+      // I la comprovació sencera s'espaia: no en surt cap altra consulta.
+      expect(supabaseMock.selectCalls.filter(c => c.includes('sport_id')).length).toBe(1);
+      discardPeriodicTasks();
+    }));
+
+    it('sense la columna updated_at continua com abans', fakeAsync(() => {
+      // La migració 030 encara no s'ha executat: el servidor contesta 42703 i
+      // el client se n'ha de desdir sol, no quedar-se sense refrescar.
+      sessionsData = [sessionRow('s1', '2024-03-06')];
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+      void service.loadAllSessions();
+      tick();
+
+      supabaseMock.selectErrors['updated_at'] =
+        { code: '42703', message: 'column "updated_at" does not exist' };
+
+      supabaseMock.selectCalls.length = 0;
+      void service.refreshLoaded(true);
+      tick();
+
+      // Torna a la comprovació sencera de sempre, i l'historial hi continua.
+      expect(supabaseMock.selectCalls.some(c => c.includes('sport_id'))).toBeTrue();
+      expect(service.allSessionsLoaded()).toBeTrue();
+      expect(service.sessions().length).toBe(1);
+
+      // I no hi torna: un cop sap que la columna no hi és, ja no la demana.
+      supabaseMock.selectCalls.length = 0;
+      void service.refreshLoaded(true);
+      tick();
+      expect(supabaseMock.selectCalls).not.toContain('updated_at');
+      discardPeriodicTasks();
     }));
 
     // Tombar-ho i tornar-ho a aixecar feia que els rècords del detall d'una

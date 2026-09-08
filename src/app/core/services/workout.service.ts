@@ -7,7 +7,10 @@ import { SupabaseService } from './supabase.service';
 import { TodayService } from './today.service';
 import { OfflineService } from './offline.service';
 import { SyncService } from './sync.service';
-import { WORKOUT_SUMMARY_COLUMNS, WorkoutStoreService, toWorkout, toWorkoutSummary } from './workout-store.service';
+import { SUPABASE_PAGE_SIZE, fetchAllRows } from './supabase-page.util';
+import {
+  WORKOUT_COLUMNS, WORKOUT_SUMMARY_COLUMNS, WorkoutStoreService, toWorkout, toWorkoutSummary,
+} from './workout-store.service';
 import { FeelingLevel, PlannedSource, Workout, WorkoutEntry, WorkoutSet, setMaxWeight, workoutExerciseNames } from '../models/workout.model';
 
 /** The filters the Historial list can have active at once. */
@@ -76,8 +79,13 @@ export class WorkoutService {
   private _allLoaded = false;
   private _realtimeChannel: RealtimeChannel | null = null;
   private _lastRefreshAt = 0;
-  /** Fins on s'han demanat canvis (`updated_at` del servidor). */
+  /** Fins on s'han demanat canvis. És l'`updated_at` **més alt que ha arribat
+   *  en una resposta**, no l'hora d'aquest dispositiu: vegeu `_pullChanges()`. */
   private _lastPulledAt: string | null = null;
+  /** Si la consulta de canvis ja s'ha fet un cop en aquesta sessió. Separat del
+   *  cursor perquè un usuari sense cap entrenament no en té, i sense això
+   *  quedava condemnat a la comprovació sencera a cada refresc. */
+  private _pulledOnce = false;
   private _lastFullPullAt = 0;
   /** Consultes senceres en marxa. Sense això, qualsevol canvi als senyals
    *  mentre una viatjava en disparava una altra, i l'arrencada acabava
@@ -184,6 +192,44 @@ export class WorkoutService {
     )
   );
 
+  /**
+   * Les sessions de cada exercici, de la més recent a la més antiga.
+   *
+   * Es refà un cop per canvi, com `byDate`, i és el que fa que consultar «què
+   * vaig fer l'última vegada» o «tinc rècord» costi el mateix tinguis dues
+   * setmanes d'historial o vuit anys.
+   *
+   * Abans cada consulta recorria l'historial sencer. Sona a poc, però on es
+   * fan és mentre entrenes: el marcador de rècord i el plafó de l'última
+   * sessió són `computed()` que passen per **cada exercici del dia**, i es
+   * refan **a cada sèrie que registres**. Amb deu exercicis i uns quants
+   * centenars de sessions carregades, són desenes de milers de comparacions
+   * per cada toc a la pantalla — i el toc no és en un moment qualsevol, és amb
+   * el mòbil a la mà entre sèrie i sèrie.
+   *
+   * Els entrenaments planificats també hi entren: `getAllTimeMaxWeight()` els
+   * mirava, i encara que no portin sèries, deixar-los fora seria canviar què
+   * fa la funció mentre se n'arregla el cost. Qui vol només els fets, ho
+   * filtra en llegir el calaix.
+   */
+  private readonly _byExercise = computed((): Map<string, Workout[]> => {
+    const map = new Map<string, Workout[]>();
+    // `workouts()` ja ve de la més recent a la més antiga, i els calaixos
+    // n'hereten l'ordre: no cal tornar a ordenar res per exercici.
+    for (const w of this.workouts()) {
+      // Una sessió amb el mateix exercici repetit hi ha de constar un sol cop:
+      // qui llegeix el calaix compta sessions, no entrades.
+      const seen = new Set<string>();
+      for (const e of w.entries) {
+        if (seen.has(e.exerciseId)) continue;
+        seen.add(e.exerciseId);
+        const bucket = map.get(e.exerciseId);
+        if (bucket) bucket.push(w); else map.set(e.exerciseId, [w]);
+      }
+    }
+    return map;
+  });
+
   // ── Constructor ──────────────────────────────────────────────────────────
   constructor() {
     effect(() => {
@@ -195,6 +241,7 @@ export class WorkoutService {
       this._monthLoads.clear();
       this._monthsSeen.clear();
       this._lastPulledAt  = null;
+      this._pulledOnce    = false;
       this._lastFullPullAt = 0;
       this._allLoaded = false;
       this._exLoadedIds.clear();
@@ -276,7 +323,7 @@ export class WorkoutService {
     // desaparegut: una sessió esborrada des d'un altre dispositiu ja no surt a
     // cap consulta de canvis, perquè no hi ha cap fila que ho digui.
     const dueFullPull = now - this._lastFullPullAt > WorkoutService.FULL_PULL_EVERY_MS;
-    if (!dueFullPull && this._lastPulledAt) return;
+    if (!dueFullPull && this._pulledOnce) return;
     this._lastFullPullAt = now;
 
     if (this._allLoaded) { await this._fetchAll(true); return; }
@@ -294,6 +341,20 @@ export class WorkoutService {
    * marcador d'on es va quedar (aquí, `updated_at`) i, a partir d'aquí, només
    * les files noves. Tornar a demanar mesos sencers cada cop que tornaves a
    * l'app era car i lent, i sobretot arribava tard.
+   *
+   * **El marcador surt de les files, no del rellotge d'aquest dispositiu.**
+   * `updated_at` l'escriu qui fa el canvi, o sigui que la taula barreja les
+   * hores de tots els dispositius de l'usuari. Amb el marcador posat a «ara»
+   * segons aquest, un mòbil amb el rellotge dos minuts endarrerit escrivia
+   * files amb una hora que ja havíem passat: quedaven per sempre per sota del
+   * marcador i la consulta de canvis no les veia mai més. Prenent el
+   * `updated_at` més alt que ha arribat de debò, el marcador viu al mateix
+   * rellotge que les dades que compara.
+   *
+   * Es demana amb `gte` i no `gt`: així no es perd res quan diverses files
+   * comparteixen el mateix `updated_at` a la frontera d'un tram. Tornar a
+   * aplicar una fila que ja teníem no costa res — `applyServerRow()` és
+   * idempotent i no toca el que espera pujar.
    */
   private _pullChanges(): Promise<void> {
     if (this._pullLoad) return this._pullLoad;
@@ -306,22 +367,40 @@ export class WorkoutService {
     const uid = this.auth.uid();
     if (!uid || this.offline.isOffline()) return;
 
-    const since = this._lastPulledAt;
-    const askedAt = new Date().toISOString();
+    let cursor = this._lastPulledAt;
     try {
-      let q = this.supabase
-        .from('workouts')
-        .select('*')
-        .eq('user_id', uid)
-        .order('updated_at', { ascending: true });
-      if (since) q = q.gt('updated_at', since);
-      else       q = q.gte('date', this._retentionStart());
+      // Els canvis d'una estona són pocs, però tornar després d'uns dies sense
+      // connexió pot portar-ne molts: es recorren per trams, que si no
+      // PostgREST talla la resposta i la resta no arribaria fins al proper cop.
+      for (let page = 0; page < 20; page++) {
+        let q = this.supabase
+          .from('workouts')
+          .select(WORKOUT_COLUMNS)
+          .eq('user_id', uid)
+          .order('updated_at', { ascending: true })
+          .order('id', { ascending: true })
+          .limit(SUPABASE_PAGE_SIZE);
+        if (cursor) q = q.gte('updated_at', cursor);
+        else        q = q.gte('date', this._retentionStart());
 
-      const { data, error } = await q;
-      if (error) return;
+        const { data, error } = await q;
+        if (error) return;
 
-      this.store.applyServerRows((data ?? []).map(r => toWorkout(r as Record<string, unknown>)));
-      this._lastPulledAt = askedAt;
+        const rows = (data ?? []) as Record<string, unknown>[];
+        this.store.applyServerRows(rows.map(r => toWorkout(r)));
+
+        const newest = rows.reduce<string | null>((max, r) => {
+          const at = r['updated_at'] as string | undefined;
+          return at && (!max || at > max) ? at : max;
+        }, null);
+        if (newest) { cursor = newest; this._lastPulledAt = cursor; }
+
+        this._pulledOnce = true;
+        // Tram incomplet: ja no en queden. I si un tram ple no ha pogut moure
+        // el marcador (totes les files amb la mateixa hora), continuar només
+        // seria demanar el mateix un altre cop.
+        if (rows.length < SUPABASE_PAGE_SIZE || !newest) return;
+      }
     } catch {
       // Sense xarxa: el marcador no es mou i la propera vegada es reprèn aquí.
     }
@@ -381,7 +460,7 @@ export class WorkoutService {
 
     const { data, error } = await this.supabase
       .from('workouts')
-      .select('*')
+      .select(WORKOUT_COLUMNS)
       .eq('user_id', uid)
       .eq('date', today);
 
@@ -442,7 +521,7 @@ export class WorkoutService {
 
       const { data, error } = await this.supabase
         .from('workouts')
-        .select('*')
+        .select(WORKOUT_COLUMNS)
         .eq('user_id', uid)
         .gte('date', start)
         .lte('date', end)
@@ -480,22 +559,36 @@ export class WorkoutService {
     // Sense connexió no es marca com a carregat: quan torni la xarxa, el
     // progrés d'aquest exercici s'ha de poder demanar de veritat.
     if (this.offline.isOffline()) return;
+    const uid = this._uid();
     try {
-      const { data, error } = await this.supabase
-        .from('workouts')
-        .select('*')
-        .eq('user_id', this._uid())
-        .neq('status', 'planned')
-        .filter('entries::text', 'ilike', `%"exerciseId":"${exerciseId}"%`)
-        .order('date', { ascending: true });
+      // Contenció de jsonb (`entries @> [{"exerciseId": …}]`), no un `ilike`
+      // sobre `entries::text`. És la mateixa trampa que va treure la migració
+      // 020 de la cerca de l'historial: convertir tot el blob a text obliga
+      // el servidor a llegir i convertir *cada* entrenament de l'usuari a
+      // cada consulta, i no hi ha cap índex que hi pugui ajudar. Amb la
+      // contenció, l'índex GIN de la migració 029 va directe a les files que
+      // el porten. La cadena es passa ja feta perquè `.contains()` amb un
+      // array el tradueix a literal d'array de Postgres — bo per a
+      // `categories`, però no per a una columna jsonb.
+      const { rows, error } = await fetchAllRows<Record<string, unknown>>(() =>
+        this.supabase
+          .from('workouts')
+          .select(WORKOUT_COLUMNS)
+          .eq('user_id', uid)
+          .neq('status', 'planned')
+          .contains('entries', JSON.stringify([{ exerciseId }]))
+          .order('date',       { ascending: true })
+          .order('created_at', { ascending: true })
+          .order('id',         { ascending: true })
+      );
 
       if (error) {
         this._exLoadedIds.add(exerciseId); // prevent retry storm on repeated Supabase errors
         return;
       }
 
-      const fetched = (data ?? [])
-        .map(r => toWorkout(r as Record<string, unknown>))
+      const fetched = rows
+        .map(r => toWorkout(r))
         .filter(w => w.entries.some(e => e.exerciseId === exerciseId));
 
       // Files soltes, no un mes sencer: només s'incorporen, no es dedueix
@@ -542,28 +635,39 @@ export class WorkoutService {
     const recentFrom = this._retentionStart();
 
     try {
+      // Per trams, i amb un ordre total. És la consulta de l'arrencada i
+      // cobreix tota la vida de l'usuari: demanada d'una tacada, PostgREST la
+      // tallaria al seu topall de files i l'historial vell quedaria escapçat
+      // sense que res ho digués. I amb l'ordre només per data, dues sessions
+      // del mateix dia poden caure entre dos trams i no sortir a cap.
       const [, res] = await Promise.all([
         // `_pullChanges()` porta la finestra recent sencera el primer cop, i
         // després ja només el que ha canviat.
         this._pullChanges(),
-        this.supabase
-          .from('workouts')
-          .select(WORKOUT_SUMMARY_COLUMNS)
-          .eq('user_id', uid)
-          .lt('date', recentFrom)
-          .order('date', { ascending: false }),
+        fetchAllRows<Record<string, unknown>>(() =>
+          this.supabase
+            .from('workouts')
+            .select(WORKOUT_SUMMARY_COLUMNS)
+            .eq('user_id', uid)
+            .lt('date', recentFrom)
+            .order('date',       { ascending: false })
+            .order('created_at', { ascending: false })
+            .order('id',         { ascending: false })
+        ),
       ]);
 
       if (res.error) return; // es manté el que ja teníem
 
       const map = new Map<string, Workout>();
-      for (const r of res.data ?? []) {
-        const w = toWorkoutSummary(r as Record<string, unknown>);
+      for (const r of res.rows) {
+        const w = toWorkoutSummary(r);
         // El que ja tenim sencer no es degrada mai a resum.
         if (!this.store.has(w.id)) map.set(w.id, w);
       }
       this._summaries.set(map);
-      this._summariesLoaded = true;
+      // Només es dóna per fet si s'ha arribat al final: amb un tram a mitges,
+      // el que hi ha ja es pot ensenyar, però queda per tornar-ho a provar.
+      this._summariesLoaded = res.complete;
     } catch {
       // Sense xarxa: es manté el que hi ha al dispositiu, que és el que val.
     }
@@ -591,7 +695,7 @@ export class WorkoutService {
     try {
       const { data, error } = await this.supabase
         .from('workouts')
-        .select('*')
+        .select(WORKOUT_COLUMNS)
         .eq('user_id', uid)
         .eq('id', id)
         .maybeSingle();
@@ -640,15 +744,25 @@ export class WorkoutService {
 
     const since = this.store.mark();
     try {
-      const { data, error } = await this.supabase
-        .from('workouts')
-        .select('*')
-        .eq('user_id', uid)
-        .order('date', { ascending: false });
+      // Per trams, i amb un ordre total: `mergeServerScope()` treu del
+      // dispositiu tot el que aquesta resposta no porti, així que una resposta
+      // tallada pel topall de files no seria «l'historial a mitges» sinó
+      // esborrar la còpia local de la meitat que falta. I amb l'ordre només
+      // per data, dues sessions del mateix dia poden caure entre dos trams i
+      // no sortir a cap.
+      const { rows, error, complete } = await fetchAllRows<Record<string, unknown>>(() =>
+        this.supabase
+          .from('workouts')
+          .select(WORKOUT_COLUMNS)
+          .eq('user_id', uid)
+          .order('date',       { ascending: false })
+          .order('created_at', { ascending: false })
+          .order('id',         { ascending: false })
+      );
 
-      if (error) return; // es manté el que ja teníem
+      if (error || !complete) return; // es manté el que ja teníem
 
-      const fetched = (data ?? []).map(r => toWorkout(r as Record<string, unknown>));
+      const fetched = rows.map(r => toWorkout(r));
       this.store.mergeServerScope(fetched, () => true, since);
       // Ja no hi ha res que el magatzem no sàpiga: cap resum no hi pinta res.
       this._summaries.set(new Map());
@@ -682,7 +796,9 @@ export class WorkoutService {
     // across every page and no workout goes missing from the history list.
     let q = this.supabase
       .from('workouts')
-      .select('*', { count: 'exact' })
+      // `exercise_names` es filtra però no es porta: existeix per cercar-hi al
+      // servidor, i el client ja té els noms dins d'`entries`.
+      .select(WORKOUT_COLUMNS, { count: 'exact' })
       .eq('user_id', this._uid())
       .neq('status', 'planned')
       .order('date', { ascending })
@@ -724,15 +840,23 @@ export class WorkoutService {
     return this.getWorkoutsForDate(date).filter(w => (w.status ?? 'done') !== 'planned');
   }
 
+  /** Les sessions fetes d'aquest exercici, de la més antiga a la més recent
+   *  (l'ordre que volen les gràfiques de progrés). */
   getWorkoutsForExercise(exerciseId: string): Workout[] {
-    return this.doneWorkouts()
-      .filter(w => w.entries.some(e => e.exerciseId === exerciseId))
-      .sort((a, b) => a.date.localeCompare(b.date));
+    const bucket = this._byExercise().get(exerciseId);
+    if (!bucket) return [];
+    // El calaix ja ve ordenat de la més recent a la més antiga: invertir-lo
+    // costa menys que tornar a ordenar, i sobretot no toca l'historial sencer.
+    const out: Workout[] = [];
+    for (let i = bucket.length - 1; i >= 0; i--) {
+      if ((bucket[i].status ?? 'done') !== 'planned') out.push(bucket[i]);
+    }
+    return out;
   }
 
   getAllTimeMaxWeight(exerciseId: string, excludeWorkoutId?: string): number {
     let max = 0;
-    for (const w of this._historical()) {
+    for (const w of this._byExercise().get(exerciseId) ?? []) {
       if (w.id === excludeWorkoutId) continue;
       const entry = w.entries.find(e => e.exerciseId === exerciseId);
       if (entry) for (const s of entry.sets) { if (s.warmup) continue; const m = setMaxWeight(s); if (m > max) max = m; }
@@ -750,18 +874,20 @@ export class WorkoutService {
    *  recent completed session for an exercise: its sets, note and feeling
    *  plus the derived summary (max weight, set counts, total reps). */
   getLastSessionEntry(exerciseId: string, excludeWorkoutId?: string): LastSessionEntry | null {
-    const past = this.doneWorkouts()
-      .filter(w =>
-        w.id !== excludeWorkoutId &&
-        w.entries.some(e => e.exerciseId === exerciseId && e.sets.length > 0)
-      )
-      .sort((a, b) => b.date.localeCompare(a.date));
-    if (!past.length) return null;
-    const entry       = past[0].entries.find(e => e.exerciseId === exerciseId)!;
+    // El calaix de l'exercici ja ve de la més recent a la més antiga, així que
+    // la primera que serveixi és la resposta: no cal filtrar ni ordenar
+    // l'historial sencer per saber què vas fer l'última vegada.
+    const last = (this._byExercise().get(exerciseId) ?? []).find(w =>
+      w.id !== excludeWorkoutId &&
+      (w.status ?? 'done') !== 'planned' &&
+      w.entries.some(e => e.exerciseId === exerciseId && e.sets.length > 0)
+    );
+    if (!last) return null;
+    const entry       = last.entries.find(e => e.exerciseId === exerciseId)!;
     const workingSets = entry.sets.filter(s => !s.warmup);
     const maxWeight   = Math.max(...(workingSets.length ? workingSets : entry.sets).map(s => setMaxWeight(s)));
     return {
-      date:        past[0].date,
+      date:        last.date,
       maxWeight,
       feeling:     entry.feeling,
       notes:       entry.notes,

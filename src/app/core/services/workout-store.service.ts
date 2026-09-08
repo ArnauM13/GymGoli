@@ -34,6 +34,21 @@ export const RETAINED_MONTHS = 3;
 
 // ── Serialització ───────────────────────────────────────────────────────────
 
+/**
+ * Les columnes que l'app llegeix de debò d'un entrenament.
+ *
+ * Amb `select('*')` cada fila arribava també amb `exercise_names` — la columna
+ * generada que repeteix, en text pla, tots els noms d'exercicis que ja venen
+ * dins d'`entries`. Existeix perquè el servidor hi pugui cercar (migració
+ * 020), no perquè ningú se l'endugui: `toWorkout()` ni la mira. En una
+ * consulta d'un mes són uns quants centenars de bytes; en la de tot
+ * l'historial, que és la que fan el progrés i el calendari, són desenes de
+ * kilobytes de xarxa i de memòria per no res. `user_id` tampoc: ja sabem de
+ * qui són, que és el filtre de la consulta.
+ */
+export const WORKOUT_COLUMNS =
+  'id,date,category,categories,entries,notes,feeling,source_proposal_id,created_at,updated_at,status,planned_source';
+
 /** Una entrada d'un JSON antic pot venir sense `sets`. Normalitzar-ho aquí
  *  garanteix que cap consumidor pugui petar a `entry.sets.length`. */
 export function normalizeEntries(raw: unknown): WorkoutEntry[] {

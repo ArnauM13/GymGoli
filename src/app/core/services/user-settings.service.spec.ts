@@ -23,16 +23,21 @@ function makeSupabaseMock(getSelectResult: () => SelectResult) {
   builder.select.and.returnValue(builder);
   builder.eq.and.returnValue(builder);
   const fromSpy = jasmine.createSpy('from').and.returnValue(builder);
-  return { supabase: { client: { from: fromSpy } }, upsertSpy, fromSpy };
+  // La pujada normal va per `merge_user_settings`, que fusiona per camps al
+  // servidor. `upsert` només és el pla B quan la funció encara no hi és.
+  const rpcSpy: jasmine.Spy = jasmine.createSpy('rpc').and.resolveTo({ error: null });
+  return { supabase: { client: { from: fromSpy, rpc: rpcSpy } }, upsertSpy, fromSpy, rpcSpy };
 }
 
-const LS_KEY = (uid: string) => `gymgoli_settings_${uid}`;
+const LS_KEY      = (uid: string) => `gymgoli_settings_${uid}`;
+const PENDING_KEY = (uid: string) => `gymgoli_settings_pending_${uid}`;
 
 describe('UserSettingsService', () => {
   let uid: ReturnType<typeof signal<string | null>>;
   let selectResult: SelectResult;
   let upsertSpy: jasmine.Spy;
   let fromSpy: jasmine.Spy;
+  let rpcSpy: jasmine.Spy;
   let service: UserSettingsService;
 
   function setup(): void {
@@ -43,6 +48,7 @@ describe('UserSettingsService', () => {
     const mock = makeSupabaseMock(() => selectResult);
     upsertSpy = mock.upsertSpy;
     fromSpy   = mock.fromSpy;
+    rpcSpy    = mock.rpcSpy;
 
     TestBed.configureTestingModule({
       providers: [
@@ -126,11 +132,12 @@ describe('UserSettingsService', () => {
   describe('update()', () => {
     it('does nothing when there is no authenticated user', async () => {
       await service.update({ weightUnit: 'lb' });
+      expect(rpcSpy).not.toHaveBeenCalled();
       expect(upsertSpy).not.toHaveBeenCalled();
       expect(service.weightUnit()).toBe('kg');
     });
 
-    it('applies the patch locally and persists to localStorage + Supabase', fakeAsync(() => {
+    it('applies the patch locally and puja només el que ha canviat', fakeAsync(() => {
       uid.set('user-1');
       TestBed.flushEffects();
       tick();
@@ -142,11 +149,77 @@ describe('UserSettingsService', () => {
       expect(stored.weightUnit).toBe('lb');
       tick();
 
-      expect(fromSpy).toHaveBeenCalledWith('user_settings');
+      expect(rpcSpy).toHaveBeenCalled();
+      const [fn, args] = rpcSpy.calls.mostRecent().args;
+      expect(fn).toBe('merge_user_settings');
+      // Només el camp tocat: enviar el bloc sencer és el que esborrava el que
+      // s'hagués canviat des d'un altre dispositiu.
+      expect(args.p_patch).toEqual({ weightUnit: 'lb' });
+    }));
+
+    it('treu el camp de la cua quan el servidor l\'ha acceptat', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+
+      service.update({ weightUnit: 'lb' });
+      tick();
+
+      expect(localStorage.getItem(PENDING_KEY('user-1'))).toBeNull();
+    }));
+
+    it('el manté pendent quan la pujada falla, i el torna a enviar', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+
+      rpcSpy.and.resolveTo({ error: { code: '08006', message: 'network' } });
+      service.update({ weightUnit: 'lb' });
+      tick();
+
+      expect(JSON.parse(localStorage.getItem(PENDING_KEY('user-1'))!)).toEqual({ weightUnit: 'lb' });
+      // Localment el canvi hi és igualment: el dispositiu no espera ningú.
+      expect(service.weightUnit()).toBe('lb');
+
+      rpcSpy.and.resolveTo({ error: null });
+      service.update({ restTimerSeconds: 60 });
+      tick();
+
+      // La segona tanda arrossega el que havia quedat enrere.
+      expect(rpcSpy.calls.mostRecent().args[1].p_patch)
+        .toEqual({ weightUnit: 'lb', restTimerSeconds: 60 });
+      expect(localStorage.getItem(PENDING_KEY('user-1'))).toBeNull();
+    }));
+
+    it('el que espera pujar mana per damunt del que contesta el servidor', fakeAsync(() => {
+      // El servidor encara porta el valor d'abans perquè la pujada no hi ha
+      // arribat: adoptar-lo desfaria el canvi davant dels ulls de l'usuari.
+      rpcSpy.and.resolveTo({ error: { code: '08006', message: 'network' } });
+      localStorage.setItem(PENDING_KEY('user-1'), JSON.stringify({ weightUnit: 'lb' }));
+      selectResult = { data: { settings: { weightUnit: 'kg', fitnessGoal: 'strength' } }, error: null };
+
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+
+      expect(service.weightUnit()).toBe('lb');
+      expect(service.fitnessGoal()).toBe('strength');
+    }));
+
+    it('torna a l\'escriptura del bloc sencer si la funció no hi és', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+
+      rpcSpy.and.resolveTo({ error: { code: 'PGRST202', message: 'function not found' } });
+      service.update({ weightUnit: 'lb' });
+      tick();
+
       expect(upsertSpy).toHaveBeenCalled();
       const payload = upsertSpy.calls.mostRecent().args[0];
       expect(payload.user_id).toBe('user-1');
       expect(payload.settings.weightUnit).toBe('lb');
+      expect(localStorage.getItem(PENDING_KEY('user-1'))).toBeNull();
     }));
   });
 

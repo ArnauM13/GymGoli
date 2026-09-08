@@ -2,6 +2,7 @@ import { Injectable, computed, effect, inject, signal } from '@angular/core';
 
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
+import { onAppResume } from './app-resume.util';
 import {
   DEFAULT_TRAINING_TYPES,
   TrainingType,
@@ -47,8 +48,16 @@ export class TrainingTypeService {
       if (uid) {
         const cached = this._readFromStorage(uid);
         if (cached?.length) this._types.set(cached);
-        this._load(uid);
+        this._load(uid, true);
       }
+    });
+
+    // El tipus d'entrenament que has creat al mòbil no existia a la pestanya
+    // oberta a l'ordinador: les sessions etiquetades amb ell hi sortien amb el
+    // color i el nom per defecte.
+    onAppResume(() => {
+      const uid = this.auth.uid();
+      if (uid && this._loaded()) void this._load(uid);
     });
   }
 
@@ -58,24 +67,31 @@ export class TrainingTypeService {
     if (this._loaded()) return Promise.resolve();
     if (this._loadPromise) return this._loadPromise;
     const uid = this.auth.uid();
-    this._loadPromise = (uid ? this._load(uid) : Promise.resolve())
+    this._loadPromise = (uid ? this._load(uid, true) : Promise.resolve())
       .finally(() => { this._loadPromise = null; });
     return this._loadPromise;
   }
 
   // ── Load / seed ──────────────────────────────────────────────────────────
 
-  private async _load(uid: string): Promise<void> {
+  /** `allowSeed` només a la primera càrrega: en un refresc, la llista buida vol
+   *  dir que l'usuari els ha esborrat des d'un altre dispositiu, i tornar-los a
+   *  sembrar seria desfer-li-ho. */
+  private async _load(uid: string, allowSeed = false): Promise<void> {
     try {
-      const { data } = await this.supabase
+      const { data, error } = await this.supabase
         .from('training_types')
         .select('*')
         .eq('user_id', uid)
         .order('sort_order')
         .order('created_at');
 
+      // Una consulta fallida no és «no en té cap»: sembrar-hi el catàleg per
+      // defecte cada cop que la xarxa falla és ressuscitar el que s'ha esborrat.
+      if (error) return;
+
       const types = (data ?? []).map(r => toTrainingType(r as Record<string, unknown>));
-      if (types.length === 0) {
+      if (types.length === 0 && allowSeed) {
         await this._seedDefaults(uid);
       } else {
         this._types.set(types);
