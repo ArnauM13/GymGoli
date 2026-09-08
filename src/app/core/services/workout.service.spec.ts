@@ -7,27 +7,49 @@ import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { ExerciseService } from './exercise.service';
 import { SyncService } from './sync.service';
-import { WorkoutStoreService } from './workout-store.service';
+import { WORKOUT_SUMMARY_COLUMNS, WorkoutStoreService } from './workout-store.service';
 
 interface QueryResult { data?: unknown; count?: number; error?: unknown }
 
 interface QueryChain {
   select: jasmine.Spy; eq: jasmine.Spy; neq: jasmine.Spy; order: jasmine.Spy;
   contains: jasmine.Spy; ilike: jasmine.Spy; filter: jasmine.Spy; range: jasmine.Spy;
-  gte: jasmine.Spy; lte: jasmine.Spy; delete: jasmine.Spy;
+  gte: jasmine.Spy; lte: jasmine.Spy; lt: jasmine.Spy; delete: jasmine.Spy;
+  maybeSingle: jasmine.Spy;
   /** Mutable so a test can change what the next query answers. */
   result: QueryResult;
+  /** La resposta d'una consulta d'una sola fila (`.maybeSingle()`). */
+  singleResult?: QueryResult;
+  /** Respostes per joc de columnes demanat, per distingir la consulta en mode
+   *  targeta de la que porta les sèries. */
+  resultBySelect?: Record<string, QueryResult>;
   then: (resolve: (v: QueryResult) => void) => void;
 }
 
-/** A chainable query-builder stub: every filter method returns the same
- *  object (so calls can be inspected afterwards) and it resolves like a
- *  real supabase-js query when awaited. */
+/**
+ * A chainable query-builder stub: the filter methods are shared spies (so
+ * calls can be inspected afterwards) and it resolves like a real supabase-js
+ * query when awaited.
+ *
+ * `.select()` returns a view of its own so two queries in flight at the same
+ * time — the app now asks for the recent window and the older summaries
+ * together — each resolve with the answer for the columns they asked for.
+ */
 function makeQueryChain(result: QueryResult): QueryChain {
   const chain = {} as QueryChain;
-  for (const method of ['select', 'eq', 'neq', 'order', 'contains', 'ilike', 'filter', 'range', 'gte', 'lte', 'delete'] as const) {
-    chain[method] = jasmine.createSpy(method).and.callFake(() => chain);
+  for (const method of ['eq', 'neq', 'order', 'contains', 'ilike', 'filter', 'range', 'gte', 'lte', 'lt', 'delete'] as const) {
+    chain[method] = jasmine.createSpy(method).and.callFake(function (this: QueryChain) { return this; });
   }
+  chain.select = jasmine.createSpy('select').and.callFake(function (this: QueryChain, cols: string) {
+    const view = Object.create(this) as QueryChain;
+    view.then = (resolve) => resolve(chain.resultBySelect?.[cols] ?? chain.result);
+    return view;
+  });
+  // `.maybeSingle()` tanca la consulta d'una sola sessió: retorna la resposta,
+  // no la cadena. `singleResult` deixa que un test contesti una fila solta
+  // sense tocar el que contesten les consultes de llista.
+  chain.maybeSingle = jasmine.createSpy('maybeSingle').and.callFake(() =>
+    Promise.resolve(chain.singleResult ?? chain.result));
   chain.result = result;
   chain.then = (resolve) => resolve(chain.result);
   return chain;
@@ -548,6 +570,95 @@ describe('WorkoutService', () => {
   // ── Local primer ─────────────────────────────────────────────────────────
   // El que l'usuari fa s'ha de guardar al dispositiu abans i independentment
   // de qualsevol resposta del servidor, i sobreviure a tancar l'app.
+  // ── Carregat en dos temps ───────────────────────────────────────────────
+  //
+  // L'arrencada demanava `select('*')` de tota la vida de l'usuari per acabar
+  // fent servir la data i el tipus. Ara l'historial vell arriba en mode
+  // targeta i les sèries es demanen quan s'obre la sessió.
+  describe('carregat en dos temps', () => {
+    it('l\'historial vell es demana sense les sèries', async () => {
+      await service.loadHistorySummaries();
+
+      expect(workoutsChain.select).toHaveBeenCalledWith(WORKOUT_SUMMARY_COLUMNS);
+      expect(workoutsChain.lt).toHaveBeenCalledWith('date', jasmine.any(String));
+    });
+
+    it('un resum es veu a la llista però no entra al magatzem', async () => {
+      workoutsChain.resultBySelect = {
+        [WORKOUT_SUMMARY_COLUMNS]: { data: [row('vella', '2019-05-04')], count: 1, error: null },
+      };
+      await service.loadHistorySummaries();
+
+      const found = service.workouts().find(w => w.id === 'vella');
+      expect(found).toBeTruthy();
+      expect(found!.entriesLoaded).toBeFalse();
+      // El magatzem és la còpia bona i tot el que hi entra es puja: una sessió
+      // sense sèries que hi entrés la buidaria al servidor.
+      expect(TestBed.inject(WorkoutStoreService).has('vella')).toBeFalse();
+    });
+
+    it('no torna a demanar-lo un cop el té', async () => {
+      await service.loadHistorySummaries();
+      const calls = workoutsChain.select.calls.count();
+
+      await service.loadHistorySummaries();
+
+      expect(workoutsChain.select.calls.count()).toBe(calls);
+    });
+
+    it('ensureWorkoutEntries() baixa la sessió sencera i la deixa editable', async () => {
+      workoutsChain.resultBySelect = {
+        [WORKOUT_SUMMARY_COLUMNS]: { data: [row('vella', '2019-05-04')], count: 1, error: null },
+      };
+      await service.loadHistorySummaries();
+
+      workoutsChain.singleResult = {
+        data: row('vella', '2019-05-04', {
+          entries: [{ exerciseId: 'ex1', exerciseName: 'Press banca', sets: [{ weight: 80, reps: 8 }] }],
+        }),
+        error: null,
+      };
+      await service.ensureWorkoutEntries('vella');
+
+      const w = service.workouts().find(x => x.id === 'vella')!;
+      expect(w.entriesLoaded).not.toBeFalse();
+      expect(w.entries[0].sets.length).toBe(1);
+      expect(TestBed.inject(WorkoutStoreService).has('vella')).toBeTrue();
+    });
+
+    it('no demana res d\'una sessió que ja tenim sencera', async () => {
+      await service.createWorkoutForDate('2024-03-06');
+      const id = service.getWorkoutForDate('2024-03-06')!.id;
+      const calls = workoutsChain.maybeSingle.calls.count();
+
+      await service.ensureWorkoutEntries(id);
+
+      expect(workoutsChain.maybeSingle.calls.count()).toBe(calls);
+    });
+
+    // Cada senyal que canviava mentre la consulta viatjava en disparava una
+    // altra, i l'app arrencava baixant l'historial tres o quatre vegades.
+    it('dues peticions alhora de tot l\'historial són una sola consulta', async () => {
+      const calls = workoutsChain.select.calls.count();
+
+      await Promise.all([service.loadAllWorkouts(), service.loadAllWorkouts()]);
+
+      expect(workoutsChain.select.calls.count()).toBe(calls + 1);
+    });
+
+    it('quan arriba tot l\'historial, els resums deixen de pintar res', async () => {
+      workoutsChain.resultBySelect = {
+        [WORKOUT_SUMMARY_COLUMNS]: { data: [row('vella', '2019-05-04')], count: 1, error: null },
+      };
+      await service.loadHistorySummaries();
+      expect(service.workouts().some(w => w.entriesLoaded === false)).toBeTrue();
+
+      await service.loadAllWorkouts();
+
+      expect(service.workouts().some(w => w.entriesLoaded === false)).toBeFalse();
+    });
+  });
+
   describe('primer al dispositiu, després al servidor', () => {
     it('un entrenament registrat sense connexió queda guardat i esperant pujar', async () => {
       const store = TestBed.inject(WorkoutStoreService);

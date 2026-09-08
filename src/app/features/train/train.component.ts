@@ -1887,6 +1887,10 @@ export class TrainComponent implements OnDestroy {
   // ── Workout navigation ────────────────────────────────────────────────────
 
   openWorkout(id: string): void {
+    // De l'historial vell només se n'ha baixat el resum de la targeta. Obrir
+    // la sessió és el moment de demanar-ne les sèries: sense elles l'editor
+    // ensenyaria una sessió buida i cap canvi hi arribaria.
+    void this.workoutService.ensureWorkoutEntries(id);
     this.activeWorkoutId.set(id);
     this.pickerCat.set(null);
   }

@@ -2,6 +2,7 @@ import { Injectable, computed, effect, inject } from '@angular/core';
 
 import { ExerciseCategory } from '../models/exercise.model';
 import { Sport } from '../models/sport.model';
+import { AuthService } from './auth.service';
 import { UserSettingsService } from './user-settings.service';
 import { SportService } from './sport.service';
 import { TrainingTypeService } from './training-type.service';
@@ -56,21 +57,22 @@ export class WorkoutProfileService {
   private sportService    = inject(SportService);
   private settingsService = inject(UserSettingsService);
   private trainingTypeService = inject(TrainingTypeService);
+  private auth            = inject(AuthService);
 
   constructor() {
-    // "Days since last <category>" is only right if the *whole* history is
-    // loaded. Otherwise a category last trained in an earlier month (not yet
-    // in the lazy month cache) looks like it was never trained. `workouts()`
-    // is read so this re-runs after a login clears the cache; loadAllWorkouts
-    // is guarded so it runs a single query per session.
+    // «Dies des de l'últim <tipus>» només és cert si es mira tot l'historial:
+    // un tipus entrenat en un mes que encara no s'ha demanat sembla que no
+    // s'hagi fet mai. D'aquí només calen les dates i els tipus, així que es
+    // demana el resum i no les sèries de tota la vida de l'usuari.
+    //
+    // Es mira `uid()` i no la llista d'entrenaments: llegint la llista, cada
+    // fila que arribava tornava a disparar l'efecte, i com que la guarda de
+    // «ja està carregat» no es tanca fins al final, l'app engegava tres o
+    // quatre descàrregues de l'historial sencer a la vegada. Amb l'usuari n'hi
+    // ha prou: el que ha de tornar a passar és entrar-hi, no cada canvi.
     effect(() => {
-      this.workoutService.workouts();
-      this.workoutService.loadAllWorkouts();
-    });
-    // Same reasoning for the "recent sport" recency: without the full history
-    // the last sport session may live in an unloaded month.
-    effect(() => {
-      this.sportService.sessions();
+      if (!this.auth.uid()) return;
+      this.workoutService.loadHistorySummaries();
       this.sportService.loadAllSessions();
     });
   }

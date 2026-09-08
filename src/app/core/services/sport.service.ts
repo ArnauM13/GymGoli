@@ -97,6 +97,9 @@ export class SportService {
   private readonly _allLoaded = signal(false);
   /** Cert quan `loadAllSessions()` ja ha portat l'historial sencer. */
   readonly allSessionsLoaded = this._allLoaded.asReadonly();
+  /** La consulta de tot l'historial que hi ha en marxa, si n'hi ha cap. Qui la
+   *  demani mentre viatja s'hi enganxa en comptes de llançar-ne una altra. */
+  private _allLoad: Promise<void> | null = null;
   private _lastRefreshAt = 0;
 
   /** Marge mínim entre refrescos automàtics (tornar a l'app dispara alhora
@@ -155,6 +158,9 @@ export class SportService {
       this._allLoaded.set(false);
       this.isLoaded.set(false);
       this._loadPromise = null;
+      // Una consulta de l'usuari anterior no pot quedar-se com la que espera
+      // qui demani l'historial ara.
+      this._allLoad = null;
       if (uid) {
         const cached = this._readSportsFromStorage(uid);
         if (cached) {
@@ -194,7 +200,10 @@ export class SportService {
     if (!immediate && now - this._lastRefreshAt < SportService.REFRESH_THROTTLE_MS) return;
     this._lastRefreshAt = now;
 
-    if (this._allLoaded()) { this._allLoaded.set(false); await this.loadAllSessions(); return; }
+    // Es torna a demanar sencer sense tombar `allSessionsLoaded`: qui en depèn
+    // (els rècords del detall d'una sessió) tornaria a pintar-se a mitges cada
+    // cop que l'app recupera el focus, i això és part de les pampallugues.
+    if (this._allLoaded()) { await this._fetchAllSessions(); return; }
 
     await Promise.all([...this._monthCache.keys()].map(key => {
       const [y, m] = key.split('-').map(Number);
@@ -443,8 +452,21 @@ export class SportService {
    *  query. Needed by features that reason over all-time recency (e.g. the
    *  workout suggestion), which the lazy per-month loading can't guarantee.
    *  Cached after the first successful run. */
-  async loadAllSessions(): Promise<void> {
-    if (this._allLoaded()) return;
+  loadAllSessions(): Promise<void> {
+    if (this._allLoaded()) return Promise.resolve();
+    return this._fetchAllSessions();
+  }
+
+  /** La consulta de debò, amb guarda de petició en marxa: qui la demani
+   *  mentre una viatja espera aquella en comptes de llançar-ne una altra. */
+  private _fetchAllSessions(): Promise<void> {
+    if (this._allLoad) return this._allLoad;
+    const p = this._runFetchAllSessions().finally(() => { this._allLoad = null; });
+    this._allLoad = p;
+    return p;
+  }
+
+  private async _runFetchAllSessions(): Promise<void> {
     const uid = this.auth.uid();
     if (!uid) return;
     this.isLoading.set(true);

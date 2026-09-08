@@ -59,16 +59,37 @@ export class SyncLogService {
   /** Del més recent al més antic, que és l'ordre en què es mira. */
   readonly entries = this._entries.asReadonly();
 
+  /** Hi ha una escriptura ajornada esperant el final de la tanda. */
+  private _pendingWrite = false;
+
   log(event: SyncLogEvent, detail: Omit<SyncLogEntry, 'at' | 'event'> = {}): void {
     const entry: SyncLogEntry = { at: new Date().toISOString(), event, ...detail };
-    const next = [entry, ...this._entries()].slice(0, MAX_ENTRIES);
-    this._entries.set(next);
-    this._write(next);
+    this._entries.set([entry, ...this._entries()].slice(0, MAX_ENTRIES));
+    this._scheduleWrite();
   }
 
   clear(): void {
     this._entries.set([]);
+    this._pendingWrite = false;
     try { localStorage.removeItem(SyncLogService.LS_KEY); } catch { /* res a fer */ }
+  }
+
+  /**
+   * Guardar el diari s'ajorna al final de la tanda.
+   *
+   * Una resposta del servidor amb dos-cents entrenaments anotava dues-centes
+   * línies, i cadascuna serialitzava l'anell sencer i el desava: dues-centes
+   * escriptures síncrones que bloquejaven la pàgina just quan carregava. Com
+   * que la tanda és síncrona, un microtask ho deixa en una sola escriptura amb
+   * tot el que s'hi ha anotat, abans que el navegador pugui fer res més.
+   */
+  private _scheduleWrite(): void {
+    if (this._pendingWrite) return;
+    this._pendingWrite = true;
+    queueMicrotask(() => {
+      this._pendingWrite = false;
+      this._write(this._entries());
+    });
   }
 
   private _read(): SyncLogEntry[] {

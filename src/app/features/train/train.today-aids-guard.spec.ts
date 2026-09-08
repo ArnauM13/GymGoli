@@ -62,7 +62,7 @@ describe('TrainComponent — today-only aids never crash the workout view', () =
           workouts: signal([done]), doneWorkouts: signal([done]), isLoading: signal(false),
           getWorkoutsForDate: () => [], getDoneWorkoutsForDate: () => [], getPlannedForDate: () => [],
           getLastWorkoutByCategory: () => null, getAllTimeMaxWeight: () => 0, getLastSessionInfo: () => null, getLastSessionEntry: () => null,
-          ensureMonthLoaded: () => {},
+          ensureMonthLoaded: () => {}, ensureWorkoutEntries: () => Promise.resolve(),
         } },
         { provide: SportService, useValue: {
           sports: signal([]), sessions: signal([]), isLoaded: signal(true), sportsLoaded: signal(true),

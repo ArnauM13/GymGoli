@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 
 import { WorkoutProfileService } from './workout-profile.service';
+import { AuthService } from './auth.service';
 import { WorkoutService } from './workout.service';
 import { SportService } from './sport.service';
 import { TrainingTypeService } from './training-type.service';
@@ -42,7 +43,8 @@ describe('WorkoutProfileService', () => {
 
     TestBed.configureTestingModule({
       providers: [
-        { provide: WorkoutService,      useValue: { doneWorkouts, workouts: signal<Workout[]>([]), loadAllWorkouts: jasmine.createSpy('loadAllWorkouts').and.resolveTo(undefined) } },
+        { provide: AuthService,         useValue: { uid: signal<string | null>('u1') } },
+        { provide: WorkoutService,      useValue: { doneWorkouts, workouts: signal<Workout[]>([]), loadHistorySummaries: jasmine.createSpy('loadHistorySummaries').and.resolveTo(undefined) } },
         { provide: SportService,        useValue: { sessions, sports, loadAllSessions: jasmine.createSpy('loadAllSessions').and.resolveTo(undefined) } },
         { provide: UserSettingsService, useValue: { fitnessGoal } },
         { provide: TrainingTypeService, useValue: { types: signal(DEFAULT_TRAINING_TYPES) } },
