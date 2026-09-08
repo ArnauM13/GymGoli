@@ -38,7 +38,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { NavigationHistoryService } from '../../core/services/navigation-history.service';
 import { TodayService } from '../../core/services/today.service';
 import {
-  formatFeeling, workoutCardColor, workoutPrimaryColor,
+  feedDayLabel, formatFeeling, workoutCardColor, workoutPrimaryColor, workoutPrimaryIcon,
   workoutVolumeFmt as workoutVolumeFmtUtil,
 } from '../../shared/utils/workout-card.utils';
 import { toDateStr } from '../../shared/utils/date.utils';
@@ -84,38 +84,62 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
           <span class="aw-type-badge" [style.--bc]="workoutPrimaryColor(w)">{{ workoutLabel(w) }}</span>
         </header>
 
-        <!-- Floating card header (same style as dashboard workout-card) -->
-        <div class="workout-card aw-header-sticky" [style.--wc]="workoutPrimaryColor(w)">
-          <div class="wc-bar" [style.background]="workoutCardColor(w)"></div>
-          <div class="wc-info">
-            <span class="wc-label">{{ workoutLabel(w) }}</span>
-            <div class="wc-stats">
-              <span class="wc-stat">
-                <span class="material-symbols-outlined">fitness_center</span>
-                <strong>{{ w.entries.length }}</strong> exerc
-              </span>
-              @if (topbarTotalSets(w) || topbarWarmupSets(w)) {
-                <span class="wc-stat-sep">·</span>
-                <span class="wc-stat">
-                  <span class="material-symbols-outlined">repeat</span>
-                  <strong>{{ topbarTotalSets(w) }}</strong> sèr
-                  @if (topbarWarmupSets(w); as warm) {
-                    <span class="wc-stat-warmup">
-                      +{{ warm }}<span class="material-symbols-outlined">local_fire_department</span>
-                    </span>
-                  }
+        <!-- ── Qui, quan i com ha anat ──
+             La mateixa targeta que corona una sessió d'esport: barra de
+             color, icona amb el gos, què és, quan va ser i com t'ha anat. Un
+             entrenament i una sessió d'esport són la mateixa cosa vistes de
+             prop, i fins ara cadascuna es presentava a la seva manera.
+             Segueix enganxada a dalt: les xifres han de ser llegibles a mig
+             entrenament, sense tornar a pujar. -->
+        <div class="activity-hero aw-hero" [class.activity-hero--planned]="isPlannedWorkout(w)"
+             [style.--ac]="workoutPrimaryColor(w)">
+          <span class="ah-bar" [style.background]="workoutCardColor(w)" aria-hidden="true"></span>
+          <app-activity-icon [icon]="workoutPrimaryIcon(w)"
+                             [color]="workoutPrimaryColor(w)" mascot="marley" />
+          <div class="ah-text">
+            <div class="ah-title-row">
+              <span class="ah-title">{{ workoutLabel(w) }}</span>
+            </div>
+            <!-- El dia i les xifres en una sola línia: la targeta viu
+                 enganxada a dalt i cada línia de més és pantalla de menys. -->
+            <div class="ah-meta">
+              <span class="ah-date">{{ heroDateLabel(w) }}</span>
+              @if (!isPlannedWorkout(w)) {
+                <span class="ah-sep" aria-hidden="true">·</span>
+                <span class="ah-stat">
+                  <span class="material-symbols-outlined" aria-hidden="true">fitness_center</span>
+                  <strong>{{ w.entries.length }}</strong> exerc
                 </span>
-              }
-              @if (workoutVolumeFmt(w); as vol) {
-                <span class="wc-stat-sep">·</span>
-                <span class="wc-stat wc-stat--vol">
-                  <span class="material-symbols-outlined">weight</span>
-                  <strong>{{ vol }}</strong>
-                </span>
+                @if (topbarTotalSets(w) || topbarWarmupSets(w)) {
+                  <span class="ah-sep" aria-hidden="true">·</span>
+                  <span class="ah-stat">
+                    <span class="material-symbols-outlined" aria-hidden="true">repeat</span>
+                    <strong>{{ topbarTotalSets(w) }}</strong> sèr
+                    @if (topbarWarmupSets(w); as warm) {
+                      <span class="ah-warmup">
+                        +{{ warm }}<span class="material-symbols-outlined" aria-hidden="true">local_fire_department</span>
+                      </span>
+                    }
+                  </span>
+                }
+                @if (workoutVolumeFmt(w); as vol) {
+                  <span class="ah-sep" aria-hidden="true">·</span>
+                  <span class="ah-stat ah-stat--vol">
+                    <span class="material-symbols-outlined" aria-hidden="true">weight</span>
+                    <strong>{{ vol }}</strong>
+                  </span>
+                }
               }
             </div>
           </div>
-          <div class="aw-header-right">
+          <!-- Un pla encara no s'ha viscut: hi diu que està previst, i la
+               sensació no hi té res a dir fins que es faci. -->
+          @if (isPlannedWorkout(w)) {
+            <span class="ah-pill">
+              <span class="material-symbols-outlined" aria-hidden="true">event_upcoming</span>
+              Planificat
+            </span>
+          } @else {
             <button class="aw-feeling-btn" (click)="$event.stopPropagation(); awFeelingOpen.set(!awFeelingOpen())"
                     [class.aw-feeling-btn--set]="w.feeling"
                     [attr.aria-label]="w.feeling ? 'Canviar sensació' : 'Afegir sensació'"
@@ -126,8 +150,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
                 <span class="material-symbols-outlined">sentiment_neutral</span>
               }
             </button>
-            <span class="aw-date">{{ topbarDateLabel(w) }}</span>
-          </div>
+          }
         </div>
 
         <!-- Feeling picker (slides in below header) -->
@@ -554,22 +577,14 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       &:active { opacity: 0.7; }
     }
 
-    /* ── Active workout floating header (reuses .workout-card) ── */
-    .aw-header-sticky {
-      position: sticky; top: 12px; z-index: 10;
-      margin: 12px 16px 0;
-      cursor: default;
-      &:hover { box-shadow: none; background: color-mix(in srgb, var(--wc, var(--c-card)) 8%, var(--c-card)); border-color: color-mix(in srgb, var(--wc, var(--c-border-2)) 30%, var(--c-border-2)); }
-    }
-    .aw-header-right {
-      display: flex; align-items: center; gap: 4px; flex-shrink: 0;
-    }
-    .aw-date {
-      font-size: 11px; font-weight: 600; color: var(--c-text-2);
-      padding: 0 14px 0 0; flex-shrink: 0;
-    }
+    /* ── Capçalera de l'entrenament ──
+       La targeta és la compartida (.activity-hero, a styles.scss); d'aquesta
+       pàgina només és que es quedi enganxada a dalt: les xifres han de ser
+       llegibles a mig entrenament, sense tornar a pujar. */
+    .aw-hero { position: sticky; top: 12px; z-index: 10; margin-top: 12px; }
+
     .aw-feeling-btn {
-      width: 34px; height: 34px; border-radius: 50%;
+      width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
       border: none; background: transparent; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       touch-action: manipulation; transition: background 0.15s;
@@ -610,7 +625,6 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       .material-symbols-outlined { font-size: 16px; }
       &:hover { color: #ef5350; border-color: rgba(239,83,80,0.3); background: rgba(239,83,80,0.06); }
     }
-    .wc-feeling { font-size: 14px; line-height: 1; }
 
     /* ── Active workout action menu FAB ── */
     .aw-menu-fab {
@@ -955,61 +969,6 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       cursor: pointer; touch-action: manipulation; transition: background 0.15s, color 0.15s;
       .material-symbols-outlined { font-size: 19px; }
       &:hover { background: var(--c-subtle); color: var(--c-text-2); }
-    }
-
-    /* ── Workout summary cards ── */
-    .workout-card {
-      display: flex; align-items: center;
-      margin-bottom: 8px;
-      border: 1.5px solid color-mix(in srgb, var(--wc, var(--c-border-2)) 38%, var(--c-border-2));
-      border-radius: 14px;
-      background: color-mix(in srgb, var(--wc, var(--c-card)) 8%, var(--c-card));
-      overflow: hidden;
-      cursor: pointer; transition: box-shadow 0.15s, border-color 0.15s, background 0.15s;
-      touch-action: manipulation;
-      &:hover {
-        box-shadow: 0 2px 8px var(--c-shadow);
-        background: color-mix(in srgb, var(--wc, var(--c-card)) 14%, var(--c-card));
-        border-color: color-mix(in srgb, var(--wc, var(--c-border)) 50%, var(--c-border));
-      }
-    }
-    .wc-bar {
-      width: 5px; align-self: stretch; flex-shrink: 0;
-    }
-    .wc-info {
-      flex: 1; min-width: 0;
-      display: flex; flex-direction: column; gap: 2px;
-      padding: 10px 10px;
-    }
-    .wc-label {
-      font-size: 13px; font-weight: 700; color: var(--c-text);
-      display: inline-flex; align-items: center; gap: 5px;
-    }
-    .wc-icon { font-size: 15px; font-variation-settings: 'FILL' 1, 'wght' 400; }
-    .wc-stats {
-      display: flex; align-items: center; gap: 4px;
-      font-size: 11px; color: var(--c-text-3);
-    }
-    .wc-stat {
-      display: flex; align-items: center; gap: 2px;
-      .material-symbols-outlined { font-size: 11px; }
-      strong { color: var(--c-text-2); font-weight: 700; }
-    }
-    .wc-stat-warmup {
-      display: inline-flex; align-items: center; gap: 1px; margin-left: 1px; color: #ff9800;
-      .material-symbols-outlined { font-size: 11px; color: #ff9800; font-variation-settings: 'FILL' 1, 'wght' 400; }
-      strong { color: #ff9800; }
-    }
-    .wc-stat-sep { color: var(--c-border); }
-    .wc-stat--vol strong { color: var(--wc, var(--c-brand)); }
-    .wc-delete {
-      width: 40px; height: 40px; flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center;
-      border: none; background: transparent; cursor: pointer;
-      color: var(--c-text-3); transition: color 0.15s, background 0.15s; touch-action: manipulation;
-      border-radius: 10px; margin-right: 4px;
-      .material-symbols-outlined { font-size: 18px; }
-      &:hover { color: #ef5350; background: rgba(239,83,80,0.08); }
     }
 
     .type-btn--active {
@@ -1668,10 +1627,16 @@ export class TrainComponent implements OnDestroy {
     return label.charAt(0).toUpperCase() + label.slice(1);
   }
 
-  topbarDateLabel(w: Workout): string {
-    const d = new Date(w.date + 'T12:00:00');
-    if (w.date === this.selectedDate() && this.isToday()) return 'Avui';
-    return d.toLocaleDateString('ca-ES', { weekday: 'short', day: 'numeric', month: 'short' });
+  /** El dia de l'entrenament tal com el diu el feed: «Avui», «Ahir» o escrit.
+   *  El mateix que corona una sessió d'esport. */
+  heroDateLabel(w: Workout): string {
+    return feedDayLabel(w.date, this.today());
+  }
+
+  /** Un pla és el que encara no s'ha fet: ni xifres ni sensació, com a
+   *  `sport-session`. */
+  isPlannedWorkout(w: Workout): boolean {
+    return (w.status ?? 'done') === 'planned';
   }
 
   topbarTotalSets(w: Workout): number {
@@ -1694,6 +1659,7 @@ export class TrainComponent implements OnDestroy {
 
   readonly workoutCardColor    = workoutCardColor;
   readonly workoutPrimaryColor = workoutPrimaryColor;
+  readonly workoutPrimaryIcon  = workoutPrimaryIcon;
   /** Bodyweight-aware total volume label — folds in the user's bodyweight for
    *  bodyweight/assisted exercises (dominades, fons…). */
   workoutVolumeFmt(w: Workout): string {

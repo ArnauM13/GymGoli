@@ -105,8 +105,8 @@ describe('SportSessionComponent', () => {
 
     const el = fixture.nativeElement as HTMLElement;
     expect(component.pair()?.session.id).toBe('sess1');
-    expect(el.querySelector('.hero-title')?.textContent?.trim()).toBe('Pàdel');
-    expect(el.querySelector('.hero-subtype')?.textContent?.trim()).toBe('Dobles');
+    expect(el.querySelector('.ah-title')?.textContent?.trim()).toBe('Pàdel');
+    expect(el.querySelector('.ss-subtype')?.textContent?.trim()).toBe('Dobles');
   });
 
   it("demana l'historial sencer: hi arriba per l'URL i no sap de quin mes és", () => {
