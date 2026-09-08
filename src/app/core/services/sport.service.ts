@@ -140,7 +140,10 @@ export class SportService {
 
   /** Cada quant es reintenta la cua d'escriptures pendents. */
   private static readonly RETRY_MS = 20_000;
-  readonly isLoading = signal(false);
+  /** Només la consulta d'historial sencer, que és la que té indicador propi. */
+  private readonly _fullLoading = signal(false);
+  /** Hi ha alguna consulta de sessions en marxa. */
+  readonly isLoading = computed(() => this._fullLoading() || this.activityFeed.loading());
 
   private readonly _sportsLoaded = signal(false);
   /** True once the user's sport definitions have been fetched at least once. */
@@ -630,7 +633,6 @@ export class SportService {
       }
     }
     this._rebuild();
-    this.isLoading.set(false);
   }
 
   /** Loads the user's entire sport-session history into the cache in a single
@@ -654,7 +656,7 @@ export class SportService {
   private async _runFetchAllSessions(): Promise<void> {
     const uid = this.auth.uid();
     if (!uid) return;
-    this.isLoading.set(true);
+    this._fullLoading.set(true);
     try {
       const known        = new Set([...this._monthCache.values()].flat().map(s => s.id));
       const queuedBefore = new Set(this._readPending(uid).map(o => o.id));
@@ -700,7 +702,7 @@ export class SportService {
     } catch {
       // best-effort; keep whatever we already have
     } finally {
-      this.isLoading.set(false);
+      this._fullLoading.set(false);
     }
   }
 

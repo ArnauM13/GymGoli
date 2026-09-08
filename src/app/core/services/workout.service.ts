@@ -128,7 +128,30 @@ export class WorkoutService {
   /** Sessions que ara mateix s'estan baixant senceres, per id. */
   private readonly _entryLoads = new Map<string, Promise<void>>();
 
-  readonly isLoading = signal(false);
+  /** Només la consulta d'historial sencer, que és la que té indicador propi. */
+  private readonly _fullLoading = signal(false);
+
+  /**
+   * Hi ha alguna consulta d'entrenaments en marxa.
+   *
+   * Per a un esquelet de secció val més `hasRange()`: això s'encén per
+   * qualsevol consulta, i una pantalla que ja té les seves dades no té cap
+   * motiu per parpellejar perquè n'estigui arribant una altra.
+   */
+  readonly isLoading = computed(() => this._fullLoading() || this.activityFeed.loading());
+
+  /** Cert quan aquest tram ja ha arribat. És el que ha de mirar una secció per
+   *  decidir si ensenya l'esquelet: cada secció mira el seu, i les que ja
+   *  tenen les dades es pinten de seguida. */
+  hasRange(from: string, to: string): boolean {
+    return this.activityFeed.covers(from, to);
+  }
+
+  /** El mateix per a la finestra que es demana en entrar. */
+  readonly hasRecentWindow = computed(() => {
+    const { from, to } = this.recentWindow();
+    return this.activityFeed.covers(from, to);
+  });
 
   // ── Public signals ───────────────────────────────────────────────────────
 
@@ -683,7 +706,7 @@ export class WorkoutService {
   private async _runFetchAll(silent: boolean): Promise<void> {
     const uid = this.auth.uid();
     if (!uid || this.offline.isOffline()) return;
-    if (!silent) this.isLoading.set(true);
+    if (!silent) this._fullLoading.set(true);
 
     const since = this.store.mark();
     try {
@@ -712,7 +735,7 @@ export class WorkoutService {
       for (const w of fetched) this.store.markReconciled(w.date.substring(0, 7));
       this._allLoaded = true;
     } finally {
-      if (!silent) this.isLoading.set(false);
+      if (!silent) this._fullLoading.set(false);
     }
   }
 

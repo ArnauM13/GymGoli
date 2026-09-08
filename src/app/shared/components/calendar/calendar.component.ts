@@ -5,7 +5,7 @@ import { WorkoutService } from '../../../core/services/workout.service';
 import { Workout } from '../../../core/models/workout.model';
 import { SportService } from '../../../core/services/sport.service';
 import { TodayService } from '../../../core/services/today.service';
-import { todayStr } from '../../utils/date.utils';
+import { toDateStr, todayStr } from '../../utils/date.utils';
 import { CATEGORY_COLORS, ExerciseCategory } from '../../../core/models/exercise.model';
 import {
   MONTHS_CA, CalDay,
@@ -397,9 +397,18 @@ export class CalendarComponent {
   readonly weekStart = signal<string>(mondayOf(todayStr()));
 
   readonly dayNames = ['dl', 'dm', 'dc', 'dj', 'dv', 'ds', 'dg'];
-  readonly isLoading = computed(() =>
-    this.workoutService.isLoading() || !this.sportService.isLoaded()
-  );
+  /** L'esquelet només mentre falti **aquest** període.
+   *
+   *  Abans mirava «hi ha alguna consulta en marxa», i el calendari parpellejava
+   *  cada cop que qualsevol altra pantalla en demanava una, encara que el mes
+   *  que s'estava mirant ja hi fos. */
+  readonly isLoading = computed(() => {
+    if (!this.sportService.isLoaded()) return true;
+    const y = this.calYear(), m = this.calMonth();
+    const from = toDateStr(new Date(y, m, 1));
+    const to   = toDateStr(new Date(y, m + 1, 0));
+    return !this.workoutService.hasRange(from, to);
+  });
   readonly isDialog  = !!this.dialogRef;
   /** Reactiu a posta: amb l'app oberta a mitjanit, el dia marcat com a "avui"
    *  ha de saltar sol al dia nou. */

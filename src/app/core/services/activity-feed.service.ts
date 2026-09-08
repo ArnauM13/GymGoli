@@ -271,6 +271,10 @@ export class ActivityFeedService {
   private async _fetch(from: string, to: string): Promise<void> {
     const since     = this.store.mark();
     const startedAt = Date.now();
+    // De qui són les dades que estem demanant. Tancar la sessió i entrar-hi
+    // amb un altre compte mentre la consulta viatja faria que la resposta de
+    // l'anterior s'apliqués a sobre del nou.
+    const forUid    = this.auth.uid();
 
     const { data, error } = await this.supabase.rpc('activity_feed', {
       p_from:       from,
@@ -281,6 +285,7 @@ export class ActivityFeedService {
     // Xarxa o servidor KO: es manté el que ja teníem i el tram no consta com
     // a rebut, així que la propera visita el tornarà a demanar.
     if (error) return;
+    if (this.auth.uid() !== forUid) return;   // ja no és el mateix usuari
 
     const rows = (data ?? []) as FeedRow[];
 
