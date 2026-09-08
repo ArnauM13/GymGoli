@@ -648,6 +648,22 @@ nav pill (inset side margins, all four corners rounded) and slide up from below.
   is open (`this.dialog.openDialogs.length`).
 - Floating cards that aren't full sheets (rest timer, confirm bars) sit above
   the nav with `bottom: calc(var(--nav-height) + N)` — never a hardcoded px.
+- **Swipe down to close (opt-in):** a sheet that comes up with the thumb should
+  go back down with it. Add `appSheetDrag` (`shared/directives/sheet-drag.directive`)
+  to the panel, hand it the backdrop element so it dims with the same movement,
+  and close on `(sheetDragDismiss)` — the same handler as the ✕:
+
+  ```html
+  <div #backdrop class="bottom-sheet-backdrop" (click)="close()" aria-hidden="true"></div>
+  <div class="bottom-sheet my-sheet" role="dialog" …
+       appSheetDrag [appSheetDragBackdrop]="backdrop" (sheetDragDismiss)="close()">
+  ```
+
+  The gesture only takes over when the content is already scrolled to the top
+  and the finger goes down more than sideways, so a scrollable sheet still
+  scrolls. It never replaces the ✕ or Escape: with a mouse or a keyboard there
+  is no finger. Sheets that carry unsaved input (editors, forms) stay out of
+  it — a stray swipe must not throw away what was typed.
 
 ### Insight card & detail sheet
 

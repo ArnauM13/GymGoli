@@ -2,6 +2,8 @@ import { Component, HostListener, computed, inject, input, output } from '@angul
 import { A11yModule } from '@angular/cdk/a11y';
 import { MatDialog } from '@angular/material/dialog';
 
+import { SheetDragDirective } from '../../directives/sheet-drag.directive';
+
 import { FitnessInsight, InsightBar } from '../../../core/models/insight.model';
 import { MASCOTS, MascotMeta } from '../../../core/models/mascot.model';
 
@@ -19,12 +21,15 @@ import { MASCOTS, MascotMeta } from '../../../core/models/mascot.model';
 @Component({
   selector: 'app-insight-detail-sheet',
   standalone: true,
-  imports: [A11yModule],
+  imports: [A11yModule, SheetDragDirective],
   template: `
-    <div class="bottom-sheet-backdrop" (click)="close.emit()" aria-hidden="true"></div>
+    <div #backdrop class="bottom-sheet-backdrop" (click)="close.emit()" aria-hidden="true"></div>
 
+    <!-- El full es tanca amb la creu, amb l'Escape, tocant el fosc… i
+         arrossegant-lo cap avall, que al mòbil és el primer que es prova. -->
     <div class="ids-sheet bottom-sheet" role="dialog" aria-modal="true"
          aria-labelledby="ids-title" cdkTrapFocus cdkTrapFocusAutoCapture
+         appSheetDrag [appSheetDragBackdrop]="backdrop" (sheetDragDismiss)="close.emit()"
          [style.--ic]="insight().color">
       <span class="bottom-sheet-handle" aria-hidden="true"></span>
 
@@ -104,6 +109,8 @@ import { MASCOTS, MascotMeta } from '../../../core/models/mascot.model';
   `,
   styles: [`
     .ids-sheet { padding: 8px 18px 22px; }
+    /* La nansa és el que es veu agafable: amb el ratolí, que ho digui el cursor. */
+    .ids-sheet .bottom-sheet-handle { cursor: grab; }
 
     /* ── Capçalera ── */
     .ids-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
