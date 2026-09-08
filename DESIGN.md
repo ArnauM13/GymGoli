@@ -341,7 +341,13 @@ data i li faltaven les xifres.
 
 Les dues activitats tenen **pàgina pròpia**, i s'hi arriba igual des del feed
 i des d'Entrenar: un entrenament a `/train?workout=` (mode pantalla sencera de
-la pàgina d'Entrenar) i una sessió d'esport a `/sport/:id`. Cap de les dues
+la pàgina d'Entrenar) i una sessió d'esport a `/sport/:id`. **L'adreça es
+queda com és**: el `?workout=` no s'esborra un cop obert. La pàgina d'Entrenar
+es manté viva entre navegacions (`AppReuseStrategy`), i el que ha d'ensenyar
+el llegeix de l'adreça a què ha anat a parar cada navegació —no d'un
+observable de la ruta, que reenganxada només torna a emetre si els paràmetres
+han canviat—, així que obrir dues vegades el mateix entrenament funciona
+igual, i recarregar o tornar enrere hi torna. Cap de les dues
 s'obre en un full flotant —això queda per a triar coses (`bottom sheet`, §8),
 no per a mirar ni omplir una activitat.
 

@@ -1,6 +1,6 @@
 import { Component, HostListener, OnDestroy, ViewChild, computed, effect, inject, signal, untracked } from '@angular/core';
-import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { filter, map } from 'rxjs/operators';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { filter } from 'rxjs/operators';
 import { FormsModule } from '@angular/forms';
 import { A11yModule } from '@angular/cdk/a11y';
 import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
@@ -1457,77 +1457,75 @@ export class TrainComponent implements OnDestroy {
     this.sportService.ensureLoaded();
     this._nowTimer = setInterval(() => this._now.set(Date.now()), 60_000);
 
-    // Coming from the home feed with a specific workout to open (e.g. tapping
-    // a day's card there navigates here with ?workout=<id>). Reactive (rather
-    // than a one-off snapshot read) since this route is kept alive and reused
-    // across nav-bar switches, so the query param can change without the
-    // component being recreated.
-    const queryWorkoutId = toSignal(this.route.queryParamMap.pipe(map(params => params.get('workout'))));
-    effect(() => {
-      const id = queryWorkoutId();
-      if (id) untracked(() => {
-        this.openWorkout(id);
-        // The train route is kept alive (AppReuseStrategy), so its query-param
-        // observable only re-emits when the value actually changes. Strip the
-        // consumed ?workout= from the URL right away — otherwise re-tapping the
-        // same workout later navigates to an identical URL that never re-fires
-        // this effect, leaving the dashboard visible instead of the detail.
-        queueMicrotask(() => this.router.navigate([], {
-          relativeTo: this.route,
-          queryParams: { workout: null },
-          queryParamsHandling: 'merge',
-          replaceUrl: true,
-        }));
-      });
-    });
-
-    // Coming from the home feed with a specific sport session to open
-    // (e.g. tapping a sport row there navigates here with
-    // ?sport=<id>&date=<date>). Reactive on sportService.sports() too,
-    // since the list may still be loading on first visit; handledSportQueryId
-    // stops it from reopening (or, worse, toggle-closing) the sheet every
-    // time the sports list happens to change afterwards.
-    // Deep-link to a specific day (e.g. "Registrar entrenament" from the
-    // calendar → /train?date=YYYY-MM-DD). The train route is kept alive
-    // (AppReuseStrategy), so the constructor's snapshot seed only runs on a
-    // cold mount — this reactive sync makes the link land on the right day
-    // even when returning to an already-instantiated train page.
-    const queryDate = toSignal(
-      this.route.queryParamMap.pipe(map(params => validDateParam(params.get('date'))))
-    );
-    effect(() => {
-      const d = queryDate();
-      if (d) untracked(() => this.selectedDate.set(d));
-    });
-
+    // ── El que s'està mirant ho diu l'adreça ────────────────────────────
+    //
+    // S'hi arriba amb `/train?workout=<id>` (des d'Inici o de l'Historial) o
+    // amb `/train?date=<dia>` (registrar un dia passat, planificar-ne un de
+    // futur), i la pàgina es posa al dia a cada navegació que hi acaba.
+    //
+    // Es llegeix de l'estat del router, no de `route.queryParamMap`: la ruta
+    // es manté viva (AppReuseStrategy) i, quan es reenganxa, aquell
+    // observable només torna a emetre si els paràmetres han canviat respecte
+    // de l'última vegada que hi eres. Obrir dues vegades el mateix
+    // entrenament no els canvia, i el segon cop et quedaves al taulell.
+    //
+    // I l'adreça es queda com és: abans, tot just consumit el `?workout=`, se
+    // n'anava amb una navegació a part. Aquella navegació —relativa a una
+    // ruta que podia haver deixat de ser l'activa— és la que de tant en tant
+    // et plantava a `/train` en comptes de l'entrenament, i deixava l'adreça
+    // dient una cosa i la pantalla una altra: recarregar o tornar enrere ja
+    // no hi tornava.
     let firstDateEffectRun = true;
-    // Set right before a deep-link (obrir un entrenament) changes
-    // selectedDate on purpose, so this effect's reset below doesn't
-    // immediately close what it just opened.
+    // Es posa just abans que obrir un entrenament canviï el dia a posta,
+    // perquè la reinicialització de sota no tanqui el que s'acaba d'obrir.
     let suppressNextDateReset = false;
 
-    // ...i entrar-hi *sense* `?date=` vol dir avui. La ruta es manté viva
-    // (AppReuseStrategy), així que sense això la pàgina es quedava clavada al
-    // dia que havies obert abans — tornaves a Inici, hi triaves avui, i
-    // Entrenament seguia pensant que eres a l'1 de setembre.
-    // Només compta quan s'hi arriba des d'una altra pàgina: els canvis de
-    // query param de la mateixa pàgina (obrir un entrenament, per exemple) no
-    // han de moure't del dia que estàs mirant.
+    // Arribar-hi *sense* `?date=` vol dir avui. La ruta es manté viva, així
+    // que sense això la pàgina es quedava clavada al dia que havies obert
+    // abans — tornaves a Inici, hi triaves avui, i Entrenament seguia pensant
+    // que eres a l'1 de setembre. Només compta quan s'hi arriba des d'una
+    // altra pàgina: navegar dins la mateixa pàgina no t'ha de moure de dia.
     let previousPath = this.router.url.split('?')[0];
+
+    // Arrencada en fred amb `?workout=` a l'adreça: el senyal ja ve sembrat
+    // del snapshot perquè la primera pintada sigui l'entrenament i no el
+    // taulell (l'outlet pot muntar la pàgina després que la navegació hagi
+    // acabat, i llavors no n'arriba cap avís). Les sèries, però, encara
+    // s'han de demanar.
+    const seededWorkoutId = this.activeWorkoutId();
+    if (seededWorkoutId) this.openWorkout(seededWorkoutId);
+
+    const syncFromUrl = (url: string, arrivedNow: boolean): void => {
+      // Els paràmetres es llegeixen de l'adreça on ha anat a parar la
+      // navegació, que és sempre la bona: ni depèn que un observable d'una
+      // ruta reenganxada torni a emetre, ni de l'ordre en què s'actualitza
+      // res.
+      const params    = this.router.parseUrl(url).queryParams as Record<string, string | undefined>;
+      const workoutId = params['workout'] ?? null;
+      const linkDate  = validDateParam(params['date'] ?? null);
+
+      const goToDay = (day: string): void => {
+        if (this.selectedDate() === day) return;
+        // El salt de dia és només de context quan s'obre un entrenament: no
+        // ha de tancar el que s'acaba d'obrir.
+        if (workoutId) suppressNextDateReset = true;
+        this.selectedDate.set(day);
+      };
+
+      if (linkDate) goToDay(linkDate);
+      else if (arrivedNow) goToDay(this.today());
+
+      if (workoutId && workoutId !== this.activeWorkoutId()) this.openWorkout(workoutId);
+    };
+
     this.router.events
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd), takeUntilDestroyed())
       .subscribe(e => {
         const path       = e.urlAfterRedirects.split('?')[0];
         const arrivedNow = previousPath !== '/train' && path === '/train';
         previousPath = path;
-        if (!arrivedNow) return;
-        const params = this.route.snapshot.queryParamMap;
-        if (validDateParam(params.get('date'))) return;
-        if (this.selectedDate() === this.today()) return;
-        // Si s'arriba per obrir un entrenament concret, el salt de dia és
-        // només de context: no ha de tancar el que s'acaba d'obrir.
-        if (params.get('workout')) suppressNextDateReset = true;
-        this.selectedDate.set(this.today());
+        if (path !== '/train') return;
+        syncFromUrl(e.urlAfterRedirects, arrivedNow);
       });
 
     effect(() => {

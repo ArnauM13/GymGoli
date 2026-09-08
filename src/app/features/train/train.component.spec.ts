@@ -455,6 +455,65 @@ describe('TrainComponent', () => {
 
       expect(component.selectedDate()).toBe('2020-09-01');
     });
+
+    // El que s'ha d'ensenyar ho diu l'adreça: la ruta es manté viva
+    // (AppReuseStrategy) i abans això penjava d'un observable de la ruta que,
+    // reenganxada, només torna a emetre si els paràmetres han canviat.
+    describe("obrir el que diu l'adreça", () => {
+      it('obre l\'entrenament que anomena el `?workout=`', () => {
+        navigateTo('/home', 1);
+        navigateTo('/train?workout=w1', 2);
+
+        expect(component.activeWorkoutId()).toBe('w1');
+      });
+
+      it('el torna a obrir després d\'haver-lo tancat, encara que sigui el mateix', () => {
+        navigateTo('/home', 1);
+        navigateTo('/train?workout=w1', 2);
+        component.closeWorkout();
+        expect(component.activeWorkoutId()).toBeNull();
+
+        navigateTo('/home', 3);
+        navigateTo('/train?workout=w1', 4);
+
+        expect(component.activeWorkoutId()).toBe('w1');
+      });
+
+      it('canvia d\'entrenament sense passar pel taulell', () => {
+        navigateTo('/home', 1);
+        navigateTo('/train?workout=w1', 2);
+        navigateTo('/home', 3);
+        navigateTo('/train?workout=w2', 4);
+
+        expect(component.activeWorkoutId()).toBe('w2');
+      });
+
+      // Arribar-hi d'una altra pàgina posa el dia a avui, i això reinicia el
+      // que hi hagi obert: obrir un entrenament no ho ha de patir.
+      it('no es tanca sol quan el salt de dia va amb ell', () => {
+        component.selectedDate.set('2020-09-01');
+        navigateTo('/home', 1);
+        navigateTo('/train?workout=w1', 2);
+        TestBed.flushEffects();
+
+        expect(component.selectedDate()).toBe(TODAY);
+        expect(component.activeWorkoutId()).toBe('w1');
+      });
+
+      it('deixa l\'adreça com és: no navega enlloc en obrir-lo', () => {
+        navigateTo('/home', 1);
+        navigateTo('/train?workout=w1', 2);
+
+        expect(navigateSpy).not.toHaveBeenCalled();
+      });
+
+      it('un `?date=` deep-link mou el dia encara que la pàgina ja fos viva', () => {
+        navigateTo('/home', 1);
+        navigateTo('/train?date=2024-03-05', 2);
+
+        expect(component.selectedDate()).toBe('2024-03-05');
+      });
+    });
   });
 
   // ── isSelectedPast() / selectedDateLabel() ───────────────────────────────
