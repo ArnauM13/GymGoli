@@ -223,10 +223,16 @@ export class SportDetailComponent {
   readonly hiddenRowCount = computed(() => this.sessionRows().length - this.visibleRows().length);
 
   constructor() {
-    // El detall només es dibuixa quan algú desplega la targeta, i llavors sí
-    // que val la pena demanar l'historial d'aquest esport: és una crida i
-    // prou, i la resta de vegades es queda a la guarda de «ja el tinc».
-    effect(() => { void this.sportService.loadSessionsForSport(this.sport().id); });
+    // L'historial de l'esport només fa falta per al que només diu la pàgina:
+    // rècords, mitjanes i quantes sessions en portes. La ullada del feed no
+    // en diu res, així que tampoc no el demana —seria baixar-se totes les
+    // sessions d'un esport per pintar dues files que la targeta ja tenia.
+    // Quan sí que cal, és una crida i prou: la resta de vegades es queda a la
+    // guarda de «ja el tinc».
+    effect(() => {
+      if (this.compact()) return;
+      void this.sportService.loadSessionsForSport(this.sport().id);
+    });
   }
 
   /** Les sessions fetes d'aquest esport, l'actual a part: el llistó contra el

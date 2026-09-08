@@ -238,6 +238,14 @@ describe('SportDetailComponent', () => {
       expect(el.querySelector('.sdv-block-title')).toBeNull();
     });
 
+    // Els rècords i les mitjanes són l'única cosa que necessita l'historial
+    // sencer de l'esport, i la ullada no en diu res: demanar-lo seria baixar
+    // totes les sessions per pintar dues files que la targeta ja tenia.
+    it("no demana l'historial de l'esport", () => {
+      build(makeSport(), makeSession({ duration: 90 }), true);
+      expect(loadSessionsForSport).not.toHaveBeenCalled();
+    });
+
     it('no corona cap marca: la ullada són les dades i prou', () => {
       const el = build(makeSport(), makeSession({ duration: 90 }), true);
       expect(rows(el).some(r => r.record)).toBeFalse();

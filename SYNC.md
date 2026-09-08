@@ -118,7 +118,7 @@ El que es demana al servidor va per necessitat, no per costum:
 | La finestra recent (`_pullChanges`) | En arrencar i en tornar a l'app | El que ha canviat, amb les sessions senceres dels últims mesos |
 | Una sessió (`ensureWorkoutEntries`) | En obrir-la | Aquella sessió sencera |
 | Un exercici (`loadWorkoutsForExercise`) | En obrir-ne el progrés | Totes les sessions on surt |
-| Un esport (`loadSessionsForSport`) | En desplegar-ne una targeta | Totes les sessions d'aquell esport |
+| Un esport (`loadSessionsForSport`) | En **obrir-ne** una sessió (no en desplegar la targeta) | Totes les sessions d'aquell esport |
 | Una sessió d'esport (`ensureSessionLoaded`) | En obrir-la per l'URL | Aquella fila |
 | Una cerca (`searchHistory`) | En escriure a l'historial | Només les coincidències, de tot l'historial |
 | Els rècords (`WorkoutStatsService`) | En obrir Gràfiques | Una fila per exercici: sessions, màxim i última data |
@@ -130,6 +130,16 @@ un mes d'esports tampoc. Abans eren dues consultes per mes visible, cadascuna
 amb totes les sèries de cada sessió, perquè per pintar «6 exerc · 21 sèr ·
 4.2t» calia el `jsonb` sencer. Ara aquestes xifres les compta el servidor
 (migració 031) i viatgen com tres números.
+
+**El desplegable demana el mínim, i el mínim depèn del que ensenya.** Obrir el
+detall d'una targeta és una ullada: d'un entrenament, una línia per exercici,
+que necessita les seves sèries (`ensureWorkoutEntries`, una fila) perquè el
+resum del feed no porta el desglossament per exercici; d'un esport, les dades
+que la sessió ja porta, que **no necessiten res**. Els rècords i les mitjanes
+d'un esport són l'única cosa que demana el seu historial sencer
+(`loadSessionsForSport`) i només surten a la pàgina de la sessió, així que
+només els demana la pàgina: una targeta desplegada al feed no es baixa cap
+sessió d'aquell esport.
 
 ### El que veu els esborrats
 
