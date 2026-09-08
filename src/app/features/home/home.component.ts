@@ -106,10 +106,12 @@ const RECENT_DAYS = 30;
                El botó gran de dalt comença l'entrenament ara mateix, i el de
                la setmana planifica els set dies. Faltava el mig: deixar
                apuntat el d'avui per a més tard. Va aquí, dins el dia, perquè
-               és del dia que parla — i només hi surt quan el dia és avui: un
-               de futur ja té «Planifica aquest dia» a dalt, i un de passat no
-               es pot planificar. -->
-          @if (isToday()) {
+               és del dia que parla — i només hi surt quan el dia és avui i
+               encara no hi ha res: un de futur ja té «Planifica aquest dia» a
+               dalt, un de passat no es pot planificar, i si avui ja té
+               alguna cosa (planificat o fet) tornar-lo a oferir seria dir
+               dues vegades el mateix. -->
+          @if (canPlanToday()) {
             <button class="today-plan-btn" (click)="planSelectedDay()">
               <span class="material-symbols-outlined" aria-hidden="true">event_upcoming</span>
               Planificar avui
@@ -587,6 +589,10 @@ export class HomeComponent {
   });
 
   readonly isToday = computed(() => this.effectiveDate() === this.today());
+
+  /** El botó «Planificar avui» només té sentit si avui encara no té res —
+   *  ni planificat ni fet. */
+  readonly canPlanToday = computed(() => this.isToday() && !this.previewFeedEntry());
 
   /** A day that has already passed — the "Comença un entrenament" primary
    *  action is swapped for "Registra un entrenament", which opens the train

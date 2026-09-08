@@ -293,7 +293,7 @@ describe('TrainComponent', () => {
 
       expect(component.editing()).toBeTrue();
       expect(el.querySelector('.edit-btn')).toBeNull();
-      expect(el.querySelector('.aw-action--finish')).toBeTruthy();
+      expect(el.querySelector('.aw-menu-fab--finish')).toBeTruthy();
     });
 
     it("un d'acabat s'obre a l'esquema, amb el botó d'editar", () => {
@@ -324,7 +324,7 @@ describe('TrainComponent', () => {
       expect(component.editing()).toBeTrue();
       expect((fixture.nativeElement as HTMLElement).querySelector('.edit-btn')).toBeNull();
       // Ja estava acabat: no hi ha res a acabar una segona vegada.
-      expect((fixture.nativeElement as HTMLElement).querySelector('.aw-action--finish')).toBeNull();
+      expect((fixture.nativeElement as HTMLElement).querySelector('.aw-menu-fab--finish')).toBeNull();
     });
 
     it('acabar-lo tanca l\'editor i deixa el resum', () => {
@@ -356,8 +356,9 @@ describe('TrainComponent', () => {
     });
 
     // Ordenar i acabar es fan cada dia: no poden viure dins el menú de tres
-    // punts, que és on van les coses que gairebé no es toquen.
-    it('ordenar i acabar es veuen, no s\'amaguen al menú', () => {
+    // punts, que és on van les coses que gairebé no es toquen. Viuen com a
+    // botons flotants, mateixa família que el de tres punts.
+    it('ordenar i acabar es veuen com a botons flotants, no s\'amaguen al menú', () => {
       ongoing.start('live');
       const el = open(makeWorkout({
         id: 'live', date: TODAY, categories: ['push'],
@@ -367,9 +368,9 @@ describe('TrainComponent', () => {
         ],
       }));
 
-      const labels = Array.from(el.querySelectorAll('.aw-action')).map(b => b.textContent?.trim());
-      expect(labels?.join(' ')).toContain('Ordenar');
-      expect(labels?.join(' ')).toContain("Acabar l'entrenament");
+      expect(el.querySelector('.aw-fab-row [aria-label="Ordenar els exercicis"]')).toBeTruthy();
+      expect(el.querySelector('.aw-fab-row [aria-label="Acabar l\'entrenament"]')).toBeTruthy();
+      expect(el.querySelector('.aw-fab-row [aria-label="Opcions de l\'entrenament"]')).toBeTruthy();
 
       component.workoutMenuOpen.set(true);
       fixture.detectChanges();
