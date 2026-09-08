@@ -154,27 +154,6 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
           (requestAddExercise)="openPicker()"
         />
 
-        <!-- ── Les dues coses que es fan entrenant ──
-             Ordenar els exercicis i posar punt final. Vivien dins el menú de
-             tres punts, que és on van les coses que gairebé no es fan;
-             aquestes dues es fan cada dia, així que es veuen. -->
-        @if (!reorderMode() && !groupingMode()) {
-          <div class="aw-actions">
-            @if (w.entries.length > 1) {
-              <button class="aw-action" (click)="reorderMode.set(true); groupingMode.set(false)">
-                <span class="material-symbols-outlined" aria-hidden="true">swap_vert</span>
-                Ordenar
-              </button>
-            }
-            @if (activeIsOngoing()) {
-              <button class="aw-action aw-action--finish" (click)="finishWorkout()">
-                <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
-                Acabar l'entrenament
-              </button>
-            }
-          </div>
-        }
-
         <!-- ── Sèrie activa: proper exercici suggerit (aprèn de l'usuari) ── -->
         @if (exerciseSuggestions(); as sugg) {
           @if (sugg.length && !reorderMode() && !groupingMode()) {
@@ -233,7 +212,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
 
         }
 
-        <!-- While reordering, the three-dots menu is replaced by a single
+        <!-- While reordering, the whole row is replaced by a single
              "save order" button — the reorder is persisted live on each drop,
              so this just leaves reorder mode. -->
         @if (reorderMode()) {
@@ -242,37 +221,56 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
             Guardar ordre
           </button>
         } @else {
-          <!-- ── Three-dots action menu ── -->
-          @if (workoutMenuOpen()) {
-            <div class="aw-menu-backdrop" (click)="workoutMenuOpen.set(false)"></div>
-            <div class="aw-menu-dropdown">
-              @if (editing() && (settingsService.supersetsEnabled() || groupingMode())) {
-                <button class="aw-menu-item" (click)="workoutMenuOpen.set(false); groupingMode.set(!groupingMode()); reorderMode.set(false)">
-                  <span class="material-symbols-outlined">{{ groupingMode() ? 'check' : 'link' }}</span>
-                  {{ groupingMode() ? 'Finalitzar agrupació' : 'Agrupar en superset' }}
-                </button>
-              }
-              @if (!offlineService.isOffline()) {
-                <button class="aw-menu-item" (click)="openSaveAsTemplate(w)">
-                  <span class="material-symbols-outlined">bookmark_add</span>
-                  Guardar com a plantilla
-                </button>
-                <button class="aw-menu-item" (click)="shareWorkout(w)">
-                  <span class="material-symbols-outlined">share</span>
-                  Compartir entrenament
-                </button>
-              }
-              <button class="aw-menu-item aw-menu-item--danger" (click)="workoutMenuOpen.set(false); deleteActiveWorkout()">
-                <span class="material-symbols-outlined">delete</span>
-                Eliminar entrenament
+          <!-- ── Botons flotants de l'entrenament actiu ──
+               Ordenar i posar punt final es fan cada dia, així que viuen a la
+               mateixa vista que el menú de tres punts — mateixa família
+               (rodó, flotant) en comptes d'amagar-los dins seu. -->
+          <div class="aw-fab-row">
+            @if (!groupingMode() && w.entries.length > 1) {
+              <button class="aw-menu-fab" (click)="reorderMode.set(true); groupingMode.set(false)"
+                      aria-label="Ordenar els exercicis">
+                <span class="material-symbols-outlined" aria-hidden="true">swap_vert</span>
               </button>
-            </div>
-          }
-          <button class="aw-menu-fab" [class.aw-menu-fab--open]="workoutMenuOpen()"
-                  (click)="workoutMenuOpen.set(!workoutMenuOpen())"
-                  aria-label="Opcions de l'entrenament" [attr.aria-expanded]="workoutMenuOpen()">
-            <span class="material-symbols-outlined">more_vert</span>
-          </button>
+            }
+            @if (!groupingMode() && activeIsOngoing()) {
+              <button class="aw-menu-fab aw-menu-fab--finish" (click)="finishWorkout()"
+                      aria-label="Acabar l'entrenament">
+                <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+              </button>
+            }
+
+            <!-- ── Three-dots action menu ── -->
+            @if (workoutMenuOpen()) {
+              <div class="aw-menu-backdrop" (click)="workoutMenuOpen.set(false)"></div>
+              <div class="aw-menu-dropdown">
+                @if (editing() && (settingsService.supersetsEnabled() || groupingMode())) {
+                  <button class="aw-menu-item" (click)="workoutMenuOpen.set(false); groupingMode.set(!groupingMode()); reorderMode.set(false)">
+                    <span class="material-symbols-outlined">{{ groupingMode() ? 'check' : 'link' }}</span>
+                    {{ groupingMode() ? 'Finalitzar agrupació' : 'Agrupar en superset' }}
+                  </button>
+                }
+                @if (!offlineService.isOffline()) {
+                  <button class="aw-menu-item" (click)="openSaveAsTemplate(w)">
+                    <span class="material-symbols-outlined">bookmark_add</span>
+                    Guardar com a plantilla
+                  </button>
+                  <button class="aw-menu-item" (click)="shareWorkout(w)">
+                    <span class="material-symbols-outlined">share</span>
+                    Compartir entrenament
+                  </button>
+                }
+                <button class="aw-menu-item aw-menu-item--danger" (click)="workoutMenuOpen.set(false); deleteActiveWorkout()">
+                  <span class="material-symbols-outlined">delete</span>
+                  Eliminar entrenament
+                </button>
+              </div>
+            }
+            <button class="aw-menu-fab" [class.aw-menu-fab--open]="workoutMenuOpen()"
+                    (click)="workoutMenuOpen.set(!workoutMenuOpen())"
+                    aria-label="Opcions de l'entrenament" [attr.aria-expanded]="workoutMenuOpen()">
+              <span class="material-symbols-outlined">more_vert</span>
+            </button>
+          </div>
         }
 
         <!-- ── Save as template bottom sheet ── -->
@@ -576,29 +574,6 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
        xifres han de ser llegibles a mig entrenament, sense tornar a pujar. */
     .aw-hero { display: block; position: sticky; top: 12px; z-index: 10; margin: 12px 16px 0; }
 
-    /* ── Les accions del dia, a la vista ── */
-    .aw-actions {
-      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-      margin: 12px 16px 0;
-    }
-    .aw-action {
-      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-      height: 42px; padding: 0 16px; border-radius: 14px;
-      border: 1.5px solid var(--c-border); background: var(--c-card);
-      font-size: 13.5px; font-weight: 700; color: var(--c-text-2);
-      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 19px; }
-      &:hover { border-color: var(--c-brand); color: var(--c-brand); }
-      &:active { transform: scale(0.99); }
-    }
-    /* Posar punt final és el gest que tanca la sessió: mana sobre l'altre i
-       s'emporta l'amplada que sobra. */
-    .aw-action--finish {
-      flex: 1; min-width: 180px;
-      border-color: transparent; background: var(--c-brand); color: white;
-      &:hover { background: var(--c-brand-dk); border-color: transparent; color: white; }
-    }
-
     /* ── Llegir un entrenament passat ──
        El detall porta la seva vora superior, així que la targeta que
        l'embolcalla no n'hi posa una altra. La mateixa forma que a la pàgina
@@ -652,12 +627,18 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       &:hover { color: #ef5350; border-color: rgba(239,83,80,0.3); background: rgba(239,83,80,0.06); }
     }
 
-    /* ── Active workout action menu FAB ── */
-    .aw-menu-fab {
+    /* ── Fila de botons flotants de l'entrenament actiu ──
+       Ordenar, acabar i el menú de tres punts hi viuen junts, mateixa forma
+       (rodó, 56px) i mateixa alçada — la fila és qui es posiciona, no cada
+       botó per separat. */
+    .aw-fab-row {
       position: fixed; right: 20px;
       bottom: calc(var(--nav-height) + 16px);
       z-index: 89;
-      width: 56px; height: 56px; border-radius: 50%;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .aw-menu-fab {
+      width: 56px; height: 56px; border-radius: 50%; flex-shrink: 0;
       border: 1.5px solid var(--c-border); background: var(--c-card); color: var(--c-text-2);
       display: flex; align-items: center; justify-content: center;
       cursor: pointer; touch-action: manipulation;
@@ -667,6 +648,12 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       &:hover { background: var(--c-subtle); transform: scale(1.06); }
       &:active { transform: scale(0.94); }
       &.aw-menu-fab--open { background: var(--c-subtle); border-color: var(--c-brand); color: var(--c-brand); }
+    }
+    /* Posar punt final és el gest que tanca la sessió: mateixa forma que la
+       resta, però tenyit de marca perquè destaqui com a acció principal. */
+    .aw-menu-fab--finish {
+      border-color: transparent; background: var(--c-brand); color: white;
+      &:hover { background: var(--c-brand-dk); border-color: transparent; color: white; }
     }
     .aw-menu-backdrop { position: fixed; inset: 0; z-index: 88; }
     /* ── Save-order button shown while reordering ── */

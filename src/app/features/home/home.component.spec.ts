@@ -300,6 +300,18 @@ describe('HomeComponent', () => {
       fixture.detectChanges();
       expect((fixture.nativeElement as HTMLElement).querySelector('.today-plan-btn')).toBeNull();
     });
+
+    // Oferir-lo quan avui ja té alguna cosa —planificada o feta— diria dues
+    // vegades el mateix: la targeta del dia ja ho ensenya.
+    it("no hi és si avui ja té alguna activitat", () => {
+      const workoutService = TestBed.inject(WorkoutService) as unknown as {
+        getDoneWorkoutsForDate: jasmine.Spy;
+      };
+      workoutService.getDoneWorkoutsForDate.and.returnValue([makeWorkout({ id: 'w1', date: TODAY })]);
+      doneWorkoutsSignal.set([makeWorkout({ id: 'w1', date: TODAY })]);
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).querySelector('.today-plan-btn')).toBeNull();
+    });
   });
 
   // ── dayAction() ──────────────────────────────────────────────────────────
