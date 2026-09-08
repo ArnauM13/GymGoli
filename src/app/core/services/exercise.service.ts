@@ -9,6 +9,7 @@ import {
 } from '../models/exercise.model';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
+import { onAppResume } from './app-resume.util';
 
 function toExercise(r: Record<string, unknown>): Exercise {
   const sMin = r['sets_min'] as number | null;
@@ -80,6 +81,20 @@ export class ExerciseService {
         if (cached) this._exercises.set(cached);
       }
     });
+
+    // El catàleg es carregava un cop en entrar i prou: l'exercici que creaves
+    // al mòbil no existia a la pestanya que tenies oberta a l'ordinador fins
+    // que no la recarregaves, i triar-lo per registrar-hi sèries hi
+    // apareixia sense nom.
+    onAppResume(() => this.refresh());
+  }
+
+  /** Torna a demanar el catàleg. No fa res si encara no s'ha carregat mai:
+   *  llavors la primera càrrega ja el porta sencer. */
+  async refresh(): Promise<void> {
+    const uid = this.auth.uid();
+    if (!uid || !this.isLoaded()) return;
+    await this._fetch(uid);
   }
 
   // ── Lazy initialisation — call once per feature that needs exercises ──────
@@ -112,16 +127,33 @@ export class ExerciseService {
     this._writeExercisesToStorage(uid, exercises);
   }
 
-  // Inserts default exercises the very first time a user has none
+  /**
+   * Inserts default exercises the very first time a user has none.
+   *
+   * Mirar quants n'hi ha i inserir-los després són dues peticions, i entre
+   * l'una i l'altra hi caben segons: estrenar l'app al mòbil i a l'ordinador
+   * alhora feia que els dos veiessin zero exercicis i els dos sembressin el
+   * catàleg sencer. L'usuari es trobava cada exercici duplicat, i com que la
+   * taula no té cap restricció d'unicitat, ningú l'aturava.
+   *
+   * `seed_default_exercises` (migració 029) fa la comprovació i la inserció
+   * dins la mateixa transacció, amb un pany per usuari: el segon dispositiu
+   * espera, troba el catàleg ja posat i no fa res. Si la funció no hi és
+   * encara, es fa com abans — millor un catàleg duplicat que cap.
+   */
   private async _seedIfNeeded(uid: string): Promise<void> {
-    const { count, error } = await this.supabase
+    const rows = DEFAULT_EXERCISES.map(e => this._toRow(uid, e));
+
+    const { error } = await this.supabase.rpc('seed_default_exercises', { p_rows: rows });
+    if (!error) return;
+    if (error.code !== 'PGRST202' && !/seed_default_exercises/i.test(error.message ?? '')) return;
+
+    const { count, error: countError } = await this.supabase
       .from('exercises')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', uid);
 
-    if (error || (count ?? 0) > 0) return;
-
-    const rows = DEFAULT_EXERCISES.map(e => this._toRow(uid, e));
+    if (countError || (count ?? 0) > 0) return;
     await this.supabase.from('exercises').insert(rows);
   }
 

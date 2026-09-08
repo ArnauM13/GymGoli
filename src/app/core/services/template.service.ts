@@ -2,6 +2,7 @@ import { Injectable, effect, inject, signal } from '@angular/core';
 
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
+import { onAppResume } from './app-resume.util';
 import { ExerciseCategory } from '../models/exercise.model';
 import { TemplateEntry, WorkoutTemplate } from '../models/template.model';
 import { todayStr } from '../../shared/utils/date.utils';
@@ -58,6 +59,13 @@ export class TemplateService {
         if (cached) this._templates.set(cached);
         this._load(uid);
       }
+    });
+
+    // La plantilla que has desat al mòbil no apareixia a la pestanya oberta a
+    // l'ordinador fins que no la recarregaves.
+    onAppResume(() => {
+      const uid = this.auth.uid();
+      if (uid && this.isLoaded()) void this._load(uid);
     });
   }
 

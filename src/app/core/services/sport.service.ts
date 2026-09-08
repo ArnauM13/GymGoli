@@ -3,6 +3,7 @@ import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { TodayService } from './today.service';
+import { fetchAllRows } from './supabase-page.util';
 import { DEFAULT_SPORTS, Sport, SportMetricDef, SportSession, SportSessionStatus, SportSubtype } from '../models/sport.model';
 import { FeelingLevel, PlannedSource } from '../models/workout.model';
 
@@ -22,6 +23,13 @@ type SportOpKind = 'insert' | 'update' | 'delete';
 interface PendingSportOp { op: SportOpKind; id: string; row: Record<string, unknown>; seq?: number; }
 
 // ── Row mappers ──────────────────────────────────────────────────────────────
+
+/** Les columnes que l'app llegeix de debò d'una sessió d'esport. `select('*')`
+ *  hi afegia `user_id` (que ja és el filtre de la consulta) i
+ *  `duration_minutes`, la columna que va substituir `duration` i que ningú
+ *  llegeix des de fa migracions. */
+const SPORT_SESSION_COLUMNS =
+  'id,date,sport_id,subtype_id,duration,feeling,metrics,notes,status,planned_source,created_at';
 
 function toSport(row: Record<string, unknown>): Sport {
   return {
@@ -161,7 +169,7 @@ export class SportService {
           this._sports.set(cached);
           this._sportsLoaded.set(true);
         }
-        this._loadSports(uid);
+        this._loadSports(uid, true);
         this._preloadCurrentMonth();
         this._flushPending();
       }
@@ -187,19 +195,29 @@ export class SportService {
    * cosa diferent del que veies al mòbil.
    */
   async refreshLoaded(immediate = false): Promise<void> {
-    if (!this.auth.uid()) return;
+    const uid = this.auth.uid();
+    if (!uid) return;
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
 
     const now = Date.now();
     if (!immediate && now - this._lastRefreshAt < SportService.REFRESH_THROTTLE_MS) return;
     this._lastRefreshAt = now;
 
-    if (this._allLoaded()) { this._allLoaded.set(false); await this.loadAllSessions(); return; }
+    // Els esports en si també: crear-ne un al mòbil deixava la pestanya de
+    // l'ordinador amb sessions d'un esport que no sabia dibuixar, perquè
+    // `getSportsForDate()` descarta la sessió si no en troba la definició.
+    const sports = this._loadSports(uid);
 
-    await Promise.all([...this._monthCache.keys()].map(key => {
+    if (this._allLoaded()) {
+      this._allLoaded.set(false);
+      await Promise.all([sports, this.loadAllSessions()]);
+      return;
+    }
+
+    await Promise.all([sports, ...[...this._monthCache.keys()].map(key => {
       const [y, m] = key.split('-').map(Number);
       return this.ensureMonthLoaded(y, m - 1, true);
-    }));
+    })]);
   }
 
   // ── Lazy initialisation — call once per feature that needs sport definitions
@@ -213,22 +231,30 @@ export class SportService {
   private async _initLoad(): Promise<void> {
     const uid = this.auth.uid();
     if (!uid) return;
-    await this._loadSports(uid);
+    await this._loadSports(uid, true);
     this.isLoaded.set(true);
   }
 
   // ── Sport CRUD ────────────────────────────────────────────────────────────
 
-  private async _loadSports(uid: string): Promise<void> {
+  /** `allowSeed` només el posa la primera càrrega. En un refresc, trobar la
+   *  llista buida vol dir que l'usuari ha esborrat tots els esports des d'un
+   *  altre dispositiu — tornar-los a sembrar seria desfer-li-ho. */
+  private async _loadSports(uid: string, allowSeed = false): Promise<void> {
     try {
-      const { data } = await this.supabase
+      const { data, error } = await this.supabase
         .from('sports')
         .select('*')
         .eq('user_id', uid)
         .order('created_at');
 
+      // Una consulta que ha fallat no és «aquest usuari no té esports»: sembrar
+      // el catàleg per defecte a cada refresc que topi amb la xarxa caiguda és
+      // ressuscitar el que l'usuari havia esborrat.
+      if (error) return;
+
       const sports = (data ?? []).map(r => toSport(r as Record<string, unknown>));
-      if (sports.length === 0) {
+      if (sports.length === 0 && allowSeed) {
         await this._seedDefaults(uid);
       } else {
         this._sports.set(sports);
@@ -393,7 +419,7 @@ export class SportService {
 
       const { data, error } = await this.supabase
         .from('sport_sessions')
-        .select('*')
+        .select(SPORT_SESSION_COLUMNS)
         .eq('user_id', uid)
         .gte('date', start)
         .lte('date', end)
@@ -451,15 +477,24 @@ export class SportService {
     try {
       const known        = new Set([...this._monthCache.values()].flat().map(s => s.id));
       const queuedBefore = new Set(this._readPending(uid).map(o => o.id));
-      const { data, error } = await this.supabase
-        .from('sport_sessions')
-        .select('*')
-        .eq('user_id', uid)
-        .order('date', { ascending: false });
+      // Per trams i amb un ordre total: el que no surti d'aquesta resposta es
+      // dóna per esborrat des d'un altre dispositiu i marxa de la cau, així que
+      // una resposta tallada pel topall de files de PostgREST buidaria mitja
+      // història. Amb l'ordre només per data, a més, dues sessions del mateix
+      // dia poden caure entre dos trams i no sortir a cap.
+      const { rows, error, complete } = await fetchAllRows<Record<string, unknown>>(() =>
+        this.supabase
+          .from('sport_sessions')
+          .select(SPORT_SESSION_COLUMNS)
+          .eq('user_id', uid)
+          .order('date',       { ascending: false })
+          .order('created_at', { ascending: false })
+          .order('id',         { ascending: false })
+      );
 
-      if (error) return; // es manté el que ja teníem
+      if (error || !complete) return; // es manté el que ja teníem
 
-      const fetched = (data ?? []).map(r => toSportSession(r as Record<string, unknown>));
+      const fetched = rows.map(r => toSportSession(r));
       const pending = this._readPending(uid);
       const queued  = new Set(pending.filter(o => o.op !== 'delete').map(o => o.id));
       const erased  = new Set(pending.filter(o => o.op === 'delete').map(o => o.id));

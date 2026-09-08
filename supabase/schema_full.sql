@@ -1,5 +1,5 @@
 -- GymGoli – Schema complet i idempotent
--- Consolida totes les migracions (001–028).
+-- Consolida totes les migracions (001–029).
 -- Segur de re-executar: usa IF NOT EXISTS, DROP … IF EXISTS i OR REPLACE.
 -- Executa a: Supabase Dashboard → SQL Editor → New query
 
@@ -39,6 +39,10 @@ CREATE TABLE IF NOT EXISTS exercises (
   sets_max    smallint    DEFAULT NULL,
   reps_min    smallint    DEFAULT NULL,
   reps_max    smallint    DEFAULT NULL,
+  unilateral        boolean     DEFAULT false,
+  load_type         text        NOT NULL DEFAULT 'weighted',
+  bodyweight_factor real,
+  weight_step       real,
   created_at  timestamptz DEFAULT now()
 );
 
@@ -101,6 +105,10 @@ CREATE TABLE IF NOT EXISTS workouts (
   feeling            smallint    CHECK (feeling BETWEEN 1 AND 5),
   source_proposal_id uuid        REFERENCES trainer_proposals(id) ON DELETE SET NULL,
   created_at         timestamptz DEFAULT now(),
+  -- Qui mana quan dos dispositius toquen la mateixa sessió: la pujada porta
+  -- guarda `.lt('updated_at', la nostra)` i sense aquesta columna la
+  -- sincronització no funciona (vegeu SYNC.md i la migració 024).
+  updated_at         timestamptz DEFAULT now(),
   -- Space-joined exercise names, kept in sync automatically — lets
   -- Historial's search filter with a plain, always-supported .ilike()
   -- instead of casting the whole `entries` blob to text.
@@ -201,7 +209,11 @@ ALTER TABLE exercises
   ADD COLUMN IF NOT EXISTS sets_min    smallint DEFAULT NULL,
   ADD COLUMN IF NOT EXISTS sets_max    smallint DEFAULT NULL,
   ADD COLUMN IF NOT EXISTS reps_min    smallint DEFAULT NULL,
-  ADD COLUMN IF NOT EXISTS reps_max    smallint DEFAULT NULL;
+  ADD COLUMN IF NOT EXISTS reps_max    smallint DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS unilateral        boolean DEFAULT false,
+  ADD COLUMN IF NOT EXISTS load_type         text    NOT NULL DEFAULT 'weighted',
+  ADD COLUMN IF NOT EXISTS bodyweight_factor real,
+  ADD COLUMN IF NOT EXISTS weight_step       real;
 
 -- sports
 ALTER TABLE sports
@@ -229,8 +241,13 @@ END $$;
 
 -- workouts
 ALTER TABLE workouts
-  ADD COLUMN IF NOT EXISTS feeling            smallint CHECK (feeling BETWEEN 1 AND 5),
-  ADD COLUMN IF NOT EXISTS source_proposal_id uuid     REFERENCES trainer_proposals(id) ON DELETE SET NULL;
+  ADD COLUMN IF NOT EXISTS feeling            smallint    CHECK (feeling BETWEEN 1 AND 5),
+  ADD COLUMN IF NOT EXISTS source_proposal_id uuid        REFERENCES trainer_proposals(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS updated_at         timestamptz DEFAULT now();
+
+-- Files anteriors a la migració 024: sense marca de temps, la guarda de la
+-- pujada (`updated_at < la nostra`) no les deixaria editar mai.
+UPDATE workouts SET updated_at = created_at WHERE updated_at IS NULL;
 
 DO $$
 BEGIN
@@ -493,6 +510,16 @@ CREATE INDEX IF NOT EXISTS workouts_user_id_date_idx
 CREATE INDEX IF NOT EXISTS workouts_user_status_date_idx
   ON workouts (user_id, status, date);
 
+-- Consulta de canvis del refresc en tornar a l'app (migració 029):
+--   where user_id = ? and updated_at >= ? order by updated_at
+CREATE INDEX IF NOT EXISTS workouts_user_updated_at_idx
+  ON workouts (user_id, updated_at DESC NULLS LAST);
+
+-- «Tots els entrenaments d'aquest exercici» (migració 029):
+--   entries @> '[{"exerciseId": "…"}]'
+CREATE INDEX IF NOT EXISTS workouts_entries_gin_idx
+  ON workouts USING gin (entries jsonb_path_ops);
+
 -- Filtre per tipus d'entrenament de l'historial (categories @> ARRAY[<tipus>])
 CREATE INDEX IF NOT EXISTS workouts_categories_gin_idx
   ON workouts USING gin (categories);
@@ -650,6 +677,115 @@ BEGIN
   RETURN jsonb_build_object('success', true, 'trainer_id', v_invite.trainer_id::text);
 END;
 $$;
+
+-- ── Paràmetres: fusionar per camps (migració 029) ─────────────────────────────
+-- El client puja només el que ha canviat; el servidor ho fusiona amb el que hi
+-- ha. Sense això, dos dispositius oberts alhora es desfeien la configuració
+-- l'un a l'altre: l'últim que escrivia s'enduia el bloc sencer.
+
+CREATE OR REPLACE FUNCTION merge_user_settings(p_patch jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_uid    uuid := auth.uid();
+  v_result jsonb;
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'no autenticat';
+  END IF;
+  IF p_patch IS NULL OR jsonb_typeof(p_patch) <> 'object' THEN
+    RAISE EXCEPTION 'el pedaç ha de ser un objecte jsonb';
+  END IF;
+
+  INSERT INTO user_settings (user_id, settings, updated_at)
+  VALUES (v_uid, p_patch, now())
+  ON CONFLICT (user_id) DO UPDATE
+    SET settings   = user_settings.settings || excluded.settings,
+        updated_at = now()
+  RETURNING settings INTO v_result;
+
+  RETURN v_result;
+END;
+$$;
+
+REVOKE ALL     ON FUNCTION merge_user_settings(jsonb) FROM public;
+GRANT  EXECUTE ON FUNCTION merge_user_settings(jsonb) TO authenticated;
+
+-- ── Catàleg inicial d'exercicis, una sola vegada (migració 029) ───────────────
+-- El client mirava quants exercicis tenia l'usuari i, si cap, inseria el
+-- catàleg per defecte. Són dues peticions amb segons pel mig: estrenar l'app
+-- al mòbil i a l'ordinador alhora feia que tots dos veiessin zero i tots dos
+-- sembressin, i l'usuari es trobava el catàleg duplicat. La taula no té cap
+-- restricció d'unicitat que ho aturés, i no se n'hi pot afegir una ara sense
+-- decidir quin duplicat s'esborra — i els entrenaments ja fets apunten als
+-- seus ids.
+--
+-- Aquí la comprovació i la inserció són la mateixa transacció, i el pany per
+-- usuari fa esperar el segon dispositiu: quan entra, ja hi troba el catàleg i
+-- no fa res. `p_rows` és el mateix catàleg que porta el client (així no cal
+-- mantenir-lo en dos llocs), però `user_id` el posa la funció: el que digui
+-- el client s'ignora.
+
+CREATE OR REPLACE FUNCTION seed_default_exercises(p_rows jsonb)
+RETURNS integer
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_uid      uuid := auth.uid();
+  v_inserted integer;
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'no autenticat';
+  END IF;
+  IF p_rows IS NULL OR jsonb_typeof(p_rows) <> 'array' THEN
+    RAISE EXCEPTION 'p_rows ha de ser un array jsonb';
+  END IF;
+
+  -- Dos dispositius que arrenquen alhora fan cua aquí. El pany es deixa anar
+  -- sol quan acaba la transacció.
+  PERFORM pg_advisory_xact_lock(hashtext('gymgoli_seed_exercises:' || v_uid::text));
+
+  IF EXISTS (SELECT 1 FROM exercises WHERE user_id = v_uid) THEN
+    RETURN 0;
+  END IF;
+
+  INSERT INTO exercises (
+    user_id, name, category, subcategory, notes, muscles, description,
+    sets_min, sets_max, reps_min, reps_max,
+    unilateral, load_type, bodyweight_factor, weight_step
+  )
+  SELECT
+    v_uid,
+    r ->> 'name',
+    r ->> 'category',
+    NULLIF(r ->> 'subcategory', ''),
+    NULLIF(r ->> 'notes', ''),
+    CASE WHEN jsonb_typeof(r -> 'muscles') = 'array'
+         THEN ARRAY(SELECT jsonb_array_elements_text(r -> 'muscles'))
+         END,
+    NULLIF(r ->> 'description', ''),
+    (r ->> 'sets_min')::smallint,
+    (r ->> 'sets_max')::smallint,
+    (r ->> 'reps_min')::smallint,
+    (r ->> 'reps_max')::smallint,
+    COALESCE((r ->> 'unilateral')::boolean, false),
+    COALESCE(NULLIF(r ->> 'load_type', ''), 'weighted'),
+    (r ->> 'bodyweight_factor')::real,
+    (r ->> 'weight_step')::real
+  FROM jsonb_array_elements(p_rows) AS r
+  WHERE COALESCE(r ->> 'name', '') <> ''
+    AND COALESCE(r ->> 'category', '') <> '';
+
+  GET DIAGNOSTICS v_inserted = ROW_COUNT;
+  RETURN v_inserted;
+END;
+$$;
+
+REVOKE ALL     ON FUNCTION seed_default_exercises(jsonb) FROM public;
+GRANT  EXECUTE ON FUNCTION seed_default_exercises(jsonb) TO authenticated;
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 8. REALTIME

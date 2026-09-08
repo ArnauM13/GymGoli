@@ -14,7 +14,7 @@ interface QueryResult { data?: unknown; count?: number; error?: unknown }
 interface QueryChain {
   select: jasmine.Spy; eq: jasmine.Spy; neq: jasmine.Spy; order: jasmine.Spy;
   contains: jasmine.Spy; ilike: jasmine.Spy; filter: jasmine.Spy; range: jasmine.Spy;
-  gte: jasmine.Spy; lte: jasmine.Spy; delete: jasmine.Spy;
+  gte: jasmine.Spy; lte: jasmine.Spy; gt: jasmine.Spy; limit: jasmine.Spy; delete: jasmine.Spy;
   /** Mutable so a test can change what the next query answers. */
   result: QueryResult;
   then: (resolve: (v: QueryResult) => void) => void;
@@ -25,7 +25,7 @@ interface QueryChain {
  *  real supabase-js query when awaited. */
 function makeQueryChain(result: QueryResult): QueryChain {
   const chain = {} as QueryChain;
-  for (const method of ['select', 'eq', 'neq', 'order', 'contains', 'ilike', 'filter', 'range', 'gte', 'lte', 'delete'] as const) {
+  for (const method of ['select', 'eq', 'neq', 'order', 'contains', 'ilike', 'filter', 'range', 'gte', 'lte', 'gt', 'limit', 'delete'] as const) {
     chain[method] = jasmine.createSpy(method).and.callFake(() => chain);
   }
   chain.result = result;
@@ -548,6 +548,135 @@ describe('WorkoutService', () => {
   // ── Local primer ─────────────────────────────────────────────────────────
   // El que l'usuari fa s'ha de guardar al dispositiu abans i independentment
   // de qualsevol resposta del servidor, i sobreviure a tancar l'app.
+  describe('escala: consultes d\'abast obert', () => {
+    it('demana les sessions d\'un exercici per contenció de jsonb, no convertint el blob a text', async () => {
+      await service.loadWorkoutsForExercise('ex-1');
+
+      // `entries::text ilike …` obliga el servidor a llegir i convertir cada
+      // entrenament de l'usuari, i cap índex hi pot ajudar. La contenció va
+      // per l'índex GIN de la migració 029.
+      expect(workoutsChain.contains).toHaveBeenCalledWith('entries', '[{"exerciseId":"ex-1"}]');
+      expect(workoutsChain.filter).not.toHaveBeenCalled();
+    });
+
+    it('recorre l\'historial sencer per trams i amb un ordre total', async () => {
+      await service.loadAllWorkouts();
+
+      expect(workoutsChain.range).toHaveBeenCalled();
+      // Amb l'ordre només per data, dues sessions del mateix dia poden caure
+      // entre dos trams i no sortir a cap.
+      expect(workoutsChain.order).toHaveBeenCalledWith('date', { ascending: false });
+      expect(workoutsChain.order).toHaveBeenCalledWith('created_at', { ascending: false });
+      expect(workoutsChain.order).toHaveBeenCalledWith('id', { ascending: false });
+    });
+
+    it('no dedueix cap esborrat d\'una resposta que ha fallat a mig recórrer', async () => {
+      workoutsChain.result = { data: [row('w1', '2024-03-06')], count: 1, error: null };
+      await service.ensureMonthLoaded(2024, 2);
+      expect(service.getWorkoutsForDate('2024-03-06').length).toBe(1);
+
+      workoutsChain.result = { data: null, count: 0, error: new Error('network') };
+      await service.loadAllWorkouts();
+
+      // La sessió continua al dispositiu: una resposta incompleta no és prova
+      // que s'hagi esborrat des d'un altre lloc.
+      expect(service.getWorkoutsForDate('2024-03-06').length).toBe(1);
+    });
+
+    it('no s\'endú columnes que ningú llegeix', async () => {
+      await service.ensureMonthLoaded(2024, 2);
+
+      const columns = workoutsChain.select.calls.mostRecent().args[0] as string;
+      expect(columns).not.toContain('*');
+      // La columna generada repeteix, en text, els noms que ja venen dins
+      // d'`entries`: existeix per cercar-hi al servidor, no per baixar-la.
+      expect(columns).not.toContain('exercise_names');
+      expect(columns).toContain('entries');
+      expect(columns).toContain('updated_at');
+    });
+  });
+
+  describe('consulta de canvis (pull incremental)', () => {
+    it('avança el marcador amb l\'hora de les files, no amb la d\'aquest dispositiu', async () => {
+      // El mòbil té el rellotge endarrerit: escriu amb una hora que aquest
+      // dispositiu ja ha passat. Amb el marcador posat a «ara segons jo»,
+      // aquelles files quedaven per sota per sempre i no arribaven mai.
+      workoutsChain.result = {
+        data: [row('w1', '2024-03-06', { updated_at: '2024-03-06T10:00:00.000Z' })],
+        count: 1, error: null,
+      };
+
+      await service.refreshLoaded(true);
+      await service.refreshLoaded(true);
+
+      const cursors = workoutsChain.gte.calls.allArgs()
+        .filter(([col]) => col === 'updated_at')
+        .map(([, value]) => value);
+      expect(cursors).toContain('2024-03-06T10:00:00.000Z');
+    });
+
+    it('demana des del marcador inclòs, per no perdre empats a la frontera', async () => {
+      workoutsChain.result = {
+        data: [row('w1', '2024-03-06', { updated_at: '2024-03-06T10:00:00.000Z' })],
+        count: 1, error: null,
+      };
+
+      await service.refreshLoaded(true);
+      await service.refreshLoaded(true);
+
+      // `gt` es deixaria les files que comparteixen l'hora del marcador;
+      // tornar-ne a aplicar una que ja teníem no costa res.
+      expect(workoutsChain.gt).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('índex per exercici', () => {
+    async function seedSession(date: string, exerciseId: string, weight: number): Promise<string> {
+      const id = await service.createWorkoutForDate(date);
+      await service.addExerciseToWorkout(id, { exerciseId, exerciseName: exerciseId, sets: [] });
+      await service.addSetsToEntry(id, exerciseId, [{ reps: 5, weight }]);
+      return id;
+    }
+
+    it('l\'última sessió és la més recent de l\'exercici, excloent la d\'ara', async () => {
+      await seedSession('2024-03-01', 'ex-1', 60);
+      await seedSession('2024-03-08', 'ex-1', 70);
+      const today = await seedSession('2024-03-15', 'ex-1', 80);
+
+      const last = service.getLastSessionEntry('ex-1', today);
+      expect(last?.date).toBe('2024-03-08');
+      expect(last?.maxWeight).toBe(70);
+    });
+
+    it('no barreja exercicis diferents', async () => {
+      await seedSession('2024-03-01', 'ex-1', 60);
+      await seedSession('2024-03-08', 'ex-2', 90);
+
+      expect(service.getLastSessionEntry('ex-1')?.maxWeight).toBe(60);
+      expect(service.getAllTimeMaxWeight('ex-1')).toBe(60);
+      expect(service.getAllTimeMaxWeight('ex-2')).toBe(90);
+    });
+
+    it('les sessions d\'un exercici surten de la més antiga a la més recent', async () => {
+      await seedSession('2024-03-08', 'ex-1', 70);
+      await seedSession('2024-03-01', 'ex-1', 60);
+      await seedSession('2024-03-15', 'ex-1', 80);
+
+      expect(service.getWorkoutsForExercise('ex-1').map(w => w.date))
+        .toEqual(['2024-03-01', '2024-03-08', '2024-03-15']);
+    });
+
+    it('deixa fora els entrenaments planificats', async () => {
+      await seedSession('2024-03-01', 'ex-1', 60);
+      await service.createPlannedWorkout('2024-03-20', undefined, [
+        { exerciseId: 'ex-1', exerciseName: 'ex-1', sets: [] },
+      ]);
+
+      expect(service.getWorkoutsForExercise('ex-1').length).toBe(1);
+      expect(service.getLastSessionEntry('ex-1')?.date).toBe('2024-03-01');
+    });
+  });
+
   describe('primer al dispositiu, després al servidor', () => {
     it('un entrenament registrat sense connexió queda guardat i esperant pujar', async () => {
       const store = TestBed.inject(WorkoutStoreService);

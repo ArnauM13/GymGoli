@@ -6,7 +6,7 @@ import { Workout } from '../models/workout.model';
 import { OfflineService } from './offline.service';
 import { SupabaseService } from './supabase.service';
 import { SyncLogService } from './sync-log.service';
-import { WorkoutStoreService, countSets, toRow, toWorkout } from './workout-store.service';
+import { WORKOUT_COLUMNS, WorkoutStoreService, countSets, toRow, toWorkout } from './workout-store.service';
 
 export type SyncStatus = 'synced' | 'pending' | 'syncing' | 'error';
 
@@ -205,7 +205,7 @@ export class SyncService {
     // Cap fila canviada: cal saber si és que ja no hi és o que és més nova.
     const { data: current, error: readError } = await this.supabase
       .from('workouts')
-      .select('*')
+      .select(WORKOUT_COLUMNS)
       .eq('id', w.id)
       .eq('user_id', uid)
       .maybeSingle();
