@@ -80,10 +80,9 @@ const RECENT_DAYS = 30;
           <span class="today-header-icon-wrap">
             <span class="material-symbols-outlined today-header-icon">today</span>
           </span>
-          <div class="today-header-text">
-            <h2 class="today-title">{{ previewTitle() }}</h2>
-            <span class="today-sub">{{ todayDateLabel() }}</span>
-          </div>
+          <!-- Un sol títol: «Avui», «Ahir» o el dia escrit. La data sencera a
+               sota deia dues vegades el mateix dia amb dues cares diferents. -->
+          <h2 class="today-title">{{ previewTitle() }}</h2>
           @if (plannedCount() > 0) {
             <span class="today-plan-pill">
               <span class="material-symbols-outlined">event_upcoming</span>
@@ -258,9 +257,12 @@ const RECENT_DAYS = 30;
       box-shadow: 0 2px 8px color-mix(in srgb, var(--c-brand) 35%, transparent);
     }
     .today-header-icon { font-size: 21px; color: white; font-variation-settings: 'FILL' 1, 'wght' 400; }
-    .today-header-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-    .today-title { margin: 0; font-size: 17px; font-weight: 800; color: var(--c-text); letter-spacing: 0.1px; text-transform: capitalize; }
-    .today-sub { font-size: 12px; font-weight: 500; color: var(--c-text-3); }
+    .today-title {
+      flex: 1; min-width: 0; margin: 0;
+      font-size: 17px; font-weight: 800; color: var(--c-text);
+      letter-spacing: 0.1px; text-transform: capitalize;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
     .today-plan-pill {
       display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0;
       padding: 4px 9px; border-radius: 20px;

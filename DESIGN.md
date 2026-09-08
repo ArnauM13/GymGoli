@@ -648,6 +648,56 @@ nav pill (inset side margins, all four corners rounded) and slide up from below.
   is open (`this.dialog.openDialogs.length`).
 - Floating cards that aren't full sheets (rest timer, confirm bars) sit above
   the nav with `bottom: calc(var(--nav-height) + N)` — never a hardcoded px.
+- **Swipe down to close (opt-in):** a sheet that comes up with the thumb should
+  go back down with it. Add `appSheetDrag` (`shared/directives/sheet-drag.directive`)
+  to the panel, hand it the backdrop element so it dims with the same movement,
+  and close on `(sheetDragDismiss)` — the same handler as the ✕:
+
+  ```html
+  <div #backdrop class="bottom-sheet-backdrop" (click)="close()" aria-hidden="true"></div>
+  <div class="bottom-sheet my-sheet" role="dialog" …
+       appSheetDrag [appSheetDragBackdrop]="backdrop" (sheetDragDismiss)="close()">
+  ```
+
+  The gesture only takes over when the content is already scrolled to the top
+  and the finger goes down more than sideways, so a scrollable sheet still
+  scrolls. It never replaces the ✕ or Escape: with a mouse or a keyboard there
+  is no finger. Sheets that carry unsaved input (editors, forms) stay out of
+  it — a stray swipe must not throw away what was typed.
+
+### Activity hero
+
+The card that crowns an activity's own page — a workout (`train`, with a
+workout open) and a sport session (`sport-session`) — is **one shared shell**
+in `styles.scss`, not a per-page card. A workout and a sport session are the
+same thing seen up close, and the feed already draws them with the same card;
+the detail pages must not drift apart either.
+
+```html
+<div class="activity-hero" [class.activity-hero--planned]="isPlanned()"
+     [style.--ac]="color">
+  <span class="ah-bar" aria-hidden="true"></span>
+  <app-activity-icon [icon]="icon" [color]="color" mascot="marley" />
+  <div class="ah-text">
+    <div class="ah-title-row"><span class="ah-title">…</span></div>
+    <div class="ah-meta">
+      <span class="ah-date">Avui</span>
+      <span class="ah-sep" aria-hidden="true">·</span>
+      <span class="ah-stat">…<strong>5</strong> exerc</span>
+    </div>
+  </div>
+  <span class="ah-pill">Planificat</span>   <!-- o la sensació -->
+</div>
+```
+
+- The activity's hue comes in through `--ac`; the shell paints the border,
+  the tint, the 5px `.ah-bar` and the dashed border of `--planned`.
+- The date says the day the way the feed says it (`feedDayLabel`): "Avui",
+  "Ahir", or the day written out. The same day can't have two names.
+- The page keeps only what's its own: the workout page makes it sticky
+  (`.aw-hero`), the sport page adds the subtype pill.
+- A planned activity shows the "Planificat" pill and no figures — it hasn't
+  happened yet, so there is nothing to count and no feeling to give.
 
 ### Insight card & detail sheet
 

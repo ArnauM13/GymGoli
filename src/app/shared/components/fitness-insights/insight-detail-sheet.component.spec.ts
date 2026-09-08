@@ -1,4 +1,4 @@
-import { TestBed } from '@angular/core/testing';
+import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 
 import { InsightDetailSheetComponent } from './insight-detail-sheet.component';
@@ -28,6 +28,16 @@ function makeInsight(chart: InsightChart, overrides: Partial<FitnessInsight> = {
 
 function bars(...values: number[]): InsightBar[] {
   return values.map((value, i) => ({ label: `b${i}`, value }));
+}
+
+/** Un dit que baixa pel full, de `from` a `to`. */
+function swipeDown(el: HTMLElement, from: number, to: number): void {
+  for (const [type, y] of [['touchstart', from], ['touchmove', (from + to) / 2], ['touchmove', to], ['touchend', to]] as const) {
+    const t = new Touch({ identifier: 1, target: el, clientX: 0, clientY: y });
+    el.dispatchEvent(new TouchEvent(type, {
+      touches: type === 'touchend' ? [] : [t], changedTouches: [t], bubbles: true, cancelable: true,
+    }));
+  }
 }
 
 describe('InsightDetailSheetComponent', () => {
@@ -152,6 +162,20 @@ describe('InsightDetailSheetComponent', () => {
 
     expect(closed).toBe(true);
   });
+
+  it('es tanca arrossegant-lo cap avall', fakeAsync(() => {
+    build({ caption: 'Activitats per setmana', bars: bars(1, 2) });
+    let closed = false;
+    component.close.subscribe(() => (closed = true));
+
+    const sheet = fixture.nativeElement.querySelector('.ids-sheet') as HTMLElement;
+    document.body.appendChild(fixture.nativeElement);
+    swipeDown(sheet, 100, 300);
+    tick(400);
+    fixture.nativeElement.remove();
+
+    expect(closed).toBe(true);
+  }));
 
   it('pinta les xifres i l\'explicació', () => {
     build({ caption: 'Activitats per setmana', bars: bars(1, 2) });

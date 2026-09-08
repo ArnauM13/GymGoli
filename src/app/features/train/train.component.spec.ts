@@ -107,7 +107,8 @@ describe('TrainComponent', () => {
             weightUnit: signal<'kg' | 'lb'>('kg'), fitnessGoal: signal(null), loaded: signal(true),
             weeklyPlan: weeklyPlanSignal, settings: settingsSignal, update: updateSettings,
             supersetsEnabled: signal(false), dropsetsEnabled: signal(false), dismissedHints: signal<string[]>([]),
-            bodyweightKg: signal(null),
+            bodyweightKg: signal(null), difficultyScale: signal('emoji'),
+            nextExerciseSuggestionEnabled: signal(false),
             dismissedProposalDates: computed(() => settingsSignal().dismissedProposalDates ?? []),
           },
         },
@@ -216,6 +217,44 @@ describe('TrainComponent', () => {
       component.openWorkout('abc');
       component.closeWorkout();
       expect(goBackSpy).toHaveBeenCalledWith('/home');
+    });
+  });
+
+  // ── Capçalera de l'entrenament ───────────────────────────────────────────
+  // La mateixa targeta que corona una sessió d'esport: qui, quan i com ha anat.
+
+  describe('capçalera de l\'entrenament obert', () => {
+    function openWith(w: Workout): HTMLElement {
+      const workoutService = TestBed.inject(WorkoutService) as unknown as { workouts: ReturnType<typeof signal<Workout[]>> };
+      workoutService.workouts.set([w]);
+      component.openWorkout(w.id);
+      fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    it('diu què és, quan i quantes sèries portes', () => {
+      const el = openWith(makeWorkout({
+        id: 'abc', date: TODAY, categories: ['push'],
+        entries: [{ exerciseId: 'e1', exerciseName: 'Press banca', sets: [{ weight: 60, reps: 10 }] }],
+      }));
+
+      const hero = el.querySelector('.aw-hero') as HTMLElement;
+      expect(hero).toBeTruthy();
+      expect(hero.querySelector('app-activity-icon')).toBeTruthy();
+      expect(hero.textContent).toContain('Empenta');
+      expect(hero.textContent).toContain('Avui');
+      expect(hero.textContent).toContain('1');
+    });
+
+    it('un pla es veu com a pla i encara no té xifres', () => {
+      const el = openWith(makeWorkout({ id: 'abc', date: TODAY, status: 'planned', categories: ['push'] }));
+
+      const hero = el.querySelector('.aw-hero') as HTMLElement;
+      expect(hero.classList).toContain('activity-hero--planned');
+      expect(hero.textContent).toContain('Planificat');
+      expect(hero.textContent).not.toContain('exerc');
+      // La sensació espera que l'entrenament s'hagi fet.
+      expect(hero.querySelector('.aw-feeling-btn')).toBeNull();
     });
   });
 
@@ -377,19 +416,31 @@ describe('TrainComponent', () => {
 
   });
 
-  // ── topbarDateLabel() ────────────────────────────────────────────────────
+  // ── heroDateLabel() ──────────────────────────────────────────────────────
+  // La capçalera diu el dia com el diu el feed i la sessió d'esport: el mateix
+  // dia no es pot dir de dues maneres segons la pantalla on siguis.
 
-  describe('topbarDateLabel()', () => {
-    it('returns "Avui" when workout date is today and selectedDate is today', () => {
-      component.selectedDate.set(TODAY);
-      expect(component.topbarDateLabel(makeWorkout({ date: TODAY }))).toBe('Avui');
+  describe('heroDateLabel()', () => {
+    it('diu «Avui» quan l\'entrenament és d\'avui', () => {
+      expect(component.heroDateLabel(makeWorkout({ date: TODAY }))).toBe('Avui');
     });
 
-    it('returns a formatted date string for a past workout', () => {
-      component.selectedDate.set('2024-03-10');
-      const result = component.topbarDateLabel(makeWorkout({ date: '2024-03-10' }));
+    it('escriu el dia quan ja fa dies', () => {
+      const result = component.heroDateLabel(makeWorkout({ date: '2024-03-10' }));
       expect(result).not.toBe('Avui');
       expect(result.length).toBeGreaterThan(0);
+    });
+  });
+
+  // ── isPlannedWorkout() ───────────────────────────────────────────────────
+
+  describe('isPlannedWorkout()', () => {
+    it('un entrenament sense estat ja s\'ha fet', () => {
+      expect(component.isPlannedWorkout(makeWorkout({ date: TODAY }))).toBe(false);
+    });
+
+    it('un pla encara no s\'ha fet', () => {
+      expect(component.isPlannedWorkout(makeWorkout({ date: TODAY, status: 'planned' }))).toBe(true);
     });
   });
 

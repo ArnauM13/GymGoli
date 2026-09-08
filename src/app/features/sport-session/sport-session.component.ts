@@ -37,23 +37,23 @@ import { feedDayLabel, formatFeeling } from '../../shared/utils/workout-card.uti
         <app-page-header [title]="p.sport.name" [showBack]="true" backFallback="/home" />
 
         <!-- ── Qui, quan i com ha anat ── -->
-        <div class="hero" [class.hero--planned]="isPlanned()" [style.--ac]="p.sport.color">
-          <span class="hero-bar" aria-hidden="true"></span>
+        <div class="activity-hero" [class.activity-hero--planned]="isPlanned()" [style.--ac]="p.sport.color">
+          <span class="ah-bar" aria-hidden="true"></span>
           <app-activity-icon [icon]="p.sport.icon" [color]="p.sport.color" mascot="xoco" />
-          <div class="hero-text">
-            <div class="hero-title-row">
-              <span class="hero-title">{{ p.sport.name }}</span>
-              @if (subtypeName(); as sub) { <span class="hero-subtype">{{ sub }}</span> }
+          <div class="ah-text">
+            <div class="ah-title-row">
+              <span class="ah-title">{{ p.sport.name }}</span>
+              @if (subtypeName(); as sub) { <span class="ss-subtype">{{ sub }}</span> }
             </div>
-            <span class="hero-date">{{ dateLabel() }}</span>
+            <span class="ah-date">{{ dateLabel() }}</span>
           </div>
           @if (isPlanned()) {
-            <span class="hero-pill">
+            <span class="ah-pill">
               <span class="material-symbols-outlined" aria-hidden="true">event_upcoming</span>
               Planificat
             </span>
           } @else if (p.session.feeling) {
-            <span class="hero-feeling">{{ emojiOf(p.session.feeling) }}</span>
+            <span class="ah-feeling">{{ emojiOf(p.session.feeling) }}</span>
           }
         </div>
 
@@ -197,42 +197,15 @@ import { feedDayLabel, formatFeeling } from '../../shared/utils/workout-card.uti
   styles: [`
     .page { padding: 0 0 24px; }
 
-    /* ── Capçalera de la sessió ── */
-    .hero {
-      position: relative;
-      display: flex; align-items: center; gap: 11px;
-      margin: 4px 16px 0; padding: 14px 14px 14px 19px;
-      border: 1.5px solid color-mix(in srgb, var(--ac) 34%, var(--c-border-2));
-      border-radius: 16px; overflow: hidden;
-      background: color-mix(in srgb, var(--ac) 6%, var(--c-card));
-      box-shadow: 0 2px 10px var(--c-shadow);
-    }
-    .hero--planned {
-      border-style: dashed;
-      border-color: color-mix(in srgb, var(--ac) 55%, var(--c-border-2));
-    }
-    .hero-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--ac); }
-    .hero-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-    .hero-title-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
-    .hero-title {
-      flex: 0 1 auto; min-width: 0; font-size: 17px; font-weight: 800; color: var(--c-text);
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .hero-subtype {
+    /* ── Capçalera de la sessió ──
+       La targeta és la compartida (.activity-hero, a styles.scss), la mateixa
+       que corona un entrenament. D'aquí només és el subtipus, que un
+       entrenament no té. */
+    .ss-subtype {
       flex-shrink: 0; padding: 1px 8px; border-radius: 8px;
       background: color-mix(in srgb, var(--ac) 14%, transparent);
       color: color-mix(in srgb, var(--ac) 65%, var(--c-text));
       font-size: 11px; font-weight: 700; line-height: 1.5;
-    }
-    .hero-date { font-size: 12px; font-weight: 500; color: var(--c-text-3); text-transform: capitalize; }
-    .hero-feeling { flex-shrink: 0; font-size: 22px; line-height: 1; }
-    .hero-pill {
-      display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0;
-      padding: 4px 9px; border-radius: 20px;
-      background: color-mix(in srgb, var(--ac) 14%, transparent);
-      color: color-mix(in srgb, var(--ac) 70%, var(--c-text));
-      font-size: 11px; font-weight: 800;
-      .material-symbols-outlined { font-size: 14px; }
     }
 
     /* ── Registrar un pla que ja toca ── */
