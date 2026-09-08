@@ -226,13 +226,13 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
                mateixa vista que el menú de tres punts — mateixa família
                (rodó, flotant) en comptes d'amagar-los dins seu. -->
           <div class="aw-fab-row">
-            @if (!groupingMode() && w.entries.length > 1) {
+            @if (editing() && !groupingMode() && w.entries.length > 1) {
               <button class="aw-menu-fab" (click)="reorderMode.set(true); groupingMode.set(false)"
                       aria-label="Ordenar els exercicis">
                 <span class="material-symbols-outlined" aria-hidden="true">swap_vert</span>
               </button>
             }
-            @if (!groupingMode() && activeIsOngoing()) {
+            @if (editing() && !groupingMode() && activeIsOngoing()) {
               <button class="aw-menu-fab aw-menu-fab--finish" (click)="finishWorkout()"
                       aria-label="Acabar l'entrenament">
                 <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
