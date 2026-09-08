@@ -109,15 +109,20 @@ export class SportService {
   private readonly _fullMonths = new Set<string>();
   /** Peticions de mes en marxa, per no demanar-lo dos cops alhora. */
   private readonly _sessions   = signal<SportSession[]>([]);
-  /** Senyal, i no un booleà a seques, perquè qui depèn de tenir *tot*
-   *  l'historial a mà (els rècords del detall d'una sessió) se n'assabenti
-   *  quan acaba d'arribar, i no ensenyi una fita calculada a mitges. */
-  private readonly _allLoaded = signal(false);
-  /** Cert quan `loadAllSessions()` ja ha portat l'historial sencer. */
-  readonly allSessionsLoaded = this._allLoaded.asReadonly();
-  /** La consulta de tot l'historial que hi ha en marxa, si n'hi ha cap. Qui la
-   *  demani mentre viatja s'hi enganxa en comptes de llançar-ne una altra. */
-  private _allLoad: Promise<void> | null = null;
+  /** Esports i sessions que ja s'han demanat pel seu compte, i les consultes
+   *  que hi ha en marxa. Vegeu `loadSessionsForSport()` i
+   *  `ensureSessionLoaded()`: cap de les dues baixa l'historial sencer. */
+  private readonly _sportLoadedIds   = new Set<string>();
+  private readonly _sportLoads       = new Map<string, Promise<void>>();
+  private readonly _sessionLoadedIds = new Set<string>();
+  private readonly _sessionLoads     = new Map<string, Promise<void>>();
+  /** Puja a cada càrrega acabada, perquè els `computed()` que pregunten si
+   *  l'historial d'un esport ja hi és es refacin quan arriba. */
+  private readonly _version = signal(0);
+
+  private _isOffline(): boolean {
+    return typeof navigator !== 'undefined' && navigator.onLine === false;
+  }
   private _lastRefreshAt = 0;
 
   /** Fins on s'han demanat canvis: l'`updated_at` més alt que ha arribat en
@@ -195,12 +200,15 @@ export class SportService {
       this._monthCache.clear();
       this._fullMonths.clear();
       this._sessions.set([]);
-      this._allLoaded.set(false);
+      this._sportLoadedIds.clear();
+      this._sportLoads.clear();
+      this._sessionLoadedIds.clear();
+      this._sessionLoads.clear();
+      this._version.update(v => v + 1);
       this.isLoaded.set(false);
       this._loadPromise = null;
       // Una consulta de l'usuari anterior no pot quedar-se com la que espera
       // qui demani l'historial ara, ni el seu marcador de canvis com el nostre.
-      this._allLoad = null;
       this._sportsLoad = null;
       this._pullLoad = null;
       this._lastPulledAt = null;
@@ -369,7 +377,7 @@ export class SportService {
       const key = s.date.substring(0, 7);
       // Un mes que aquest dispositiu no ha demanat mai no s'omple a trossos:
       // tenir-ne una sessió solta faria semblar que ja el té sencer.
-      if (!this._monthCache.has(key) && !this._allLoaded()) continue;
+      if (!this._monthCache.has(key)) continue;
 
       // Pot haver canviat de dia, i llavors ha de marxar del mes on era.
       for (const [k, bucket] of this._monthCache) {
@@ -555,7 +563,6 @@ export class SportService {
    * d'esports.
    */
   async ensureMonthLoaded(year: number, month: number, force = false): Promise<void> {
-    if (this._allLoaded() && !force) return;
     const key     = `${year}-${String(month + 1).padStart(2, '0')}`;
     const lastDay = new Date(year, month + 1, 0).getDate();
     // El que hi ha guardat al dispositiu es pot ensenyar ja, i és l'única cosa
@@ -635,75 +642,136 @@ export class SportService {
     this._rebuild();
   }
 
-  /** Loads the user's entire sport-session history into the cache in a single
-   *  query. Needed by features that reason over all-time recency (e.g. the
-   *  workout suggestion), which the lazy per-month loading can't guarantee.
-   *  Cached after the first successful run. */
-  loadAllSessions(): Promise<void> {
-    if (this._allLoaded()) return Promise.resolve();
-    return this._fetchAllSessions();
-  }
-
-  /** La consulta de debò, amb guarda de petició en marxa: qui la demani
-   *  mentre una viatja espera aquella en comptes de llançar-ne una altra. */
-  private _fetchAllSessions(): Promise<void> {
-    if (this._allLoad) return this._allLoad;
-    const p = this._runFetchAllSessions().finally(() => { this._allLoad = null; });
-    this._allLoad = p;
+  /**
+   * Les sessions d'un esport, totes.
+   *
+   * És el que necessiten els rècords i les mitjanes del detall («la teva
+   * millor marca», «el que sols fer»): una fita calculada amb mitja història
+   * no és una fita. Però són les d'**aquell** esport — abans es baixaven les
+   * de tots per acabar filtrant-les aquí, i qui obria el detall d'una sessió
+   * de córrer es baixava també cada partit de pàdel que hagués jugat mai.
+   *
+   * Es guarda quin esport ja s'ha demanat: desplegar-ne dos cops la targeta és
+   * una consulta, no dues.
+   */
+  loadSessionsForSport(sportId: string): Promise<void> {
+    if (this._sportLoadedIds.has(sportId)) return Promise.resolve();
+    const inFlight = this._sportLoads.get(sportId);
+    if (inFlight) return inFlight;
+    const p = this._fetchSessionsForSport(sportId).finally(() => this._sportLoads.delete(sportId));
+    this._sportLoads.set(sportId, p);
     return p;
   }
 
-  private async _runFetchAllSessions(): Promise<void> {
+  /** Cert quan ja hi ha totes les sessions d'aquest esport: fins llavors, qui
+   *  en calculi rècords val més que no digui res. */
+  sportHistoryLoaded(sportId: string): boolean {
+    this._version();
+    return this._sportLoadedIds.has(sportId);
+  }
+
+  private async _fetchSessionsForSport(sportId: string): Promise<void> {
     const uid = this.auth.uid();
-    if (!uid) return;
-    this._fullLoading.set(true);
+    if (!uid || this._isOffline()) return;
     try {
-      const known        = new Set([...this._monthCache.values()].flat().map(s => s.id));
-      const queuedBefore = new Set(this._readPending(uid).map(o => o.id));
-      // Per trams i amb un ordre total: el que no surti d'aquesta resposta es
-      // dóna per esborrat des d'un altre dispositiu i marxa de la cau, així que
-      // una resposta tallada pel topall de files de PostgREST buidaria mitja
-      // història. Amb l'ordre només per data, a més, dues sessions del mateix
-      // dia poden caure entre dos trams i no sortir a cap.
       const { rows, error, complete } = await fetchAllRows<Record<string, unknown>>(() =>
         this.supabase
           .from('sport_sessions')
           .select(SPORT_SESSION_COLUMNS)
           .eq('user_id', uid)
+          .eq('sport_id', sportId)
           .order('date',       { ascending: false })
           .order('created_at', { ascending: false })
           .order('id',         { ascending: false })
       );
+      if (error || !complete) return;   // es manté el que ja teníem
 
-      if (error || !complete) return; // es manté el que ja teníem
-
-      const fetched = rows.map(r => toSportSession(r));
-      const pending = this._readPending(uid);
-      const queued  = new Set(pending.filter(o => o.op !== 'delete').map(o => o.id));
-      const erased  = new Set(pending.filter(o => o.op === 'delete').map(o => o.id));
-
-      // Igual que a `_mergeMonth`: la resposta mana, i la versió local només
-      // es conserva mentre esperi torn per pujar.
-      const byId = new Map(fetched.filter(s => !erased.has(s.id)).map(s => [s.id, s]));
-      for (const s of [...this._monthCache.values()].flat()) {
-        if (erased.has(s.id)) continue;
-        if (queued.has(s.id) || queuedBefore.has(s.id) || !known.has(s.id)) byId.set(s.id, s);
-      }
-
-      this._monthCache.clear();
-      this._fullMonths.clear();
-      for (const s of byId.values()) {
-        const key = s.date.substring(0, 7);
-        this._monthCache.set(key, [...(this._monthCache.get(key) ?? []), s]);
-        this._fullMonths.add(key);
-      }
-      this._rebuild();
-      this._allLoaded.set(true);
+      this._absorb(uid, rows.map(r => toSportSession(r)));
+      this._sportLoadedIds.add(sportId);
+      this._version.update(v => v + 1);
     } catch {
-      // best-effort; keep whatever we already have
-    } finally {
-      this._fullLoading.set(false);
+      // Sense xarxa: no es marca com a carregat, i el proper cop es torna a provar.
     }
+  }
+
+  /**
+   * Una sessió pel seu id.
+   *
+   * La pàgina d'una sessió s'obre per l'URL i no sap de quin mes és. Abans
+   * l'única manera de trobar-la era tenir-les totes; ara es demana **aquella
+   * fila**, que és una consulta d'una fila.
+   */
+  async ensureSessionLoaded(id: string): Promise<void> {
+    const uid = this.auth.uid();
+    if (!uid || this._isOffline()) return;
+    if (this.getSessionById(id)) return;
+    if (this._sessionLoadedIds.has(id)) return;
+
+    const inFlight = this._sessionLoads.get(id);
+    if (inFlight) return inFlight;
+
+    const p = (async () => {
+      try {
+        const { data, error } = await this.supabase
+          .from('sport_sessions')
+          .select(SPORT_SESSION_COLUMNS)
+          .eq('user_id', uid)
+          .eq('id', id)
+          .maybeSingle();
+        // Sense error i sense fila vol dir que no existeix: es marca igualment
+        // per no tornar-la a demanar en bucle des d'una pàgina que l'espera.
+        if (error) return;
+        if (data) this._absorb(uid, [toSportSession(data as Record<string, unknown>)]);
+        this._sessionLoadedIds.add(id);
+        this._version.update(v => v + 1);
+      } catch {
+        // Sense xarxa: no es marca, i es torna a provar quan torni.
+      }
+    })().finally(() => this._sessionLoads.delete(id));
+
+    this._sessionLoads.set(id, p);
+    return p;
+  }
+
+  /** Cert quan ja s'ha preguntat pel seu compte per aquesta sessió: si a
+   *  hores d'ara no hi és, no arribarà. */
+  sessionLookupDone(id: string): boolean {
+    this._version();
+    return this._sessionLoadedIds.has(id) || !!this.getSessionById(id);
+  }
+
+  /**
+   * Incorpora files soltes vingudes del servidor.
+   *
+   * Com la consulta de canvis, **no dedueix res del que hi falta**: aquestes
+   * respostes no cobreixen cap tram sencer, només porten el que s'ha demanat.
+   * El que espera torn a la cua d'enviament no es toca — és exactament la
+   * versió que estem a punt de pujar.
+   */
+  private _absorb(uid: string, fetched: SportSession[]): void {
+    if (!fetched.length) return;
+    const pending = this._readPending(uid);
+    const queued  = new Set(pending.filter(o => o.op !== 'delete').map(o => o.id));
+    const erased  = new Set(pending.filter(o => o.op === 'delete').map(o => o.id));
+
+    const touched = new Set<string>();
+    for (const s of fetched) {
+      if (queued.has(s.id) || erased.has(s.id)) continue;
+      const key = s.date.substring(0, 7);
+      // Pot haver canviat de dia, i llavors ha de marxar del mes on era.
+      for (const [k, bucket] of this._monthCache) {
+        if (k === key) continue;
+        const without = bucket.filter(x => x.id !== s.id);
+        if (without.length !== bucket.length) { this._monthCache.set(k, without); touched.add(k); }
+      }
+      const bucket = (this._monthCache.get(key) ?? []).filter(x => x.id !== s.id);
+      this._monthCache.set(key, [...bucket, s]);
+      touched.add(key);
+    }
+
+    if (!touched.size) return;
+    for (const key of touched) this._writeSessionsToStorage(uid, key, this._monthCache.get(key) ?? []);
+    this._rebuild();
   }
 
   // ── Queries ───────────────────────────────────────────────────────────────
@@ -717,6 +785,23 @@ export class SportService {
       .filter(s => (s.status ?? 'done') !== 'planned')
       .map(s => sportsMap.get(s.sportId))
       .filter((s): s is Sport => !!s);
+  }
+
+  /**
+   * Totes les sessions fetes que hi ha al dispositiu, amb el seu esport.
+   *
+   * És per a la cerca de l'historial, que no va dia a dia sinó per
+   * coincidències: recórrer anys de dies buits per pintar-ne quatre és car, i
+   * no cal.
+   */
+  allSportSessionPairs(): Array<{ sport: Sport; session: SportSession }> {
+    const sportsMap = this._sportsById();
+    const out: Array<{ sport: Sport; session: SportSession }> = [];
+    for (const session of this.sessions()) {
+      const sport = sportsMap.get(session.sportId);
+      if (sport) out.push({ sport, session });
+    }
+    return out;
   }
 
   /** Returns sport + DONE session pairs for a given date. */
@@ -781,9 +866,9 @@ export class SportService {
   }
 
   /** Una sessió pel seu id, sigui feta o planificada — la pàgina d'una sessió
-   *  hi arriba per l'URL i no sap de quin dia és fins que la troba. Només la
-   *  veurà si el seu mes és carregat: qui hi entra de nou fa
-   *  `loadAllSessions()` abans de donar-la per perduda. */
+   *  hi arriba per l'URL i no sap de quin dia és fins que la troba. Si el seu
+   *  mes no és carregat, qui hi entra fa `ensureSessionLoaded()`, que demana
+   *  aquella fila i prou. */
   getSessionById(id: string): SportSession | undefined {
     return this._sessions().find(s => s.id === id);
   }

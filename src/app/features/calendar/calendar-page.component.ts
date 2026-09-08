@@ -1,6 +1,6 @@
 import {
   Component, computed, effect, ElementRef, inject,
-  OnDestroy, signal, viewChild,
+  OnDestroy, signal, untracked, viewChild,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import {
@@ -458,7 +458,9 @@ export class CalendarPageComponent implements OnDestroy {
   /** Mesos seguits carregats sense trobar-hi res. */
   private _emptyStreak = 0;
 
-  readonly hasMore = computed(() => !this._reachedEnd());
+  /** Amb un filtre posat no hi ha res més a carregar: la resposta del servidor
+   *  ja porta totes les coincidències de tot l'historial. */
+  readonly hasMore = computed(() => !this._reachedEnd() && !this.searchQuery().trim() && !this.filterCat());
 
   /** El primer dia carregat: l'1 del mes més antic que s'ha demanat. */
   private readonly windowStart = computed(() => {
@@ -477,16 +479,47 @@ export class CalendarPageComponent implements OnDestroy {
    * passada pels filtres de la pàgina.
    */
   readonly feedDays = computed((): DayFeedEntry[] => {
-    // Reactivitat sobre les dades crues: el feed s'omple tot sol quan acaba de
-    // carregar un mes, sense haver de tocar res.
-    this.workoutService.workouts(); this.sportService.sessions(); this.sportService.sports();
+    // Reactivitat sobre les dades crues: el feed s'omple tot sol quan acaba
+    // d'arribar un tram, sense haver de tocar res.
+    const all = this.workoutService.workouts();
+    this.sportService.sessions(); this.sportService.sports();
 
     const sel    = this.selectedDate();
     const today  = this.workoutService.todayDateString();
-    const from   = sel ?? this.windowStart();
-    const to     = sel ?? today;
     const search = this.searchQuery().trim().toLowerCase();
     const cat    = this.filterCat();
+
+    // ── Amb cerca o filtre: des de les coincidències ────────────────────────
+    // La resposta del servidor porta les que hi ha, escampades per anys. Fer
+    // el bucle dia a dia des de la finestra visible no les trobaria (era el
+    // que passava: buscar un exercici antic no ensenyava res, i el botó de
+    // «carregar-ne més» quedava desactivat), i fer-lo des de la primera
+    // coincidència voldria dir recórrer milers de dies buits per pintar-ne
+    // quatre.
+    if (!sel && (search || cat)) {
+      const byDate = new Map<string, DayFeedEntry>();
+      const bucket = (date: string): DayFeedEntry => {
+        let d = byDate.get(date);
+        if (!d) { d = { date, workouts: [], sports: [] }; byDate.set(date, d); }
+        return d;
+      };
+      for (const w of all) {
+        if (!this._matchesWorkout(w, cat, search)) continue;
+        bucket(w.date).workouts.push(w);
+      }
+      if (!cat) {
+        for (const item of this.sportService.allSportSessionPairs()) {
+          if (!this._matchesSport(item, cat, search)) continue;
+          bucket(item.session.date).sports.push(item);
+        }
+      }
+      const days = [...byDate.values()].sort((a, b) => b.date.localeCompare(a.date));
+      return this.sortDesc() ? days : days.reverse();
+    }
+
+    // ── Sense filtre: dia a dia per la finestra visible ─────────────────────
+    const from = sel ?? this.windowStart();
+    const to   = sel ?? today;
 
     const days: DayFeedEntry[] = [];
     const cursor = new Date(to + 'T12:00:00');
@@ -561,9 +594,10 @@ export class CalendarPageComponent implements OnDestroy {
     // Cercar o filtrar per tipus mira tot l'historial, no només els mesos que
     // ja s'han carregat: si no, buscar un exercici antic no trobaria res.
     effect(() => {
-      const needsAll = !!this.searchQuery().trim() || !!this.filterCat();
-      if (!needsAll || !this.authService.uid()) return;
-      this._loadEverything();
+      const search = this.searchQuery().trim();
+      const cat    = this.filterCat();
+      if ((!search && !cat) || !this.authService.uid()) return;
+      untracked(() => { void this._runSearch(); });
     });
 
     // Un dia triat al calendari pot ser d'un mes que encara no s'ha carregat.
@@ -632,21 +666,23 @@ export class CalendarPageComponent implements OnDestroy {
     ]);
   }
 
-  /** Buscar o filtrar mira tot l'historial, sèries incloses: és el que fa
-   *  falta perquè les targetes trobades surtin amb les seves xifres. Com que
-   *  és la consulta grossa de la pàgina, va amb el mateix indicador que
-   *  l'infinite scroll. */
-  private async _loadEverything(): Promise<void> {
-    this.isLoadingMore.set(true);
-    try {
-      await Promise.all([
-        this.workoutService.loadAllWorkouts(),
-        this.sportService.loadAllSessions(),
-      ]);
-    } finally {
-      this.isLoadingMore.set(false);
-    }
-    this._reachedEnd.set(true);
+  /**
+   * Buscar o filtrar pregunta al servidor.
+   *
+   * Abans es baixava tot l'historial amb totes les sèries i es filtrava aquí.
+   * Ara la pregunta la contesta qui té índexs per contestar-la, i el que
+   * viatja són només les coincidències —sense sèries—, encara que siguin de fa
+   * vuit anys.
+   *
+   * Els esports no hi entren: no tenen ni noms d'exercici ni tipus
+   * d'entrenament, o sigui que amb qualsevol dels dos filtres queden fora
+   * igualment, i sense filtre no s'arriba mai aquí.
+   */
+  private async _runSearch(): Promise<void> {
+    await this.workoutService.searchHistory({
+      search:   this.searchQuery().trim(),
+      category: this.filterCat() ?? undefined,
+    });
   }
 
   // ── Calendar ─────────────────────────────────────────────────────────────

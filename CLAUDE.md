@@ -39,6 +39,9 @@ tests que les subjecten són allà.
   (`activity_feed`) porta entrenaments i esports d'un rang de dies amb el
   que necessita la targeta plegada i cap sèrie. Passa per
   `WorkoutService.ensureRange()`; les sèries es demanen en obrir la sessió
+- **Cap consulta no baixa «tot»**: tota consulta va acotada per un tram, un
+  exercici, un esport, una fila o un filtre. Agregar i filtrar és feina del
+  servidor — vegeu `SYNC.md` §«Res no baixa tot»
 - Material Symbols (outlined) via the global font, never `mat-icon`
 
 ## Conventions

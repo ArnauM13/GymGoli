@@ -618,12 +618,13 @@ describe('WorkoutService', () => {
       expect(service.getWorkoutForDate('2024-03-06')!.entries[0].sets[0].weight).toBe(60);
     });
 
-    it('loadAllWorkouts() també refresca el que ja era a la cau', async () => {
+    it('un tram tornat a demanar refresca el que ja era al dispositiu', async () => {
       workoutsChain.result = { data: [row('w1', '2024-03-06', { notes: 'vell' })], count: 1, error: null };
-      await service.ensureMonthLoaded(2024, 2);
+      await service.refreshLoaded(true);
+      expect(service.getWorkoutForDate('2024-03-06')!.notes).toBe('vell');
 
-      workoutsChain.result = { data: [row('w1', '2024-03-06', { notes: 'nou' })], count: 1, error: null };
-      await service.loadAllWorkouts();
+      workoutsChain.result = { data: [row('w1', '2024-03-06', { notes: 'nou', updated_at: '2030-01-01T00:00:00.000Z' })], count: 1, error: null };
+      await service.refreshLoaded(true);
 
       expect(service.getWorkoutForDate('2024-03-06')!.notes).toBe('nou');
     });
@@ -640,28 +641,38 @@ describe('WorkoutService', () => {
       expect(workoutsChain.filter).not.toHaveBeenCalled();
     });
 
-    it('recorre l\'historial sencer per trams i amb un ordre total', async () => {
-      await service.loadAllWorkouts();
+    it('les sessions d\'un exercici es recorren per trams i amb un ordre total', async () => {
+      await service.loadWorkoutsForExercise('ex-1');
 
       expect(workoutsChain.range).toHaveBeenCalled();
       // Amb l'ordre només per data, dues sessions del mateix dia poden caure
       // entre dos trams i no sortir a cap.
-      expect(workoutsChain.order).toHaveBeenCalledWith('date', { ascending: false });
-      expect(workoutsChain.order).toHaveBeenCalledWith('created_at', { ascending: false });
-      expect(workoutsChain.order).toHaveBeenCalledWith('id', { ascending: false });
+      expect(workoutsChain.order).toHaveBeenCalledWith('date', { ascending: true });
+      expect(workoutsChain.order).toHaveBeenCalledWith('created_at', { ascending: true });
+      expect(workoutsChain.order).toHaveBeenCalledWith('id', { ascending: true });
     });
 
-    it('no dedueix cap esborrat d\'una resposta que ha fallat a mig recórrer', async () => {
-      workoutsChain.result = { data: [row('w1', '2024-03-06')], count: 1, error: null };
-      await service.refreshLoaded(true);   // la consulta de canvis la porta sencera
-      expect(service.getWorkoutsForDate('2024-03-06').length).toBe(1);
+    // Cap consulta d'aquesta pàgina baixa ja tot l'historial: la cerca la
+    // contesta el servidor filtrada, i els rècords els compta ell.
+    it('buscar a l\'historial no baixa cap sèrie: va per l\'endpoint filtrat', async () => {
+      rpcSpy.calls.reset();
 
-      workoutsChain.result = { data: null, count: 0, error: new Error('network') };
-      await service.loadAllWorkouts();
+      await service.searchHistory({ search: 'dominades' });
 
-      // La sessió continua al dispositiu: una resposta incompleta no és prova
-      // que s'hagi esborrat des d'un altre lloc.
-      expect(service.getWorkoutsForDate('2024-03-06').length).toBe(1);
+      const call = rpcSpy.calls.allArgs().find(args => args[0] === 'activity_feed')!;
+      expect(call[1]).toEqual(jasmine.objectContaining({ p_search: 'dominades' }));
+      // Un filtre no diu qui hi ha d'haver, només qui coincideix: no pot
+      // treure del dispositiu el que no encaixi amb la cerca.
+      expect(service.workouts().length).toBe(0);
+    });
+
+    it('una cerca no es repeteix mentre l\'usuari escriu i esborra', async () => {
+      await service.searchHistory({ search: 'press' });
+      const calls = rpcSpy.calls.allArgs().filter(a => a[0] === 'activity_feed').length;
+
+      await service.searchHistory({ search: 'press' });
+
+      expect(rpcSpy.calls.allArgs().filter(a => a[0] === 'activity_feed').length).toBe(calls);
     });
 
     it('no s\'endú columnes que ningú llegeix', async () => {
@@ -865,16 +876,6 @@ describe('WorkoutService', () => {
       await service.ensureWorkoutEntries(id);
 
       expect(workoutsChain.maybeSingle.calls.count()).toBe(calls);
-    });
-
-    // Cada senyal que canviava mentre la consulta viatjava en disparava una
-    // altra, i l'app arrencava baixant l'historial tres o quatre vegades.
-    it('dues peticions alhora de tot l\'historial són una sola consulta', async () => {
-      const calls = workoutsChain.select.calls.count();
-
-      await Promise.all([service.loadAllWorkouts(), service.loadAllWorkouts()]);
-
-      expect(workoutsChain.select.calls.count()).toBe(calls + 1);
     });
 
     // Una resposta de tram cobreix el tram sencer, o sigui que diu qui hi ha

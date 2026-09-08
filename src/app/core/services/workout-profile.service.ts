@@ -64,8 +64,8 @@ export class WorkoutProfileService {
     // dir **tot l'historial**: el resum de cada entrenament de tota la vida de
     // l'usuari, més totes les sessions d'esport senceres, demanat en entrar i
     // per a tothom, l'hagués de mirar o no. Era la petició més cara de
-    // l'arrencada, i a més deixava `allSessionsLoaded` encès, cosa que feia
-    // que cada tornada a l'app en tornés a baixar una còpia.
+    // l'arrencada, i a més deixava l'app en mode «ja ho tinc tot», cosa que
+    // feia que cada tornada a l'app en tornés a baixar una còpia.
     //
     // Amb la finestra recent n'hi ha prou, i és la que ja hi és per als altres
     // motius: aquest perfil no distingeix entre «fa 95 dies» i «no ho has fet

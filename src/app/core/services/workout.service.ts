@@ -15,6 +15,11 @@ import { FeelingLevel, PlannedSource, Workout, WorkoutEntry, WorkoutSet, setMaxW
 import { toDateStr } from '../../shared/utils/date.utils';
 import { addDays, workoutCategories } from '../../shared/utils/calendar-utils';
 
+/** Des d'on es busca quan es busca «a tot l'historial». Cap app de gimnàs no
+ *  té dades d'abans, i posar-hi una data en comptes de deixar el rang obert fa
+ *  que la consulta continuï passant per l'índex de `(user_id, date)`. */
+const EPOCH_START = '2000-01-01';
+
 /** The filters the Historial list can have active at once. */
 export interface HistoryFilters {
   category?: string;
@@ -74,7 +79,6 @@ export class WorkoutService {
    *  dia d'ahir quan passava la mitjanit amb la pestanya oberta. */
   private get _todayStr(): string { return this.today.today(); }
 
-  private _allLoaded = false;
   private _realtimeChannel: RealtimeChannel | null = null;
   private _lastRefreshAt = 0;
   /** Fins on s'han demanat canvis. És l'`updated_at` **més alt que ha arribat
@@ -84,10 +88,8 @@ export class WorkoutService {
    *  cursor perquè un usuari sense cap entrenament no en té, i sense això
    *  quedava condemnat a la comprovació sencera a cada refresc. */
   private _pulledOnce = false;
-  /** Consultes senceres en marxa. Sense això, qualsevol canvi als senyals
-   *  mentre una viatjava en disparava una altra, i l'arrencada acabava
-   *  baixant l'historial sencer tres o quatre vegades alhora. */
-  private _fullLoad: Promise<void> | null = null;
+  /** La consulta de canvis que hi ha en marxa. Sense això, qualsevol canvi
+   *  als senyals mentre una viatjava en disparava una altra. */
   private _pullLoad: Promise<void> | null = null;
 
   /** Marge mínim entre refrescos automàtics: tornar a l'app dispara alhora
@@ -128,9 +130,6 @@ export class WorkoutService {
   /** Sessions que ara mateix s'estan baixant senceres, per id. */
   private readonly _entryLoads = new Map<string, Promise<void>>();
 
-  /** Només la consulta d'historial sencer, que és la que té indicador propi. */
-  private readonly _fullLoading = signal(false);
-
   /**
    * Hi ha alguna consulta d'entrenaments en marxa.
    *
@@ -138,7 +137,7 @@ export class WorkoutService {
    * qualsevol consulta, i una pantalla que ja té les seves dades no té cap
    * motiu per parpellejar perquè n'estigui arribant una altra.
    */
-  readonly isLoading = computed(() => this._fullLoading() || this.activityFeed.loading());
+  readonly isLoading = computed(() => this.activityFeed.loading());
 
   /** Cert quan aquest tram ja ha arribat. És el que ha de mirar una secció per
    *  decidir si ensenya l'esquelet: cada secció mira el seu, i les que ja
@@ -317,12 +316,10 @@ export class WorkoutService {
       this._realtimeChannel = null;
       this._lastPulledAt  = null;
       this._pulledOnce    = false;
-      this._allLoaded = false;
       this._exLoadedIds.clear();
       this._exLoadPromises.clear();
       // Cap consulta de l'usuari anterior no pot fer de resposta per a qui
       // demani les dades ara.
-      this._fullLoad = null;
       this._pullLoad = null;
       this._entryLoads.clear();
 
@@ -404,10 +401,10 @@ export class WorkoutService {
     //
     // Abans, aquí hi havia una comprovació sencera cada cinc minuts que
     // rebaixava **tot l'historial amb totes les sèries** —i n'hi havia prou
-    // que alguna pantalla hagués cridat `loadAllWorkouts()` un cop perquè
-    // passés a cada canvi de pestanya— i, si no, una petició per cada mes que
-    // haguessis arribat a mirar. Scrollar el calendari mig any enrere deixava
-    // l'app fent dotze peticions cada cinc minuts, per sempre.
+    // que alguna pantalla n'hagués demanat un cop perquè passés a cada canvi
+    // de pestanya— i, si no, una petició per cada mes que haguessis arribat a
+    // mirar. Scrollar el calendari mig any enrere deixava l'app fent dotze
+    // peticions cada cinc minuts, per sempre.
     const hot = this.recentWindow();
     await Promise.all([
       this._pullChanges(),
@@ -580,9 +577,27 @@ export class WorkoutService {
    * consulta de canvis, que és qui manté editable el que s'està entrenant.
    */
   async ensureRange(from: string, to: string, force = false): Promise<void> {
-    if (this._allLoaded && !force) return;
     await this.activityFeed.ensureRange(from, to, force);
   }
+
+  /**
+   * Busca a tot l'historial, al servidor.
+   *
+   * És el que fa la cerca del Calendari. Abans, escriure «dominades» hi
+   * baixava **tota la vida de l'usuari amb totes les sèries** per filtrar-la
+   * aquí; ara la pregunta la contesta el servidor —amb l'índex trigram de
+   * `exercise_names`— i el que viatja són només les coincidències, sense cap
+   * sèrie.
+   *
+   * No cobreix cap tram: una resposta filtrada diu qui coincideix, no qui hi
+   * ha d'haver. Vegeu `ActivityFeedService.searchRange()`.
+   */
+  async searchHistory(filters: { search?: string; category?: string }): Promise<void> {
+    await this.activityFeed.searchRange(EPOCH_START, this._todayStr, filters);
+  }
+
+  /** Hi ha una cerca en marxa contra el servidor. */
+  readonly isSearching = computed(() => this.activityFeed.searching());
 
   /**
    * Carrega un mes. Es manté pel codi que pensa en mesos (el calendari, el
@@ -599,7 +614,7 @@ export class WorkoutService {
   // into the month cache so getWorkoutsForExercise() and exercisesWithData()
   // stay consistent.
   async loadWorkoutsForExercise(exerciseId: string): Promise<void> {
-    if (this._allLoaded || this._exLoadedIds.has(exerciseId)) return;
+    if (this._exLoadedIds.has(exerciseId)) return;
     const inFlight = this._exLoadPromises.get(exerciseId);
     if (inFlight) return inFlight;
     const p = this._fetchForExercise(exerciseId).finally(() =>
@@ -686,56 +701,6 @@ export class WorkoutService {
       this.store.applyServerRow(toWorkout(data as Record<string, unknown>));
     } catch {
       // Sense xarxa: la targeta es queda amb el resum, que ja diu què va ser.
-    }
-  }
-
-  async loadAllWorkouts(): Promise<void> {
-    if (this._allLoaded) return;
-    await this._fetchAll(false);
-  }
-
-  /** `silent` per als refrescos de fons: no encén l'indicador de càrrega, que
-   *  tornar a l'app no ha de fer parpellejar tota la pantalla. */
-  private _fetchAll(silent: boolean): Promise<void> {
-    if (this._fullLoad) return this._fullLoad;
-    const p = this._runFetchAll(silent).finally(() => { this._fullLoad = null; });
-    this._fullLoad = p;
-    return p;
-  }
-
-  private async _runFetchAll(silent: boolean): Promise<void> {
-    const uid = this.auth.uid();
-    if (!uid || this.offline.isOffline()) return;
-    if (!silent) this._fullLoading.set(true);
-
-    const since = this.store.mark();
-    try {
-      // Per trams, i amb un ordre total: `mergeServerScope()` treu del
-      // dispositiu tot el que aquesta resposta no porti, així que una resposta
-      // tallada pel topall de files no seria «l'historial a mitges» sinó
-      // esborrar la còpia local de la meitat que falta. I amb l'ordre només
-      // per data, dues sessions del mateix dia poden caure entre dos trams i
-      // no sortir a cap.
-      const { rows, error, complete } = await fetchAllRows<Record<string, unknown>>(() =>
-        this.supabase
-          .from('workouts')
-          .select(WORKOUT_COLUMNS)
-          .eq('user_id', uid)
-          .order('date',       { ascending: false })
-          .order('created_at', { ascending: false })
-          .order('id',         { ascending: false })
-      );
-
-      if (error || !complete) return; // es manté el que ja teníem
-
-      const fetched = rows.map(r => toWorkout(r));
-      this.store.mergeServerScope(fetched, () => true, since);
-      // Ja no hi ha res que el magatzem no sàpiga de cap mes que porti alguna
-      // sessió: aquests ja es poden alliberar del dispositiu si cal espai.
-      for (const w of fetched) this.store.markReconciled(w.date.substring(0, 7));
-      this._allLoaded = true;
-    } finally {
-      if (!silent) this._fullLoading.set(false);
     }
   }
 

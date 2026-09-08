@@ -118,6 +118,10 @@ El que es demana al servidor va per necessitat, no per costum:
 | La finestra recent (`_pullChanges`) | En arrencar i en tornar a l'app | El que ha canviat, amb les sessions senceres dels últims mesos |
 | Una sessió (`ensureWorkoutEntries`) | En obrir-la | Aquella sessió sencera |
 | Un exercici (`loadWorkoutsForExercise`) | En obrir-ne el progrés | Totes les sessions on surt |
+| Un esport (`loadSessionsForSport`) | En desplegar-ne una targeta | Totes les sessions d'aquell esport |
+| Una sessió d'esport (`ensureSessionLoaded`) | En obrir-la per l'URL | Aquella fila |
+| Una cerca (`searchHistory`) | En escriure a l'historial | Només les coincidències, de tot l'historial |
+| Els rècords (`WorkoutStatsService`) | En obrir Gràfiques | Una fila per exercici: sessions, màxim i última data |
 
 **Una pregunta per tram, no una per mes.** `ActivityFeedService` recorda quins
 trams ja han arribat i fusiona els que es toquen, així que demanar un mes que
@@ -139,6 +143,24 @@ què ha canviat, i qui hi ha d'haver al tram calent. Abans, un cop alguna
 pantalla havia demanat tot l'historial —i el perfil ho feia en entrar,
 sempre— cada canvi de pestanya passats cinc minuts en baixava una còpia
 sencera; i quan no, una petició per cada mes que haguessis arribat a mirar.
+
+### Res no baixa «tot»
+
+Cap consulta de l'app es porta la vida sencera de l'usuari. La regla és que
+**una consulta ha d'estar acotada per alguna cosa**: un tram de dies, un
+exercici, un esport, una fila, o un filtre. Les tres que no ho estaven ja no
+hi són:
+
+| Què es preguntava | Com es contestava | Com es contesta |
+| --- | --- | --- |
+| «Quin és el meu rècord de cada exercici?» | Baixar tota la vida amb totes les sèries i calcular-ho aquí | `exercise_records()`: una fila per exercici |
+| «On surt "dominades" a l'historial?» | Igual, i filtrar-ho aquí | `activity_feed(..., p_search)`: només les coincidències |
+| «Quantes sessions d'aquest esport porto?» | Baixar les de **tots** els esports | `loadSessionsForSport()`: les d'aquell |
+
+El patró és sempre el mateix: **agregar i filtrar és feina del servidor**. Sap
+fer-ho amb índexs i torna el resultat, no les dades per calcular-lo. El que
+viatja deixa de créixer amb l'historial: qui porta vuit anys entrenant rep el
+mateix que qui en porta dos.
 
 ### El que no es guarda
 

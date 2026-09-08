@@ -81,6 +81,7 @@ describe('ActivityFeedService', () => {
 
     expect(rpc).toHaveBeenCalledWith('activity_feed', {
       p_from: '2024-01-01', p_to: '2024-03-31', p_bodyweight: 75,
+      p_search: null, p_category: null,
     });
   });
 
@@ -176,5 +177,48 @@ describe('ActivityFeedService', () => {
 
     expect(service.workoutSummaries().length).toBe(0);
     expect(service.covers('2024-01-01', '2024-01-31')).toBeFalse();
+  });
+
+  // ── Cerca ────────────────────────────────────────────────────────────────
+  //
+  // Buscar «dominades» baixava tot l'historial amb totes les sèries i el
+  // filtrava al client. Ara la pregunta la contesta el servidor.
+  describe('searchRange()', () => {
+    it('passa la cerca i el tipus al servidor', async () => {
+      await service.searchRange('2000-01-01', '2024-12-31', { search: 'dominades', category: 'pull' });
+
+      expect(rpc).toHaveBeenCalledWith('activity_feed', jasmine.objectContaining({
+        p_search: 'dominades', p_category: 'pull',
+      }));
+    });
+
+    it('sense cap filtre no pregunta res: això és per buscar, no per carregar', async () => {
+      await service.searchRange('2000-01-01', '2024-12-31', {});
+
+      expect(rpc).not.toHaveBeenCalled();
+    });
+
+    it('no repeteix la mateixa cerca', async () => {
+      await service.searchRange('2000-01-01', '2024-12-31', { search: 'press' });
+      rpc.calls.reset();
+
+      await service.searchRange('2000-01-01', '2024-12-31', { search: 'press' });
+
+      expect(rpc).not.toHaveBeenCalled();
+    });
+
+    // Una resposta filtrada diu qui coincideix, no qui hi ha d'haver: donar-la
+    // per completa esborraria del dispositiu tot el que no encaixés amb la
+    // cerca.
+    it('no cobreix el tram ni treu res del que ja hi havia', async () => {
+      rows = [feedRow('gener', '2024-01-05')];
+      await service.ensureRange('2024-01-01', '2024-01-31');
+
+      rows = [feedRow('vell', '2019-04-02')];
+      await service.searchRange('2000-01-01', '2024-12-31', { search: 'press' });
+
+      expect(service.workoutSummaries().map(w => w.id).sort()).toEqual(['gener', 'vell']);
+      expect(service.covers('2000-01-01', '2024-12-31')).toBeFalse();
+    });
   });
 });

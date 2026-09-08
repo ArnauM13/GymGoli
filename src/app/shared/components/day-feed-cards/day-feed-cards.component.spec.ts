@@ -40,8 +40,9 @@ describe('DayFeedCardsComponent', () => {
         { provide: WorkoutService, useValue: { startPlannedWorkout, deleteWorkout } },
         { provide: SportService, useValue: {
           updateSession, deleteSession, startPlannedSession,
-          sessions: signal([]), allSessionsLoaded: signal(false),
-          loadAllSessions: jasmine.createSpy().and.resolveTo(undefined),
+          sessions: signal([]),
+          sportHistoryLoaded: () => false,
+          loadSessionsForSport: jasmine.createSpy().and.resolveTo(undefined),
         } },
         { provide: UserSettingsService, useValue: { difficultyScale: signal('emoji'), bodyweightKg: signal(null), weightUnit: signal<'kg' | 'lb'>('kg') } },
         { provide: ExerciseService, useValue: { loadTypeOf: () => undefined, getById: () => undefined } },

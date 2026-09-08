@@ -11,6 +11,15 @@ import { FeelingLevel, PlannedSource, Workout, WorkoutStatus } from '../models/w
 /** Un tram de dies, amb els dos extrems inclosos. */
 export interface DateRange { from: string; to: string; }
 
+/** Els filtres que el servidor sap aplicar a un tram. */
+export interface FeedFilters {
+  /** Un tros de nom d'exercici. Va contra `exercise_names`, que té índex
+   *  trigram: buscar «dominades» és una consulta indexada. */
+  search?:   string;
+  /** Un tipus d'entrenament, contra `categories`. */
+  category?: string;
+}
+
 /**
  * El resultat d'una consulta de tram, per a qui hagi de treure el que ja no
  * hi és.
@@ -163,6 +172,10 @@ export class ActivityFeedService {
   /** La consulta que hi ha ara mateix en marxa, si n'hi ha cap. */
   private _inFlight: Promise<void> | null = null;
   private _lastFullRefreshAt = 0;
+  /** Cerques ja contestades i les que hi ha en marxa, per no repetir-les
+   *  mentre l'usuari escriu. */
+  private readonly _searched    = new Set<string>();
+  private readonly _searchLoads = new Map<string, Promise<void>>();
 
   /** Cada quant el refresc cobreix tot el que s'ha arribat a demanar, i no
    *  només el tram calent. Vegeu `refreshLoaded()`. */
@@ -175,6 +188,9 @@ export class ActivityFeedService {
   /** Hi ha una consulta de tram en marxa. Les seccions n'encenen el seu
    *  esquelet mentre esperen. */
   readonly loading = signal(false);
+  /** Hi ha una cerca en marxa. Separat de `loading` perquè la llista pot
+   *  ensenyar el que ja té mentre n'arriben més coincidències. */
+  readonly searching = signal(false);
 
   /** L'últim tram que ha arribat sencer. Els dos magatzems s'hi enganxen per
    *  treure el que ja no hi és al servidor. */
@@ -203,6 +219,9 @@ export class ActivityFeedService {
     this._loaded = [];
     this._inFlight = null;
     this._lastFullRefreshAt = 0;
+    this._searched.clear();
+    this._searchLoads.clear();
+    this.searching.set(false);
     this._summaries.set(new Map());
     this._sessions.set(new Map());
     this._version.update(v => v + 1);
@@ -268,6 +287,57 @@ export class ActivityFeedService {
     await this.ensureRange(from, to, true);
   }
 
+  /**
+   * Busca dins d'un tram, al servidor.
+   *
+   * És el camí de la cerca de l'historial. Amb un filtre posat, el rang es pot
+   * demanar tan ample com calgui —tota la vida de l'usuari— perquè el que
+   * torna són **només les coincidències**, i continuen sense portar cap sèrie.
+   * Abans, buscar «dominades» volia dir baixar-se tot l'historial amb totes
+   * les sèries i filtrar-lo aquí.
+   *
+   * A diferència d'`ensureRange()`, això **no cobreix** el tram: una resposta
+   * filtrada no diu qui hi ha d'haver, només qui coincideix. Per això només
+   * afegeix, no treu res ni apunta cap cobertura — donar-la per completa
+   * esborraria del dispositiu tot el que no encaixés amb la cerca.
+   */
+  async searchRange(from: string, to: string, filters: FeedFilters): Promise<void> {
+    if (!this.auth.uid() || this.offline.isOffline()) return;
+    if (!filters.search && !filters.category) return;
+
+    const key = `${from}|${to}|${filters.search ?? ''}|${filters.category ?? ''}`;
+    if (this._searched.has(key)) return;
+
+    const inFlight = this._searchLoads.get(key);
+    if (inFlight) return inFlight;
+
+    const p = this._runSearch(from, to, filters, key)
+      .finally(() => { this._searchLoads.delete(key); this.searching.set(this._searchLoads.size > 0); });
+    this._searchLoads.set(key, p);
+    this.searching.set(true);
+    return p;
+  }
+
+  private async _runSearch(from: string, to: string, filters: FeedFilters, key: string): Promise<void> {
+    const forUid = this.auth.uid();
+    const { data, error } = await this.supabase.rpc('activity_feed', {
+      p_from:       from,
+      p_to:         to,
+      p_bodyweight: this.settings.bodyweightKg(),
+      p_search:     filters.search   || null,
+      p_category:   filters.category || null,
+    });
+    if (error) return;
+    if (this.auth.uid() !== forUid) return;
+
+    const rows      = (data ?? []) as FeedRow[];
+    const summaries = new Map(this._summaries());
+    for (const r of rows) if (r.kind === 'workout') summaries.set(r.item_id, toSummary(r));
+    this._summaries.set(summaries);
+    this._searched.add(key);
+    this._version.update(v => v + 1);
+  }
+
   private async _fetch(from: string, to: string): Promise<void> {
     const since     = this.store.mark();
     const startedAt = Date.now();
@@ -280,6 +350,8 @@ export class ActivityFeedService {
       p_from:       from,
       p_to:         to,
       p_bodyweight: this.settings.bodyweightKg(),
+      p_search:     null,
+      p_category:   null,
     });
 
     // Xarxa o servidor KO: es manté el que ja teníem i el tram no consta com

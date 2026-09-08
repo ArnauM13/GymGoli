@@ -412,10 +412,13 @@ export class SportSessionComponent {
    *  així que el formulari ja t'espera obert. */
   private readonly isNew = this.route.snapshot.queryParamMap.get('nova') === '1';
 
-  /** Fals només mentre encara pot aparèixer: un cop l'historial hi és tot i la
-   *  sessió no hi és, ja no arribarà. */
-  readonly loading = computed(() =>
-    !this.pair() && (!this.sportService.allSessionsLoaded() || !this.sportService.sportsLoaded()));
+  /** Fals només mentre encara pot aparèixer: un cop s'ha preguntat per aquesta
+   *  sessió i no hi és, ja no arribarà. */
+  readonly loading = computed(() => {
+    const id = this.sessionId();
+    if (this.pair()) return false;
+    return !this.sportService.sportsLoaded() || !id || !this.sportService.sessionLookupDone(id);
+  });
 
   readonly pair = computed((): { sport: Sport; session: SportSession } | null => {
     const id = this.sessionId();
@@ -466,10 +469,13 @@ export class SportSessionComponent {
       untracked(() => this.toggleEdit(p));
     });
 
-    // La pàgina s'obre per l'URL i no sap de quin mes és la sessió: l'única
-    // manera de trobar-la sempre és tenir-les totes. El detall ja les demana
-    // per als rècords, i la crida es guarda de repetir-se.
-    this.sportService.loadAllSessions();
+    // La pàgina s'obre per l'URL i no sap de quin mes és la sessió. Abans
+    // l'única manera de trobar-la era tenir-les totes; ara es demana aquella
+    // fila, que és una consulta d'una fila.
+    effect(() => {
+      const id = this.sessionId();
+      if (id) void this.sportService.ensureSessionLoaded(id);
+    });
 
     // Si la sessió desapareix mentre la mires (l'has eliminada, o ho ha fet un
     // altre dispositiu), la pàgina no es queda buida: torna d'on venies.

@@ -521,16 +521,16 @@ describe('SportService', () => {
       expect(supabaseMock.selectCalls.some(c => c.includes('sport_id'))).toBeFalse();
     }));
 
-    // Cada senyal que canviava mentre la consulta viatjava en disparava una
-    // altra, i l'app arrencava baixant l'historial diverses vegades alhora.
-    it('dues peticions alhora de tot l\'historial són una sola consulta', fakeAsync(() => {
+    // Els rècords del detall demanen l'historial d'un esport. Desplegar-ne
+    // dues targetes alhora no pot ser dues consultes.
+    it('dues peticions alhora del mateix esport són una sola consulta', fakeAsync(() => {
       uid.set('user-1');
       TestBed.flushEffects();
       tick();
       const calls = supabaseMock.fromSpy.calls.count();
 
-      void service.loadAllSessions();
-      void service.loadAllSessions();
+      void service.loadSessionsForSport('sport-1');
+      void service.loadSessionsForSport('sport-1');
       tick();
 
       expect(supabaseMock.fromSpy.calls.count()).toBe(calls + 1);
@@ -544,7 +544,7 @@ describe('SportService', () => {
       uid.set('user-1');
       TestBed.flushEffects();
       tick();
-      void service.loadAllSessions();
+      void service.ensureMonthLoaded(2024, 2);
       tick();
 
       supabaseMock.selectCalls.length = 0;
@@ -563,7 +563,7 @@ describe('SportService', () => {
       uid.set('user-1');
       TestBed.flushEffects();
       tick();
-      void service.loadAllSessions();
+      void service.ensureMonthLoaded(2024, 2);
       tick();
       void service.refreshLoaded(true); // sembra el marcador i fa la sencera
       tick();
@@ -590,7 +590,7 @@ describe('SportService', () => {
       uid.set('user-1');
       TestBed.flushEffects();
       tick();
-      void service.loadAllSessions();
+      void service.ensureMonthLoaded(2024, 2);
       tick();
 
       supabaseMock.selectErrors['updated_at'] =
@@ -618,22 +618,22 @@ describe('SportService', () => {
     // Tombar-ho i tornar-ho a aixecar feia que els rècords del detall d'una
     // sessió es tornessin a pintar a mitges cada cop que l'app agafava el
     // focus: part de les pampallugues que es veien mentre carregava.
-    it('refrescar no tomba mai «ja tinc tot l\'historial»', fakeAsync(() => {
+    it('refrescar no tomba mai «ja tinc l\'historial d\'aquest esport»', fakeAsync(() => {
       uid.set('user-1');
       TestBed.flushEffects();
       tick();
-      void service.loadAllSessions();
+      void service.loadSessionsForSport('sport-1');
       tick();
-      expect(service.allSessionsLoaded()).toBeTrue();
+      expect(service.sportHistoryLoaded('sport-1')).toBeTrue();
 
       const seen: boolean[] = [];
-      const stop = setInterval(() => seen.push(service.allSessionsLoaded()), 1);
+      const stop = setInterval(() => seen.push(service.sportHistoryLoaded('sport-1')), 1);
       void service.refreshLoaded(true);
       tick(10);
       clearInterval(stop);
 
       expect(seen.every(v => v)).toBeTrue();
-      expect(service.allSessionsLoaded()).toBeTrue();
+      expect(service.sportHistoryLoaded('sport-1')).toBeTrue();
       discardPeriodicTasks();
     }));
   });

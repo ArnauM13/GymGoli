@@ -59,7 +59,8 @@ describe('CalendarPageComponent', () => {
       getPlannedForDate:    jasmine.createSpy().and.callFake((d: string) => plannedByDate[d] ?? []),
       todayDateString:      jasmine.createSpy().and.returnValue(TODAY),
       ensureMonthLoaded:    jasmine.createSpy().and.resolveTo(undefined),
-      loadAllWorkouts:      jasmine.createSpy().and.resolveTo(undefined),
+      searchHistory:        jasmine.createSpy().and.resolveTo(undefined),
+      isSearching:          signal(false),
       createPlannedWorkout: jasmine.createSpy().and.resolveTo('w1'),
       deleteWorkout:        jasmine.createSpy().and.resolveTo(undefined),
     };
@@ -79,7 +80,9 @@ describe('CalendarPageComponent', () => {
       getSportSessionsForDate:        jasmine.createSpy().and.callFake((d: string) => sportsByDate[d] ?? []),
       getPlannedSportSessionsForDate: jasmine.createSpy().and.returnValue([]),
       ensureMonthLoaded:              jasmine.createSpy().and.resolveTo(undefined),
-      loadAllSessions:                jasmine.createSpy().and.resolveTo(undefined),
+      // Amb una cerca activa el feed no va dia a dia: es munta des de les
+      // coincidències, que és com arriben del servidor.
+      allSportSessionPairs:           () => Object.values(sportsByDate).flat(),
       logSession:                     jasmine.createSpy().and.resolveTo(undefined),
       deleteSession:                  jasmine.createSpy().and.resolveTo(undefined),
       ensureLoaded:                   jasmine.createSpy().and.resolveTo(undefined),
@@ -283,11 +286,29 @@ describe('CalendarPageComponent', () => {
   });
 
   describe('searching', () => {
-    it('pulls the whole history in so the search is not limited to loaded months', () => {
-      const loadAll = TestBed.inject(WorkoutService).loadAllWorkouts as jasmine.Spy;
+    // Abans, buscar baixava tot l'historial amb totes les sèries i filtrava
+    // aquí. Ara la pregunta la contesta el servidor i el que viatja són només
+    // les coincidències.
+    it('pregunta al servidor, en comptes de baixar-se l\'historial', () => {
+      const search = TestBed.inject(WorkoutService).searchHistory as jasmine.Spy;
       component.searchQuery.set('banca');
       fixture.detectChanges();
-      expect(loadAll).toHaveBeenCalled();
+      expect(search).toHaveBeenCalledWith(jasmine.objectContaining({ search: 'banca' }));
+    });
+
+    it('un filtre de tipus també va al servidor', () => {
+      const search = TestBed.inject(WorkoutService).searchHistory as jasmine.Spy;
+      component.filterCat.set('push' as never);
+      fixture.detectChanges();
+      expect(search).toHaveBeenCalledWith(jasmine.objectContaining({ category: 'push' }));
+    });
+
+    // La resposta filtrada ja porta totes les coincidències de tot
+    // l'historial: no hi ha cap «mes anterior» que anar a buscar.
+    it('amb un filtre posat no ofereix carregar-ne més', () => {
+      component.searchQuery.set('banca');
+      fixture.detectChanges();
+      expect(component.hasMore()).toBeFalse();
     });
   });
 
