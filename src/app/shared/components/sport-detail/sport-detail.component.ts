@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, input } from '@angular/core';
+import { Component, booleanAttribute, computed, effect, inject, input } from '@angular/core';
 
 import { RECORD_METRICS, Sport, SportMetricDef, SportSession } from '../../../core/models/sport.model';
 import { FeelingLevel } from '../../../core/models/workout.model';
@@ -42,23 +42,23 @@ interface SportDetailRow {
   selector: 'app-sport-detail',
   standalone: true,
   template: `
-    <div class="sport-detail">
+    <div class="sport-detail" [class.sport-detail--compact]="compact()">
 
       <section class="sdv-block">
-        <span class="sdv-block-title">Sessió</span>
+        @if (!compact()) { <span class="sdv-block-title">Sessió</span> }
         @if (sessionRows().length) {
           <div class="sdv-rows">
             @for (row of sessionRows(); track row.key) {
               <div class="sdv-row" [class.sdv-row--record]="row.record">
-                <span class="material-symbols-outlined sdv-icon" aria-hidden="true">{{ row.icon }}</span>
-                <span class="sdv-label">{{ row.label }}</span>
-                <span class="sdv-value-col">
+                <div class="sdv-row-main">
+                  <span class="material-symbols-outlined sdv-icon" aria-hidden="true">{{ row.icon }}</span>
+                  <span class="sdv-label">{{ row.label }}</span>
                   <span class="sdv-value">
                     {{ row.value }}
                     @if (row.record) { <span class="sdv-record">RÈCORD</span> }
                   </span>
-                  @if (row.note; as note) { <span class="sdv-note">{{ note }}</span> }
-                </span>
+                </div>
+                @if (!compact() && row.note) { <span class="sdv-note">{{ row.note }}</span> }
               </div>
             }
           </div>
@@ -69,34 +69,36 @@ interface SportDetailRow {
 
       @if (feelingRow() || session().notes?.trim()) {
         <section class="sdv-block">
-          <span class="sdv-block-title">Com ha anat</span>
+          @if (!compact()) { <span class="sdv-block-title">Com ha anat</span> }
           @if (feelingRow(); as row) {
             <div class="sdv-rows">
               <div class="sdv-row">
-                <span class="material-symbols-outlined sdv-icon" aria-hidden="true">{{ row.icon }}</span>
-                <span class="sdv-label">{{ row.label }}</span>
-                <span class="sdv-value-col">
+                <div class="sdv-row-main">
+                  <span class="material-symbols-outlined sdv-icon" aria-hidden="true">{{ row.icon }}</span>
+                  <span class="sdv-label">{{ row.label }}</span>
                   <span class="sdv-value">{{ row.value }}</span>
-                  @if (row.note; as note) { <span class="sdv-note">{{ note }}</span> }
-                </span>
+                </div>
+                @if (!compact() && row.note) { <span class="sdv-note">{{ row.note }}</span> }
               </div>
             </div>
           }
           @if (session().notes?.trim(); as note) {
             <div class="sdv-notes">
               <span class="material-symbols-outlined" aria-hidden="true">notes</span>
-              {{ note }}
+              <span class="sdv-notes-text">{{ note }}</span>
             </div>
           }
         </section>
       }
 
-      <div class="sdv-footer">
-        @for (part of footer(); track part; let i = $index) {
-          @if (i > 0) { <span class="sdvf-sep" aria-hidden="true">·</span> }
-          <span>{{ part }}</span>
-        }
-      </div>
+      @if (!compact()) {
+        <div class="sdv-footer">
+          @for (part of footer(); track part; let i = $index) {
+            @if (i > 0) { <span class="sdvf-sep" aria-hidden="true">·</span> }
+            <span>{{ part }}</span>
+          }
+        </div>
+      }
     </div>
   `,
   styles: [`
@@ -114,13 +116,17 @@ interface SportDetailRow {
     }
 
     .sdv-rows { display: flex; flex-direction: column; gap: 2px; }
-    /* Etiqueta a l'esquerra i valor a la dreta: la columna de valors queda
-       alineada i la sessió es llegeix d'una passada vertical. */
+    /* La fila és una columna: a dalt la dada (etiqueta a l'esquerra, xifra a
+       la dreta) i, si n'hi ha, el context a sota. Abans el context anava dins
+       la columna del valor i li estirava l'alçada, així que la fila deixava
+       d'estar alineada amb les del costat i el comentari es llegia com un
+       tros del número. */
     .sdv-row {
-      display: flex; align-items: baseline; gap: 7px;
+      display: flex; flex-direction: column; gap: 3px;
       padding: 5px 6px; border-radius: 7px; transition: background 0.15s;
       &:nth-child(odd) { background: color-mix(in srgb, var(--ac, var(--c-subtle)) 5%, var(--c-subtle)); }
     }
+    .sdv-row-main { display: flex; align-items: center; gap: 7px; min-height: 20px; }
     /* La fila d'una millor marca es tenyeix del color de l'esport, com la
        sèrie més pesada d'un entrenament. */
     .sdv-row--record {
@@ -129,19 +135,16 @@ interface SportDetailRow {
       .sdv-value { color: color-mix(in srgb, var(--ac, var(--c-brand)) 75%, var(--c-text)); }
     }
     .sdv-icon {
-      flex-shrink: 0; align-self: center; font-size: 14px;
+      flex-shrink: 0; font-size: 14px;
       color: color-mix(in srgb, var(--ac, var(--c-text-3)) 60%, var(--c-text-3));
     }
     .sdv-label {
       flex: 1; min-width: 0; font-size: 12px; font-weight: 600; color: var(--c-text-2);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .sdv-value-col {
-      flex-shrink: 0; max-width: 62%;
-      display: flex; flex-direction: column; align-items: flex-end; gap: 1px;
-    }
     .sdv-value {
-      display: inline-flex; align-items: baseline; gap: 5px; text-align: right;
+      flex-shrink: 0; max-width: 62%;
+      display: inline-flex; align-items: center; gap: 5px; text-align: right;
       font-size: 13px; font-weight: 700; color: var(--c-text); line-height: 1.3;
     }
     .sdv-record {
@@ -149,16 +152,31 @@ interface SportDetailRow {
       font-size: 9px; font-weight: 800; letter-spacing: 0.3px;
       color: #b88500; background: rgba(255, 193, 7, 0.18);
     }
-    /* El context va sota el valor i en veu baixa: hi és per a qui s'hi fixa,
-       no per competir amb la xifra. */
-    .sdv-note { font-size: 10.5px; font-weight: 600; color: var(--c-text-3); line-height: 1.3; }
+    /* El context és un subcomentari de la dada: línia pròpia, sagnat sota
+       l'etiqueta i amb un filet a l'esquerra que diu de qui penja. */
+    .sdv-note {
+      margin-left: 21px; padding: 1px 0 1px 8px;
+      border-left: 2px solid color-mix(in srgb, var(--ac, var(--c-border)) 40%, var(--c-border-2));
+      font-size: 11px; font-weight: 600; color: var(--c-text-3); line-height: 1.45;
+    }
     .sdv-none { padding-left: 6px; font-size: 12px; color: var(--c-text-3); font-style: italic; }
 
+    /* El comentari de la sessió, amb la mateixa forma de subcomentari que les
+       notes de context: filet a l'esquerra i veu baixa. */
     .sdv-notes {
-      display: flex; align-items: flex-start; gap: 6px;
+      display: flex; align-items: flex-start; gap: 7px;
       padding: 8px 10px; border-radius: 8px; background: var(--c-subtle);
-      font-size: 12px; color: var(--c-text-2); font-style: italic; line-height: 1.4;
+      border-left: 3px solid color-mix(in srgb, var(--ac, var(--c-border)) 45%, var(--c-border-2));
+      font-size: 12px; color: var(--c-text-2); line-height: 1.45;
       .material-symbols-outlined { font-size: 15px; color: var(--c-text-3); flex-shrink: 0; margin-top: 1px; }
+    }
+    .sdv-notes-text { flex: 1; min-width: 0; font-style: italic; overflow-wrap: anywhere; }
+
+    /* Plegat dins una targeta del feed el detall només diu les dades: ni
+       titolets, ni context, ni peu — allò ja té la seva pàgina. */
+    .sport-detail--compact {
+      gap: 8px; padding: 8px 12px 10px 14px;
+      .sdv-block { gap: 4px; }
     }
 
     .sdv-footer {
@@ -174,6 +192,12 @@ export class SportDetailComponent {
 
   readonly sport   = input.required<Sport>();
   readonly session = input.required<SportSession>();
+
+  /** Plegat dins una targeta del feed: només les dades de la sessió, sense
+   *  titolets, ni el context de l'historial, ni el peu. El desplegable és una
+   *  ullada al que ja diu la targeta; qui vulgui la lectura sencera obre la
+   *  sessió. */
+  readonly compact = input(false, { transform: booleanAttribute });
 
   constructor() {
     // El detall només es dibuixa quan algú desplega la targeta, i llavors sí

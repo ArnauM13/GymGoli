@@ -179,7 +179,7 @@ export interface DayFeedEntry {
         </div>
 
         @if (expandedSportId() === item.session.id) {
-          <app-sport-detail [sport]="item.sport" [session]="item.session" />
+          <app-sport-detail [sport]="item.sport" [session]="item.session" compact />
           <div class="ac-detail-actions">
             <button class="ac-open-btn" (click)="openSport.emit(item)">
               <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>

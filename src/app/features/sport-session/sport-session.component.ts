@@ -57,32 +57,40 @@ import { feedDayLabel, formatFeeling } from '../../shared/utils/workout-card.uti
           }
         </div>
 
-        <!-- Un pla del dia d'avui o d'abans encara es pot donar per fet tal com
-             estava previst, sense passar pel formulari. -->
-        @if (isPlanned() && p.session.date <= today()) {
-          <button class="register-btn" [disabled]="saving()" (click)="registerPlan(p)">
-            <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
-            Registrar la sessió
+        <!-- ── Llegir ──
+             Mentre s'edita res d'això no hi és: la sessió i el formulari deien
+             el mateix dues vegades i el que es tocava quedava a mitja pantalla
+             del que es llegia. -->
+        @if (!editOpen()) {
+
+          <!-- Un pla del dia d'avui o d'abans encara es pot donar per fet tal com
+               estava previst, sense passar pel formulari. -->
+          @if (isPlanned() && p.session.date <= today()) {
+            <button class="register-btn" [disabled]="saving()" (click)="registerPlan(p)">
+              <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
+              Registrar la sessió
+            </button>
+          }
+
+          <div class="detail-card">
+            <app-sport-detail [sport]="p.sport" [session]="p.session" />
+          </div>
+
+          <button class="edit-btn" (click)="openEdit(p)">
+            <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+            Editar la sessió
           </button>
-        }
 
-        <div class="detail-card">
-          <app-sport-detail [sport]="p.sport" [session]="p.session" />
-        </div>
+        } @else {
 
-        <!-- ── Editar ──
-             Plegada de sèrie: la pàgina és per llegir la sessió, i el
-             formulari només s'obre si vas a canviar-hi res. -->
-        <div class="card-section edit-card" [class.edit-card--open]="editOpen()">
-          <h2 class="section-heading">
-            <button class="section-header" (click)="toggleEdit(p)" [attr.aria-expanded]="editOpen()">
+          <!-- ── Editar ──
+               Un cop obert, el formulari és l'única cosa a la pàgina. -->
+          <div class="card-section edit-card">
+            <h2 class="section-heading">
               <span class="material-symbols-outlined section-icon" aria-hidden="true">edit_note</span>
               <span class="section-title">Editar la sessió</span>
-              <span class="material-symbols-outlined section-chevron" aria-hidden="true">expand_more</span>
-            </button>
-          </h2>
+            </h2>
 
-          @if (editOpen()) {
             <div class="edit-body">
 
               <div class="sl-field">
@@ -170,8 +178,9 @@ import { feedDayLabel, formatFeeling } from '../../shared/utils/workout-card.uti
                 </div>
               </div>
             </div>
-          }
-        </div>
+          </div>
+
+        }
 
       } @else if (loading()) {
 
@@ -195,7 +204,10 @@ import { feedDayLabel, formatFeeling } from '../../shared/utils/workout-card.uti
     </div>
   `,
   styles: [`
-    .page { padding: 0 0 24px; }
+    /* La nav flota per damunt del contingut: el peu de la pàgina li deixa
+       l'espai perquè els botons de baix (Guardar, Eliminar) no hi quedin
+       xafats a sota. */
+    .page { padding: 0 0 88px; }
 
     /* ── Capçalera de la sessió ──
        La targeta és la compartida (.activity-hero, a styles.scss), la mateixa
@@ -228,24 +240,32 @@ import { feedDayLabel, formatFeeling } from '../../shared/utils/workout-card.uti
       border: 1.5px solid var(--c-border-2); box-shadow: 0 2px 10px var(--c-shadow);
     }
 
-    /* ── Secció d'edició (plegable) ── */
+    /* ── Passar a editar ──
+       La pàgina és per llegir la sessió; el formulari s'obre quan el demanes,
+       i llavors ocupa la pàgina ell sol. */
+    .edit-btn {
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+      width: calc(100% - 32px); box-sizing: border-box;
+      margin: 12px 16px 0; padding: 12px; border-radius: 14px;
+      border: 1.5px solid var(--c-border); background: var(--c-card);
+      font-size: 14px; font-weight: 700; color: var(--c-text-2);
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 19px; }
+      &:hover { border-color: var(--c-brand); color: var(--c-brand); }
+      &:active { transform: scale(0.99); }
+    }
+
+    /* ── Secció d'edició ── */
     .card-section {
-      margin: 12px 16px 0; padding: 14px;
+      margin: 12px 16px 0; padding: 14px 14px 16px;
       background: var(--c-card); border-radius: 18px;
       box-shadow: 0 2px 10px var(--c-shadow);
     }
-    .edit-card--open { padding-bottom: 16px; }
-    .section-heading { margin: 0; }
-    .section-header {
-      display: flex; align-items: center; gap: 7px;
-      width: 100%; padding: 0; border: none; background: none;
-      text-align: left; font: inherit;
-      cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+    .section-heading {
+      display: flex; align-items: center; gap: 7px; margin: 0;
     }
     .section-icon  { font-size: 18px; color: var(--c-text-3); font-variation-settings: 'FILL' 0, 'wght' 300; }
     .section-title { margin: 0; flex: 1; font-size: 14px; font-weight: 700; color: var(--c-text-2); letter-spacing: 0.2px; }
-    .section-chevron { font-size: 20px; color: var(--c-text-3); flex-shrink: 0; transition: transform 0.2s; }
-    .edit-card--open .section-chevron { transform: rotate(180deg); }
 
     .edit-body { padding-top: 4px; animation: section-open 0.18s ease-out; }
     @keyframes section-open {
@@ -254,7 +274,6 @@ import { feedDayLabel, formatFeeling } from '../../shared/utils/workout-card.uti
     }
     @media (prefers-reduced-motion: reduce) {
       .edit-body { animation: none; }
-      .section-chevron { transition: none; }
     }
 
     /* ── Camps del formulari ── */
@@ -439,7 +458,7 @@ export class SportSessionComponent {
       const p = this.pair();
       if (!p || !this.isNew || openedForNew) return;
       openedForNew = true;
-      untracked(() => this.toggleEdit(p));
+      untracked(() => this.openEdit(p));
     });
 
     // La pàgina s'obre per l'URL i no sap de quin mes és la sessió. Abans
@@ -465,9 +484,8 @@ export class SportSessionComponent {
   }
 
   /** Obrir el formulari el carrega amb el que la sessió ja porta; tancar-lo
-   *  llença els canvis sense guardar. */
-  toggleEdit(p: { sport: Sport; session: SportSession }): void {
-    if (this.editOpen()) { this.editOpen.set(false); return; }
+   *  (Cancel·lar) llença els canvis sense guardar. */
+  openEdit(p: { sport: Sport; session: SportSession }): void {
     this.editDuration.set(p.session.duration ?? 60);
     this.editSubtype.set(p.session.subtypeId ?? null);
     this.editFeeling.set(p.session.feeling ?? null);
