@@ -7,6 +7,7 @@ import { Subject } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 
 import { TrainComponent } from './train.component';
+import { ActivityCardComponent } from '../../shared/components/activity-card/activity-card.component';
 import { WorkoutService } from '../../core/services/workout.service';
 import { SportService } from '../../core/services/sport.service';
 import { ExerciseService } from '../../core/services/exercise.service';
@@ -124,7 +125,9 @@ describe('TrainComponent', () => {
       ],
     })
       .overrideComponent(TrainComponent, {
-        set: { imports: [LowerCasePipe], schemas: [NO_ERRORS_SCHEMA] },
+        // La targeta de dalt és la compartida i és el que aquests tests
+        // miren, així que es queda de debò; la resta de fills, esquemàtics.
+        set: { imports: [LowerCasePipe, ActivityCardComponent], schemas: [NO_ERRORS_SCHEMA] },
       })
       .compileComponents();
 
@@ -232,7 +235,7 @@ describe('TrainComponent', () => {
       return fixture.nativeElement as HTMLElement;
     }
 
-    it('diu què és, quan i quantes sèries portes', () => {
+    it('diu què és i quantes sèries portes, amb la targeta del feed', () => {
       const el = openWith(makeWorkout({
         id: 'abc', date: TODAY, categories: ['push'],
         entries: [{ exerciseId: 'e1', exerciseName: 'Press banca', sets: [{ weight: 60, reps: 10 }] }],
@@ -241,20 +244,77 @@ describe('TrainComponent', () => {
       const hero = el.querySelector('.aw-hero') as HTMLElement;
       expect(hero).toBeTruthy();
       expect(hero.querySelector('app-activity-icon')).toBeTruthy();
+      expect(hero.querySelector('.act-card')).toBeTruthy();
       expect(hero.textContent).toContain('Empenta');
-      expect(hero.textContent).toContain('Avui');
       expect(hero.textContent).toContain('1');
+    });
+
+    it('la data la diu la capçalera, no la targeta', () => {
+      const el = openWith(makeWorkout({ id: 'abc', date: TODAY, categories: ['push'] }));
+
+      expect(el.querySelector('.aw-date-sub')?.textContent).toContain('Avui');
+      expect((el.querySelector('.aw-hero') as HTMLElement).textContent).not.toContain('Avui');
     });
 
     it('un pla es veu com a pla i encara no té xifres', () => {
       const el = openWith(makeWorkout({ id: 'abc', date: TODAY, status: 'planned', categories: ['push'] }));
 
       const hero = el.querySelector('.aw-hero') as HTMLElement;
-      expect(hero.classList).toContain('activity-hero--planned');
+      expect(hero.querySelector('.act-card')?.classList).toContain('act-card--planned');
       expect(hero.textContent).toContain('Planificat');
       expect(hero.textContent).not.toContain('exerc');
       // La sensació espera que l'entrenament s'hagi fet.
       expect(hero.querySelector('.aw-feeling-btn')).toBeNull();
+    });
+  });
+
+  // Un entrenament d'un dia passat s'obre per llegir-lo, com una sessió
+  // d'esport; el d'avui s'obre per fer-lo.
+  describe('llegir o editar en obrir un entrenament', () => {
+    function open(w: Workout): HTMLElement {
+      const workoutService = TestBed.inject(WorkoutService) as unknown as { workouts: ReturnType<typeof signal<Workout[]>> };
+      workoutService.workouts.set([w]);
+      component.openWorkout(w.id);
+      fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    it("el d'avui cau de dret a l'editor", () => {
+      const el = open(makeWorkout({ id: 'today', date: TODAY, categories: ['push'] }));
+      expect(component.editing()).toBeTrue();
+      expect(el.querySelector('.edit-btn')).toBeNull();
+    });
+
+    it("un de passat s'obre a l'esquema, amb el botó d'editar", () => {
+      const el = open(makeWorkout({ id: 'old', date: '2024-03-05', categories: ['push'] }));
+      expect(component.editing()).toBeFalse();
+      expect(el.querySelector('app-workout-detail')).toBeTruthy();
+      expect(el.querySelector('.edit-btn')).toBeTruthy();
+    });
+
+    it('i llavors es toca com el d\'avui: tot editable', () => {
+      open(makeWorkout({ id: 'old', date: '2024-03-05', categories: ['push'] }));
+      component.startEditing();
+      fixture.detectChanges();
+
+      expect(component.editing()).toBeTrue();
+      expect((fixture.nativeElement as HTMLElement).querySelector('.edit-btn')).toBeNull();
+    });
+
+    it('un de passat acabat de crear ja ve obert per omplir-lo', () => {
+      open(makeWorkout({ id: 'old', date: '2024-03-05', categories: ['push'] }));
+      component.openWorkout('old', { edit: true });
+      expect(component.editing()).toBeTrue();
+    });
+
+    it('tancar-lo oblida que se n\'havia demanat l\'edició', () => {
+      open(makeWorkout({ id: 'old', date: '2024-03-05', categories: ['push'] }));
+      component.startEditing();
+      component.closeWorkout();
+      component.openWorkout('old');
+      fixture.detectChanges();
+
+      expect(component.editing()).toBeFalse();
     });
   });
 

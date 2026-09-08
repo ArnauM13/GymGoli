@@ -109,8 +109,11 @@ describe('SportSessionComponent', () => {
 
     const el = fixture.nativeElement as HTMLElement;
     expect(component.pair()?.session.id).toBe('sess1');
-    expect(el.querySelector('.ah-title')?.textContent?.trim()).toBe('Pàdel');
-    expect(el.querySelector('.ss-subtype')?.textContent?.trim()).toBe('Dobles');
+    // La targeta és la compartida amb el feed (`app-activity-card`).
+    expect(el.querySelector('.ac-title')?.textContent?.trim()).toBe('Pàdel');
+    expect(el.querySelector('.ac-subtype')?.textContent?.trim()).toBe('Dobles');
+    // El dia el diu la capçalera, no la targeta.
+    expect(el.querySelector('.ph-sub')?.textContent?.trim()).toBeTruthy();
   });
 
   // Abans, l'única manera de trobar-la era tenir-les totes. Ara es demana

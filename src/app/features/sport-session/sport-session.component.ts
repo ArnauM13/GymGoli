@@ -8,13 +8,13 @@ import { FeelingLevel } from '../../core/models/workout.model';
 import { SportService } from '../../core/services/sport.service';
 import { TodayService } from '../../core/services/today.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
-import { ActivityIconComponent } from '../../shared/components/activity-icon/activity-icon.component';
+import { ActivityCardComponent } from '../../shared/components/activity-card/activity-card.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { SportDetailComponent } from '../../shared/components/sport-detail/sport-detail.component';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { NavigationHistoryService } from '../../core/services/navigation-history.service';
-import { feedDayLabel, formatFeeling } from '../../shared/utils/workout-card.utils';
+import { ActivityStat, feedDayLabel, formatFeeling, sportCardStats } from '../../shared/utils/workout-card.utils';
 
 /**
  * Una sessió d'esport, a la seva pàgina.
@@ -28,34 +28,25 @@ import { feedDayLabel, formatFeeling } from '../../shared/utils/workout-card.uti
 @Component({
   selector: 'app-sport-session',
   standalone: true,
-  imports: [ActivityIconComponent, PageHeaderComponent, SportDetailComponent],
+  imports: [ActivityCardComponent, PageHeaderComponent, SportDetailComponent],
   template: `
     <div class="page">
 
       @if (pair(); as p) {
 
-        <app-page-header [title]="p.sport.name" [showBack]="true" backFallback="/home" />
+        <app-page-header [title]="p.sport.name" [subtitle]="dateLabel()"
+                         [showBack]="true" backFallback="/home" />
 
-        <!-- ── Qui, quan i com ha anat ── -->
-        <div class="activity-hero" [class.activity-hero--planned]="isPlanned()" [style.--ac]="p.sport.color">
-          <span class="ah-bar" aria-hidden="true"></span>
-          <app-activity-icon [icon]="p.sport.icon" [color]="p.sport.color" mascot="xoco" />
-          <div class="ah-text">
-            <div class="ah-title-row">
-              <span class="ah-title">{{ p.sport.name }}</span>
-              @if (subtypeName(); as sub) { <span class="ss-subtype">{{ sub }}</span> }
-            </div>
-            <span class="ah-date">{{ dateLabel() }}</span>
-          </div>
-          @if (isPlanned()) {
-            <span class="ah-pill">
-              <span class="material-symbols-outlined" aria-hidden="true">event_upcoming</span>
-              Planificat
-            </span>
-          } @else if (p.session.feeling) {
-            <span class="ah-feeling">{{ emojiOf(p.session.feeling) }}</span>
-          }
-        </div>
+        <!-- ── Què és i com ha anat ──
+             La targeta compartida, la mateixa que al feed: qui, les xifres
+             d'un cop d'ull i la sensació. El dia el diu la capçalera d'aquí
+             sobre, com a la pàgina d'un entrenament. -->
+        <app-activity-card class="ss-hero"
+            [accent]="p.sport.color" [icon]="p.sport.icon" mascot="xoco"
+            [title]="p.sport.name" [subtype]="subtypeName()"
+            [note]="p.session.notes ?? ''" [stats]="sessionStats(p)"
+            [feeling]="p.session.feeling ? emojiOf(p.session.feeling) : ''"
+            [planned]="isPlanned()" plannedPill />
 
         <!-- ── Llegir ──
              Mentre s'edita res d'això no hi és: la sessió i el formulari deien
@@ -210,15 +201,9 @@ import { feedDayLabel, formatFeeling } from '../../shared/utils/workout-card.uti
     .page { padding: 0 0 88px; }
 
     /* ── Capçalera de la sessió ──
-       La targeta és la compartida (.activity-hero, a styles.scss), la mateixa
-       que corona un entrenament. D'aquí només és el subtipus, que un
-       entrenament no té. */
-    .ss-subtype {
-      flex-shrink: 0; padding: 1px 8px; border-radius: 8px;
-      background: color-mix(in srgb, var(--ac) 14%, transparent);
-      color: color-mix(in srgb, var(--ac) 65%, var(--c-text));
-      font-size: 11px; font-weight: 700; line-height: 1.5;
-    }
+       La targeta és la compartida (app-activity-card), la mateixa que al feed
+       i la que corona un entrenament. D'aquí només és on es posa. */
+    .ss-hero { display: block; margin: 4px 16px 0; }
 
     /* ── Registrar un pla que ja toca ── */
     .register-btn {
@@ -481,6 +466,12 @@ export class SportSessionComponent {
 
   emojiOf(level: FeelingLevel): string {
     return formatFeeling(level, this.settingsService.difficultyScale());
+  }
+
+  /** Les xifres de la targeta: la durada i la mètrica que més diu d'aquest
+   *  esport, les mateixes que al feed. La resta són a sota, al detall. */
+  sessionStats(p: { sport: Sport; session: SportSession }): ActivityStat[] {
+    return sportCardStats(p.session, p.sport);
   }
 
   /** Obrir el formulari el carrega amb el que la sessió ja porta; tancar-lo

@@ -46,28 +46,31 @@ interface SportDetailRow {
 
       <section class="sdv-block">
         @if (!compact()) { <span class="sdv-block-title">Sessió</span> }
-        @if (sessionRows().length) {
+        @if (visibleRows().length) {
           <div class="sdv-rows">
-            @for (row of sessionRows(); track row.key) {
-              <div class="sdv-row" [class.sdv-row--record]="row.record">
+            @for (row of visibleRows(); track row.key) {
+              <div class="sdv-row" [class.sdv-row--record]="!compact() && row.record">
                 <div class="sdv-row-main">
                   <span class="material-symbols-outlined sdv-icon" aria-hidden="true">{{ row.icon }}</span>
                   <span class="sdv-label">{{ row.label }}</span>
                   <span class="sdv-value">
                     {{ row.value }}
-                    @if (row.record) { <span class="sdv-record">RÈCORD</span> }
+                    @if (!compact() && row.record) { <span class="sdv-record">RÈCORD</span> }
                   </span>
                 </div>
                 @if (!compact() && row.note) { <span class="sdv-note">{{ row.note }}</span> }
               </div>
             }
           </div>
+          @if (hiddenRowCount(); as more) {
+            <span class="sdv-more">+{{ more }} dada{{ more === 1 ? '' : 'es' }} més</span>
+          }
         } @else {
           <span class="sdv-none">Cap dada registrada</span>
         }
       </section>
 
-      @if (feelingRow() || session().notes?.trim()) {
+      @if (!compact() && (feelingRow() || session().notes?.trim())) {
         <section class="sdv-block">
           @if (!compact()) { <span class="sdv-block-title">Com ha anat</span> }
           @if (feelingRow(); as row) {
@@ -172,8 +175,16 @@ interface SportDetailRow {
     }
     .sdv-notes-text { flex: 1; min-width: 0; font-style: italic; overflow-wrap: anywhere; }
 
-    /* Plegat dins una targeta del feed el detall només diu les dades: ni
-       titolets, ni context, ni peu — allò ja té la seva pàgina. */
+    /* El que no hi cap, comptat: la ullada diu quantes dades s'ha deixat i
+       la pàgina de la sessió les diu totes. */
+    .sdv-more {
+      padding-left: 6px; font-size: 11px; font-weight: 600; color: var(--c-text-3);
+    }
+
+    /* Plegat dins una targeta del feed el detall és una ullada: només les
+       primeres dades de la sessió, sense titolets, ni rècords, ni context, ni
+       la sensació i la nota (que ja són a la targeta), ni peu. Tot això té la
+       seva pàgina, que és on s'hi entra a fons. */
     .sport-detail--compact {
       gap: 8px; padding: 8px 12px 10px 14px;
       .sdv-block { gap: 4px; }
@@ -193,11 +204,23 @@ export class SportDetailComponent {
   readonly sport   = input.required<Sport>();
   readonly session = input.required<SportSession>();
 
-  /** Plegat dins una targeta del feed: només les dades de la sessió, sense
-   *  titolets, ni el context de l'historial, ni el peu. El desplegable és una
-   *  ullada al que ja diu la targeta; qui vulgui la lectura sencera obre la
-   *  sessió. */
+  /** Plegat dins una targeta del feed: només les primeres dades de la sessió,
+   *  sense titolets, ni rècords, ni el context de l'historial, ni el peu. El
+   *  desplegable és una ullada al que ja diu la targeta; qui vulgui la
+   *  lectura sencera obre la sessió. És la mateixa regla que a
+   *  `app-workout-detail`: una activitat es llegeix igual sigui del gimnàs o
+   *  d'un esport. */
   readonly compact = input(false, { transform: booleanAttribute });
+
+  /** Quantes dades caben a una ullada abans que el desplegable deixi de
+   *  ser-ho. La mateixa xifra per a un entrenament i per a un esport. */
+  static readonly COMPACT_ROWS = 5;
+
+  /** Les dades que es pinten: totes a la pàgina, les primeres al desplegable. */
+  readonly visibleRows = computed((): SportDetailRow[] =>
+    this.compact() ? this.sessionRows().slice(0, SportDetailComponent.COMPACT_ROWS) : this.sessionRows());
+
+  readonly hiddenRowCount = computed(() => this.sessionRows().length - this.visibleRows().length);
 
   constructor() {
     // El detall només es dibuixa quan algú desplega la targeta, i llavors sí
