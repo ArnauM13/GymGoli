@@ -28,6 +28,8 @@ describe('SportService', () => {
   let sportsData: Record<string, unknown>[];
   let sessionsData: Record<string, unknown>[];
   let insertShouldFail: boolean;
+  /** Fa que la consulta per trams contesti error, com la xarxa caiguda. */
+  let rpcShouldFail: boolean;
   /** Quant triga el servidor a contestar una escriptura. La finestra que obre
    *  aquesta espera és on es poden perdre canvis fets mentrestant. */
   let writeDelayMs: number;
@@ -103,9 +105,39 @@ describe('SportService', () => {
       return { select: (cols?: string) => selectChain(() => [], cols), ...writers };
     });
 
+    // `activity_feed`: la consulta per trams, que ara és per on arriben les
+    // sessions d'un mes. Contesta amb les mateixes `sessionsData` que la
+    // taula, en la forma que torna l'endpoint, així els tests continuen
+    // preparant les dades en un sol lloc.
+    const rpcSpy = jasmine.createSpy('rpc').and.callFake(
+      (fn: string, args: { p_from: string; p_to: string }) => {
+        if (fn !== 'activity_feed') return Promise.resolve({ data: [], error: null });
+        if (rpcShouldFail) return Promise.resolve({ data: null, error: new Error('network error') });
+        const rows = sessionsData
+          .filter(r => (r['date'] as string) >= args.p_from && (r['date'] as string) <= args.p_to)
+          .map(r => ({
+            kind: 'sport',
+            item_id:     r['id'],
+            item_date:   r['date'],
+            item_status: r['status'] ?? 'done',
+            planned_source: r['planned_source'] ?? null,
+            feeling:     r['feeling'] ?? null,
+            notes:       r['notes'] ?? null,
+            created_at:  r['created_at'] ?? `${r['date'] as string}T08:00:00.000Z`,
+            updated_at:  r['updated_at'] ?? null,
+            category: null, categories: null, exercise_names: null,
+            exercise_count: null, set_count: null, warmup_count: null, volume: null,
+            sport_id:   r['sport_id'],
+            subtype_id: r['subtype_id'] ?? null,
+            duration:   r['duration'] ?? null,
+            metrics:    r['metrics'] ?? null,
+          }));
+        return Promise.resolve({ data: rows, error: null });
+      });
+
     return {
-      client: { from: fromSpy }, fromSpy, insertSpy, upsertSpy, updateSpy, deleteSpy,
-      selectCalls, filterCalls, selectErrors,
+      client: { from: fromSpy, rpc: rpcSpy }, fromSpy, insertSpy, upsertSpy, updateSpy, deleteSpy,
+      rpcSpy, selectCalls, filterCalls, selectErrors,
     };
   }
 
@@ -115,6 +147,7 @@ describe('SportService', () => {
     sportsData = [sportRow()];
     sessionsData = [];
     insertShouldFail = false;
+    rpcShouldFail = false;
     writeDelayMs = 0;
     supabaseMock = buildMock();
 
@@ -401,7 +434,10 @@ describe('SportService', () => {
   // el servidor ja no retornava es quedava enganxat: dos dispositius podien
   // ensenyar coses diferents tot el dia.
   describe('sincronització entre dispositius', () => {
-    it('torna a demanar els mesos carregats i treu el que ja no hi és', fakeAsync(() => {
+    // Una resposta de tram cobreix el tram sencer, o sigui que diu qui hi ha
+    // de ser: és l'única cosa que veu un esborrat fet des d'un altre lloc,
+    // perquè una fila esborrada no surt a cap consulta de canvis.
+    it('torna a demanar el tram carregat i treu el que ja no hi és', fakeAsync(() => {
       uid.set('user-1');
       TestBed.flushEffects();
       tick();
@@ -409,11 +445,13 @@ describe('SportService', () => {
       sessionsData = [sessionRow('s1', '2024-03-06')];
       void service.ensureMonthLoaded(2024, 2);
       tick();
+      TestBed.flushEffects();
       expect(service.sessions().some(s => s.id === 's1')).toBeTrue();
 
       sessionsData = []; // esborrada des d'un altre dispositiu
-      void service.refreshLoaded(true);
+      void service.ensureMonthLoaded(2024, 2, true);
       tick();
+      TestBed.flushEffects();
 
       expect(service.sessions().some(s => s.id === 's1')).toBeFalse();
     }));
@@ -459,13 +497,28 @@ describe('SportService', () => {
       uid.set('user-1');
       TestBed.flushEffects();
       tick();
-      const calls = supabaseMock.fromSpy.calls.count();
+      const calls = supabaseMock.rpcSpy.calls.count();
 
       void service.ensureMonthLoaded(2024, 2);
       void service.ensureMonthLoaded(2024, 2);
       tick();
 
-      expect(supabaseMock.fromSpy.calls.count()).toBe(calls + 1);
+      expect(supabaseMock.rpcSpy.calls.count()).toBe(calls + 1);
+    }));
+
+    // Un mes d'esports ja no és cap consulta pròpia: va amb la mateixa
+    // resposta que els entrenaments. Abans eren dues peticions per mes
+    // visible, una per taula.
+    it('un mes no fa cap consulta a la taula de sessions', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+      supabaseMock.selectCalls.length = 0;
+
+      void service.ensureMonthLoaded(2024, 2);
+      tick();
+
+      expect(supabaseMock.selectCalls.some(c => c.includes('sport_id'))).toBeFalse();
     }));
 
     // Cada senyal que canviava mentre la consulta viatjava en disparava una
@@ -547,9 +600,11 @@ describe('SportService', () => {
       void service.refreshLoaded(true);
       tick();
 
-      // Torna a la comprovació sencera de sempre, i l'historial hi continua.
-      expect(supabaseMock.selectCalls.some(c => c.includes('sport_id'))).toBeTrue();
-      expect(service.allSessionsLoaded()).toBeTrue();
+      // Sense consulta de canvis, qui porta les dades és el tram — que no
+      // depèn de cap columna que la migració pugui no haver creat.
+      void service.ensureMonthLoaded(2024, 2, true);
+      tick();
+      TestBed.flushEffects();
       expect(service.sessions().length).toBe(1);
 
       // I no hi torna: un cop sap que la columna no hi és, ja no la demana.

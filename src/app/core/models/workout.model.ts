@@ -137,6 +137,24 @@ export interface Workout {
    *  servidor. És el que permet buscar dins una sessió que encara no s'ha
    *  baixat sencera. */
   exerciseNames?: string;
+  /**
+   * Les xifres de la targeta, comptades pel servidor (`activity_feed`).
+   *
+   * Hi són perquè una targeta plegada es pugui pintar sencera sense baixar-se
+   * cap sèrie: abans, per ensenyar «6 exerc · 21 sèr · 4.2t» calia el `jsonb`
+   * complet de la sessió — cada pes, cada repetició i cada nota — i era el
+   * gruix del que viatjava en obrir l'app.
+   *
+   * Quan la sessió porta les entrades senceres no s'hi mira: es compten les
+   * de debò, que són les que l'usuari acaba de tocar i encara no ha pujat.
+   * Vegeu `workoutSetsCount()` i companyia a `shared/utils/workout-card.utils`.
+   */
+  exerciseCount?: number;
+  setCount?:      number;
+  warmupCount?:   number;
+  /** Volum en kg, ja amb el pes corporal i el tipus de càrrega aplicats — la
+   *  mateixa matemàtica que `workoutVolume()`, feta al servidor. */
+  volume?: number;
 }
 
 /** Cert si la sessió porta les sèries; fals si només se n'ha demanat el

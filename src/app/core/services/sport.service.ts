@@ -1,5 +1,6 @@
-import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 
+import { ActivityFeedService, FeedScope } from './activity-feed.service';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { TodayService } from './today.service';
@@ -81,6 +82,10 @@ export class SportService {
   private supabase = inject(SupabaseService).client;
   private auth     = inject(AuthService);
   private today    = inject(TodayService);
+  /** Les sessions per tram arriben de la mateixa crida que els entrenaments.
+   *  Vegeu `ActivityFeedService`: demanar un mes d'esports ja no és cap
+   *  petició — el tram que el calendari o Inici ja han demanat el porta. */
+  private activityFeed = inject(ActivityFeedService);
 
   /** Igual que a WorkoutService: avui es mira, no es recorda. */
   private get _todayStr(): string { return this.today.today(); }
@@ -90,6 +95,8 @@ export class SportService {
   readonly sports  = this._sports.asReadonly();
   readonly isLoaded = signal(false);
   private _loadPromise: Promise<void> | null = null;
+  /** La consulta del catàleg d'esports que hi ha ara mateix en marxa. */
+  private _sportsLoad: Promise<void> | null = null;
 
   // ── Sessions cache ────────────────────────────────────────────────────────
   private readonly _monthCache = new Map<string, SportSession[]>();
@@ -97,7 +104,6 @@ export class SportService {
    *  vol dir tenir-les totes. */
   private readonly _fullMonths = new Set<string>();
   /** Peticions de mes en marxa, per no demanar-lo dos cops alhora. */
-  private readonly _monthLoads = new Map<string, Promise<void>>();
   private readonly _sessions   = signal<SportSession[]>([]);
   /** Senyal, i no un booleà a seques, perquè qui depèn de tenir *tot*
    *  l'historial a mà (els rècords del detall d'una sessió) se n'assabenti
@@ -114,7 +120,6 @@ export class SportService {
    *  una resposta, no l'hora d'aquest dispositiu (vegeu `_pullChanges()`). */
   private _lastPulledAt: string | null = null;
   private _pulledOnce = false;
-  private _lastFullPullAt = 0;
   private _pullLoad: Promise<void> | null = null;
   /** Fals quan la base de dades encara no té `sport_sessions.updated_at`
    *  (migració 030). Llavors no hi ha consulta de canvis possible i es torna a
@@ -124,9 +129,6 @@ export class SportService {
   /** Marge mínim entre refrescos automàtics (tornar a l'app dispara alhora
    *  `focus` i `visibilitychange`). */
   private static readonly REFRESH_THROTTLE_MS = 10_000;
-  /** Cada quant es fa la comprovació sencera, l'única que veu els esborrats
-   *  fets des d'un altre dispositiu. El mateix que als entrenaments. */
-  private static readonly FULL_PULL_EVERY_MS = 5 * 60_000;
   private _isFlushing = false;
   /** Comptador de versions de la cua d'enviaments. */
   private _opSeq = 0;
@@ -169,13 +171,22 @@ export class SportService {
   });
 
   constructor() {
+    // Les sessions d'esport d'un tram arriben amb la mateixa resposta que els
+    // entrenaments. Com que cobreix el tram sencer, també és l'única cosa que
+    // veu el que s'ha esborrat des d'un altre dispositiu.
+    effect(() => {
+      const scope = this.activityFeed.lastScope();
+      const rows  = this.activityFeed.sportSessions();
+      if (!scope) return;
+      untracked(() => this._ingestScope(scope, rows));
+    });
+
     effect(() => {
       const uid = this.auth.uid();
       this._sports.set([]);
       this._sportsLoaded.set(false);
       this._monthCache.clear();
       this._fullMonths.clear();
-      this._monthLoads.clear();
       this._sessions.set([]);
       this._allLoaded.set(false);
       this.isLoaded.set(false);
@@ -183,10 +194,10 @@ export class SportService {
       // Una consulta de l'usuari anterior no pot quedar-se com la que espera
       // qui demani l'historial ara, ni el seu marcador de canvis com el nostre.
       this._allLoad = null;
+      this._sportsLoad = null;
       this._pullLoad = null;
       this._lastPulledAt = null;
       this._pulledOnce = false;
-      this._lastFullPullAt = 0;
       if (uid) {
         const cached = this._readSportsFromStorage(uid);
         if (cached) {
@@ -194,7 +205,6 @@ export class SportService {
           this._sportsLoaded.set(true);
         }
         this._loadSports(uid, true);
-        this._preloadCurrentMonth();
         this._flushPending();
       }
     });
@@ -238,22 +248,14 @@ export class SportService {
     // sessions, per assabentar-se de si n'hi havia una de nova.
     await Promise.all([sports, this._pullChanges(uid)]);
 
-    // I de tant en tant, la comprovació sencera. És l'única que veu el que ha
-    // desaparegut: una sessió esborrada des d'un altre dispositiu ja no surt a
-    // cap consulta de canvis, perquè no hi ha cap fila que ho digui.
-    const dueFullPull = now - this._lastFullPullAt > SportService.FULL_PULL_EVERY_MS;
-    if (!dueFullPull && this._pulledOnce) return;
-    this._lastFullPullAt = now;
-
-    // Es torna a demanar sencer sense tombar `allSessionsLoaded`: qui en depèn
-    // (els rècords del detall d'una sessió) tornaria a pintar-se a mitges cada
-    // cop que l'app recupera el focus, i això és part de les pampallugues.
-    if (this._allLoaded()) { await this._fetchAllSessions(); return; }
-
-    await Promise.all([...this._monthCache.keys()].map(key => {
-      const [y, m] = key.split('-').map(Number);
-      return this.ensureMonthLoaded(y, m - 1, true);
-    }));
+    // El que ha desaparegut el veu el refresc del tram, que és **una** crida
+    // per a les dues activitats i el fa `WorkoutService.refreshLoaded()`.
+    //
+    // Aquí abans hi havia la comprovació sencera cada cinc minuts. Com que
+    // `WorkoutProfileService` demanava tot l'historial d'esports en entrar,
+    // `_allLoaded()` era cert des del primer segon i cada tornada a l'app —
+    // cada canvi de pestanya— en tornava a baixar anys sencers. I quan no,
+    // una petició per cada mes que haguessis arribat a mirar.
   }
 
   /**
@@ -398,7 +400,17 @@ export class SportService {
   /** `allowSeed` només el posa la primera càrrega. En un refresc, trobar la
    *  llista buida vol dir que l'usuari ha esborrat tots els esports des d'un
    *  altre dispositiu — tornar-los a sembrar seria desfer-li-ho. */
-  private async _loadSports(uid: string, allowSeed = false): Promise<void> {
+  private _loadSports(uid: string, allowSeed = false): Promise<void> {
+    // Sense aquesta guarda el catàleg es demanava dues vegades a l'arrencada:
+    // un cop des de l'efecte d'usuari i un altre des de l'`ensureLoaded()`
+    // que fa Inici en muntar-se, que passen amb milisegons de diferència.
+    if (this._sportsLoad) return this._sportsLoad;
+    const p = this._doLoadSports(uid, allowSeed).finally(() => { this._sportsLoad = null; });
+    this._sportsLoad = p;
+    return p;
+  }
+
+  private async _doLoadSports(uid: string, allowSeed = false): Promise<void> {
     try {
       const { data, error } = await this.supabase
         .from('sports')
@@ -526,101 +538,95 @@ export class SportService {
 
   // ── Sessions load ─────────────────────────────────────────────────────────
 
-  private _preloadCurrentMonth(): void {
-    const now = new Date();
-    this.ensureMonthLoaded(now.getFullYear(), now.getMonth());
-  }
-
-  /** Carrega un mes, i el torna a demanar si `force` — que un mes només es
-   *  demanés un cop per sessió és el que feia que dos dispositius ensenyessin
-   *  coses diferents. */
+  /**
+   * Carrega un mes.
+   *
+   * Ja no fa cap consulta pròpia: demana el tram al servei d'activitat, que és
+   * el mateix que demanen els entrenaments. Si aquell mes ja hi cau a dins —i
+   * hi cau gairebé sempre, perquè en entrar es demanen tres mesos— **no hi ha
+   * cap petició**. Abans cada mes visible eren dues: una d'entrenaments i una
+   * d'esports.
+   */
   async ensureMonthLoaded(year: number, month: number, force = false): Promise<void> {
-    const key = `${year}-${String(month + 1).padStart(2, '0')}`;
-    if (!force && (this._fullMonths.has(key) || this._allLoaded())) return;
-
-    const inFlight = this._monthLoads.get(key);
-    if (inFlight) return inFlight;
-
-    const load = this._loadMonth(year, month, key).finally(() => this._monthLoads.delete(key));
-    this._monthLoads.set(key, load);
-    return load;
+    if (this._allLoaded() && !force) return;
+    const key     = `${year}-${String(month + 1).padStart(2, '0')}`;
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    // El que hi ha guardat al dispositiu es pot ensenyar ja, i és l'única cosa
+    // que hi haurà si ara mateix no hi ha connexió.
+    this._primeMonthFromStorage(key);
+    await this.activityFeed.ensureRange(
+      `${key}-01`, `${key}-${String(lastDay).padStart(2, '0')}`, force,
+    );
   }
 
-  private async _loadMonth(year: number, month: number, key: string): Promise<void> {
+  /** Posa a la cau el que el dispositiu ja sap d'aquest mes, sense esperar
+   *  ningú. */
+  private _primeMonthFromStorage(key: string): void {
     const uid = this.auth.uid();
-    if (!uid) return;
-
-    // ── Step 1: serve from localStorage immediately (no spinner if cached) ──
-    if (!this._monthCache.has(key)) {
-      const cached = this._readSessionsFromStorage(uid, key);
-      if (cached) {
-        this._monthCache.set(key, cached);
-        this._rebuild();
-      } else {
-        this._monthCache.set(key, []); // mark loading
-        this.isLoading.set(true);
-      }
-    }
-
-    // ── Step 2: background refresh from Supabase ────────────────────────────
-    try {
-      const start   = `${key}-01`;
-      const lastDay = new Date(year, month + 1, 0).getDate();
-      const end     = `${key}-${String(lastDay).padStart(2, '0')}`;
-
-      // Què hi havia abans de demanar-ho: el que aparegui mentre la consulta
-      // viatja s'ha registrat ara mateix i encara no pot sortir a la resposta.
-      const known = new Set((this._monthCache.get(key) ?? []).map(s => s.id));
-      // Qui esperava torn quan vam preguntar: si puja mentre la consulta
-      // viatja, la resposta encara no el porta i desapareixeria de la vista.
-      const queuedBefore = new Set(this._readPending(uid).map(o => o.id));
-
-      const { data, error } = await this.supabase
-        .from('sport_sessions')
-        .select(SPORT_SESSION_COLUMNS)
-        .eq('user_id', uid)
-        .gte('date', start)
-        .lte('date', end)
-        .order('date', { ascending: false });
-
-      if (error) return; // es manté el que ja teníem
-
-      const fetched = (data ?? []).map(r => toSportSession(r as Record<string, unknown>));
-      this._mergeMonth(uid, key, fetched, known, queuedBefore);
-      this._fullMonths.add(key);
-      this._writeSessionsToStorage(uid, key, this._monthCache.get(key)!);
-    } catch {
-      // Network failure — keep whatever we have from localStorage/local state
-    } finally {
-      this.isLoading.set(false);
-    }
+    if (!uid || this._monthCache.has(key)) return;
+    const cached = this._readSessionsFromStorage(uid, key);
+    this._monthCache.set(key, cached ?? []);
+    if (cached?.length) this._rebuild();
   }
 
   /**
-   * Fusiona la resposta d'un mes sencer amb el que hi ha a la cau.
+   * Incorpora les sessions d'un tram que ha arribat sencer.
    *
-   * El servidor mana: del que teníem només es conserva el que encara espera a
-   * la cua d'enviament i el que s'ha registrat mentre la consulta viatjava
-   * (registrar un esport just abans que arribés la resposta el feia
-   * desaparèixer de la pantalla). El que el servidor ja no retorna s'ha
-   * esborrat des d'un altre dispositiu i ha de marxar també d'aquí.
+   * La resposta mana, amb tres excepcions, que són les de sempre:
+   *
+   * - el que espera torn a la cua d'enviament es queda (és el que estem a punt
+   *   de pujar);
+   * - el que s'ha esborrat aquí i encara no allà no torna;
+   * - i el que s'ha registrat **mentre la consulta viatjava** tampoc no marxa:
+   *   no podia sortir a la resposta, i prendre-ho per esborrat feia que un
+   *   esport registrat just abans desaparegués de la pantalla.
+   *
+   * La resta —el que teníem d'aquest tram i la resposta no porta— s'ha
+   * esborrat des d'un altre dispositiu i se'n va.
    */
-  private _mergeMonth(
-    uid: string, key: string, fetched: SportSession[],
-    knownBefore: Set<string>, queuedBefore: Set<string>,
-  ): void {
+  private _ingestScope(scope: FeedScope, rows: SportSession[]): void {
+    const uid = this.auth.uid();
+    if (!uid) return;
+
     const pending = this._readPending(uid);
     const queued  = new Set(pending.filter(o => o.op !== 'delete').map(o => o.id));
     const erased  = new Set(pending.filter(o => o.op === 'delete').map(o => o.id));
 
-    const byId = new Map(fetched.filter(s => !erased.has(s.id)).map(s => [s.id, s]));
-    for (const s of this._monthCache.get(key) ?? []) {
+    const inScope = (d: string) => d >= scope.from && d <= scope.to;
+
+    const byId = new Map<string, SportSession>();
+    for (const s of rows) {
       if (erased.has(s.id)) continue;
-      if (queued.has(s.id) || queuedBefore.has(s.id) || !knownBefore.has(s.id)) byId.set(s.id, s);
+      byId.set(s.id, s);
+    }
+    for (const s of [...this._monthCache.values()].flat()) {
+      if (erased.has(s.id)) continue;
+      if (byId.has(s.id)) continue;
+      const survives = !inScope(s.date)
+        || queued.has(s.id)
+        || s.createdAt.getTime() >= scope.startedAt;
+      if (survives) byId.set(s.id, s);
     }
 
-    this._monthCache.set(key, [...byId.values()]);
+    const touched = new Set<string>(this._monthCache.keys());
+    this._monthCache.clear();
+    for (const s of byId.values()) {
+      const key = s.date.substring(0, 7);
+      this._monthCache.set(key, [...(this._monthCache.get(key) ?? []), s]);
+      touched.add(key);
+    }
+    // Els mesos que el tram cobreix del tot ja es poden servir del dispositiu
+    // sense preguntar res.
+    for (const key of touched) {
+      if (!this._monthCache.has(key)) this._monthCache.set(key, []);
+      this._writeSessionsToStorage(uid, key, this._monthCache.get(key) ?? []);
+      const lastDay = new Date(Number(key.slice(0, 4)), Number(key.slice(5, 7)), 0).getDate();
+      if (inScope(`${key}-01`) && inScope(`${key}-${String(lastDay).padStart(2, '0')}`)) {
+        this._fullMonths.add(key);
+      }
+    }
     this._rebuild();
+    this.isLoading.set(false);
   }
 
   /** Loads the user's entire sport-session history into the cache in a single
