@@ -31,10 +31,11 @@ describe('SportDetailComponent', () => {
   let loadSessionsForSport: jasmine.Spy;
   let scale: ReturnType<typeof signal<'emoji' | 'numeric'>>;
 
-  function build(sport: Sport, session: SportSession): HTMLElement {
+  function build(sport: Sport, session: SportSession, compact = false): HTMLElement {
     const fixture = TestBed.createComponent(SportDetailComponent);
     fixture.componentRef.setInput('sport', sport);
     fixture.componentRef.setInput('session', session);
+    fixture.componentRef.setInput('compact', compact);
     fixture.detectChanges();
     return fixture.nativeElement as HTMLElement;
   }
@@ -206,6 +207,40 @@ describe('SportDetailComponent', () => {
     it('marca un pla al peu', () => {
       const el = build(makeSport(), makeSession({ duration: 60, status: 'planned' }));
       expect(el.querySelector('.sdv-footer')?.textContent).toContain('Planificat');
+    });
+  });
+
+  // Desplegat dins una targeta del feed és una ullada, no la lectura sencera:
+  // les xifres i prou, que el context i el compte de sessions ja tenen pàgina.
+  describe('plegat dins la targeta (compact)', () => {
+    beforeEach(() => {
+      allLoaded.set(true);
+      sessions.set([
+        makeSession({ id: 'a', date: '2024-01-01', duration: 40, feeling: 2 }),
+        makeSession({ id: 'b', date: '2024-02-01', duration: 50, feeling: 2 }),
+      ]);
+    });
+
+    it('segueix dient les dades de la sessió', () => {
+      const el = build(makeSport(), makeSession({ duration: 90, metrics: { distance_km: 15 } }), true);
+      expect(rows(el).map(r => r.label)).toEqual(['Durada', 'Distància']);
+    });
+
+    it('no diu el context de l\'historial', () => {
+      const el = build(makeSport(), makeSession({ duration: 90, feeling: 4 }), true);
+      expect(rows(el).every(r => r.note === '')).toBeTrue();
+      expect(el.querySelector('.sdv-note')).toBeNull();
+    });
+
+    it('no porta ni titolets ni el peu de sessions i durada', () => {
+      const el = build(makeSport(), makeSession({ duration: 90, feeling: 4, notes: 'Bé' }), true);
+      expect(el.querySelector('.sdv-footer')).toBeNull();
+      expect(el.querySelector('.sdv-block-title')).toBeNull();
+    });
+
+    it('corona igualment una millor marca', () => {
+      const el = build(makeSport(), makeSession({ duration: 90 }), true);
+      expect(rows(el).find(r => r.label === 'Durada')?.record).toBeTrue();
     });
   });
 });

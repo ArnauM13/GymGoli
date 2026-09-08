@@ -149,13 +149,52 @@ describe('SportSessionComponent', () => {
       expect(component.editDuration()).toBe(60);
     });
 
+    // Editar i llegir no es fan alhora: mentre el formulari hi és, la sessió
+    // no es dibuixa a sota — deia el mateix dues vegades i deixava el que es
+    // toca a mitja pantalla del que es llegeix.
+    it('la pàgina llegeix la sessió i ofereix un botó per editar-la', () => {
+      allSessions.set([makeSession({ duration: 60 })]);
+      build();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('.detail-card')).toBeTruthy();
+      expect(el.querySelector('.edit-btn')).toBeTruthy();
+      expect(el.querySelector('.edit-body')).toBeNull();
+    });
+
+    it("el botó d'editar obre el formulari i amaga la sessió", () => {
+      allSessions.set([makeSession({ duration: 60 })]);
+      build();
+
+      const el = fixture.nativeElement as HTMLElement;
+      el.querySelector<HTMLButtonElement>('.edit-btn')!.click();
+      fixture.detectChanges();
+
+      expect(component.editOpen()).toBeTrue();
+      expect(el.querySelector('.edit-body')).toBeTruthy();
+      expect(el.querySelector('.detail-card')).toBeNull();
+      expect(el.querySelector('.edit-btn')).toBeNull();
+    });
+
+    it("editant un pla, el botó de registrar tampoc no hi és", () => {
+      allSessions.set([makeSession({ date: '2024-03-05', status: 'planned' })]);
+      build();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('.register-btn')).toBeTruthy();
+
+      el.querySelector<HTMLButtonElement>('.edit-btn')!.click();
+      fixture.detectChanges();
+      expect(el.querySelector('.register-btn')).toBeNull();
+    });
+
     it('el formulari arrenca plegat i es carrega amb el que la sessió porta', () => {
       const session = makeSession({ duration: 75, subtypeId: 'dobles', feeling: 4, notes: 'Bé', metrics: { sets_won: 2 } });
       allSessions.set([session]);
       build();
 
       expect(component.editOpen()).toBeFalse();
-      component.toggleEdit({ sport: SPORT, session });
+      component.openEdit({ sport: SPORT, session });
 
       expect(component.editOpen()).toBeTrue();
       expect(component.editDuration()).toBe(75);
@@ -170,7 +209,7 @@ describe('SportSessionComponent', () => {
       allSessions.set([session]);
       build();
 
-      component.toggleEdit({ sport: SPORT, session });
+      component.openEdit({ sport: SPORT, session });
       component.editDuration.set(45);
       await component.save({ sport: SPORT, session });
 
@@ -184,7 +223,7 @@ describe('SportSessionComponent', () => {
       allSessions.set([session]);
       build();
 
-      component.toggleEdit({ sport: SPORT, session });
+      component.openEdit({ sport: SPORT, session });
       component.editDuration.set(90);
       await component.save({ sport: SPORT, session });
 
@@ -197,7 +236,7 @@ describe('SportSessionComponent', () => {
       allSessions.set([session]);
       build();
 
-      component.toggleEdit({ sport: SPORT, session });
+      component.openEdit({ sport: SPORT, session });
       await component.save({ sport: SPORT, session });
 
       expect(updateSession).toHaveBeenCalledWith(
