@@ -73,6 +73,7 @@ describe('TrainComponent', () => {
       ensureWorkoutEntries:       jasmine.createSpy().and.resolveTo(undefined),
       createWorkoutForDate:       jasmine.createSpy().and.resolveTo('new-id'),
       createWorkoutFromTemplate:  jasmine.createSpy().and.resolveTo('new-id'),
+      createPlannedWorkout:       jasmine.createSpy().and.resolveTo('plan-id'),
       addExerciseToWorkout:       jasmine.createSpy().and.resolveTo(undefined),
       deleteWorkout:              jasmine.createSpy().and.resolveTo(undefined),
     };
@@ -377,6 +378,33 @@ describe('TrainComponent', () => {
     });
   });
 
+  // Planificar el dia d'avui: el botó d'Inici hi porta amb `?plan=1`, i el
+  // que es crea és un pla encara que el dia sigui avui.
+  describe('planificar el dia', () => {
+    it("crea un pla quan s'hi ha vingut a planificar", async () => {
+      const workoutService = TestBed.inject(WorkoutService) as unknown as { createPlannedWorkout: jasmine.Spy; createWorkoutForDate: jasmine.Spy };
+      component.planRequested.set(true);
+      component.selectedDate.set(TODAY);
+
+      component.selectType('push');
+      await component.pickerStartEmpty();
+
+      expect(workoutService.createPlannedWorkout).toHaveBeenCalledWith(TODAY, 'push', []);
+      expect(workoutService.createWorkoutForDate).not.toHaveBeenCalled();
+    });
+
+    it('i sense demanar-ho, el d\'avui es comença', async () => {
+      const workoutService = TestBed.inject(WorkoutService) as unknown as { createPlannedWorkout: jasmine.Spy; createWorkoutForDate: jasmine.Spy };
+      component.selectedDate.set(TODAY);
+
+      component.selectType('push');
+      await component.pickerStartEmpty();
+
+      expect(workoutService.createWorkoutForDate).toHaveBeenCalledWith(TODAY, 'push');
+      expect(workoutService.createPlannedWorkout).not.toHaveBeenCalled();
+    });
+  });
+
   // ── deleteActiveWorkout() ────────────────────────────────────────────────
 
   describe('deleteActiveWorkout()', () => {
@@ -571,6 +599,32 @@ describe('TrainComponent', () => {
         navigateTo('/train?date=2024-03-05', 2);
 
         expect(component.selectedDate()).toBe('2024-03-05');
+      });
+
+      // Planificar avui: el dia ja hi és, però el que s'hi creï és un pla i
+      // no una sessió que comenci ara.
+      it('`?plan=1` fa que el dia d\'avui es planifiqui, no es comenci', () => {
+        navigateTo('/home', 1);
+        navigateTo(`/train?date=${TODAY}&plan=1`, 2);
+
+        expect(component.planning()).toBeTrue();
+        expect(component.isToday()).toBeTrue();
+      });
+
+      it('tornar a Entrenar sense demanar-ho deixa de planificar', () => {
+        navigateTo('/home', 1);
+        navigateTo(`/train?date=${TODAY}&plan=1`, 2);
+        navigateTo('/home', 3);
+        navigateTo('/train', 4);
+
+        expect(component.planning()).toBeFalse();
+      });
+
+      it('un dia passat no es planifica encara que ho demanin', () => {
+        navigateTo('/home', 1);
+        navigateTo('/train?date=2024-03-05&plan=1', 2);
+
+        expect(component.planning()).toBeFalse();
       });
     });
   });

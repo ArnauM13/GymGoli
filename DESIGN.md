@@ -758,6 +758,27 @@ Once you tap edit, a finished workout behaves exactly like the one you are
 doing right now: everything is editable, live-saved, nothing read-only about
 it. A plan always opens in the editor — planning is writing.
 
+### Els tres abasts de planificar (Inici)
+
+Inici ofereix tres gestos sobre el temps, i cadascun viu on parla:
+
+| Gest | On | Què fa |
+| --- | --- | --- |
+| Fer-lo ara | `.start-workout-btn`, sota el calendari | Comença (o registra) el dia seleccionat |
+| Deixar-lo apuntat | `.today-plan-btn`, **dins la targeta del dia** | Planifica **només aquell dia** (`/train?date=…&plan=1`) |
+| La setmana | `.plan-week-btn`, sota el resum setmanal | Obre el planificador dels set dies |
+
+El del mig és el que faltava: un dia futur ja es planifica sol (encara no ha
+arribat), però el d'avui només es podia començar. `?plan=1` diu a Entrenar que
+el que s'hi creï és un pla i no una sessió que comenci ara —`planning()`, que
+també val per als esports— i el rètol de dalt ho confirma: «Planificant ·
+Avui». Un dia passat no s'hi apunta: allò ja ha passat, i el paràmetre
+s'ignora.
+
+Per això el botó de la targeta del dia **només surt quan el dia és avui**: un
+de futur ja té «Planifica aquest dia» a dalt, i duplicar-lo dins la targeta
+seria dir dues vegades el mateix.
+
 ### Insight card & detail sheet
 
 The card on `home` is a **headline**: one figure with the period it belongs

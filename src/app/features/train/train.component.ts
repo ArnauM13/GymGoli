@@ -306,7 +306,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
         <app-page-header title="Entrenament" [showBack]="true" />
 
         <!-- ── Context d'un dia que no és avui (registrar passat / planificar futur) ── -->
-        @if (!isToday()) {
+        @if (!isToday() || planning()) {
           <div class="date-context" [class.date-context--past]="isSelectedPast()">
             <span class="material-symbols-outlined dc-icon">{{ isSelectedPast() ? 'history' : 'event_upcoming' }}</span>
             <div class="dc-info">
@@ -1177,6 +1177,14 @@ export class TrainComponent implements OnDestroy {
     validDateParam(this.route.snapshot.queryParamMap.get('date')) ?? this.today()
   );
   readonly sportToggling   = signal(false);
+  /**
+   * S'hi ha vingut a planificar el dia, no a fer-lo (`/train?date=…&plan=1`).
+   *
+   * Un dia futur ja es planifica sol —encara no ha arribat—, però el d'avui
+   * es pot voler deixar apuntat per a més tard en comptes de començar-lo ara;
+   * és el que demana el botó «Planificar avui» d'Inici.
+   */
+  readonly planRequested   = signal(false);
   private typeService = inject(TrainingTypeService);
   readonly workoutTypes = computed((): WorkoutTypeItem[] =>
     this.typeService.types().map(t => ({ value: t.id, label: t.name, icon: t.icon, color: t.color }))
@@ -1339,6 +1347,12 @@ export class TrainComponent implements OnDestroy {
   }
 
   readonly isSelectedFuture = computed(() => this.selectedDate() > this.today());
+
+  /** El que es creï serà un pla: perquè el dia encara ha de venir, o perquè
+   *  s'ha demanat planificar-lo expressament. Un dia passat no: allò ja ha
+   *  passat i el que s'hi fa és registrar-ho. */
+  readonly planning = computed(() =>
+    this.isSelectedFuture() || (this.planRequested() && !this.isSelectedPast()));
 
   readonly pagePaddingBottom = computed(() =>
     '88px' // clear the active-workout menu FAB / the dog's suggestion card
@@ -1554,6 +1568,9 @@ export class TrainComponent implements OnDestroy {
       const params    = this.router.parseUrl(url).queryParams as Record<string, string | undefined>;
       const workoutId = params['workout'] ?? null;
       const linkDate  = validDateParam(params['date'] ?? null);
+      // Sempre, no només quan hi és: tornar a Entrenar sense demanar-ho vol
+      // dir que ja no s'hi ve a planificar.
+      this.planRequested.set(params['plan'] === '1');
 
       const goToDay = (day: string): void => {
         if (this.selectedDate() === day) return;
@@ -1591,6 +1608,7 @@ export class TrainComponent implements OnDestroy {
         if (suppressNextDateReset) { suppressNextDateReset = false; return; }
         this.activeWorkoutId.set(null);
         this.editRequestedFor.set(null);
+        this.planRequested.set(false);
         this.pickerCat.set(null);
       });
     });
@@ -1864,7 +1882,7 @@ export class TrainComponent implements OnDestroy {
 
   /** Create a planned workout (future date) or a live one (today/past), then open it. */
   private async _createForSelectedDate(cat: ExerciseCategory, entries: WorkoutEntry[]): Promise<string> {
-    if (this.isSelectedFuture()) {
+    if (this.planning()) {
       return this.workoutService.createPlannedWorkout(this.selectedDate(), cat, entries);
     }
     if (entries.length) {
@@ -2022,7 +2040,9 @@ export class TrainComponent implements OnDestroy {
     const existing = this.sportService.getSessionForDate(date, sport.id);
     if (existing) { this._openSportSession(existing.id); return; }
 
-    const planning = this.isSelectedFuture();
+    // Planificar un esport segueix la mateixa regla que un entrenament: el
+    // dia encara ha de venir, o s'ha demanat deixar-lo apuntat.
+    const planning = this.planning();
     this.sportToggling.set(true);
     try {
       const id = await this.sportService.logSession(

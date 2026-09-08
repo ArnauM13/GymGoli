@@ -270,6 +270,36 @@ describe('HomeComponent', () => {
       component.goToPlanner();
       expect(navigateSpy).toHaveBeenCalledWith(['/train/planner']);
     });
+
+    // Deixar apuntat el dia d'avui sense començar-lo: entremig del botó gran
+    // («Comença un entrenament») i del de la setmana sencera.
+    it("planSelectedDay() hi porta dient que és un pla, no una sessió d'ara", () => {
+      component.planSelectedDay();
+      expect(navigateSpy).toHaveBeenCalledWith(['/train'], { queryParams: { date: TODAY, plan: 1 } });
+    });
+  });
+
+  describe('planificar el dia des de la targeta del dia', () => {
+    const shift = (days: number) => {
+      const d = new Date(TODAY + 'T12:00:00');
+      d.setDate(d.getDate() + days);
+      return d.toISOString().split('T')[0];
+    };
+
+    it("hi és quan el dia és avui", () => {
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).querySelector('.today-plan-btn')).toBeTruthy();
+    });
+
+    it('no hi és els altres dies: ja tenen la seva acció a dalt', () => {
+      component.selectedDate.set(shift(3));
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).querySelector('.today-plan-btn')).toBeNull();
+
+      component.selectedDate.set(shift(-3));
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).querySelector('.today-plan-btn')).toBeNull();
+    });
   });
 
   // ── dayAction() ──────────────────────────────────────────────────────────
