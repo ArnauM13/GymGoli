@@ -238,9 +238,45 @@ describe('SportDetailComponent', () => {
       expect(el.querySelector('.sdv-block-title')).toBeNull();
     });
 
-    it('corona igualment una millor marca', () => {
+    // Els rècords i les mitjanes són l'única cosa que necessita l'historial
+    // sencer de l'esport, i la ullada no en diu res: demanar-lo seria baixar
+    // totes les sessions per pintar dues files que la targeta ja tenia.
+    it("no demana l'historial de l'esport", () => {
+      build(makeSport(), makeSession({ duration: 90 }), true);
+      expect(loadSessionsForSport).not.toHaveBeenCalled();
+    });
+
+    it('no corona cap marca: la ullada són les dades i prou', () => {
       const el = build(makeSport(), makeSession({ duration: 90 }), true);
-      expect(rows(el).find(r => r.label === 'Durada')?.record).toBeTrue();
+      expect(rows(el).some(r => r.record)).toBeFalse();
+      expect(el.querySelector('.sdv-record')).toBeNull();
+    });
+
+    // La sensació i la nota ja són a la targeta que es desplega: repetir-les
+    // just a sota fa el desplegable llarg sense dir res de nou.
+    it('no repeteix la sensació ni la nota de la targeta', () => {
+      const el = build(makeSport(), makeSession({ duration: 90, feeling: 4, notes: 'Bé' }), true);
+      expect(rows(el).map(r => r.label)).toEqual(['Durada']);
+      expect(el.querySelector('.sdv-notes')).toBeNull();
+    });
+
+    it('talla les dades que no caben a una ullada i diu quantes en queden', () => {
+      const sport = makeSport({
+        metricDefs: [
+          { key: 'distance_km', label: 'Distància', type: 'number', unit: 'km' },
+          { key: 'pace',        label: 'Ritme',     type: 'number', unit: 'min/km' },
+          { key: 'elevation',   label: 'Desnivell', type: 'number', unit: 'm' },
+          { key: 'calories',    label: 'Calories',  type: 'number', unit: 'kcal' },
+          { key: 'hr',          label: 'Pulsacions', type: 'number', unit: 'ppm' },
+        ],
+      });
+      const el = build(sport, makeSession({
+        duration: 90,
+        metrics: { distance_km: 15, pace: 5, elevation: 300, calories: 800, hr: 140 },
+      }), true);
+
+      expect(rows(el).length).toBe(5);
+      expect(el.querySelector('.sdv-more')?.textContent).toContain('+1');
     });
   });
 });

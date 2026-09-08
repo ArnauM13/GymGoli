@@ -93,13 +93,27 @@ const RECENT_DAYS = 30;
 
         <div class="today-body">
           @if (previewFeedEntry(); as day) {
-            <app-day-feed-cards [day]="day" (open)="goToWorkout($event)"
+            <app-day-feed-cards [day]="day" liveOpensPage (open)="goToWorkout($event)"
                                 (openSport)="goToSportSession($event)" />
           } @else {
             <div class="today-empty">
               <span class="material-symbols-outlined today-empty-icon">bedtime</span>
               <span class="today-empty-text">Sense activitat</span>
             </div>
+          }
+
+          <!-- ── Planificar just aquest dia ──
+               El botó gran de dalt comença l'entrenament ara mateix, i el de
+               la setmana planifica els set dies. Faltava el mig: deixar
+               apuntat el d'avui per a més tard. Va aquí, dins el dia, perquè
+               és del dia que parla — i només hi surt quan el dia és avui: un
+               de futur ja té «Planifica aquest dia» a dalt, i un de passat no
+               es pot planificar. -->
+          @if (isToday()) {
+            <button class="today-plan-btn" (click)="planSelectedDay()">
+              <span class="material-symbols-outlined" aria-hidden="true">event_upcoming</span>
+              Planificar avui
+            </button>
           }
         </div>
       </div>
@@ -186,7 +200,7 @@ const RECENT_DAYS = 30;
               @for (day of historyFeedDays(); track day.date) {
                 <div class="feed-day">
                   <div class="feed-day-header">{{ dayLabel(day.date) }}</div>
-                  <app-day-feed-cards [day]="day" hideVolume (open)="goToWorkout($event)"
+                  <app-day-feed-cards [day]="day" hideVolume liveOpensPage (open)="goToWorkout($event)"
                                       (openSport)="goToSportSession($event)" />
                 </div>
               }
@@ -278,6 +292,19 @@ const RECENT_DAYS = 30;
     .today-empty {
       display: flex; flex-direction: column; align-items: center; gap: 8px;
       padding: 14px 12px; text-align: center;
+    }
+    /* Discret: qui entra a Inici ve a veure el dia, no a planificar-lo. Hi
+       és quan el necessites i no compateix amb l'acció gran de dalt. */
+    .today-plan-btn {
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+      width: 100%; box-sizing: border-box; margin-top: 8px;
+      padding: 10px; border-radius: 12px;
+      border: 1.5px dashed var(--c-border); background: transparent;
+      font-size: 13px; font-weight: 700; color: var(--c-text-3);
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { border-color: var(--c-brand); color: var(--c-brand); border-style: solid; }
+      &:active { transform: scale(0.99); }
     }
     .today-empty-icon { font-size: 32px; color: color-mix(in srgb, var(--c-brand) 35%, var(--c-border)); }
     .today-empty-text { font-size: 13px; color: var(--c-text-3); line-height: 1.4; }
@@ -623,6 +650,12 @@ export class HomeComponent {
 
   goToPlanner(): void {
     this.router.navigate(['/train/planner']);
+  }
+
+  /** Deixar apuntat el dia sense començar-lo: la pàgina d'Entrenar rep el dia
+   *  i que el que s'hi faci és un pla, no una sessió que comenci ara. */
+  planSelectedDay(): void {
+    this.router.navigate(['/train'], { queryParams: { date: this.effectiveDate(), plan: 1 } });
   }
 
   /** El botó porta a definir objectius, no al Perfil en general: hi arriba

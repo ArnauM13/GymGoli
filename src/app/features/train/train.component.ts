@@ -1,6 +1,6 @@
 import { Component, HostListener, OnDestroy, ViewChild, computed, effect, inject, signal, untracked } from '@angular/core';
-import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
-import { filter, map } from 'rxjs/operators';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { filter } from 'rxjs/operators';
 import { FormsModule } from '@angular/forms';
 import { A11yModule } from '@angular/cdk/a11y';
 import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
@@ -25,8 +25,11 @@ import { TrainingTypeService } from '../../core/services/training-type.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { WorkoutService } from '../../core/services/workout.service';
+import { OngoingWorkoutService } from '../../core/services/ongoing-workout.service';
 import { OfflineService } from '../../core/services/offline.service';
+import { ActivityCardComponent } from '../../shared/components/activity-card/activity-card.component';
 import { ActivityIconComponent } from '../../shared/components/activity-icon/activity-icon.component';
+import { WorkoutDetailComponent } from '../../shared/components/workout-detail/workout-detail.component';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
 import { AppHintService } from '../../core/services/app-hint.service';
@@ -38,8 +41,9 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { NavigationHistoryService } from '../../core/services/navigation-history.service';
 import { TodayService } from '../../core/services/today.service';
 import {
-  feedDayLabel, formatFeeling, workoutCardColor, workoutPrimaryColor, workoutPrimaryIcon,
-  workoutVolumeFmt as workoutVolumeFmtUtil,
+  ActivityStat,
+  feedDayLabel, formatFeeling, workoutCardColor, workoutCardStats,
+  workoutPrimaryColor, workoutPrimaryIcon, workoutTypeLabel,
 } from '../../shared/utils/workout-card.utils';
 import { toDateStr } from '../../shared/utils/date.utils';
 
@@ -65,7 +69,10 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
 @Component({
   selector: 'app-train',
   standalone: true,
-  imports: [FormsModule, A11yModule, WorkoutEditorComponent, PageHeaderComponent, ActivityIconComponent],
+  imports: [
+    FormsModule, A11yModule, WorkoutEditorComponent, WorkoutDetailComponent,
+    PageHeaderComponent, ActivityCardComponent, ActivityIconComponent,
+  ],
   template: `
     <div class="page" [style.padding-bottom]="pagePaddingBottom()">
 
@@ -79,79 +86,27 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
           </button>
           <div class="aw-title-block">
             <h1>{{ (w.status ?? 'done') === 'planned' ? 'El meu pla' : 'El meu entrenament' }}</h1>
-            <span class="aw-date-sub">{{ workoutDateLabel(w) }}</span>
+            <span class="aw-date-sub">{{ heroDateLabel(w) }}</span>
           </div>
           <span class="aw-type-badge" [style.--bc]="workoutPrimaryColor(w)">{{ workoutLabel(w) }}</span>
         </header>
 
-        <!-- ── Qui, quan i com ha anat ──
-             La mateixa targeta que corona una sessió d'esport: barra de
-             color, icona amb el gos, què és, quan va ser i com t'ha anat. Un
-             entrenament i una sessió d'esport són la mateixa cosa vistes de
-             prop, i fins ara cadascuna es presentava a la seva manera.
-             Segueix enganxada a dalt: les xifres han de ser llegibles a mig
-             entrenament, sense tornar a pujar. -->
-        <div class="activity-hero aw-hero" [class.activity-hero--planned]="isPlannedWorkout(w)"
-             [style.--ac]="workoutPrimaryColor(w)">
-          <span class="ah-bar" [style.background]="workoutCardColor(w)" aria-hidden="true"></span>
-          <app-activity-icon [icon]="workoutPrimaryIcon(w)"
-                             [color]="workoutPrimaryColor(w)" mascot="marley" />
-          <div class="ah-text">
-            <div class="ah-title-row">
-              <span class="ah-title">{{ workoutLabel(w) }}</span>
-            </div>
-            <!-- El dia i les xifres en una sola línia: la targeta viu
-                 enganxada a dalt i cada línia de més és pantalla de menys. -->
-            <div class="ah-meta">
-              <span class="ah-date">{{ heroDateLabel(w) }}</span>
-              @if (!isPlannedWorkout(w)) {
-                <span class="ah-sep" aria-hidden="true">·</span>
-                <span class="ah-stat">
-                  <span class="material-symbols-outlined" aria-hidden="true">fitness_center</span>
-                  <strong>{{ w.entries.length }}</strong> exerc
-                </span>
-                @if (topbarTotalSets(w) || topbarWarmupSets(w)) {
-                  <span class="ah-sep" aria-hidden="true">·</span>
-                  <span class="ah-stat">
-                    <span class="material-symbols-outlined" aria-hidden="true">repeat</span>
-                    <strong>{{ topbarTotalSets(w) }}</strong> sèr
-                    @if (topbarWarmupSets(w); as warm) {
-                      <span class="ah-warmup">
-                        +{{ warm }}<span class="material-symbols-outlined" aria-hidden="true">local_fire_department</span>
-                      </span>
-                    }
-                  </span>
-                }
-                @if (workoutVolumeFmt(w); as vol) {
-                  <span class="ah-sep" aria-hidden="true">·</span>
-                  <span class="ah-stat ah-stat--vol">
-                    <span class="material-symbols-outlined" aria-hidden="true">weight</span>
-                    <strong>{{ vol }}</strong>
-                  </span>
-                }
-              }
-            </div>
-          </div>
-          <!-- Un pla encara no s'ha viscut: hi diu que està previst, i la
-               sensació no hi té res a dir fins que es faci. -->
-          @if (isPlannedWorkout(w)) {
-            <span class="ah-pill">
-              <span class="material-symbols-outlined" aria-hidden="true">event_upcoming</span>
-              Planificat
-            </span>
-          } @else {
-            <button class="aw-feeling-btn" (click)="$event.stopPropagation(); awFeelingOpen.set(!awFeelingOpen())"
-                    [class.aw-feeling-btn--set]="w.feeling"
-                    [attr.aria-label]="w.feeling ? 'Canviar sensació' : 'Afegir sensació'"
-                    [attr.aria-expanded]="awFeelingOpen()">
-              @if (w.feeling) {
-                <span class="aw-feeling-emoji">{{ emojiOf(w.feeling) }}</span>
-              } @else {
-                <span class="material-symbols-outlined">sentiment_neutral</span>
-              }
-            </button>
-          }
-        </div>
+        <!-- ── Què és i com ha anat ──
+             La targeta compartida, la mateixa que al feed d'Inici i a
+             l'Historial: el tipus d'entrenament, les xifres d'un cop d'ull i
+             la sensació. El dia no hi surt —ja el diu la capçalera d'aquí
+             sobre—, perquè una activitat s'ha de reconèixer igual la miris
+             on la miris. Segueix enganxada a dalt: les xifres han de ser
+             llegibles a mig entrenament, sense tornar a pujar. -->
+        <app-activity-card class="aw-hero"
+            [accent]="workoutPrimaryColor(w)" [barColor]="workoutCardColor(w)"
+            [icon]="workoutPrimaryIcon(w)" mascot="marley"
+            [title]="workoutTypeLabel(w)" [note]="w.notes ?? ''"
+            [stats]="workoutStats(w)"
+            [feeling]="w.feeling ? emojiOf(w.feeling) : ''"
+            [planned]="isPlannedWorkout(w)" plannedPill
+            [feelingEditable]="!isPlannedWorkout(w)" [feelingOpen]="awFeelingOpen()"
+            (feelingClick)="awFeelingOpen.set(!awFeelingOpen())" />
 
         <!-- Feeling picker (slides in below header) -->
         @if (awFeelingOpen()) {
@@ -170,6 +125,25 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
           </div>
         }
 
+        @if (!editing()) {
+
+          <!-- ── Llegir ──
+               Un entrenament d'un dia passat s'obre per mirar-se'l, no per
+               fer-lo: primer l'esquema —què vas fer a cada exercici, sèrie a
+               sèrie— i, si el vols tocar, el botó d'editar. És el mateix camí
+               que una sessió d'esport, i abans un entrenament vell queia de
+               dret dins l'editor. -->
+          <div class="detail-card">
+            <app-workout-detail [workout]="w" />
+          </div>
+
+          <button class="edit-btn" (click)="startEditing()">
+            <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+            Editar l'entrenament
+          </button>
+
+        } @else {
+
         <app-workout-editor
           #editor
           [workout]="w"
@@ -179,6 +153,27 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
           [groupingMode]="groupingMode()"
           (requestAddExercise)="openPicker()"
         />
+
+        <!-- ── Les dues coses que es fan entrenant ──
+             Ordenar els exercicis i posar punt final. Vivien dins el menú de
+             tres punts, que és on van les coses que gairebé no es fan;
+             aquestes dues es fan cada dia, així que es veuen. -->
+        @if (!reorderMode() && !groupingMode()) {
+          <div class="aw-actions">
+            @if (w.entries.length > 1) {
+              <button class="aw-action" (click)="reorderMode.set(true); groupingMode.set(false)">
+                <span class="material-symbols-outlined" aria-hidden="true">swap_vert</span>
+                Ordenar
+              </button>
+            }
+            @if (activeIsOngoing()) {
+              <button class="aw-action aw-action--finish" (click)="finishWorkout()">
+                <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+                Acabar l'entrenament
+              </button>
+            }
+          </div>
+        }
 
         <!-- ── Sèrie activa: proper exercici suggerit (aprèn de l'usuari) ── -->
         @if (exerciseSuggestions(); as sugg) {
@@ -236,6 +231,8 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
           </div>
         }
 
+        }
+
         <!-- While reordering, the three-dots menu is replaced by a single
              "save order" button — the reorder is persisted live on each drop,
              so this just leaves reorder mode. -->
@@ -249,11 +246,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
           @if (workoutMenuOpen()) {
             <div class="aw-menu-backdrop" (click)="workoutMenuOpen.set(false)"></div>
             <div class="aw-menu-dropdown">
-              <button class="aw-menu-item" (click)="workoutMenuOpen.set(false); reorderMode.set(true); groupingMode.set(false)">
-                <span class="material-symbols-outlined">swap_vert</span>
-                Ordenar exercicis
-              </button>
-              @if (settingsService.supersetsEnabled() || groupingMode()) {
+              @if (editing() && (settingsService.supersetsEnabled() || groupingMode())) {
                 <button class="aw-menu-item" (click)="workoutMenuOpen.set(false); groupingMode.set(!groupingMode()); reorderMode.set(false)">
                   <span class="material-symbols-outlined">{{ groupingMode() ? 'check' : 'link' }}</span>
                   {{ groupingMode() ? 'Finalitzar agrupació' : 'Agrupar en superset' }}
@@ -313,7 +306,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
         <app-page-header title="Entrenament" [showBack]="true" />
 
         <!-- ── Context d'un dia que no és avui (registrar passat / planificar futur) ── -->
-        @if (!isToday()) {
+        @if (!isToday() || planning()) {
           <div class="date-context" [class.date-context--past]="isSelectedPast()">
             <span class="material-symbols-outlined dc-icon">{{ isSelectedPast() ? 'history' : 'event_upcoming' }}</span>
             <div class="dc-info">
@@ -578,22 +571,55 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
     }
 
     /* ── Capçalera de l'entrenament ──
-       La targeta és la compartida (.activity-hero, a styles.scss); d'aquesta
-       pàgina només és que es quedi enganxada a dalt: les xifres han de ser
-       llegibles a mig entrenament, sense tornar a pujar. */
-    .aw-hero { position: sticky; top: 12px; z-index: 10; margin-top: 12px; }
+       La targeta és la compartida (app-activity-card, la mateixa que al
+       feed); d'aquesta pàgina només és que es quedi enganxada a dalt: les
+       xifres han de ser llegibles a mig entrenament, sense tornar a pujar. */
+    .aw-hero { display: block; position: sticky; top: 12px; z-index: 10; margin: 12px 16px 0; }
 
-    .aw-feeling-btn {
-      width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
-      border: none; background: transparent; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      touch-action: manipulation; transition: background 0.15s;
-      color: var(--c-text-3);
-      .material-symbols-outlined { font-size: 18px; }
-      &:hover { background: var(--c-hover); }
-      &.aw-feeling-btn--set { color: var(--c-text-2); }
+    /* ── Les accions del dia, a la vista ── */
+    .aw-actions {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      margin: 12px 16px 0;
     }
-    .aw-feeling-emoji { font-size: 18px; line-height: 1; }
+    .aw-action {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      height: 42px; padding: 0 16px; border-radius: 14px;
+      border: 1.5px solid var(--c-border); background: var(--c-card);
+      font-size: 13.5px; font-weight: 700; color: var(--c-text-2);
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 19px; }
+      &:hover { border-color: var(--c-brand); color: var(--c-brand); }
+      &:active { transform: scale(0.99); }
+    }
+    /* Posar punt final és el gest que tanca la sessió: mana sobre l'altre i
+       s'emporta l'amplada que sobra. */
+    .aw-action--finish {
+      flex: 1; min-width: 180px;
+      border-color: transparent; background: var(--c-brand); color: white;
+      &:hover { background: var(--c-brand-dk); border-color: transparent; color: white; }
+    }
+
+    /* ── Llegir un entrenament passat ──
+       El detall porta la seva vora superior, així que la targeta que
+       l'embolcalla no n'hi posa una altra. La mateixa forma que a la pàgina
+       d'una sessió d'esport. */
+    .detail-card {
+      margin: 12px 16px 0; border-radius: 16px; overflow: hidden;
+      border: 1.5px solid var(--c-border-2); box-shadow: 0 2px 10px var(--c-shadow);
+      background: var(--c-card);
+    }
+    .edit-btn {
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+      width: calc(100% - 32px); box-sizing: border-box;
+      margin: 12px 16px 0; padding: 12px; border-radius: 14px;
+      border: 1.5px solid var(--c-border); background: var(--c-card);
+      font-size: 14px; font-weight: 700; color: var(--c-text-2);
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 19px; }
+      &:hover { border-color: var(--c-brand); color: var(--c-brand); }
+      &:active { transform: scale(0.99); }
+    }
+
     .aw-feeling-row {
       display: flex; align-items: center; justify-content: center; gap: 6px;
       margin: 4px 16px 0;
@@ -1121,6 +1147,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
 })
 export class TrainComponent implements OnDestroy {
   readonly workoutService  = inject(WorkoutService);
+  private ongoing          = inject(OngoingWorkoutService);
   readonly sportService    = inject(SportService);
   readonly offlineService  = inject(OfflineService);
   readonly trainerService  = inject(TrainerService);
@@ -1150,6 +1177,14 @@ export class TrainComponent implements OnDestroy {
     validDateParam(this.route.snapshot.queryParamMap.get('date')) ?? this.today()
   );
   readonly sportToggling   = signal(false);
+  /**
+   * S'hi ha vingut a planificar el dia, no a fer-lo (`/train?date=…&plan=1`).
+   *
+   * Un dia futur ja es planifica sol —encara no ha arribat—, però el d'avui
+   * es pot voler deixar apuntat per a més tard en comptes de començar-lo ara;
+   * és el que demana el botó «Planificar avui» d'Inici.
+   */
+  readonly planRequested   = signal(false);
   private typeService = inject(TrainingTypeService);
   readonly workoutTypes = computed((): WorkoutTypeItem[] =>
     this.typeService.types().map(t => ({ value: t.id, label: t.name, icon: t.icon, color: t.color }))
@@ -1168,6 +1203,9 @@ export class TrainComponent implements OnDestroy {
    *  via ?workout=<id> renders straight into the editor on first paint,
    *  without a flash of the dashboard first. */
   readonly activeWorkoutId = signal<string | null>(this.route.snapshot.queryParamMap.get('workout'));
+  /** L'entrenament que s'ha demanat editar. Un de passat s'obre per llegir-lo
+   *  (`editing()`), i això recorda que ja se n'ha demanat l'edició. */
+  private readonly editRequestedFor = signal<string | null>(null);
   readonly creating          = signal(false);
   readonly awFeelingOpen     = signal(false);
   readonly feelingLevels5: FeelingLevel[] = [1, 2, 3, 4, 5];
@@ -1310,6 +1348,12 @@ export class TrainComponent implements OnDestroy {
 
   readonly isSelectedFuture = computed(() => this.selectedDate() > this.today());
 
+  /** El que es creï serà un pla: perquè el dia encara ha de venir, o perquè
+   *  s'ha demanat planificar-lo expressament. Un dia passat no: allò ja ha
+   *  passat i el que s'hi fa és registrar-ho. */
+  readonly planning = computed(() =>
+    this.isSelectedFuture() || (this.planRequested() && !this.isSelectedPast()));
+
   readonly pagePaddingBottom = computed(() =>
     '88px' // clear the active-workout menu FAB / the dog's suggestion card
   );
@@ -1321,6 +1365,33 @@ export class TrainComponent implements OnDestroy {
     const id = this.activeWorkoutId();
     if (!id) return null;
     return this.workoutService.workouts().find(w => w.id === id) ?? null;
+  });
+
+  /**
+   * Si la pàgina és per entrenar o per llegir.
+   *
+   * Mana si l'entrenament s'ha donat per acabat. Mentre està en marxa —i
+   * qualsevol acabat de crear ho està— s'obre a l'editor: hi véns a fer-lo, i
+   * un tap des d'Inici t'hi ha de deixar a dins. Un cop acabat s'obre a
+   * l'esquema, com una sessió d'esport: hi véns a mirar-te'l, i tocar-lo és
+   * un pas que es demana. Un pla també s'obre a l'editor: planificar és
+   * escriure-hi.
+   *
+   * Que estigui acabat o no només ho sap aquest dispositiu
+   * (`OngoingWorkoutService`); sense cap notícia, es dona per acabat.
+   */
+  readonly editing = computed((): boolean => {
+    const w = this.activeWorkout();
+    if (!w) return false;
+    if (this.editRequestedFor() === w.id) return true;
+    if (this.isPlannedWorkout(w)) return true;
+    return this.ongoing.isOngoing(w.id);
+  });
+
+  /** Cert mentre l'entrenament obert no s'hagi donat per acabat. */
+  readonly activeIsOngoing = computed((): boolean => {
+    const w = this.activeWorkout();
+    return !!w && !this.isPlannedWorkout(w) && this.ongoing.isOngoing(w.id);
   });
 
   readonly activeWorkoutCategories = computed((): string[] => {
@@ -1451,77 +1522,78 @@ export class TrainComponent implements OnDestroy {
     this.sportService.ensureLoaded();
     this._nowTimer = setInterval(() => this._now.set(Date.now()), 60_000);
 
-    // Coming from the home feed with a specific workout to open (e.g. tapping
-    // a day's card there navigates here with ?workout=<id>). Reactive (rather
-    // than a one-off snapshot read) since this route is kept alive and reused
-    // across nav-bar switches, so the query param can change without the
-    // component being recreated.
-    const queryWorkoutId = toSignal(this.route.queryParamMap.pipe(map(params => params.get('workout'))));
-    effect(() => {
-      const id = queryWorkoutId();
-      if (id) untracked(() => {
-        this.openWorkout(id);
-        // The train route is kept alive (AppReuseStrategy), so its query-param
-        // observable only re-emits when the value actually changes. Strip the
-        // consumed ?workout= from the URL right away — otherwise re-tapping the
-        // same workout later navigates to an identical URL that never re-fires
-        // this effect, leaving the dashboard visible instead of the detail.
-        queueMicrotask(() => this.router.navigate([], {
-          relativeTo: this.route,
-          queryParams: { workout: null },
-          queryParamsHandling: 'merge',
-          replaceUrl: true,
-        }));
-      });
-    });
-
-    // Coming from the home feed with a specific sport session to open
-    // (e.g. tapping a sport row there navigates here with
-    // ?sport=<id>&date=<date>). Reactive on sportService.sports() too,
-    // since the list may still be loading on first visit; handledSportQueryId
-    // stops it from reopening (or, worse, toggle-closing) the sheet every
-    // time the sports list happens to change afterwards.
-    // Deep-link to a specific day (e.g. "Registrar entrenament" from the
-    // calendar → /train?date=YYYY-MM-DD). The train route is kept alive
-    // (AppReuseStrategy), so the constructor's snapshot seed only runs on a
-    // cold mount — this reactive sync makes the link land on the right day
-    // even when returning to an already-instantiated train page.
-    const queryDate = toSignal(
-      this.route.queryParamMap.pipe(map(params => validDateParam(params.get('date'))))
-    );
-    effect(() => {
-      const d = queryDate();
-      if (d) untracked(() => this.selectedDate.set(d));
-    });
-
+    // ── El que s'està mirant ho diu l'adreça ────────────────────────────
+    //
+    // S'hi arriba amb `/train?workout=<id>` (des d'Inici o de l'Historial) o
+    // amb `/train?date=<dia>` (registrar un dia passat, planificar-ne un de
+    // futur), i la pàgina es posa al dia a cada navegació que hi acaba.
+    //
+    // Es llegeix de l'estat del router, no de `route.queryParamMap`: la ruta
+    // es manté viva (AppReuseStrategy) i, quan es reenganxa, aquell
+    // observable només torna a emetre si els paràmetres han canviat respecte
+    // de l'última vegada que hi eres. Obrir dues vegades el mateix
+    // entrenament no els canvia, i el segon cop et quedaves al taulell.
+    //
+    // I l'adreça es queda com és: abans, tot just consumit el `?workout=`, se
+    // n'anava amb una navegació a part. Aquella navegació —relativa a una
+    // ruta que podia haver deixat de ser l'activa— és la que de tant en tant
+    // et plantava a `/train` en comptes de l'entrenament, i deixava l'adreça
+    // dient una cosa i la pantalla una altra: recarregar o tornar enrere ja
+    // no hi tornava.
     let firstDateEffectRun = true;
-    // Set right before a deep-link (obrir un entrenament) changes
-    // selectedDate on purpose, so this effect's reset below doesn't
-    // immediately close what it just opened.
+    // Es posa just abans que obrir un entrenament canviï el dia a posta,
+    // perquè la reinicialització de sota no tanqui el que s'acaba d'obrir.
     let suppressNextDateReset = false;
 
-    // ...i entrar-hi *sense* `?date=` vol dir avui. La ruta es manté viva
-    // (AppReuseStrategy), així que sense això la pàgina es quedava clavada al
-    // dia que havies obert abans — tornaves a Inici, hi triaves avui, i
-    // Entrenament seguia pensant que eres a l'1 de setembre.
-    // Només compta quan s'hi arriba des d'una altra pàgina: els canvis de
-    // query param de la mateixa pàgina (obrir un entrenament, per exemple) no
-    // han de moure't del dia que estàs mirant.
+    // Arribar-hi *sense* `?date=` vol dir avui. La ruta es manté viva, així
+    // que sense això la pàgina es quedava clavada al dia que havies obert
+    // abans — tornaves a Inici, hi triaves avui, i Entrenament seguia pensant
+    // que eres a l'1 de setembre. Només compta quan s'hi arriba des d'una
+    // altra pàgina: navegar dins la mateixa pàgina no t'ha de moure de dia.
     let previousPath = this.router.url.split('?')[0];
+
+    // Arrencada en fred amb `?workout=` a l'adreça: el senyal ja ve sembrat
+    // del snapshot perquè la primera pintada sigui l'entrenament i no el
+    // taulell (l'outlet pot muntar la pàgina després que la navegació hagi
+    // acabat, i llavors no n'arriba cap avís). Les sèries, però, encara
+    // s'han de demanar.
+    const seededWorkoutId = this.activeWorkoutId();
+    if (seededWorkoutId) this.openWorkout(seededWorkoutId);
+
+    const syncFromUrl = (url: string, arrivedNow: boolean): void => {
+      // Els paràmetres es llegeixen de l'adreça on ha anat a parar la
+      // navegació, que és sempre la bona: ni depèn que un observable d'una
+      // ruta reenganxada torni a emetre, ni de l'ordre en què s'actualitza
+      // res.
+      const params    = this.router.parseUrl(url).queryParams as Record<string, string | undefined>;
+      const workoutId = params['workout'] ?? null;
+      const linkDate  = validDateParam(params['date'] ?? null);
+      // Sempre, no només quan hi és: tornar a Entrenar sense demanar-ho vol
+      // dir que ja no s'hi ve a planificar.
+      this.planRequested.set(params['plan'] === '1');
+
+      const goToDay = (day: string): void => {
+        if (this.selectedDate() === day) return;
+        // El salt de dia és només de context quan s'obre un entrenament: no
+        // ha de tancar el que s'acaba d'obrir.
+        if (workoutId) suppressNextDateReset = true;
+        this.selectedDate.set(day);
+      };
+
+      if (linkDate) goToDay(linkDate);
+      else if (arrivedNow) goToDay(this.today());
+
+      if (workoutId && workoutId !== this.activeWorkoutId()) this.openWorkout(workoutId);
+    };
+
     this.router.events
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd), takeUntilDestroyed())
       .subscribe(e => {
         const path       = e.urlAfterRedirects.split('?')[0];
         const arrivedNow = previousPath !== '/train' && path === '/train';
         previousPath = path;
-        if (!arrivedNow) return;
-        const params = this.route.snapshot.queryParamMap;
-        if (validDateParam(params.get('date'))) return;
-        if (this.selectedDate() === this.today()) return;
-        // Si s'arriba per obrir un entrenament concret, el salt de dia és
-        // només de context: no ha de tancar el que s'acaba d'obrir.
-        if (params.get('workout')) suppressNextDateReset = true;
-        this.selectedDate.set(this.today());
+        if (path !== '/train') return;
+        syncFromUrl(e.urlAfterRedirects, arrivedNow);
       });
 
     effect(() => {
@@ -1535,6 +1607,8 @@ export class TrainComponent implements OnDestroy {
         if (firstDateEffectRun) { firstDateEffectRun = false; return; }
         if (suppressNextDateReset) { suppressNextDateReset = false; return; }
         this.activeWorkoutId.set(null);
+        this.editRequestedFor.set(null);
+        this.planRequested.set(false);
         this.pickerCat.set(null);
       });
     });
@@ -1558,7 +1632,7 @@ export class TrainComponent implements OnDestroy {
       const id = await this.workoutService.createWorkoutFromProposal(
         this.selectedDate(), prop.id, prop.entries,
       );
-      this.openWorkout(id);
+      this.openWorkout(id, { edit: true });
     } catch {
       this.feedback.error('Error en acceptar la proposta', 3000);
     } finally {
@@ -1594,17 +1668,50 @@ export class TrainComponent implements OnDestroy {
 
   // ── Workout navigation ────────────────────────────────────────────────────
 
-  openWorkout(id: string): void {
+  /** `edit` per als camins que acaben de crear l'entrenament: l'acabes de
+   *  començar, així que no té sentit fer-te'l llegir abans de tocar-lo. */
+  openWorkout(id: string, opts: { edit?: boolean } = {}): void {
     // De l'historial vell només se n'ha baixat el resum de la targeta. Obrir
     // la sessió és el moment de demanar-ne les sèries: sense elles l'editor
     // ensenyaria una sessió buida i cap canvi hi arribaria.
     void this.workoutService.ensureWorkoutEntries(id);
     this.activeWorkoutId.set(id);
+    this.editRequestedFor.set(opts.edit ? id : null);
     this.pickerCat.set(null);
+  }
+
+  /** Un entrenament acabat es llegeix primer; això és el pas de tocar-lo, i
+   *  a partir d'aquí és una sessió com la que estàs fent: tot editable. */
+  startEditing(): void {
+    const w = this.activeWorkout();
+    if (w) this.editRequestedFor.set(w.id);
+  }
+
+  /**
+   * Donar-lo per acabat: es tanca l'editor i la pàgina passa al resum.
+   *
+   * És el gest que fa de punt final, i per això té botó propi i no viu dins
+   * cap menú. No toca l'entrenament —no és cap camp seu—: només aquest
+   * dispositiu deixa de considerar-lo en marxa.
+   */
+  finishWorkout(): void {
+    const w = this.activeWorkout();
+    if (!w) return;
+    this.ongoing.finish(w.id);
+    this.editRequestedFor.set(null);
+    this.reorderMode.set(false);
+    this.groupingMode.set(false);
+    this.feedback.success('Entrenament acabat', 2000);
+  }
+
+  /** Ni d'avui ni previst: una sessió que ja va passar. */
+  isPastWorkout(w: Workout): boolean {
+    return !this.isPlannedWorkout(w) && w.date < this.today();
   }
 
   closeWorkout(): void {
     this.activeWorkoutId.set(null);
+    this.editRequestedFor.set(null);
     this.editor?.reset();
     // Return to wherever the workout was opened from — the home feed, the
     // calendar (when registering a past day), etc. — instead of always
@@ -1617,20 +1724,15 @@ export class TrainComponent implements OnDestroy {
       // Un planificat de la rutina no és cap fila fins que el comences: el
       // que s'obre és l'entrenament que s'acaba de crear, no el projectat.
       const id = await this.workoutService.startPlannedWorkout(w.id);
-      this.openWorkout(id);
+      this.openWorkout(id, { edit: true });
     } catch {
       this.feedback.error('Error en iniciar el pla', 2500);
     }
   }
 
-  workoutDateLabel(w: Workout): string {
-    const d = new Date(w.date + 'T12:00:00');
-    const label = d.toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'long' });
-    return label.charAt(0).toUpperCase() + label.slice(1);
-  }
-
   /** El dia de l'entrenament tal com el diu el feed: «Avui», «Ahir» o escrit.
-   *  El mateix que corona una sessió d'esport. */
+   *  Viu a la capçalera de la pàgina: la targeta de sota no porta data, com
+   *  la del feed. */
   heroDateLabel(w: Workout): string {
     return feedDayLabel(w.date, this.today());
   }
@@ -1639,14 +1741,6 @@ export class TrainComponent implements OnDestroy {
    *  `sport-session`. */
   isPlannedWorkout(w: Workout): boolean {
     return (w.status ?? 'done') === 'planned';
-  }
-
-  topbarTotalSets(w: Workout): number {
-    return w.entries.reduce((acc, e) => acc + e.sets.filter(s => !s.warmup).length, 0);
-  }
-
-  topbarWarmupSets(w: Workout): number {
-    return w.entries.reduce((acc, e) => acc + e.sets.filter(s => s.warmup).length, 0);
   }
 
   workoutLabel(w: Workout): string {
@@ -1662,10 +1756,13 @@ export class TrainComponent implements OnDestroy {
   readonly workoutCardColor    = workoutCardColor;
   readonly workoutPrimaryColor = workoutPrimaryColor;
   readonly workoutPrimaryIcon  = workoutPrimaryIcon;
-  /** Bodyweight-aware total volume label — folds in the user's bodyweight for
-   *  bodyweight/assisted exercises (dominades, fons…). */
-  workoutVolumeFmt(w: Workout): string {
-    return workoutVolumeFmtUtil(w, {
+  readonly workoutTypeLabel    = workoutTypeLabel;
+
+  /** Les xifres de la targeta —exercicis, sèries i volum—, les mateixes que
+   *  al feed. El pes corporal hi compta, així les dominades i companyia sumen
+   *  volum com la resta. */
+  workoutStats(w: Workout): ActivityStat[] {
+    return workoutCardStats(w, {
       bodyweightKg: this.settingsService.bodyweightKg(),
       loadTypeOf: this.exerciseService.loadTypeOf,
       bodyweightFactorOf: this.exerciseService.bodyweightFactorOf,
@@ -1785,7 +1882,7 @@ export class TrainComponent implements OnDestroy {
 
   /** Create a planned workout (future date) or a live one (today/past), then open it. */
   private async _createForSelectedDate(cat: ExerciseCategory, entries: WorkoutEntry[]): Promise<string> {
-    if (this.isSelectedFuture()) {
+    if (this.planning()) {
       return this.workoutService.createPlannedWorkout(this.selectedDate(), cat, entries);
     }
     if (entries.length) {
@@ -1801,7 +1898,7 @@ export class TrainComponent implements OnDestroy {
     this.creating.set(true);
     try {
       const id = await this._createForSelectedDate(cat, []);
-      this.openWorkout(id);
+      this.openWorkout(id, { edit: true });
     } catch {
       this.feedback.error('Error en crear l\'entrenament', 3000);
     } finally { this.creating.set(false); }
@@ -1815,7 +1912,7 @@ export class TrainComponent implements OnDestroy {
     this.creating.set(true);
     try {
       const id = await this._createForSelectedDate(cat, last?.entries ?? []);
-      this.openWorkout(id);
+      this.openWorkout(id, { edit: true });
     } catch {
       this.feedback.error('Error en crear l\'entrenament', 3000);
     } finally { this.creating.set(false); }
@@ -1837,7 +1934,7 @@ export class TrainComponent implements OnDestroy {
           : [],
       }));
       const id = await this._createForSelectedDate(useCat, entries);
-      this.openWorkout(id);
+      this.openWorkout(id, { edit: true });
     } catch {
       this.feedback.error('Error en crear l\'entrenament', 3000);
     } finally { this.creating.set(false); }
@@ -1889,7 +1986,9 @@ export class TrainComponent implements OnDestroy {
       let workoutId = this.activeWorkout()?.id;
       if (!workoutId) {
         workoutId = await this.workoutService.createWorkoutForDate(this.selectedDate(), defaultCategory);
-        this.activeWorkoutId.set(workoutId);
+        // Acabat de crear i amb un exercici a dins: s'obre per omplir-lo,
+        // encara que el dia sigui d'abans d'avui.
+        this.openWorkout(workoutId, { edit: true });
       }
 
       await this.workoutService.addExerciseToWorkout(workoutId, {
@@ -1941,7 +2040,9 @@ export class TrainComponent implements OnDestroy {
     const existing = this.sportService.getSessionForDate(date, sport.id);
     if (existing) { this._openSportSession(existing.id); return; }
 
-    const planning = this.isSelectedFuture();
+    // Planificar un esport segueix la mateixa regla que un entrenament: el
+    // dia encara ha de venir, o s'ha demanat deixar-lo apuntat.
+    const planning = this.planning();
     this.sportToggling.set(true);
     try {
       const id = await this.sportService.logSession(

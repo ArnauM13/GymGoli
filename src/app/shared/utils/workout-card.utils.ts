@@ -41,8 +41,14 @@ export function workoutTypeLabel(w: Workout): string {
   return cats.map(c => getCatLabel(c)).join(' · ');
 }
 
-/** Una xifra d'una targeta d'activitat: el glif i el valor curt. */
-export interface ActivityStat { icon: string; text: string; }
+/**
+ * Una xifra d'una targeta d'activitat: el glif i el valor curt.
+ *
+ * `warmup` penja de la xifra de sèries (les d'escalfament no inflen el total
+ * però tampoc no s'amaguen) i `accent` marca la que es tenyeix del color de
+ * l'activitat — el volum d'un entrenament.
+ */
+export interface ActivityStat { icon: string; text: string; warmup?: number; accent?: boolean; }
 
 /** Les xifres d'una sessió d'esport: durada i mètriques, com les sèries i el
  *  volum ho són per a un entrenament. */
@@ -119,6 +125,36 @@ export function sportMetricIcon(def: SportMetricDef): string {
 function _metricStat(def: SportMetricDef, v: string | number | undefined): ActivityStat | null {
   const text = sportMetricValue(def, v);
   return text === null ? null : { icon: sportMetricIcon(def), text };
+}
+
+/**
+ * Les xifres d'un entrenament per a la targeta: exercicis, sèries i volum.
+ *
+ * Són les mateixes al feed, a l'Historial i coronant la pàgina de
+ * l'entrenament, i per això viuen aquí i no a cap component: una sessió s'ha
+ * de llegir igual la miris on la miris.
+ *
+ * Un pla encara no té xifres —no s'ha fet— i per això torna la llista buida.
+ */
+export function workoutCardStats(
+  w: Workout,
+  ctx?: WorkoutVolumeContext,
+  opts: { hideVolume?: boolean } = {},
+): ActivityStat[] {
+  if (isWorkoutPlanned(w)) return [];
+  const stats: ActivityStat[] = [
+    { icon: 'fitness_center', text: `${workoutExerciseCount(w)} exerc` },
+  ];
+
+  const sets   = workoutSetsCount(w);
+  const warmup = workoutWarmupSetsCount(w);
+  if (sets || warmup) stats.push({ icon: 'repeat', text: `${sets} sèr`, warmup: warmup || undefined });
+
+  if (!opts.hideVolume) {
+    const vol = workoutVolumeFmt(w, ctx);
+    if (vol) stats.push({ icon: 'weight', text: vol, accent: true });
+  }
+  return stats;
 }
 
 export function workoutCardColor(w: Workout): string {

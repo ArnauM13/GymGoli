@@ -7,6 +7,8 @@ import { Subject } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 
 import { TrainComponent } from './train.component';
+import { OngoingWorkoutService } from '../../core/services/ongoing-workout.service';
+import { ActivityCardComponent } from '../../shared/components/activity-card/activity-card.component';
 import { WorkoutService } from '../../core/services/workout.service';
 import { SportService } from '../../core/services/sport.service';
 import { ExerciseService } from '../../core/services/exercise.service';
@@ -50,6 +52,8 @@ describe('TrainComponent', () => {
   let sportService: { [k: string]: any };
 
   beforeEach(async () => {
+    // «En marxa» viu al dispositiu: cada test arrenca sense cap.
+    localStorage.removeItem('gymgoli_ongoing_workouts');
     forceOffline = signal(false);
     weeklyPlanSignal = signal<WeeklyPlan>(EMPTY_WEEKLY_PLAN);
     settingsSignal    = signal<UserSettings>(DEFAULT_USER_SETTINGS);
@@ -69,6 +73,7 @@ describe('TrainComponent', () => {
       ensureWorkoutEntries:       jasmine.createSpy().and.resolveTo(undefined),
       createWorkoutForDate:       jasmine.createSpy().and.resolveTo('new-id'),
       createWorkoutFromTemplate:  jasmine.createSpy().and.resolveTo('new-id'),
+      createPlannedWorkout:       jasmine.createSpy().and.resolveTo('plan-id'),
       addExerciseToWorkout:       jasmine.createSpy().and.resolveTo(undefined),
       deleteWorkout:              jasmine.createSpy().and.resolveTo(undefined),
     };
@@ -124,7 +129,9 @@ describe('TrainComponent', () => {
       ],
     })
       .overrideComponent(TrainComponent, {
-        set: { imports: [LowerCasePipe], schemas: [NO_ERRORS_SCHEMA] },
+        // La targeta de dalt és la compartida i és el que aquests tests
+        // miren, així que es queda de debò; la resta de fills, esquemàtics.
+        set: { imports: [LowerCasePipe, ActivityCardComponent], schemas: [NO_ERRORS_SCHEMA] },
       })
       .compileComponents();
 
@@ -232,7 +239,7 @@ describe('TrainComponent', () => {
       return fixture.nativeElement as HTMLElement;
     }
 
-    it('diu què és, quan i quantes sèries portes', () => {
+    it('diu què és i quantes sèries portes, amb la targeta del feed', () => {
       const el = openWith(makeWorkout({
         id: 'abc', date: TODAY, categories: ['push'],
         entries: [{ exerciseId: 'e1', exerciseName: 'Press banca', sets: [{ weight: 60, reps: 10 }] }],
@@ -241,20 +248,160 @@ describe('TrainComponent', () => {
       const hero = el.querySelector('.aw-hero') as HTMLElement;
       expect(hero).toBeTruthy();
       expect(hero.querySelector('app-activity-icon')).toBeTruthy();
+      expect(hero.querySelector('.act-card')).toBeTruthy();
       expect(hero.textContent).toContain('Empenta');
-      expect(hero.textContent).toContain('Avui');
       expect(hero.textContent).toContain('1');
+    });
+
+    it('la data la diu la capçalera, no la targeta', () => {
+      const el = openWith(makeWorkout({ id: 'abc', date: TODAY, categories: ['push'] }));
+
+      expect(el.querySelector('.aw-date-sub')?.textContent).toContain('Avui');
+      expect((el.querySelector('.aw-hero') as HTMLElement).textContent).not.toContain('Avui');
     });
 
     it('un pla es veu com a pla i encara no té xifres', () => {
       const el = openWith(makeWorkout({ id: 'abc', date: TODAY, status: 'planned', categories: ['push'] }));
 
       const hero = el.querySelector('.aw-hero') as HTMLElement;
-      expect(hero.classList).toContain('activity-hero--planned');
+      expect(hero.querySelector('.act-card')?.classList).toContain('act-card--planned');
       expect(hero.textContent).toContain('Planificat');
       expect(hero.textContent).not.toContain('exerc');
       // La sensació espera que l'entrenament s'hagi fet.
       expect(hero.querySelector('.aw-feeling-btn')).toBeNull();
+    });
+  });
+
+  // Mana si s'ha donat per acabat, no el dia: un entrenament en marxa s'obre
+  // per fer-lo, i un d'acabat per mirar-se'l, com una sessió d'esport.
+  describe('llegir o editar en obrir un entrenament', () => {
+    let ongoing: OngoingWorkoutService;
+
+    beforeEach(() => { ongoing = TestBed.inject(OngoingWorkoutService); });
+
+    function open(w: Workout): HTMLElement {
+      const workoutService = TestBed.inject(WorkoutService) as unknown as { workouts: ReturnType<typeof signal<Workout[]>> };
+      workoutService.workouts.set([w]);
+      component.openWorkout(w.id);
+      fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    it("un en marxa cau de dret a l'editor", () => {
+      ongoing.start('live');
+      const el = open(makeWorkout({ id: 'live', date: TODAY, categories: ['push'] }));
+
+      expect(component.editing()).toBeTrue();
+      expect(el.querySelector('.edit-btn')).toBeNull();
+      expect(el.querySelector('.aw-action--finish')).toBeTruthy();
+    });
+
+    it("un d'acabat s'obre a l'esquema, amb el botó d'editar", () => {
+      const el = open(makeWorkout({ id: 'old', date: '2024-03-05', categories: ['push'] }));
+
+      expect(component.editing()).toBeFalse();
+      expect(el.querySelector('app-workout-detail')).toBeTruthy();
+      expect(el.querySelector('.edit-btn')).toBeTruthy();
+    });
+
+    // Sense cap notícia d'aquest dispositiu, es dona per acabat: també el
+    // d'avui, que pot venir d'un altre mòbil.
+    it("el d'avui també, si aquest dispositiu no en sap res", () => {
+      open(makeWorkout({ id: 'today', date: TODAY, categories: ['push'] }));
+      expect(component.editing()).toBeFalse();
+    });
+
+    it('un pla sempre s\'obre per escriure-hi', () => {
+      open(makeWorkout({ id: 'plan', date: TODAY, status: 'planned', categories: ['push'] }));
+      expect(component.editing()).toBeTrue();
+    });
+
+    it('i llavors es toca com el que estàs fent: tot editable', () => {
+      open(makeWorkout({ id: 'old', date: '2024-03-05', categories: ['push'] }));
+      component.startEditing();
+      fixture.detectChanges();
+
+      expect(component.editing()).toBeTrue();
+      expect((fixture.nativeElement as HTMLElement).querySelector('.edit-btn')).toBeNull();
+      // Ja estava acabat: no hi ha res a acabar una segona vegada.
+      expect((fixture.nativeElement as HTMLElement).querySelector('.aw-action--finish')).toBeNull();
+    });
+
+    it('acabar-lo tanca l\'editor i deixa el resum', () => {
+      ongoing.start('live');
+      open(makeWorkout({ id: 'live', date: TODAY, categories: ['push'] }));
+
+      component.finishWorkout();
+      fixture.detectChanges();
+
+      expect(ongoing.isOngoing('live')).toBeFalse();
+      expect(component.editing()).toBeFalse();
+      expect((fixture.nativeElement as HTMLElement).querySelector('.edit-btn')).toBeTruthy();
+    });
+
+    it('un acabat de crear ja ve obert per omplir-lo', () => {
+      open(makeWorkout({ id: 'old', date: '2024-03-05', categories: ['push'] }));
+      component.openWorkout('old', { edit: true });
+      expect(component.editing()).toBeTrue();
+    });
+
+    it('tancar-lo oblida que se n\'havia demanat l\'edició', () => {
+      open(makeWorkout({ id: 'old', date: '2024-03-05', categories: ['push'] }));
+      component.startEditing();
+      component.closeWorkout();
+      component.openWorkout('old');
+      fixture.detectChanges();
+
+      expect(component.editing()).toBeFalse();
+    });
+
+    // Ordenar i acabar es fan cada dia: no poden viure dins el menú de tres
+    // punts, que és on van les coses que gairebé no es toquen.
+    it('ordenar i acabar es veuen, no s\'amaguen al menú', () => {
+      ongoing.start('live');
+      const el = open(makeWorkout({
+        id: 'live', date: TODAY, categories: ['push'],
+        entries: [
+          { exerciseId: 'e1', exerciseName: 'Press banca', sets: [] },
+          { exerciseId: 'e2', exerciseName: 'Fons', sets: [] },
+        ],
+      }));
+
+      const labels = Array.from(el.querySelectorAll('.aw-action')).map(b => b.textContent?.trim());
+      expect(labels?.join(' ')).toContain('Ordenar');
+      expect(labels?.join(' ')).toContain("Acabar l'entrenament");
+
+      component.workoutMenuOpen.set(true);
+      fixture.detectChanges();
+      const menu = Array.from(el.querySelectorAll('.aw-menu-item')).map(b => b.textContent?.trim());
+      expect(menu.join(' ')).not.toContain('Ordenar');
+    });
+  });
+
+  // Planificar el dia d'avui: el botó d'Inici hi porta amb `?plan=1`, i el
+  // que es crea és un pla encara que el dia sigui avui.
+  describe('planificar el dia', () => {
+    it("crea un pla quan s'hi ha vingut a planificar", async () => {
+      const workoutService = TestBed.inject(WorkoutService) as unknown as { createPlannedWorkout: jasmine.Spy; createWorkoutForDate: jasmine.Spy };
+      component.planRequested.set(true);
+      component.selectedDate.set(TODAY);
+
+      component.selectType('push');
+      await component.pickerStartEmpty();
+
+      expect(workoutService.createPlannedWorkout).toHaveBeenCalledWith(TODAY, 'push', []);
+      expect(workoutService.createWorkoutForDate).not.toHaveBeenCalled();
+    });
+
+    it('i sense demanar-ho, el d\'avui es comença', async () => {
+      const workoutService = TestBed.inject(WorkoutService) as unknown as { createPlannedWorkout: jasmine.Spy; createWorkoutForDate: jasmine.Spy };
+      component.selectedDate.set(TODAY);
+
+      component.selectType('push');
+      await component.pickerStartEmpty();
+
+      expect(workoutService.createWorkoutForDate).toHaveBeenCalledWith(TODAY, 'push');
+      expect(workoutService.createPlannedWorkout).not.toHaveBeenCalled();
     });
   });
 
@@ -394,6 +541,91 @@ describe('TrainComponent', () => {
       navigateTo('/train?workout=w1', 2);
 
       expect(component.selectedDate()).toBe('2020-09-01');
+    });
+
+    // El que s'ha d'ensenyar ho diu l'adreça: la ruta es manté viva
+    // (AppReuseStrategy) i abans això penjava d'un observable de la ruta que,
+    // reenganxada, només torna a emetre si els paràmetres han canviat.
+    describe("obrir el que diu l'adreça", () => {
+      it('obre l\'entrenament que anomena el `?workout=`', () => {
+        navigateTo('/home', 1);
+        navigateTo('/train?workout=w1', 2);
+
+        expect(component.activeWorkoutId()).toBe('w1');
+      });
+
+      it('el torna a obrir després d\'haver-lo tancat, encara que sigui el mateix', () => {
+        navigateTo('/home', 1);
+        navigateTo('/train?workout=w1', 2);
+        component.closeWorkout();
+        expect(component.activeWorkoutId()).toBeNull();
+
+        navigateTo('/home', 3);
+        navigateTo('/train?workout=w1', 4);
+
+        expect(component.activeWorkoutId()).toBe('w1');
+      });
+
+      it('canvia d\'entrenament sense passar pel taulell', () => {
+        navigateTo('/home', 1);
+        navigateTo('/train?workout=w1', 2);
+        navigateTo('/home', 3);
+        navigateTo('/train?workout=w2', 4);
+
+        expect(component.activeWorkoutId()).toBe('w2');
+      });
+
+      // Arribar-hi d'una altra pàgina posa el dia a avui, i això reinicia el
+      // que hi hagi obert: obrir un entrenament no ho ha de patir.
+      it('no es tanca sol quan el salt de dia va amb ell', () => {
+        component.selectedDate.set('2020-09-01');
+        navigateTo('/home', 1);
+        navigateTo('/train?workout=w1', 2);
+        TestBed.flushEffects();
+
+        expect(component.selectedDate()).toBe(TODAY);
+        expect(component.activeWorkoutId()).toBe('w1');
+      });
+
+      it('deixa l\'adreça com és: no navega enlloc en obrir-lo', () => {
+        navigateTo('/home', 1);
+        navigateTo('/train?workout=w1', 2);
+
+        expect(navigateSpy).not.toHaveBeenCalled();
+      });
+
+      it('un `?date=` deep-link mou el dia encara que la pàgina ja fos viva', () => {
+        navigateTo('/home', 1);
+        navigateTo('/train?date=2024-03-05', 2);
+
+        expect(component.selectedDate()).toBe('2024-03-05');
+      });
+
+      // Planificar avui: el dia ja hi és, però el que s'hi creï és un pla i
+      // no una sessió que comenci ara.
+      it('`?plan=1` fa que el dia d\'avui es planifiqui, no es comenci', () => {
+        navigateTo('/home', 1);
+        navigateTo(`/train?date=${TODAY}&plan=1`, 2);
+
+        expect(component.planning()).toBeTrue();
+        expect(component.isToday()).toBeTrue();
+      });
+
+      it('tornar a Entrenar sense demanar-ho deixa de planificar', () => {
+        navigateTo('/home', 1);
+        navigateTo(`/train?date=${TODAY}&plan=1`, 2);
+        navigateTo('/home', 3);
+        navigateTo('/train', 4);
+
+        expect(component.planning()).toBeFalse();
+      });
+
+      it('un dia passat no es planifica encara que ho demanin', () => {
+        navigateTo('/home', 1);
+        navigateTo('/train?date=2024-03-05&plan=1', 2);
+
+        expect(component.planning()).toBeFalse();
+      });
     });
   });
 

@@ -317,13 +317,22 @@ content in the middle, action buttons on the right.
 ```
 
 
-### 4a. Activity card (`app-day-feed-cards`)
+### 4a. Activity card (`app-activity-card`)
 
 Una activitat registrada — entrenament o esport — es llegeix **sempre igual**
-i **es comporta sempre igual**. La targeta és la mateixa a Inici i a Historial
-i viu en un sol component (`app-day-feed-cards`): tocar-la desplega el detall
-allà mateix (`expand_more` → `expand_less`) i, sota el detall, un botó porta a
-l'activitat sencera.
+i **es comporta sempre igual**. La targeta viu en un sol component
+(`app-activity-card`) i és literalment la mateixa a Inici, a Historial i
+coronant la pàgina de l'activitat: al feed, tocar-la desplega el detall allà
+mateix (`expand_more` → `expand_less`) i, sota el detall, un botó porta a
+l'activitat sencera; a la pàgina de l'activitat només s'hi llegeix (no és cap
+botó) i la sensació s'hi pot posar des d'allà mateix.
+
+El component no sap res d'entrenaments ni d'esports: qui el fa servir li dona
+el color (`accent`, `barColor`), la icona i el gos, el títol, el subtipus, la
+nota i les **xifres ja calculades** (`workoutCardStats` / `sportCardStats`).
+Així no hi ha manera que la targeta d'una pàgina i la del feed diguin coses
+diferents — que és exactament el que havia passat: la de la pàgina portava la
+data i li faltaven les xifres.
 
 | | Entrenament | Esport |
 | --- | --- | --- |
@@ -332,7 +341,13 @@ l'activitat sencera.
 
 Les dues activitats tenen **pàgina pròpia**, i s'hi arriba igual des del feed
 i des d'Entrenar: un entrenament a `/train?workout=` (mode pantalla sencera de
-la pàgina d'Entrenar) i una sessió d'esport a `/sport/:id`. Cap de les dues
+la pàgina d'Entrenar) i una sessió d'esport a `/sport/:id`. **L'adreça es
+queda com és**: el `?workout=` no s'esborra un cop obert. La pàgina d'Entrenar
+es manté viva entre navegacions (`AppReuseStrategy`), i el que ha d'ensenyar
+el llegeix de l'adreça a què ha anat a parar cada navegació —no d'un
+observable de la ruta, que reenganxada només torna a emetre si els paràmetres
+han canviat—, així que obrir dues vegades el mateix entrenament funciona
+igual, i recarregar o tornar enrere hi torna. Cap de les dues
 s'obre en un full flotant —això queda per a triar coses (`bottom sheet`, §8),
 no per a mirar ni omplir una activitat.
 
@@ -353,6 +368,16 @@ iguals per a gimnàs i esport.
 Una activitat **planificada** no es desplega: la targeta porta les seves dues
 accions (eliminar i començar/registrar) i prou, perquè encara no hi ha res a
 mirar.
+
+**Un entrenament en marxa, a Inici, tampoc**: mentre no s'ha donat per acabat
+l'estàs fent, i tocar la targeta hi porta d'un sol tap, en mode edició —
+desplegar-ne el resum per després prémer «Obrir» són dos taps per arribar on
+ja anaves. El chevron ho diu: `chevron_right` (navego) en comptes de
+`expand_more` (desplego). Un esport no ho fa mai —es registren sempre a
+posteriori— i a l'**Historial** no ho fa ningú: allà tot es mira, acabat o no,
+i el desplegable és el que hi toca (`liveOpensPage` només l'activa Inici).
+Acabat o no ho sap només aquest dispositiu, i sense notícies es dona per
+acabat (vegeu `SYNC.md` §«El que no es guarda»).
 
 L'estructura, de fora cap a dins:
 
@@ -388,10 +413,22 @@ Regles que la fan llegible:
   el mateix marge esquerre a totes dues targetes.
 - **La barra de 5px** és absoluta (`position: absolute; left: 0; top: 0;
   bottom: 0`) perquè acompanyi també el panell desplegat.
-- **El detall és una lectura, no un formulari**: blocs amb títol (`Sessió`,
-  `Com ha anat`), files `etiqueta → valor` alineades a la dreta, notes a part i
-  un peu que resumeix. Editar és el pas següent, amb el seu botó, i passa en
-  una altra pàgina.
+- **La data no hi surt mai.** Al feed la diu el dia que agrupa les targetes;
+  a la pàgina d'una activitat, la capçalera (`app-page-header [subtitle]`, o
+  `.aw-date-sub` a Entrenar), amb el mateix nom que li dona el feed
+  (`feedDayLabel`: «Avui», «Ahir», el dia escrit).
+- **El detall és una lectura, no un formulari**: blocs amb títol (`Exercicis`
+  o `Sessió`, i `Com ha anat`), files `etiqueta → valor` alineades a la dreta,
+  notes a part i un peu que resumeix. Editar és el pas següent, amb el seu
+  botó, i passa en una altra pàgina.
+- **Dues mides del mateix detall, iguals per a totes dues activitats.**
+  Desplegat dins la targeta (`compact`) és **una ullada**: les primeres files
+  i prou —5 com a molt, i una línia que diu quantes en queden—, sense
+  titolets, sense rècords ni PRs, sense el context de l'historial, sense la
+  sensació ni la nota (ja són a la targeta) i sense peu. Un entrenament hi
+  posa una línia per exercici («Press banca — 3×8-12 · 80 kg»); un esport, les
+  seves dades. A la pàgina hi és tot: sèrie a sèrie, PRs, rècords, context i
+  peu. La ullada convida a entrar-hi; la pàgina és on s'aprofundeix.
 - **El detall d'un esport hi posa el que la sessió no porta.** Una sessió
   d'esport és plana (durada, un parell de mètriques) i un entrenament no ho és,
   així que la substància ve del context: com se situa la durada respecte de la
@@ -668,36 +705,79 @@ nav pill (inset side margins, all four corners rounded) and slide up from below.
 ### Activity hero
 
 The card that crowns an activity's own page — a workout (`train`, with a
-workout open) and a sport session (`sport-session`) — is **one shared shell**
-in `styles.scss`, not a per-page card. A workout and a sport session are the
-same thing seen up close, and the feed already draws them with the same card;
-the detail pages must not drift apart either.
+workout open) and a sport session (`sport-session`) — **is the feed card
+itself** (`app-activity-card`, §4a), not a look-alike. A workout and a sport
+session are the same thing seen up close, and one component draws both,
+everywhere.
 
 ```html
-<div class="activity-hero" [class.activity-hero--planned]="isPlanned()"
-     [style.--ac]="color">
-  <span class="ah-bar" aria-hidden="true"></span>
-  <app-activity-icon [icon]="icon" [color]="color" mascot="marley" />
-  <div class="ah-text">
-    <div class="ah-title-row"><span class="ah-title">…</span></div>
-    <div class="ah-meta">
-      <span class="ah-date">Avui</span>
-      <span class="ah-sep" aria-hidden="true">·</span>
-      <span class="ah-stat">…<strong>5</strong> exerc</span>
-    </div>
-  </div>
-  <span class="ah-pill">Planificat</span>   <!-- o la sensació -->
-</div>
+<app-activity-card class="aw-hero"
+    [accent]="color" [barColor]="barColor" [icon]="icon" mascot="marley"
+    [title]="workoutTypeLabel(w)" [note]="w.notes ?? ''"
+    [stats]="workoutStats(w)" [feeling]="feeling"
+    [planned]="isPlanned" plannedPill
+    [feelingEditable]="!isPlanned" (feelingClick)="toggleFeelingPicker()" />
 ```
 
-- The activity's hue comes in through `--ac`; the shell paints the border,
-  the tint, the 5px `.ah-bar` and the dashed border of `--planned`.
-- The date says the day the way the feed says it (`feedDayLabel`): "Avui",
-  "Ahir", or the day written out. The same day can't have two names.
-- The page keeps only what's its own: the workout page makes it sticky
-  (`.aw-hero`), the sport page adds the subtype pill.
-- A planned activity shows the "Planificat" pill and no figures — it hasn't
-  happened yet, so there is nothing to count and no feeling to give.
+- The activity's hue comes in through `accent`; the component paints the
+  border, the tint, the 5px bar and the dashed border of a plan.
+- **No date on the card.** The page header carries the day, said the way the
+  feed says it (`feedDayLabel`). The same day can't have two names, and the
+  card must read the same here as in the feed.
+- The page keeps only where it sits: the workout page makes it sticky
+  (`.aw-hero`), the sport page just gives it the page margin (`.ss-hero`).
+- A planned activity shows the "Planificat" pill (`plannedPill`) and no
+  figures — it hasn't happened yet, so there is nothing to count and no
+  feeling to give.
+- `feelingEditable` turns the feeling into a button (the workout page opens
+  the 1-5 picker under the card); without it, the feeling is just read.
+
+### Reading an activity, then editing it
+
+Both activity pages follow **one shape**, and the page is where you go deep:
+
+1. The card (above) — what it was, at a glance.
+2. The detail, read-only, inside `.detail-card` — `app-workout-detail` or
+   `app-sport-detail`, full size: every set, PRs, records, context, footer.
+3. `.edit-btn` — "Editar l'entrenament" / "Editar la sessió". Editing replaces
+   the reading: the editor (or the form) takes the page on its own.
+
+A workout **that is still going** skips step 2 entirely: it opens in the
+editor, because that's what you came for. What decides is whether it has been
+marked as finished — not the day it happened. The two things you do *while*
+training — reordering the exercises and calling it a day — are buttons under
+the editor (`.aw-actions`, with "Acabar l'entrenament" as the primary), never
+menu entries: the three-dot menu is for what you hardly ever touch (template,
+share, delete). Finishing drops you on the summary — step 2 — which is the
+receipt for what you just did.
+
+A workout **already finished** opens on step 2, like a sport session (which is
+always logged afterwards, so it is always finished).
+
+Once you tap edit, a finished workout behaves exactly like the one you are
+doing right now: everything is editable, live-saved, nothing read-only about
+it. A plan always opens in the editor — planning is writing.
+
+### Els tres abasts de planificar (Inici)
+
+Inici ofereix tres gestos sobre el temps, i cadascun viu on parla:
+
+| Gest | On | Què fa |
+| --- | --- | --- |
+| Fer-lo ara | `.start-workout-btn`, sota el calendari | Comença (o registra) el dia seleccionat |
+| Deixar-lo apuntat | `.today-plan-btn`, **dins la targeta del dia** | Planifica **només aquell dia** (`/train?date=…&plan=1`) |
+| La setmana | `.plan-week-btn`, sota el resum setmanal | Obre el planificador dels set dies |
+
+El del mig és el que faltava: un dia futur ja es planifica sol (encara no ha
+arribat), però el d'avui només es podia començar. `?plan=1` diu a Entrenar que
+el que s'hi creï és un pla i no una sessió que comenci ara —`planning()`, que
+també val per als esports— i el rètol de dalt ho confirma: «Planificant ·
+Avui». Un dia passat no s'hi apunta: allò ja ha passat, i el paràmetre
+s'ignora.
+
+Per això el botó de la targeta del dia **només surt quan el dia és avui**: un
+de futur ja té «Planifica aquest dia» a dalt, i duplicar-lo dins la targeta
+seria dir dues vegades el mateix.
 
 ### Insight card & detail sheet
 
