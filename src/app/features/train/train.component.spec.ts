@@ -302,6 +302,10 @@ describe('TrainComponent', () => {
       expect(component.editing()).toBeFalse();
       expect(el.querySelector('app-workout-detail')).toBeTruthy();
       expect(el.querySelector('.edit-btn')).toBeTruthy();
+      // Ordenar i acabar només tenen sentit editant: en mode lectura no hi ha
+      // editor a sota que reaccioni a cap dels dos.
+      expect(el.querySelector('[aria-label="Ordenar els exercicis"]')).toBeNull();
+      expect(el.querySelector('.aw-menu-fab--finish')).toBeNull();
     });
 
     // Sense cap notícia d'aquest dispositiu, es dona per acabat: també el
