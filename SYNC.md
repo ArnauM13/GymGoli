@@ -216,6 +216,27 @@ regles que van juntes:
 Un mes és l'excepció: no hi cap prou entrenament per topar amb el topall, i
 s'estalvia la petició de comprovació.
 
+### Els esports també
+
+`WorkoutProfileService` demana tot l'historial d'esports en entrar —li cal per
+dir «fa X dies que no corres»— i des d'aquell moment `refreshLoaded()` el
+tornava a baixar **sencer** cada cop que l'app recuperava el focus: cada canvi
+de pestanya, anys de sessions, per assabentar-se de si n'hi havia una de nova.
+
+Ara segueix la mateixa forma que els entrenaments: consulta de canvis a cada
+tornada, comprovació sencera cada 5 minuts. La marca la posa un **disparador
+del servidor** (migració 030) i no el client, al revés que a `workouts`: aquí
+no hi ha cap guarda de concurrència que depengui que la marca sigui la del
+dispositiu, i posant-la el servidor no hi ha manera que un client se la deixi.
+
+El primer refresc de cada sessió no demana cap delta: encara no hi ha marcador,
+i qui porta les dades és la comprovació sencera que ve tot seguit. Només mira
+per on va el rellotge del servidor, que és una fila.
+
+Mentre la migració 030 no s'executi, el servidor contesta `42703` («la columna
+no hi és»), el client se'n desdiu sol i continua amb la comprovació sencera de
+sempre.
+
 ## 4c. Què es demana, i què no
 
 Les consultes d'entrenaments porten una llista de columnes (`WORKOUT_COLUMNS`),
@@ -236,8 +257,9 @@ Les sessions d'esport igual (`SPORT_SESSION_COLUMNS`), que a més s'enduien
 | Sessions d'un exercici (`entries @> [{"exerciseId": …}]`) | `workouts` GIN `(entries jsonb_path_ops)` |
 | Historial per mes i paginat | `workouts (user_id, date desc)` |
 | Cerca per nom d'exercici | `workouts` GIN trigram `(exercise_names)` |
+| Canvis de les sessions d'esport | `sport_sessions (user_id, updated_at desc)` |
 
-Els dos primers són de la migració 029. La segona consulta abans anava amb
+Els dos primers són de la migració 029; l'últim, de la 030. La segona consulta abans anava amb
 `entries::text ilike '%"exerciseId":"…"%'`: convertir tot el blob a text obliga
 a llegir i convertir **cada** entrenament de l'usuari a cada consulta, i no hi
 ha índex que hi pugui ajudar. És la mateixa trampa que la migració 020 va

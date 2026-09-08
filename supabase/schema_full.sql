@@ -1,5 +1,5 @@
 -- GymGoli – Schema complet i idempotent
--- Consolida totes les migracions (001–029).
+-- Consolida totes les migracions (001–030).
 -- Segur de re-executar: usa IF NOT EXISTS, DROP … IF EXISTS i OR REPLACE.
 -- Executa a: Supabase Dashboard → SQL Editor → New query
 
@@ -155,7 +155,11 @@ CREATE TABLE IF NOT EXISTS sport_sessions (
   metrics          jsonb       DEFAULT '{}',
   status           text        NOT NULL DEFAULT 'done' CHECK (status IN ('planned', 'done')),
   planned_source   text        CHECK (planned_source IN ('routine', 'manual', 'trainer')),
-  created_at       timestamptz DEFAULT now()
+  created_at       timestamptz DEFAULT now(),
+  -- La marca que fa possible la consulta de canvis (migració 030). Aquí la
+  -- posa un disparador, no el client: no hi ha cap guarda que depengui que
+  -- sigui la seva, i així tot passa per un sol rellotge.
+  updated_at       timestamptz DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS user_settings (
@@ -226,7 +230,10 @@ ALTER TABLE sport_sessions
   ADD COLUMN IF NOT EXISTS duration       integer,
   ADD COLUMN IF NOT EXISTS feeling        smallint CHECK (feeling BETWEEN 1 AND 5),
   ADD COLUMN IF NOT EXISTS metrics        jsonb    DEFAULT '{}',
-  ADD COLUMN IF NOT EXISTS planned_source text     CHECK (planned_source IN ('routine', 'manual', 'trainer'));
+  ADD COLUMN IF NOT EXISTS planned_source text     CHECK (planned_source IN ('routine', 'manual', 'trainer')),
+  ADD COLUMN IF NOT EXISTS updated_at     timestamptz DEFAULT now();
+
+UPDATE sport_sessions SET updated_at = created_at WHERE updated_at IS NULL;
 
 DO $$
 BEGIN
@@ -541,6 +548,10 @@ CREATE INDEX IF NOT EXISTS sport_sessions_user_id_date_idx
 CREATE INDEX IF NOT EXISTS sport_sessions_user_status_date_idx
   ON sport_sessions (user_id, status, date);
 
+-- Consulta de canvis de les sessions d'esport (migració 030)
+CREATE INDEX IF NOT EXISTS sport_sessions_user_updated_at_idx
+  ON sport_sessions (user_id, updated_at DESC NULLS LAST);
+
 CREATE INDEX IF NOT EXISTS user_settings_user_id_idx
   ON user_settings (user_id);
 
@@ -786,6 +797,23 @@ $$;
 
 REVOKE ALL     ON FUNCTION seed_default_exercises(jsonb) FROM public;
 GRANT  EXECUTE ON FUNCTION seed_default_exercises(jsonb) TO authenticated;
+
+-- ── La marca de les sessions d'esport la posa el servidor (migració 030) ─────
+
+CREATE OR REPLACE FUNCTION sport_sessions_touch_updated_at()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at := now();
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS sport_sessions_set_updated_at ON sport_sessions;
+CREATE TRIGGER sport_sessions_set_updated_at
+  BEFORE INSERT OR UPDATE ON sport_sessions
+  FOR EACH ROW EXECUTE FUNCTION sport_sessions_touch_updated_at();
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 8. REALTIME

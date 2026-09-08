@@ -3,7 +3,7 @@ import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { TodayService } from './today.service';
-import { fetchAllRows } from './supabase-page.util';
+import { SUPABASE_PAGE_SIZE, fetchAllRows } from './supabase-page.util';
 import { DEFAULT_SPORTS, Sport, SportMetricDef, SportSession, SportSessionStatus, SportSubtype } from '../models/sport.model';
 import { FeelingLevel, PlannedSource } from '../models/workout.model';
 
@@ -110,9 +110,23 @@ export class SportService {
   private _allLoad: Promise<void> | null = null;
   private _lastRefreshAt = 0;
 
+  /** Fins on s'han demanat canvis: l'`updated_at` més alt que ha arribat en
+   *  una resposta, no l'hora d'aquest dispositiu (vegeu `_pullChanges()`). */
+  private _lastPulledAt: string | null = null;
+  private _pulledOnce = false;
+  private _lastFullPullAt = 0;
+  private _pullLoad: Promise<void> | null = null;
+  /** Fals quan la base de dades encara no té `sport_sessions.updated_at`
+   *  (migració 030). Llavors no hi ha consulta de canvis possible i es torna a
+   *  la comprovació sencera de sempre. */
+  private _canPullChanges = true;
+
   /** Marge mínim entre refrescos automàtics (tornar a l'app dispara alhora
    *  `focus` i `visibilitychange`). */
   private static readonly REFRESH_THROTTLE_MS = 10_000;
+  /** Cada quant es fa la comprovació sencera, l'única que veu els esborrats
+   *  fets des d'un altre dispositiu. El mateix que als entrenaments. */
+  private static readonly FULL_PULL_EVERY_MS = 5 * 60_000;
   private _isFlushing = false;
   /** Comptador de versions de la cua d'enviaments. */
   private _opSeq = 0;
@@ -167,8 +181,12 @@ export class SportService {
       this.isLoaded.set(false);
       this._loadPromise = null;
       // Una consulta de l'usuari anterior no pot quedar-se com la que espera
-      // qui demani l'historial ara.
+      // qui demani l'historial ara, ni el seu marcador de canvis com el nostre.
       this._allLoad = null;
+      this._pullLoad = null;
+      this._lastPulledAt = null;
+      this._pulledOnce = false;
+      this._lastFullPullAt = 0;
       if (uid) {
         const cached = this._readSportsFromStorage(uid);
         if (cached) {
@@ -214,18 +232,150 @@ export class SportService {
     // `getSportsForDate()` descarta la sessió si no en troba la definició.
     const sports = this._loadSports(uid);
 
+    // Primer el que ha canviat des de l'últim cop. `WorkoutProfileService`
+    // demana tot l'historial en entrar, i des d'aquell moment cada tornada a
+    // l'app el tornava a baixar **sencer**: cada canvi de pestanya, anys de
+    // sessions, per assabentar-se de si n'hi havia una de nova.
+    await Promise.all([sports, this._pullChanges(uid)]);
+
+    // I de tant en tant, la comprovació sencera. És l'única que veu el que ha
+    // desaparegut: una sessió esborrada des d'un altre dispositiu ja no surt a
+    // cap consulta de canvis, perquè no hi ha cap fila que ho digui.
+    const dueFullPull = now - this._lastFullPullAt > SportService.FULL_PULL_EVERY_MS;
+    if (!dueFullPull && this._pulledOnce) return;
+    this._lastFullPullAt = now;
+
     // Es torna a demanar sencer sense tombar `allSessionsLoaded`: qui en depèn
     // (els rècords del detall d'una sessió) tornaria a pintar-se a mitges cada
     // cop que l'app recupera el focus, i això és part de les pampallugues.
-    if (this._allLoaded()) {
-      await Promise.all([sports, this._fetchAllSessions()]);
-      return;
-    }
+    if (this._allLoaded()) { await this._fetchAllSessions(); return; }
 
-    await Promise.all([sports, ...[...this._monthCache.keys()].map(key => {
+    await Promise.all([...this._monthCache.keys()].map(key => {
       const [y, m] = key.split('-').map(Number);
       return this.ensureMonthLoaded(y, m - 1, true);
-    })]);
+    }));
+  }
+
+  /**
+   * Demana només les sessions que han canviat des de l'últim cop.
+   *
+   * Mateixa forma que als entrenaments, i pels mateixos motius: el marcador és
+   * l'`updated_at` **més alt que ha arribat de debò en una resposta**, no
+   * l'hora d'aquest dispositiu — la taula barreja les hores de tots els seus
+   * dispositius i apuntar el marcador a «ara segons jo» deixa per sempre per
+   * sota el que hagi escrit un mòbil amb el rellotge endarrerit. Aquí, a més,
+   * la marca la posa un disparador del servidor (migració 030), o sigui que
+   * tot passa per un sol rellotge.
+   *
+   * Es demana amb `>=` per no perdre els empats a la frontera d'un tram: una
+   * fila repetida només es torna a aplicar a sobre d'ella mateixa.
+   */
+  private _pullChanges(uid: string): Promise<void> {
+    if (!this._canPullChanges) return Promise.resolve();
+    if (this._pullLoad) return this._pullLoad;
+    const p = this._fetchChanges(uid).finally(() => { this._pullLoad = null; });
+    this._pullLoad = p;
+    return p;
+  }
+
+  private async _fetchChanges(uid: string): Promise<void> {
+    let cursor = this._lastPulledAt;
+    try {
+      // Sense marcador encara no hi ha delta que demanar: qui porta les dades
+      // aquest primer cop és la comprovació sencera que ve tot seguit, i
+      // baixar-ho tot dues vegades seguides no diria res de nou. N'hi ha prou
+      // amb saber per on va el rellotge del servidor, que és una sola fila.
+      if (!cursor) {
+        const { data, error } = await this.supabase
+          .from('sport_sessions')
+          .select('updated_at')
+          .eq('user_id', uid)
+          .order('updated_at', { ascending: false })
+          .limit(1);
+        if (error) {
+          if ((error as { code?: string }).code === '42703') this._canPullChanges = false;
+          return;
+        }
+        const newest = (data ?? [])[0]?.['updated_at'] as string | undefined;
+        if (newest) { cursor = newest; this._lastPulledAt = cursor; }
+        this._pulledOnce = true;
+        return;
+      }
+
+      for (let page = 0; page < 20; page++) {
+        let q = this.supabase
+          .from('sport_sessions')
+          .select(`${SPORT_SESSION_COLUMNS},updated_at`)
+          .eq('user_id', uid)
+          .order('updated_at', { ascending: true })
+          .order('id', { ascending: true })
+          .limit(SUPABASE_PAGE_SIZE)
+          .gte('updated_at', cursor);
+
+        const { data, error } = await q;
+        if (error) {
+          // La migració 030 encara no hi és: sense columna no hi ha consulta
+          // de canvis, i es continua com sempre amb la comprovació sencera.
+          if ((error as { code?: string }).code === '42703') this._canPullChanges = false;
+          return;
+        }
+
+        const rows = (data ?? []) as Record<string, unknown>[];
+        this._applyServerSessions(uid, rows.map(r => toSportSession(r)));
+
+        const newest = rows.reduce<string | null>((max, r) => {
+          const at = r['updated_at'] as string | undefined;
+          return at && (!max || at > max) ? at : max;
+        }, null);
+        if (newest) { cursor = newest; this._lastPulledAt = cursor; }
+
+        this._pulledOnce = true;
+        if (rows.length < SUPABASE_PAGE_SIZE || !newest) return;
+      }
+    } catch {
+      // Sense xarxa: el marcador no es mou i la propera vegada es reprèn aquí.
+    }
+  }
+
+  /**
+   * Incorpora files soltes vingudes del servidor.
+   *
+   * A diferència d'una resposta d'abast sencer, **no dedueix res del que hi
+   * falta**: una consulta de canvis no diu què ha desaparegut, només què s'ha
+   * tocat. I el que espera pujar no es toca — és exactament la versió que
+   * estem a punt d'enviar-li.
+   */
+  private _applyServerSessions(uid: string, fetched: SportSession[]): void {
+    if (!fetched.length) return;
+    const pending = this._readPending(uid);
+    const queued  = new Set(pending.filter(o => o.op !== 'delete').map(o => o.id));
+    const erased  = new Set(pending.filter(o => o.op === 'delete').map(o => o.id));
+
+    // Els mesos tocats es guarden un cop al final: escriure el mes sencer a
+    // cada sessió serialitzaria el mateix una vegada per fila.
+    const touched = new Set<string>();
+    for (const s of fetched) {
+      if (queued.has(s.id) || erased.has(s.id)) continue;
+
+      const key = s.date.substring(0, 7);
+      // Un mes que aquest dispositiu no ha demanat mai no s'omple a trossos:
+      // tenir-ne una sessió solta faria semblar que ja el té sencer.
+      if (!this._monthCache.has(key) && !this._allLoaded()) continue;
+
+      // Pot haver canviat de dia, i llavors ha de marxar del mes on era.
+      for (const [k, bucket] of this._monthCache) {
+        if (k === key) continue;
+        const without = bucket.filter(x => x.id !== s.id);
+        if (without.length !== bucket.length) { this._monthCache.set(k, without); touched.add(k); }
+      }
+      const bucket = (this._monthCache.get(key) ?? []).filter(x => x.id !== s.id);
+      this._monthCache.set(key, [...bucket, s]);
+      touched.add(key);
+    }
+
+    if (!touched.size) return;
+    for (const key of touched) this._writeSessionsToStorage(uid, key, this._monthCache.get(key) ?? []);
+    this._rebuild();
   }
 
   // ── Lazy initialisation — call once per feature that needs sport definitions
