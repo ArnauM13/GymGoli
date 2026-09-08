@@ -105,6 +105,9 @@ import { ActivityStat } from '../../utils/workout-card.utils';
         <span class="material-symbols-outlined ac-chevron" aria-hidden="true">
           {{ expanded() ? 'expand_less' : 'expand_more' }}
         </span>
+      } @else if (navigable()) {
+        <!-- Aquesta no es desplega: porta a un altre lloc, i el glif ho diu. -->
+        <span class="material-symbols-outlined ac-chevron" aria-hidden="true">chevron_right</span>
       }
     </ng-template>
   `,
@@ -258,6 +261,9 @@ export class ActivityCardComponent {
   /** Porta chevron i diu si està desplegada. */
   readonly expandable  = input(false, { transform: booleanAttribute });
   readonly expanded    = input(false, { transform: booleanAttribute });
+  /** Tocar-la no desplega res: porta a la pàgina de l'activitat, i el
+   *  chevron apunta a la dreta en comptes d'avall. */
+  readonly navigable   = input(false, { transform: booleanAttribute });
 
   readonly feelingEditable = input(false, { transform: booleanAttribute });
   readonly feelingOpen     = input(false, { transform: booleanAttribute });

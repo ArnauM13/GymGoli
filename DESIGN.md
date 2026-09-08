@@ -369,6 +369,16 @@ Una activitat **planificada** no es desplega: la targeta porta les seves dues
 accions (eliminar i començar/registrar) i prou, perquè encara no hi ha res a
 mirar.
 
+**Un entrenament en marxa, a Inici, tampoc**: mentre no s'ha donat per acabat
+l'estàs fent, i tocar la targeta hi porta d'un sol tap, en mode edició —
+desplegar-ne el resum per després prémer «Obrir» són dos taps per arribar on
+ja anaves. El chevron ho diu: `chevron_right` (navego) en comptes de
+`expand_more` (desplego). Un esport no ho fa mai —es registren sempre a
+posteriori— i a l'**Historial** no ho fa ningú: allà tot es mira, acabat o no,
+i el desplegable és el que hi toca (`liveOpensPage` només l'activa Inici).
+Acabat o no ho sap només aquest dispositiu, i sense notícies es dona per
+acabat (vegeu `SYNC.md` §«El que no es guarda»).
+
 L'estructura, de fora cap a dins:
 
 ```
@@ -732,11 +742,21 @@ Both activity pages follow **one shape**, and the page is where you go deep:
 3. `.edit-btn` — "Editar l'entrenament" / "Editar la sessió". Editing replaces
    the reading: the editor (or the form) takes the page on its own.
 
-A workout **from a past day opens on step 2**, like a sport session: you came
-to look at it. Today's workout — and any plan, and anything just created —
-opens straight in the editor: you came to do it. Once you tap edit, a past
-workout behaves exactly like today's: everything is editable, live-saved,
-nothing read-only about it.
+A workout **that is still going** skips step 2 entirely: it opens in the
+editor, because that's what you came for. What decides is whether it has been
+marked as finished — not the day it happened. The two things you do *while*
+training — reordering the exercises and calling it a day — are buttons under
+the editor (`.aw-actions`, with "Acabar l'entrenament" as the primary), never
+menu entries: the three-dot menu is for what you hardly ever touch (template,
+share, delete). Finishing drops you on the summary — step 2 — which is the
+receipt for what you just did.
+
+A workout **already finished** opens on step 2, like a sport session (which is
+always logged afterwards, so it is always finished).
+
+Once you tap edit, a finished workout behaves exactly like the one you are
+doing right now: everything is editable, live-saved, nothing read-only about
+it. A plan always opens in the editor — planning is writing.
 
 ### Insight card & detail sheet
 

@@ -9,6 +9,7 @@ import { SupabaseService } from './supabase.service';
 import { TodayService } from './today.service';
 import { OfflineService } from './offline.service';
 import { SyncService } from './sync.service';
+import { OngoingWorkoutService } from './ongoing-workout.service';
 import { SUPABASE_PAGE_SIZE, fetchAllRows } from './supabase-page.util';
 import { WORKOUT_COLUMNS, WorkoutStoreService, toWorkout } from './workout-store.service';
 import { FeelingLevel, PlannedSource, Workout, WorkoutEntry, WorkoutSet, setMaxWeight, workoutExerciseNames } from '../models/workout.model';
@@ -64,6 +65,7 @@ export class WorkoutService {
   private auth            = inject(AuthService);
   private exerciseService = inject(ExerciseService);
   private syncService     = inject(SyncService);
+  private ongoing     = inject(OngoingWorkoutService);
   private offline         = inject(OfflineService);
   /** Qui demana l'activitat per trams al servidor. Vegeu `ActivityFeedService`:
    *  una sola crida per tram, entrenaments i esports junts, sense cap sèrie. */
@@ -846,6 +848,9 @@ export class WorkoutService {
       status:     'done',
     };
     this.store.put(newWorkout);
+    // Acabat de crear vol dir que s'està fent: fins que no el donis per
+    // acabat, obrir-lo és entrar-hi a entrenar (`OngoingWorkoutService`).
+    this.ongoing.start(id);
     this.syncService.notifyPending(true);
     return id;
   }
@@ -865,6 +870,7 @@ export class WorkoutService {
       status:          'done',
     };
     this.store.put(newWorkout);
+    this.ongoing.start(id);
     this.syncService.notifyPending(true);
     return id;
   }
@@ -1118,6 +1124,7 @@ export class WorkoutService {
     // tornaria a sortir sola a la propera càrrega.
     if (!this.store.has(id)) return;
     this.store.remove(id);
+    this.ongoing.forget(id);
     // El resum és una foto del servidor: si no es treu, la targeta esborrada
     // continuaria sortint fins al proper refresc del tram.
     this.activityFeed.forget(id);

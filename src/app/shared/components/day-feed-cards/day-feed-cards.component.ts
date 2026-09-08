@@ -6,6 +6,7 @@ import { WorkoutDetailComponent } from '../workout-detail/workout-detail.compone
 import { Sport, SportSession } from '../../../core/models/sport.model';
 import { FeelingLevel, Workout } from '../../../core/models/workout.model';
 import { WorkoutService } from '../../../core/services/workout.service';
+import { OngoingWorkoutService } from '../../../core/services/ongoing-workout.service';
 import { SportService } from '../../../core/services/sport.service';
 import { TodayService } from '../../../core/services/today.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
@@ -45,7 +46,9 @@ export interface DayFeedEntry {
           [stats]="workoutStats(w)"
           [feeling]="w.feeling ? emojiOf(w.feeling) : ''"
           [planned]="isPlanned(w)" interactive
-          [expandable]="!isPlanned(w)" [expanded]="expandedWorkoutId() === w.id"
+          [expandable]="!isPlanned(w) && !opensDirectly(w)"
+          [navigable]="opensDirectly(w)"
+          [expanded]="expandedWorkoutId() === w.id"
           (cardClick)="handleWorkoutClick(w)">
 
         @if (isPlanned(w)) {
@@ -153,6 +156,7 @@ export interface DayFeedEntry {
 })
 export class DayFeedCardsComponent {
   private workoutService = inject(WorkoutService);
+  private ongoing         = inject(OngoingWorkoutService);
   private sportService    = inject(SportService);
   private settingsService = inject(UserSettingsService);
   private exerciseService = inject(ExerciseService);
@@ -167,6 +171,17 @@ export class DayFeedCardsComponent {
    *  amplada es menja; a Activitat recent, on les targetes s'apilen, se
    *  n'amaga. A la targeta del dia i a l'Historial s'hi queda. */
   readonly hideVolume = input(false, { transform: booleanAttribute });
+  /**
+   * A Inici, un entrenament que encara no s'ha donat per acabat s'obre d'un
+   * sol tap: l'estàs fent, i desplegar-ne el resum per després prémer «Obrir»
+   * són dos taps per arribar on ja anaves. La targeta ho diu amb el chevron
+   * cap a la dreta.
+   *
+   * A l'Historial no: allà tot es mira, s'hagi acabat o no, i el desplegable
+   * és el que hi toca. Els esports tampoc: es registren sempre a posteriori,
+   * i mai n'hi ha cap en marxa.
+   */
+  readonly liveOpensPage = input(false, { transform: booleanAttribute });
   /** Obrir l'entrenament desplegat, a la pàgina d'Entrenar. */
   readonly open = output<string>();
   /** El mateix per a una sessió d'esport: la targeta només la llegeix, i
@@ -237,8 +252,15 @@ export class DayFeedCardsComponent {
     }
   }
 
+  /** Cert quan tocar la targeta ha de portar a l'entrenament en comptes de
+   *  desplegar-lo: només a Inici, i només mentre no s'hagi acabat. */
+  opensDirectly(w: Workout): boolean {
+    return this.liveOpensPage() && !this.isPlanned(w) && this.ongoing.isOngoing(w.id);
+  }
+
   handleWorkoutClick(w: Workout): void {
     if (this.isPlanned(w)) { this.startPlan(w); return; }
+    if (this.opensDirectly(w)) { this.open.emit(w.id); return; }
     this.expandedWorkoutId.update(id => id === w.id ? null : w.id);
   }
 

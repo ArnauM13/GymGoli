@@ -25,6 +25,7 @@ import { TrainingTypeService } from '../../core/services/training-type.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { WorkoutService } from '../../core/services/workout.service';
+import { OngoingWorkoutService } from '../../core/services/ongoing-workout.service';
 import { OfflineService } from '../../core/services/offline.service';
 import { ActivityCardComponent } from '../../shared/components/activity-card/activity-card.component';
 import { ActivityIconComponent } from '../../shared/components/activity-icon/activity-icon.component';
@@ -153,6 +154,27 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
           (requestAddExercise)="openPicker()"
         />
 
+        <!-- ── Les dues coses que es fan entrenant ──
+             Ordenar els exercicis i posar punt final. Vivien dins el menú de
+             tres punts, que és on van les coses que gairebé no es fan;
+             aquestes dues es fan cada dia, així que es veuen. -->
+        @if (!reorderMode() && !groupingMode()) {
+          <div class="aw-actions">
+            @if (w.entries.length > 1) {
+              <button class="aw-action" (click)="reorderMode.set(true); groupingMode.set(false)">
+                <span class="material-symbols-outlined" aria-hidden="true">swap_vert</span>
+                Ordenar
+              </button>
+            }
+            @if (activeIsOngoing()) {
+              <button class="aw-action aw-action--finish" (click)="finishWorkout()">
+                <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+                Acabar l'entrenament
+              </button>
+            }
+          </div>
+        }
+
         <!-- ── Sèrie activa: proper exercici suggerit (aprèn de l'usuari) ── -->
         @if (exerciseSuggestions(); as sugg) {
           @if (sugg.length && !reorderMode() && !groupingMode()) {
@@ -224,12 +246,6 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
           @if (workoutMenuOpen()) {
             <div class="aw-menu-backdrop" (click)="workoutMenuOpen.set(false)"></div>
             <div class="aw-menu-dropdown">
-              @if (editing()) {
-                <button class="aw-menu-item" (click)="workoutMenuOpen.set(false); reorderMode.set(true); groupingMode.set(false)">
-                  <span class="material-symbols-outlined">swap_vert</span>
-                  Ordenar exercicis
-                </button>
-              }
               @if (editing() && (settingsService.supersetsEnabled() || groupingMode())) {
                 <button class="aw-menu-item" (click)="workoutMenuOpen.set(false); groupingMode.set(!groupingMode()); reorderMode.set(false)">
                   <span class="material-symbols-outlined">{{ groupingMode() ? 'check' : 'link' }}</span>
@@ -559,6 +575,29 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
        feed); d'aquesta pàgina només és que es quedi enganxada a dalt: les
        xifres han de ser llegibles a mig entrenament, sense tornar a pujar. */
     .aw-hero { display: block; position: sticky; top: 12px; z-index: 10; margin: 12px 16px 0; }
+
+    /* ── Les accions del dia, a la vista ── */
+    .aw-actions {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      margin: 12px 16px 0;
+    }
+    .aw-action {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      height: 42px; padding: 0 16px; border-radius: 14px;
+      border: 1.5px solid var(--c-border); background: var(--c-card);
+      font-size: 13.5px; font-weight: 700; color: var(--c-text-2);
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 19px; }
+      &:hover { border-color: var(--c-brand); color: var(--c-brand); }
+      &:active { transform: scale(0.99); }
+    }
+    /* Posar punt final és el gest que tanca la sessió: mana sobre l'altre i
+       s'emporta l'amplada que sobra. */
+    .aw-action--finish {
+      flex: 1; min-width: 180px;
+      border-color: transparent; background: var(--c-brand); color: white;
+      &:hover { background: var(--c-brand-dk); border-color: transparent; color: white; }
+    }
 
     /* ── Llegir un entrenament passat ──
        El detall porta la seva vora superior, així que la targeta que
@@ -1108,6 +1147,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
 })
 export class TrainComponent implements OnDestroy {
   readonly workoutService  = inject(WorkoutService);
+  private ongoing          = inject(OngoingWorkoutService);
   readonly sportService    = inject(SportService);
   readonly offlineService  = inject(OfflineService);
   readonly trainerService  = inject(TrainerService);
@@ -1316,17 +1356,28 @@ export class TrainComponent implements OnDestroy {
   /**
    * Si la pàgina és per entrenar o per llegir.
    *
-   * El d'avui —i qualsevol pla— s'obre a l'editor: hi véns a fer-lo. Un d'un
-   * dia passat s'obre a l'esquema, com una sessió d'esport: hi véns a
-   * mirar-te'l, i editar-lo és un pas que es demana. Un que acabes de crear
-   * (registrar un dia passat, acceptar una proposta, començar un pla) ja ve
-   * demanat des d'`openWorkout`.
+   * Mana si l'entrenament s'ha donat per acabat. Mentre està en marxa —i
+   * qualsevol acabat de crear ho està— s'obre a l'editor: hi véns a fer-lo, i
+   * un tap des d'Inici t'hi ha de deixar a dins. Un cop acabat s'obre a
+   * l'esquema, com una sessió d'esport: hi véns a mirar-te'l, i tocar-lo és
+   * un pas que es demana. Un pla també s'obre a l'editor: planificar és
+   * escriure-hi.
+   *
+   * Que estigui acabat o no només ho sap aquest dispositiu
+   * (`OngoingWorkoutService`); sense cap notícia, es dona per acabat.
    */
   readonly editing = computed((): boolean => {
     const w = this.activeWorkout();
     if (!w) return false;
     if (this.editRequestedFor() === w.id) return true;
-    return !this.isPastWorkout(w);
+    if (this.isPlannedWorkout(w)) return true;
+    return this.ongoing.isOngoing(w.id);
+  });
+
+  /** Cert mentre l'entrenament obert no s'hagi donat per acabat. */
+  readonly activeIsOngoing = computed((): boolean => {
+    const w = this.activeWorkout();
+    return !!w && !this.isPlannedWorkout(w) && this.ongoing.isOngoing(w.id);
   });
 
   readonly activeWorkoutCategories = computed((): string[] => {
@@ -1611,11 +1662,28 @@ export class TrainComponent implements OnDestroy {
     this.pickerCat.set(null);
   }
 
-  /** Un entrenament passat es llegeix primer; això és el pas de tocar-lo, i
-   *  a partir d'aquí és una sessió com la d'avui: tot editable. */
+  /** Un entrenament acabat es llegeix primer; això és el pas de tocar-lo, i
+   *  a partir d'aquí és una sessió com la que estàs fent: tot editable. */
   startEditing(): void {
     const w = this.activeWorkout();
     if (w) this.editRequestedFor.set(w.id);
+  }
+
+  /**
+   * Donar-lo per acabat: es tanca l'editor i la pàgina passa al resum.
+   *
+   * És el gest que fa de punt final, i per això té botó propi i no viu dins
+   * cap menú. No toca l'entrenament —no és cap camp seu—: només aquest
+   * dispositiu deixa de considerar-lo en marxa.
+   */
+  finishWorkout(): void {
+    const w = this.activeWorkout();
+    if (!w) return;
+    this.ongoing.finish(w.id);
+    this.editRequestedFor.set(null);
+    this.reorderMode.set(false);
+    this.groupingMode.set(false);
+    this.feedback.success('Entrenament acabat', 2000);
   }
 
   /** Ni d'avui ni previst: una sessió que ja va passar. */
