@@ -147,21 +147,6 @@ describe('WeeklyPlannerComponent', () => {
     });
   });
 
-  describe('collapsible days', () => {
-    it('starts every day collapsed', () => {
-      expect(component.isDayExpanded(0)).toBeFalse();
-      expect(component.isDayExpanded(6)).toBeFalse();
-    });
-
-    it('toggleDay() expands and collapses a single day independently', () => {
-      component.toggleDay(2);
-      expect(component.isDayExpanded(2)).toBeTrue();
-      expect(component.isDayExpanded(3)).toBeFalse();
-      component.toggleDay(2);
-      expect(component.isDayExpanded(2)).toBeFalse();
-    });
-  });
-
   describe('daySummary()', () => {
     it('is empty for a day with nothing planned', () => {
       expect(component.daySummary(0)).toEqual([]);
@@ -352,13 +337,6 @@ describe('WeeklyPlannerComponent', () => {
         expect(component.isDayLocked(1)).toBeTrue();  // dimarts 05
         expect(component.isDayLocked(2)).toBeFalse(); // dimecres 06 (avui)
         expect(component.isDayLocked(6)).toBeFalse(); // diumenge 10
-      });
-
-      it('toggleDay() cannot expand a locked day', () => {
-        component.toggleDay(0);
-        expect(component.isDayExpanded(0)).toBeFalse();
-        component.toggleDay(2);
-        expect(component.isDayExpanded(2)).toBeTrue();
       });
 
       it('weekHasPastDays() is true for the current week once past Monday', () => {

@@ -40,7 +40,6 @@ const EMPTY_CATEGORY_PROFILE = { daysSinceLast: 99, typicalGapDays: 4, overdueSc
 describe('TrainComponent', () => {
   let component: TrainComponent;
   let fixture: ReturnType<typeof TestBed.createComponent<TrainComponent>>;
-  let forceOffline: ReturnType<typeof signal<boolean>>;
   let navigateSpy: jasmine.Spy;
   let goBackSpy: jasmine.Spy;
   let weeklyPlanSignal: ReturnType<typeof signal<WeeklyPlan>>;
@@ -56,7 +55,6 @@ describe('TrainComponent', () => {
   let monthLoadProbe: ReturnType<typeof signal<number>>;
 
   beforeEach(async () => {
-    forceOffline = signal(false);
     weeklyPlanSignal = signal<WeeklyPlan>(EMPTY_WEEKLY_PLAN);
     settingsSignal    = signal<UserSettings>(DEFAULT_USER_SETTINGS);
     hasTrainerSignal  = signal(false);
@@ -120,7 +118,7 @@ describe('TrainComponent', () => {
             dismissedProposalDates: computed(() => settingsSignal().dismissedProposalDates ?? []),
           },
         },
-        { provide: OfflineService,      useValue: { isOffline: signal(false), forceOffline, toggleForceOffline: jasmine.createSpy() } },
+        { provide: OfflineService,      useValue: { isOffline: signal(false) } },
         { provide: TrainerService,      useValue: { myTrainer: signal(null), hasTrainer: hasTrainerSignal, getProposalForDate: jasmine.createSpy().and.returnValue(null) } },
         { provide: TemplateService,     useValue: { forCategory: jasmine.createSpy().and.returnValue([]), create: jasmine.createSpy().and.resolveTo(undefined), recordUse: jasmine.createSpy().and.resolveTo(undefined) } },
         { provide: SharedWorkoutService, useValue: { share: jasmine.createSpy().and.resolveTo('share-id') } },
