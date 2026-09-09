@@ -187,16 +187,12 @@ res. Treure un dia concret de la rutina («avui no») s'apunta a
 `user_settings.dismissedRoutinePlans`: si no, la regla el tornaria a proposar
 tot seguit.
 
-**Que un entrenament estigui «en marxa» tampoc no és cap dada seva.** És
-l'estat d'una estona —la que va de la primera sèrie a l'última— i viu només
-en aquest dispositiu (`OngoingWorkoutService`, `localStorage`): no és cap
-columna, no es puja i no viatja enlloc. Serveix per a una sola cosa: mentre
-dura, obrir l'entrenament és entrar-hi a entrenar (un tap des d'Inici, i el
-chevron de la targeta apunta a la dreta); un cop acabat, es llegeix com
-qualsevol altre. Per això, **sense cap notícia es dona per acabat**: és el
-que és cert gairebé sempre, i equivocar-s'hi només costa un tap de més. Un
-entrenament acabat de crear comença en marxa, i el que ningú no marca com a
-acabat s'oblida sol al cap d'un dia.
+**Que un entrenament estigui «en marxa» no és cap estat de res.** Ho va ser:
+un registre en aquest dispositiu deia quins encara no s'havien donat per
+acabats, i mentre durava l'entrenament s'obria a l'editor. Marcar-los ja no
+existeix —**tot el que s'ha registrat es dona per fet**— i el registre ha
+desaparegut amb ell: un entrenament s'obre per llegir-lo, i editar-lo és el
+pas que es demana.
 | Una sessió (`ensureWorkoutEntries`) | En desplegar-ne el detall | Les seves sèries |
 | Tot (`loadAllWorkouts`) | Progrés, i buscar al calendari | L'historial sencer, amb indicador de càrrega |
 

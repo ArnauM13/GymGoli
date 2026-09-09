@@ -1,7 +1,7 @@
 import { Component, booleanAttribute, computed, effect, inject, input, signal, untracked } from '@angular/core';
 
 import { CATEGORY_COLORS, ExerciseCategory, SUBCATEGORY_LABELS } from '../../../core/models/exercise.model';
-import { FeelingLevel, Workout, WorkoutEntry, WorkoutSet, hasFullEntries, setMaxWeight } from '../../../core/models/workout.model';
+import { FeelingLevel, Workout, WorkoutEntry, WorkoutSet, hasFullEntries, setMaxWeight, setVolume } from '../../../core/models/workout.model';
 import { ExerciseService } from '../../../core/services/exercise.service';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
@@ -9,7 +9,13 @@ import { formatFeeling } from '../../utils/workout-card.utils';
 import { kgToDisplay } from '../../utils/weight.utils';
 
 /**
- * El desglossament d'un entrenament: exercicis, sèries, drop sets i PRs.
+ * El desglossament d'un entrenament: exercicis, sèries, drop sets, PRs i notes.
+ *
+ * És el germà de `app-sport-detail` i es llegeix igual que ell. Els exercicis
+ * són les úniques targetes que hi ha —van soltes, sense cap bloc que les
+ * empaqueti totes— i el que no és cap exercici (com va anar el dia, el
+ * recompte) va a part, amb la forma que hi posa una sessió d'esport: files
+ * etiqueta → valor, la nota amb el seu filet i un peu que situa.
  *
  * Té dues mides. Plegat dins una targeta del feed (`compact`) és una ullada:
  * una línia per exercici amb el que hi has fet —«4×8-12 · 80 kg»— i prou. La
@@ -132,15 +138,61 @@ import { kgToDisplay } from '../../utils/weight.utils';
         } @else {
           <span class="no-sets">Cap exercici registrat</span>
         }
+
+        <!-- ── El que no és cap exercici ──
+             Com va anar el dia i el recompte no són cap targeta d'exercici:
+             van a part, amb la mateixa forma que el detall d'una sessió
+             d'esport —titolet, files etiqueta → valor, la nota amb el seu
+             filet i un peu que resumeix. -->
+        <section class="wd-extra">
+          @if (workout().feeling || workout().notes?.trim()) {
+            <div class="wd-block">
+              <span class="wd-block-title">Com ha anat</span>
+              @if (workout().feeling; as feeling) {
+                <div class="wd-rows">
+                  <div class="wd-row">
+                    <div class="wd-row-main">
+                      <span class="material-symbols-outlined wd-icon" aria-hidden="true">mood</span>
+                      <span class="wd-label">Sensació</span>
+                      <span class="wd-value">{{ getFeelingEmoji(feeling) }}</span>
+                    </div>
+                  </div>
+                </div>
+              }
+              @if (workout().notes?.trim(); as note) {
+                <div class="wd-notes">
+                  <span class="material-symbols-outlined" aria-hidden="true">notes</span>
+                  <span class="wd-notes-text">{{ note }}</span>
+                </div>
+              }
+            </div>
+          }
+
+          <div class="wd-footer">
+            <span>{{ workout().entries.length }} exercici{{ workout().entries.length === 1 ? '' : 's' }}</span>
+            <span class="wdf-sep" aria-hidden="true">·</span>
+            <span>{{ totalSets() }} sèries@if (totalWarmupSets(); as warm) { <span class="wdf-warmup">+{{ warm }} esc</span>}</span>
+            <span class="wdf-sep" aria-hidden="true">·</span>
+            <span>{{ dispW(totalVolume()) }} {{ unit() }} volum</span>
+          </div>
+        </section>
       }
     </div>
   `,
   styles: [`
-    .workout-detail {
-      display: flex; flex-direction: column; gap: 18px;
-      padding: 16px;
-      border-top: 1px solid color-mix(in srgb, var(--ac, var(--c-border-2)) 18%, var(--c-border-2));
-      background: var(--c-card);
+    :host { display: block; }
+
+    /* A la pàgina, el detall no és cap targeta: les targetes són els
+       exercicis, i van soltes sobre el fons de la pàgina. La superfície de
+       targeta (fons i vora de dalt) només la porta el desplegable del feed,
+       que sí que viu dins una. */
+    .workout-detail { display: flex; flex-direction: column; gap: 12px; }
+
+    /* Mentre les sèries viatgen, a la pàgina l'espera és una targeta més;
+       plegat dins el feed, una línia i prou. */
+    .workout-detail:not(.workout-detail--compact) .wd-pending {
+      padding: 14px 16px; border-radius: 14px;
+      border: 1.5px solid var(--c-border-2); background: var(--c-card);
     }
 
     /* Mentre les sèries viatgen: una línia sola, de la mida d'una entrada,
@@ -236,10 +288,66 @@ import { kgToDisplay } from '../../utils/weight.utils';
     .entry-note-icon { font-size: 14px; color: var(--c-brand); flex-shrink: 0; margin-top: 1px; }
     .entry-note-text { font-size: 13px; color: var(--c-text-2); font-style: italic; line-height: 1.45; }
 
+    /* ── El context, com al detall d'una sessió d'esport ──
+       Tot el que no és un exercici (com ha anat, el recompte) va junt en una
+       superfície pròpia, la mateixa que corona el detall d'un esport: així no
+       es confon amb cap exercici i es llegeix igual a totes dues activitats. */
+    .wd-extra {
+      display: flex; flex-direction: column; gap: 12px;
+      margin-top: 4px; padding: 12px 14px; border-radius: 16px;
+      border: 1.5px solid var(--c-border-2); background: var(--c-card);
+      box-shadow: 0 2px 10px var(--c-shadow);
+    }
+    .wd-block { display: flex; flex-direction: column; gap: 6px; }
+    .wd-block-title {
+      font-size: 10.5px; font-weight: 700; color: var(--c-text-3);
+      text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .wd-rows { display: flex; flex-direction: column; gap: 2px; }
+    .wd-row {
+      display: flex; flex-direction: column; gap: 3px;
+      padding: 5px 6px; border-radius: 7px;
+      &:nth-child(odd) { background: color-mix(in srgb, var(--ac, var(--c-subtle)) 5%, var(--c-subtle)); }
+    }
+    .wd-row-main { display: flex; align-items: center; gap: 7px; min-height: 20px; }
+    .wd-icon {
+      flex-shrink: 0; font-size: 14px;
+      color: color-mix(in srgb, var(--ac, var(--c-text-3)) 60%, var(--c-text-3));
+    }
+    .wd-label {
+      flex: 1; min-width: 0; font-size: 12px; font-weight: 600; color: var(--c-text-2);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .wd-value {
+      flex-shrink: 0; max-width: 62%; text-align: right;
+      font-size: 13px; font-weight: 700; color: var(--c-text); line-height: 1.3;
+    }
+    /* La nota del dia, amb la forma de subcomentari d'un esport: filet a
+       l'esquerra i veu baixa. */
+    .wd-notes {
+      display: flex; align-items: flex-start; gap: 7px;
+      padding: 8px 10px; border-radius: 8px; background: var(--c-subtle);
+      border-left: 3px solid color-mix(in srgb, var(--ac, var(--c-border)) 45%, var(--c-border-2));
+      font-size: 12px; color: var(--c-text-2); line-height: 1.45;
+      .material-symbols-outlined { font-size: 15px; color: var(--c-text-3); flex-shrink: 0; margin-top: 1px; }
+    }
+    .wd-notes-text { flex: 1; min-width: 0; font-style: italic; overflow-wrap: anywhere; }
+
+    .wd-footer {
+      display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap;
+      padding-top: 2px; font-size: 11px; font-weight: 600; color: var(--c-text-3);
+      .wdf-sep { color: var(--c-border-2); }
+      .wdf-warmup { color: #ff9800; margin-left: 3px; }
+    }
+
     /* Plegat dins una targeta del feed: només la llista curta, amb l'aire
-       just. El que hi ha a sota (les notes, sèrie a sèrie) ja té la seva
-       pàgina. */
-    .workout-detail--compact { gap: 8px; padding: 8px 12px 10px 14px; }
+       just, i la superfície de la targeta que l'aguanta. El que hi ha a sota
+       (les notes, el peu, sèrie a sèrie) ja té la seva pàgina. */
+    .workout-detail--compact {
+      gap: 8px; padding: 8px 12px 10px 14px;
+      border-top: 1px solid color-mix(in srgb, var(--ac, var(--c-border-2)) 18%, var(--c-border-2));
+      background: var(--c-card);
+    }
   `],
 })
 export class WorkoutDetailComponent {
@@ -288,6 +396,21 @@ export class WorkoutDetailComponent {
 
   readonly unit = this.settingsService.weightUnit;
   dispW(kg: number): number { return kgToDisplay(kg, this.unit()); }
+
+  readonly totalSets = computed(() =>
+    this.workout().entries.reduce((s, e) => s + e.sets.filter(set => !set.warmup).length, 0));
+
+  readonly totalWarmupSets = computed(() =>
+    this.workout().entries.reduce((s, e) => s + e.sets.filter(set => set.warmup).length, 0));
+
+  readonly totalVolume = computed(() => {
+    const bodyweightKg = this.settingsService.bodyweightKg();
+    return Math.round(this.workout().entries.reduce((t, e) => {
+      const ex  = this.exerciseService.getById(e.exerciseId);
+      const ctx = { bodyweightKg, loadType: ex?.loadType, bodyweightFactor: ex?.bodyweightFactor };
+      return t + e.sets.reduce((s, set) => set.warmup ? s : s + setVolume(set, ctx), 0);
+    }, 0));
+  });
 
   /**
    * El que has fet a l'exercici, en quatre caràcters: «4×10 · 80 kg», o

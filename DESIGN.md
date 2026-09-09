@@ -369,16 +369,6 @@ Una activitat **planificada** no es desplega: la targeta porta les seves dues
 accions (eliminar i començar/registrar) i prou, perquè encara no hi ha res a
 mirar.
 
-**Un entrenament en marxa, a Inici, tampoc**: mentre no s'ha donat per acabat
-l'estàs fent, i tocar la targeta hi porta d'un sol tap, en mode edició —
-desplegar-ne el resum per després prémer «Obrir» són dos taps per arribar on
-ja anaves. El chevron ho diu: `chevron_right` (navego) en comptes de
-`expand_more` (desplego). Un esport no ho fa mai —es registren sempre a
-posteriori— i a l'**Historial** no ho fa ningú: allà tot es mira, acabat o no,
-i el desplegable és el que hi toca (`liveOpensPage` només l'activa Inici).
-Acabat o no ho sap només aquest dispositiu, i sense notícies es dona per
-acabat (vegeu `SYNC.md` §«El que no es guarda»).
-
 L'estructura, de fora cap a dins:
 
 ```
@@ -417,10 +407,13 @@ Regles que la fan llegible:
   a la pàgina d'una activitat, la capçalera (`app-page-header [subtitle]`, o
   `.aw-date-sub` a Entrenar), amb el mateix nom que li dona el feed
   (`feedDayLabel`: «Avui», «Ahir», el dia escrit).
-- **El detall és una lectura, no un formulari**: blocs amb títol (`Exercicis`
-  o `Sessió`, i `Com ha anat`), files `etiqueta → valor` alineades a la dreta,
-  notes a part i un peu que resumeix. Editar és el pas següent, amb el seu
-  botó, i passa en una altra pàgina.
+- **El detall és una lectura, no un formulari**: files `etiqueta → valor`
+  alineades a la dreta sota el seu titolet (`Sessió`, `Com ha anat`), notes a
+  part i un peu que resumeix. Editar és el pas següent, amb el seu botó.
+  L'entrenament hi posa els exercicis, i aquests **sí que són targetes**: una
+  per exercici, soltes, sense cap caixa que les agrupi. El que no és un
+  exercici (com ha anat, el recompte) va a sota, amb la forma de files d'un
+  esport.
 - **Dues mides del mateix detall, iguals per a totes dues activitats.**
   Desplegat dins la targeta (`compact`) és **una ullada**: les primeres files
   i prou —5 com a molt, i una línia que diu quantes en queden—, sense
@@ -737,26 +730,29 @@ everywhere.
 Both activity pages follow **one shape**, and the page is where you go deep:
 
 1. The card (above) — what it was, at a glance.
-2. The detail, read-only, inside `.detail-card` — `app-workout-detail` or
-   `app-sport-detail`, full size: every set, PRs, records, context, footer.
+2. The detail, read-only — `app-workout-detail` or `app-sport-detail`, full
+   size: every set, PRs, records, context, footer. A sport session sits inside
+   `.detail-card`, since its detail is plain rows; a workout does not, because
+   its exercises are already cards and boxing them all in one more card only
+   buries them. What isn't an exercise (feeling, notes, the count) is the part
+   that keeps the sport shape: rows and a footer, in a surface of its own.
 3. `.edit-btn` — "Editar l'entrenament" / "Editar la sessió". Editing replaces
    the reading: the editor (or the form) takes the page on its own.
 
-A workout **that is still going** skips step 2 entirely: it opens in the
-editor, because that's what you came for. What decides is whether it has been
-marked as finished — not the day it happened. The two things you do *while*
-training — reordering the exercises and calling it a day — are buttons under
-the editor (`.aw-actions`, with "Acabar l'entrenament" as the primary), never
-menu entries: the three-dot menu is for what you hardly ever touch (template,
-share, delete). Finishing drops you on the summary — step 2 — which is the
-receipt for what you just did.
+**Every workout opens on step 2**, like a sport session: what has been logged
+is taken as done, and there is no "finish it" to mark (there used to be; it is
+gone). Only two things skip straight to the editor: a plan (planning is
+writing) and a workout you just created, which arrives with editing already
+asked for — you came to fill it in.
 
-A workout **already finished** opens on step 2, like a sport session (which is
-always logged afterwards, so it is always finished).
+The options don't depend on which of the two you are in. Reordering the
+exercises is a floating button whether you are reading or editing, and
+pressing it opens the editor for you rather than making you tap edit first;
+same for grouping into a superset. The three-dot menu stays for what you
+hardly ever touch (template, share, delete).
 
-Once you tap edit, a finished workout behaves exactly like the one you are
-doing right now: everything is editable, live-saved, nothing read-only about
-it. A plan always opens in the editor — planning is writing.
+Once you tap edit, a workout behaves exactly like the one you are doing right
+now: everything is editable, live-saved, nothing read-only about it.
 
 ### Els tres abasts de planificar (Inici)
 

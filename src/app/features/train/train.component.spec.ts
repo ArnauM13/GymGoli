@@ -7,7 +7,6 @@ import { Subject } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 
 import { TrainComponent } from './train.component';
-import { OngoingWorkoutService } from '../../core/services/ongoing-workout.service';
 import { ActivityCardComponent } from '../../shared/components/activity-card/activity-card.component';
 import { WorkoutService } from '../../core/services/workout.service';
 import { SportService } from '../../core/services/sport.service';
@@ -57,8 +56,6 @@ describe('TrainComponent', () => {
   let monthLoadProbe: ReturnType<typeof signal<number>>;
 
   beforeEach(async () => {
-    // «En marxa» viu al dispositiu: cada test arrenca sense cap.
-    localStorage.removeItem('gymgoli_ongoing_workouts');
     forceOffline = signal(false);
     weeklyPlanSignal = signal<WeeklyPlan>(EMPTY_WEEKLY_PLAN);
     settingsSignal    = signal<UserSettings>(DEFAULT_USER_SETTINGS);
@@ -278,13 +275,9 @@ describe('TrainComponent', () => {
     });
   });
 
-  // Mana si s'ha donat per acabat, no el dia: un entrenament en marxa s'obre
-  // per fer-lo, i un d'acabat per mirar-se'l, com una sessió d'esport.
+  // Un entrenament registrat es dona per fet: s'obre per mirar-se'l, com una
+  // sessió d'esport, i tocar-lo és el pas següent.
   describe('llegir o editar en obrir un entrenament', () => {
-    let ongoing: OngoingWorkoutService;
-
-    beforeEach(() => { ongoing = TestBed.inject(OngoingWorkoutService); });
-
     function open(w: Workout): HTMLElement {
       const workoutService = TestBed.inject(WorkoutService) as unknown as { workouts: ReturnType<typeof signal<Workout[]>> };
       workoutService.workouts.set([w]);
@@ -293,30 +286,16 @@ describe('TrainComponent', () => {
       return fixture.nativeElement as HTMLElement;
     }
 
-    it("un en marxa cau de dret a l'editor", () => {
-      ongoing.start('live');
-      const el = open(makeWorkout({ id: 'live', date: TODAY, categories: ['push'] }));
-
-      expect(component.editing()).toBeTrue();
-      expect(el.querySelector('[aria-label="Editar l\'entrenament"]')).toBeNull();
-      expect(el.querySelector('.aw-menu-fab--finish')).toBeTruthy();
-    });
-
-    it("un d'acabat s'obre a l'esquema, amb el botó d'editar", () => {
+    it("s'obre a l'esquema, amb el botó d'editar", () => {
       const el = open(makeWorkout({ id: 'old', date: '2024-03-05', categories: ['push'] }));
 
       expect(component.editing()).toBeFalse();
       expect(el.querySelector('app-workout-detail')).toBeTruthy();
-      expect(el.querySelector('[aria-label="Editar l\'entrenament"]')).toBeTruthy();
-      // Ordenar i acabar només tenen sentit editant: en mode lectura no hi ha
-      // editor a sota que reaccioni a cap dels dos.
-      expect(el.querySelector('[aria-label="Ordenar els exercicis"]')).toBeNull();
-      expect(el.querySelector('.aw-menu-fab--finish')).toBeNull();
+      expect(el.querySelector('.edit-btn')).toBeTruthy();
     });
 
-    // Sense cap notícia d'aquest dispositiu, es dona per acabat: també el
-    // d'avui, que pot venir d'un altre mòbil.
-    it("el d'avui també, si aquest dispositiu no en sap res", () => {
+    // Tot el que s'ha registrat es dona per fet: també el d'avui.
+    it("el d'avui també s'obre per llegir-lo", () => {
       open(makeWorkout({ id: 'today', date: TODAY, categories: ['push'] }));
       expect(component.editing()).toBeFalse();
     });
@@ -332,21 +311,7 @@ describe('TrainComponent', () => {
       fixture.detectChanges();
 
       expect(component.editing()).toBeTrue();
-      expect((fixture.nativeElement as HTMLElement).querySelector('[aria-label="Editar l\'entrenament"]')).toBeNull();
-      // Ja estava acabat: no hi ha res a acabar una segona vegada.
-      expect((fixture.nativeElement as HTMLElement).querySelector('.aw-menu-fab--finish')).toBeNull();
-    });
-
-    it('acabar-lo tanca l\'editor i deixa el resum', () => {
-      ongoing.start('live');
-      open(makeWorkout({ id: 'live', date: TODAY, categories: ['push'] }));
-
-      component.finishWorkout();
-      fixture.detectChanges();
-
-      expect(ongoing.isOngoing('live')).toBeFalse();
-      expect(component.editing()).toBeFalse();
-      expect((fixture.nativeElement as HTMLElement).querySelector('[aria-label="Editar l\'entrenament"]')).toBeTruthy();
+      expect((fixture.nativeElement as HTMLElement).querySelector('.edit-btn')).toBeNull();
     });
 
     it('un acabat de crear ja ve obert per omplir-lo', () => {
@@ -365,11 +330,10 @@ describe('TrainComponent', () => {
       expect(component.editing()).toBeFalse();
     });
 
-    // Ordenar i acabar es fan cada dia: no poden viure dins el menú de tres
-    // punts, que és on van les coses que gairebé no es toquen. Viuen com a
-    // botons flotants, mateixa família que el de tres punts.
-    it('ordenar i acabar es veuen com a botons flotants, no s\'amaguen al menú', () => {
-      ongoing.start('live');
+    // Ordenar es fa cada dia: no pot viure dins el menú de tres punts, que és
+    // on van les coses que gairebé no es toquen. Viu com a botó flotant,
+    // mateixa família que el de tres punts.
+    it('ordenar es veu com a botó flotant, no s\'amaga al menú', () => {
       const el = open(makeWorkout({
         id: 'live', date: TODAY, categories: ['push'],
         entries: [
@@ -379,13 +343,31 @@ describe('TrainComponent', () => {
       }));
 
       expect(el.querySelector('.aw-fab-row [aria-label="Ordenar els exercicis"]')).toBeTruthy();
-      expect(el.querySelector('.aw-fab-row [aria-label="Acabar l\'entrenament"]')).toBeTruthy();
       expect(el.querySelector('.aw-fab-row [aria-label="Opcions de l\'entrenament"]')).toBeTruthy();
 
       component.workoutMenuOpen.set(true);
       fixture.detectChanges();
       const menu = Array.from(el.querySelectorAll('.aw-menu-item')).map(b => b.textContent?.trim());
       expect(menu.join(' ')).not.toContain('Ordenar');
+    });
+
+    // Les opcions no depenen del mode: ordenar mirant-lo obre l'editor per
+    // tu, en comptes de fer-te passar abans pel botó d'editar.
+    it('ordenar en mode lectura porta l\'editor amb ell', () => {
+      const el = open(makeWorkout({
+        id: 'old', date: '2024-03-05', categories: ['push'],
+        entries: [
+          { exerciseId: 'e1', exerciseName: 'Press banca', sets: [] },
+          { exerciseId: 'e2', exerciseName: 'Fons', sets: [] },
+        ],
+      }));
+
+      expect(component.editing()).toBeFalse();
+      (el.querySelector('[aria-label="Ordenar els exercicis"]') as HTMLElement).click();
+      fixture.detectChanges();
+
+      expect(component.editing()).toBeTrue();
+      expect(component.reorderMode()).toBeTrue();
     });
   });
 
