@@ -50,6 +50,11 @@ describe('TrainComponent', () => {
   let hasTrainerSignal: ReturnType<typeof signal<boolean>>;
   let updateSettings: jasmine.Spy;
   let sportService: { [k: string]: any };
+  /** Un senyal que `ensureMonthLoaded()` llegeix per dins, com el de debò:
+   *  el servei mira qui ets, si hi ha connexió i el teu pes corporal abans de
+   *  demanar res. Movent-lo es reprodueix el refresc que abans et tancava
+   *  l'entrenament acabat d'obrir. */
+  let monthLoadProbe: ReturnType<typeof signal<number>>;
 
   beforeEach(async () => {
     // «En marxa» viu al dispositiu: cada test arrenca sense cap.
@@ -58,6 +63,7 @@ describe('TrainComponent', () => {
     weeklyPlanSignal = signal<WeeklyPlan>(EMPTY_WEEKLY_PLAN);
     settingsSignal    = signal<UserSettings>(DEFAULT_USER_SETTINGS);
     hasTrainerSignal  = signal(false);
+    monthLoadProbe    = signal(0);
     updateSettings    = jasmine.createSpy('update').and.callFake((patch: Partial<UserSettings>) => {
       settingsSignal.set({ ...settingsSignal(), ...patch });
       return Promise.resolve();
@@ -69,7 +75,7 @@ describe('TrainComponent', () => {
       getDoneWorkoutsForDate:     jasmine.createSpy().and.returnValue([]),
       getPlannedForDate:          jasmine.createSpy().and.returnValue([]),
       getLastWorkoutByCategory:   jasmine.createSpy().and.returnValue(null),
-      ensureMonthLoaded:          jasmine.createSpy(),
+      ensureMonthLoaded:          jasmine.createSpy().and.callFake(() => { monthLoadProbe(); }),
       ensureWorkoutEntries:       jasmine.createSpy().and.resolveTo(undefined),
       createWorkoutForDate:       jasmine.createSpy().and.resolveTo('new-id'),
       createWorkoutFromTemplate:  jasmine.createSpy().and.resolveTo('new-id'),
@@ -87,7 +93,7 @@ describe('TrainComponent', () => {
       getSessionForDate:       jasmine.createSpy().and.returnValue(null),
       getSportSessionsForDate:        jasmine.createSpy().and.returnValue([]),
       getPlannedSportSessionsForDate: jasmine.createSpy().and.returnValue([]),
-      ensureMonthLoaded:       jasmine.createSpy(),
+      ensureMonthLoaded:       jasmine.createSpy().and.callFake(() => { monthLoadProbe(); }),
       ensureLoaded:            jasmine.createSpy().and.resolveTo(undefined),
       toggleSport:             jasmine.createSpy().and.resolveTo(undefined),
       setSessionSubtype:       jasmine.createSpy().and.resolveTo(undefined),
@@ -630,6 +636,55 @@ describe('TrainComponent', () => {
         navigateTo('/train?date=2024-03-05&plan=1', 2);
 
         expect(component.planning()).toBeFalse();
+      });
+    });
+
+    // ── El que hi ha obert només el tanca canviar de dia ──────────────────
+    //
+    // Demanar les dades del mes i tancar el que hi hagi obert anaven junts en
+    // un sol efecte, i tot el que `ensureMonthLoaded()` llegeix per dins
+    // n'era dependència. Cada refresc —la sessió que arriba en recarregar, la
+    // configuració, la cobertura que va i ve— et tancava l'entrenament que
+    // acabaves d'obrir i et desfeia l'editar.
+    describe('un refresc de dades no tanca res', () => {
+      function openDoneWorkout(id: string): void {
+        const workoutService = TestBed.inject(WorkoutService) as unknown as
+          { workouts: ReturnType<typeof signal<Workout[]>> };
+        workoutService.workouts.set([makeWorkout({ id, date: '2024-03-05' })]);
+        navigateTo('/home', 1);
+        navigateTo(`/train?workout=${id}`, 2);
+        fixture.detectChanges();
+      }
+
+      it("deixa obert l'entrenament que s'acaba d'obrir", () => {
+        openDoneWorkout('w1');
+        expect(component.activeWorkoutId()).toBe('w1');
+
+        monthLoadProbe.update(v => v + 1);
+        fixture.detectChanges();
+
+        expect(component.activeWorkoutId()).toBe('w1');
+      });
+
+      it("no desfà l'editar acabat de demanar", () => {
+        openDoneWorkout('w1');
+        component.startEditing();
+        expect(component.editing()).toBeTrue();
+
+        monthLoadProbe.update(v => v + 1);
+        fixture.detectChanges();
+
+        expect(component.editing()).toBeTrue();
+      });
+
+      // L'altra meitat: canviar de dia sí que ha de tancar el que hi havia.
+      it('canviar de dia sí que tanca el que hi havia obert', () => {
+        openDoneWorkout('w1');
+
+        component.selectedDate.set('2020-09-01');
+        fixture.detectChanges();
+
+        expect(component.activeWorkoutId()).toBeNull();
       });
     });
   });
