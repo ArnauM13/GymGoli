@@ -315,10 +315,60 @@ describe('TrainComponent', () => {
       expect((fixture.nativeElement as HTMLElement).querySelector('.edit-btn')).toBeNull();
     });
 
+    // Si has entrat a editar des de la consulta, hi ha una consulta on tornar
+    // i tornar-hi és un botó. No desa res —tot es desa sol—, només apaga
+    // l'edició.
+    it("editant des de la consulta, s'hi pot tornar", () => {
+      const el = open(makeWorkout({ id: 'old', date: '2024-03-05', categories: ['push'] }));
+      component.startEditing();
+      fixture.detectChanges();
+
+      expect(component.canStopEditing()).toBeTrue();
+      el.querySelector<HTMLButtonElement>('.read-btn')!.click();
+      fixture.detectChanges();
+
+      expect(component.editing()).toBeFalse();
+      expect(el.querySelector('.read-btn')).toBeNull();
+      expect(el.querySelector('.edit-btn')).toBeTruthy();
+    });
+
+    // Mentre entrenes l'edició no ve de cap consulta: oferir-la seria un botó
+    // de més justament quan tens les mans ocupades.
+    it("entrenant no s'ofereix tornar a la consulta", () => {
+      const el = open(makeWorkout({ id: 'today', date: TODAY, categories: ['push'] }));
+
+      expect(component.canStopEditing()).toBeFalse();
+      expect(el.querySelector('.read-btn')).toBeNull();
+    });
+
+    it("un pla tampoc no ofereix tornar a la consulta", () => {
+      const el = open(makeWorkout({ id: 'plan', date: TODAY, status: 'planned', categories: ['push'] }));
+
+      expect(component.canStopEditing()).toBeFalse();
+      expect(el.querySelector('.read-btn')).toBeNull();
+    });
+
+    // Ordenar i agrupar tenen la seva pròpia sortida: dos botons de sortir
+    // alhora no diuen res.
+    it("mentre s'ordena no s'ofereix tornar a la consulta", () => {
+      const el = open(makeWorkout({ id: 'old', date: '2024-03-05', categories: ['push'] }));
+      component.startEditing();
+      component.startReordering();
+      fixture.detectChanges();
+
+      expect(el.querySelector('.read-btn')).toBeNull();
+    });
+
     it('un acabat de crear ja ve obert per omplir-lo', () => {
       open(makeWorkout({ id: 'old', date: '2024-03-05', categories: ['push'] }));
       component.openWorkout('old', { edit: true });
+      fixture.detectChanges();
+
       expect(component.editing()).toBeTrue();
+      // Ve obert per escriure-hi: no ve de cap consulta, i per tant no n'hi ha
+      // cap on tornar.
+      expect(component.canStopEditing()).toBeFalse();
+      expect((fixture.nativeElement as HTMLElement).querySelector('.read-btn')).toBeNull();
     });
 
     it('tancar-lo oblida que se n\'havia demanat l\'edició', () => {
