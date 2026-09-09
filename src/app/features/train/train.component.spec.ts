@@ -292,7 +292,7 @@ describe('TrainComponent', () => {
       const el = open(makeWorkout({ id: 'live', date: TODAY, categories: ['push'] }));
 
       expect(component.editing()).toBeTrue();
-      expect(el.querySelector('.edit-btn')).toBeNull();
+      expect(el.querySelector('[aria-label="Editar l\'entrenament"]')).toBeNull();
       expect(el.querySelector('.aw-menu-fab--finish')).toBeTruthy();
     });
 
@@ -301,7 +301,7 @@ describe('TrainComponent', () => {
 
       expect(component.editing()).toBeFalse();
       expect(el.querySelector('app-workout-detail')).toBeTruthy();
-      expect(el.querySelector('.edit-btn')).toBeTruthy();
+      expect(el.querySelector('[aria-label="Editar l\'entrenament"]')).toBeTruthy();
       // Ordenar i acabar només tenen sentit editant: en mode lectura no hi ha
       // editor a sota que reaccioni a cap dels dos.
       expect(el.querySelector('[aria-label="Ordenar els exercicis"]')).toBeNull();
@@ -326,7 +326,7 @@ describe('TrainComponent', () => {
       fixture.detectChanges();
 
       expect(component.editing()).toBeTrue();
-      expect((fixture.nativeElement as HTMLElement).querySelector('.edit-btn')).toBeNull();
+      expect((fixture.nativeElement as HTMLElement).querySelector('[aria-label="Editar l\'entrenament"]')).toBeNull();
       // Ja estava acabat: no hi ha res a acabar una segona vegada.
       expect((fixture.nativeElement as HTMLElement).querySelector('.aw-menu-fab--finish')).toBeNull();
     });
@@ -340,7 +340,7 @@ describe('TrainComponent', () => {
 
       expect(ongoing.isOngoing('live')).toBeFalse();
       expect(component.editing()).toBeFalse();
-      expect((fixture.nativeElement as HTMLElement).querySelector('.edit-btn')).toBeTruthy();
+      expect((fixture.nativeElement as HTMLElement).querySelector('[aria-label="Editar l\'entrenament"]')).toBeTruthy();
     });
 
     it('un acabat de crear ja ve obert per omplir-lo', () => {

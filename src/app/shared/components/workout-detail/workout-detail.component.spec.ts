@@ -114,28 +114,19 @@ describe('WorkoutDetailComponent', () => {
       expect(el.querySelector('.esl-pr')).toBeTruthy();
     });
 
-    it('separa com ha anat en un bloc propi, com una sessió d\'esport', () => {
+    it('ensenya els exercicis directes, sense cap bloc pare', () => {
       const el = build(makeWorkout({
         feeling: 4, notes: 'Bon dia',
-        entries: [entry({ sets: [{ weight: 80, reps: 10 }] })],
+        entries: [
+          entry({ sets: [{ weight: 80, reps: 10 }] }),
+          entry({ exerciseId: 'e2', exerciseName: 'Fons', sets: [{ weight: 0, reps: 12 }] }),
+        ],
       }));
 
-      const blocks = Array.from(el.querySelectorAll('.wd-block-title')).map(n => n.textContent?.trim());
-      expect(blocks).toEqual(['Exercicis', 'Com ha anat']);
-      expect(el.querySelector('.wd-feeling-value')?.textContent?.trim()).toBeTruthy();
-      expect(el.querySelector('.workout-notes')?.textContent).toContain('Bon dia');
-    });
-
-    it('compta exercicis, sèries i volum al peu', () => {
-      const el = build(makeWorkout({
-        entries: [entry({ sets: [{ weight: 80, reps: 10 }, { weight: 40, reps: 10, warmup: true }] })],
-      }));
-
-      const footer = el.querySelector('.workout-volume-footer')?.textContent ?? '';
-      expect(footer).toContain('1 exercici');
-      expect(footer).toContain('1 sèries');
-      expect(footer).toContain('+1 esc');
-      expect(footer).toContain('800');
+      const root = el.querySelector('.workout-detail');
+      expect(root?.querySelectorAll(':scope > .entry-card').length).toBe(2);
+      expect(el.querySelector('.wd-block-title')).toBeNull();
+      expect(el.querySelector('.workout-volume-footer')).toBeNull();
     });
   });
 

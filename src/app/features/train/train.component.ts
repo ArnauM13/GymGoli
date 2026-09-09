@@ -137,11 +137,6 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
             <app-workout-detail [workout]="w" />
           </div>
 
-          <button class="edit-btn" (click)="startEditing()">
-            <span class="material-symbols-outlined" aria-hidden="true">edit</span>
-            Editar l'entrenament
-          </button>
-
         } @else {
 
         <app-workout-editor
@@ -226,6 +221,14 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
                mateixa vista que el menú de tres punts — mateixa família
                (rodó, flotant) en comptes d'amagar-los dins seu. -->
           <div class="aw-fab-row">
+            <!-- ── Llegir un entrenament passat ──
+                 L'editar és un FAB més, no un botó al final del detall: la
+                 mateixa família que el menú de tres punts. -->
+            @if (!editing()) {
+              <button class="aw-menu-fab" (click)="startEditing()" aria-label="Editar l'entrenament">
+                <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+              </button>
+            }
             @if (editing() && !groupingMode() && w.entries.length > 1) {
               <button class="aw-menu-fab" (click)="reorderMode.set(true); groupingMode.set(false)"
                       aria-label="Ordenar els exercicis">
@@ -583,18 +586,6 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       border: 1.5px solid var(--c-border-2); box-shadow: 0 2px 10px var(--c-shadow);
       background: var(--c-card);
     }
-    .edit-btn {
-      display: flex; align-items: center; justify-content: center; gap: 7px;
-      width: calc(100% - 32px); box-sizing: border-box;
-      margin: 12px 16px 0; padding: 12px; border-radius: 14px;
-      border: 1.5px solid var(--c-border); background: var(--c-card);
-      font-size: 14px; font-weight: 700; color: var(--c-text-2);
-      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 19px; }
-      &:hover { border-color: var(--c-brand); color: var(--c-brand); }
-      &:active { transform: scale(0.99); }
-    }
-
     .aw-feeling-row {
       display: flex; align-items: center; justify-content: center; gap: 6px;
       margin: 4px 16px 0;
