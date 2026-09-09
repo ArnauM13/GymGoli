@@ -1,4 +1,4 @@
-import { Component, HostListener, OnDestroy, ViewEncapsulation, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { Component, HostListener, OnDestroy, ViewEncapsulation, booleanAttribute, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { A11yModule } from '@angular/cdk/a11y';
@@ -70,7 +70,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
             <div class="we-superset-chip">
               <span class="material-symbols-outlined">link</span>
               <span>Superset {{ supersetLabels().get(entry.supersetGroupId) }}</span>
-              @if (alwaysEditable() || editMode()) {
+              @if (canEdit()) {
                 <button type="button" class="we-superset-ungroup-btn" (click)="ungroupSuperset(entry.exerciseId)" title="Desfer superset">
                   <span class="material-symbols-outlined">close</span>
                 </button>
@@ -94,7 +94,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
             [difficultyScale]="settingsService.difficultyScale()"
             [prBadge]="prExerciseIds().has(entry.exerciseId)"
             [showStatsAction]="!offlineService.isOffline() && !groupingMode()"
-            [showDeleteAction]="(alwaysEditable() || editMode()) && !groupingMode()"
+            [showDeleteAction]="canEdit() && !groupingMode()"
             [selectable]="groupingMode()"
             [selected]="selectedForGroup().has(entry.exerciseId)"
             (statsClick)="openStats(entry)"
@@ -544,57 +544,62 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
               }
             }
 
-            <!-- ── Entry footer: consultation (left) · logging + overflow (right).
-                 Each action owns a hue so it is told apart at a glance, always
-                 backed by its own icon and label — never by color alone. ── -->
-            <div class="we-entry-footer">
-              <div class="we-footer-actions">
-                @if (lastSession(entry); as ls) {
-                  <button type="button" class="we-footer-btn we-footer-btn--history"
-                    [class.we-footer-btn--on]="lastSessionPanelFor() === entry.exerciseId"
-                    [attr.aria-expanded]="lastSessionPanelFor() === entry.exerciseId"
-                    (click)="toggleLastSession(entry.exerciseId)"
-                    [attr.aria-label]="'Última sessió, ' + formatLastDate(ls.date)">
-                    <span class="material-symbols-outlined" aria-hidden="true">history</span>
-                    <span class="we-footer-btn-label">{{ formatLastDate(ls.date) }}</span>
-                  </button>
-                }
+            <!-- ── El peu de l'exercici ──
+                 Consultar (esquerra) · registrar i el desplegable (dreta).
+                 Cada acció té el seu to per distingir-la d'un cop d'ull,
+                 sempre amb la seva icona i etiqueta al darrere —mai només
+                 pel color. En consulta no hi és: allà no s'hi registra res,
+                 i un peu d'accions apagades només fa nosa. ── -->
+            @if (!readOnly()) {
+              <div class="we-entry-footer">
+                <div class="we-footer-actions">
+                  @if (lastSession(entry); as ls) {
+                    <button type="button" class="we-footer-btn we-footer-btn--history"
+                      [class.we-footer-btn--on]="lastSessionPanelFor() === entry.exerciseId"
+                      [attr.aria-expanded]="lastSessionPanelFor() === entry.exerciseId"
+                      (click)="toggleLastSession(entry.exerciseId)"
+                      [attr.aria-label]="'Última sessió, ' + formatLastDate(ls.date)">
+                      <span class="material-symbols-outlined" aria-hidden="true">history</span>
+                      <span class="we-footer-btn-label">{{ formatLastDate(ls.date) }}</span>
+                    </button>
+                  }
+                </div>
+                <div class="we-footer-actions">
+                  @if (canEdit()) {
+                    <button type="button" class="we-footer-btn we-footer-btn--note"
+                      [class.we-footer-btn--on]="entry.notes"
+                      (click)="openNotesPopup(entry.exerciseId)"
+                      [attr.aria-label]="entry.notes ? 'Nota escrita, editar' : 'Afegir una nota'">
+                      <span class="material-symbols-outlined" aria-hidden="true">{{ entry.notes ? 'sticky_note_2' : 'note_add' }}</span>
+                    </button>
+                    <button type="button" class="we-footer-btn we-footer-btn--feeling"
+                      [class.we-footer-btn--on]="entry.feeling"
+                      (click)="openFatigaPicker(entry.exerciseId)"
+                      [attr.aria-label]="entry.feeling ? 'Fatiga: ' + getFeelingLabel(entry.feeling) : 'Marcar la fatiga'">
+                      @if (entry.feeling) {
+                        <span aria-hidden="true">{{ getFeelingEmoji(entry.feeling) }}</span>
+                      } @else {
+                        <span class="material-symbols-outlined" aria-hidden="true">sentiment_neutral</span>
+                      }
+                    </button>
+                    <button type="button" class="we-footer-btn we-footer-btn--menu"
+                      [class.we-footer-btn--on]="optionsFor() === entry.exerciseId"
+                      [attr.aria-expanded]="optionsFor() === entry.exerciseId"
+                      (click)="openOptions(entry.exerciseId)"
+                      aria-label="Més opcions de l'exercici" aria-haspopup="dialog">
+                      <span class="material-symbols-outlined" aria-hidden="true">more_vert</span>
+                    </button>
+                  }
+                </div>
               </div>
-              <div class="we-footer-actions">
-                @if (alwaysEditable() || editMode()) {
-                  <button type="button" class="we-footer-btn we-footer-btn--note"
-                    [class.we-footer-btn--on]="entry.notes"
-                    (click)="openNotesPopup(entry.exerciseId)"
-                    [attr.aria-label]="entry.notes ? 'Nota escrita, editar' : 'Afegir una nota'">
-                    <span class="material-symbols-outlined" aria-hidden="true">{{ entry.notes ? 'sticky_note_2' : 'note_add' }}</span>
-                  </button>
-                  <button type="button" class="we-footer-btn we-footer-btn--feeling"
-                    [class.we-footer-btn--on]="entry.feeling"
-                    (click)="openFatigaPicker(entry.exerciseId)"
-                    [attr.aria-label]="entry.feeling ? 'Fatiga: ' + getFeelingLabel(entry.feeling) : 'Marcar la fatiga'">
-                    @if (entry.feeling) {
-                      <span aria-hidden="true">{{ getFeelingEmoji(entry.feeling) }}</span>
-                    } @else {
-                      <span class="material-symbols-outlined" aria-hidden="true">sentiment_neutral</span>
-                    }
-                  </button>
-                  <button type="button" class="we-footer-btn we-footer-btn--menu"
-                    [class.we-footer-btn--on]="optionsFor() === entry.exerciseId"
-                    [attr.aria-expanded]="optionsFor() === entry.exerciseId"
-                    (click)="openOptions(entry.exerciseId)"
-                    aria-label="Més opcions de l'exercici" aria-haspopup="dialog">
-                    <span class="material-symbols-outlined" aria-hidden="true">more_vert</span>
-                  </button>
-                }
-              </div>
-            </div>
+            }
 
             <!-- end projected body -->
           </app-exercise-entry-card>
           } <!-- end @if (!isEntryHidden) -->
         }
 
-        @if ((alwaysEditable() || editMode()) && !isDragging()) {
+        @if (canEdit() && !isDragging()) {
           <button class="we-add-exercise-btn" (click)="requestAddExercise.emit()">
             <span class="material-symbols-outlined">add</span>
             Afegir exercici
@@ -1479,6 +1484,20 @@ export class WorkoutEditorComponent implements OnDestroy {
   /** Superset-grouping selection mode — off by default, the parent enables
    *  it explicitly (e.g. from an "Agrupar en superset" menu action). */
   readonly groupingMode   = input<boolean>(false);
+  /**
+   * Mode consulta: el mateix entrenament de sempre, només que per mirar-se'l.
+   *
+   * Un entrenament que ja s'ha fet no s'obre en cap altra pantalla —és aquesta
+   * mateixa, amb el que serveix per escriure-hi apagat: ni afegir sèries, ni el
+   * peu d'accions de cada exercici, ni afegir exercicis, ni tocar una sèrie. I
+   * s'obre desplegat, perquè aquí has vingut a llegir-lo, no a plegar-lo.
+   * Editar-lo és el pas següent, i el demana el pare.
+   */
+  readonly readOnly       = input(false, { transform: booleanAttribute });
+
+  /** Qui pot escriure a l'entrenament. Consultar guanya sempre: mentre s'hi
+   *  llegeix, cap camí d'edició no s'ofereix. */
+  readonly canEdit = computed(() => !this.readOnly() && (this.editMode() || this.alwaysEditable()));
 
   readonly requestAddExercise = output<void>();
 
@@ -1669,10 +1688,27 @@ export class WorkoutEditorComponent implements OnDestroy {
     this.exerciseService.ensureLoaded();
 
     // Restore collapsed/done state; collapse all entries when first opening a template-loaded workout.
+    //
+    // En consulta s'obre tot desplegat: llegir-se un entrenament és veure què
+    // hi vas fer, i un munt de capçaleres plegades no ho és. Es fa un sol cop
+    // per entrenament —`expandedFor`—, que si no, cada canvi de l'entrenament
+    // (posar-hi la sensació, per exemple) et tornaria a obrir el que acabes de
+    // plegar. I es desa al mateix registre, perquè passar a editar continuï la
+    // lectura on era en comptes de plegar-t'ho tot de cop.
+    let expandedFor: string | null = null;
     effect(() => {
       const w = this.workout();
+      const readOnly = this.readOnly();
       if (!w?.id) return;
       untracked(() => {
+        if (readOnly) {
+          if (expandedFor === w.id) return;
+          expandedFor = w.id;
+          this.collapsedEntries.set(new Set());
+          _collapsedByWorkout.set(w.id, new Set());
+          return;
+        }
+        expandedFor = null;
         const savedCollapsed = _collapsedByWorkout.get(w.id);
         if (savedCollapsed !== undefined) {
           this.collapsedEntries.set(new Set(savedCollapsed));
@@ -1691,7 +1727,7 @@ export class WorkoutEditorComponent implements OnDestroy {
   }
 
   isEntryEditable(exerciseId: string): boolean {
-    return this.editMode() || this.alwaysEditable();
+    return this.canEdit();
   }
 
   isCollapsed(id: string): boolean { return this.collapsedEntries().has(id); }
