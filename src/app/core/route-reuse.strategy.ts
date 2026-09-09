@@ -11,10 +11,21 @@ export class AppReuseStrategy implements RouteReuseStrategy {
     return REUSE_ROUTES.has(route.routeConfig?.path ?? '');
   }
 
-  /** Store the detached component tree. */
+  /**
+   * Guarda l'arbre desenganxat.
+   *
+   * Amb `handle` a null l'entrada s'ha de treure: és com el router avisa que
+   * acaba de reenganxar l'arbre que hi teníem, i que allò ja no és cap còpia
+   * guardada sinó la pàgina que ara mateix es veu. Deixant-la-hi, la cau
+   * apuntava a una vista ja enganxada i la següent navegació que la volgués
+   * tornar a enganxar petava a mig activar: la navegació moria allà i el
+   * botó que l'havia demanada semblava no fer res.
+   */
   store(route: ActivatedRouteSnapshot, handle: DetachedRouteHandle | null): void {
     const key = route.routeConfig?.path;
-    if (key && handle) this.cache.set(key, handle);
+    if (!key) return;
+    if (handle) this.cache.set(key, handle);
+    else this.cache.delete(key);
   }
 
   /** Should we reattach a cached component tree for this route? */

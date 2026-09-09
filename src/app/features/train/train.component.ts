@@ -1523,7 +1523,6 @@ export class TrainComponent implements OnDestroy {
     // et plantava a `/train` en comptes de l'entrenament, i deixava l'adreça
     // dient una cosa i la pantalla una altra: recarregar o tornar enrere ja
     // no hi tornava.
-    let firstDateEffectRun = true;
     // Es posa just abans que obrir un entrenament canviï el dia a posta,
     // perquè la reinicialització de sota no tanqui el que s'acaba d'obrir.
     let suppressNextDateReset = false;
@@ -1579,15 +1578,47 @@ export class TrainComponent implements OnDestroy {
         syncFromUrl(e.urlAfterRedirects, arrivedNow);
       });
 
+    // ── Les dades del dia que es mira ──────────────────────────────────
+    //
+    // El que fa que això es torni a demanar es diu aquí i enlloc més, i la
+    // crida va `untracked`: `ensureMonthLoaded()` llegeix senyals per dins
+    // —qui ets, si hi ha connexió, el teu pes corporal— i, deixant-la
+    // destapada, tots se't colaven de dependència d'aquest efecte.
     effect(() => {
       const date = this.selectedDate();
+      // A posta, i només aquests dos: en fred la consulta se'n torna sense
+      // demanar res —encara no se sap qui ets, o no hi ha línia— i quan això
+      // canvia s'ha de tornar a preguntar.
+      this.auth.uid();
+      this.offlineService.isOffline();
       const [yearStr, monthStr] = date.split('-');
       const year  = parseInt(yearStr);
       const month = parseInt(monthStr) - 1;
-      this.workoutService.ensureMonthLoaded(year, month);
-      this.sportService.ensureMonthLoaded(year, month);
       untracked(() => {
-        if (firstDateEffectRun) { firstDateEffectRun = false; return; }
+        this.workoutService.ensureMonthLoaded(year, month);
+        this.sportService.ensureMonthLoaded(year, month);
+      });
+    });
+
+    // ── Canviar de dia tanca el que hi havia obert ─────────────────────
+    //
+    // Canviar de dia i res més. Això vivia enganxat a la càrrega de sobre i
+    // es feia a cada refresc d'aquell efecte, vingués d'on vingués: en
+    // recarregar la pàgina, en arribar la configuració, en anar i tornar la
+    // cobertura. I cada refresc et tancava l'entrenament que acabaves
+    // d'obrir —tocaves l'entrenament d'Inici i queies al taulell— i et
+    // desfeia l'editar tot just demanat.
+    //
+    // El dia que s'ha vist per últim cop es recorda aquí: així, refer
+    // l'efecte sense que el dia hagi canviat no toca res.
+    let lastSeenDate: string | null = null;
+    effect(() => {
+      const date = this.selectedDate();
+      untracked(() => {
+        if (date === lastSeenDate) return;
+        const firstRun = lastSeenDate === null;
+        lastSeenDate = date;
+        if (firstRun) return;
         if (suppressNextDateReset) { suppressNextDateReset = false; return; }
         this.activeWorkoutId.set(null);
         this.editRequestedFor.set(null);
