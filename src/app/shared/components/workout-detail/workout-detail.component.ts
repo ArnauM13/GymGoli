@@ -1,7 +1,7 @@
 import { Component, booleanAttribute, computed, effect, inject, input, signal, untracked } from '@angular/core';
 
 import { CATEGORY_COLORS, ExerciseCategory, SUBCATEGORY_LABELS } from '../../../core/models/exercise.model';
-import { FeelingLevel, Workout, WorkoutEntry, WorkoutSet, hasFullEntries, setMaxWeight, setVolume } from '../../../core/models/workout.model';
+import { FeelingLevel, Workout, WorkoutEntry, WorkoutSet, hasFullEntries, setMaxWeight } from '../../../core/models/workout.model';
 import { ExerciseService } from '../../../core/services/exercise.service';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
@@ -9,13 +9,7 @@ import { formatFeeling } from '../../utils/workout-card.utils';
 import { kgToDisplay } from '../../utils/weight.utils';
 
 /**
- * El desglossament d'un entrenament: exercicis, sèries, drop sets, PRs i notes.
- *
- * És el germà de `app-sport-detail` i es llegeix igual que ell: un bloc per a
- * la feina feta i un altre per a com ha anat, i un peu que la situa. Un
- * entrenament té més estructura que una sessió d'esport (exercicis, sèries,
- * rècords), i per això el bloc d'exercicis diu més; la forma, però, és la
- * mateixa a totes dues.
+ * El desglossament d'un entrenament: exercicis, sèries, drop sets i PRs.
  *
  * Té dues mides. Plegat dins una targeta del feed (`compact`) és una ullada:
  * una línia per exercici amb el que hi has fet —«4×8-12 · 80 kg»— i prou. La
@@ -68,110 +62,76 @@ import { kgToDisplay } from '../../utils/weight.utils';
              Cada exercici és una targeta pròpia (la mateixa forma que
              l'item-card, barra de color a l'esquerra) en comptes d'una fila
              més dins una llista contínua: així es distingeix d'un cop d'ull
-             on acaba un exercici i comença el següent. -->
-        <section class="wd-block">
-          <span class="wd-block-title">Exercicis</span>
-          @if (workout().entries.length) {
-            <div class="wd-entries">
-              @for (entry of workout().entries; track entry.exerciseId) {
-                <div class="entry-card" [style.--ec]="getEntryCatColor(entry)">
-                  <div class="entry-bar"></div>
-                  <div class="entry-body">
-                    <div class="entry-name-row">
-                      <span class="entry-name">{{ entry.exerciseName }}</span>
-                      @if (getEntrySubLabel(entry); as sub) {
-                        <span class="entry-sub-badge" [style.color]="getEntryCatColor(entry)"
-                              [style.background]="'color-mix(in srgb, ' + getEntryCatColor(entry) + ' 12%, var(--c-card))'">{{ sub }}</span>
-                      }
-                      @if (entry.feeling) {
-                        <span class="entry-feeling">{{ getFeelingEmoji(entry.feeling) }}</span>
-                      }
-                      <!-- El resum de l'exercici al costat del nom: el que en
-                           diries en veu alta abans d'entrar a mirar sèrie a sèrie. -->
-                      <span class="entry-sum">{{ entrySummary(entry) }}</span>
-                    </div>
-                    @if (entry.sets.length > 0) {
-                      <div class="entry-sets-col">
-                        @for (set of entry.sets; track $index) {
-                          <div class="entry-set-line" [class.entry-set-line--max]="isMaxSet(entry, set)"
-                               [class.entry-set-line--warmup]="set.warmup">
-                            @if (set.warmup) {
-                              <span class="esl-num esl-num--warmup material-symbols-outlined"
-                                    title="Sèrie d'escalfament">local_fire_department</span>
-                            } @else {
-                              <span class="esl-num">{{ workingSetNumber(entry, $index) }}</span>
-                            }
-                            <span class="esl-weight-group">
-                              @if (set.weightLeft != null) {
-                                <span class="esl-weight">E {{ dispW(set.weightLeft) }}<small>{{ unit() }}</small></span>
-                                <span class="esl-weight">D {{ dispW(set.weightRight!) }}<small>{{ unit() }}</small></span>
-                              } @else {
-                                <span class="esl-weight">{{ dispW(set.weight) }}<small>{{ unit() }}</small></span>
-                              }
-                            </span>
-                            <span class="esl-x">×</span>
-                            <span class="esl-reps-group">
-                              <span class="esl-reps">{{ set.reps }}</span>
-                              @for (d of (set.drops ?? []); track $index) {
-                                <span class="esl-drop-stage">
-                                  <span class="esl-drop-sep">→</span>
-                                  <span class="esl-weight drop">{{ dispW(d.weight) }}<small>{{ unit() }}</small></span>
-                                  <span class="esl-x">×</span>
-                                  <span class="esl-reps">{{ d.reps }}</span>
-                                </span>
-                              }
-                            </span>
-                            @if (isMaxSet(entry, set)) { <span class="esl-pr">PR</span> }
-                          </div>
+             on acaba un exercici i comença el següent. Van directes, sense
+             cap bloc al voltant: aquí no hi ha res més que els exercicis. -->
+        @if (workout().entries.length) {
+          @for (entry of workout().entries; track entry.exerciseId) {
+            <div class="entry-card" [style.--ec]="getEntryCatColor(entry)">
+              <div class="entry-bar"></div>
+              <div class="entry-body">
+                <div class="entry-name-row">
+                  <span class="entry-name">{{ entry.exerciseName }}</span>
+                  @if (getEntrySubLabel(entry); as sub) {
+                    <span class="entry-sub-badge" [style.color]="getEntryCatColor(entry)"
+                          [style.background]="'color-mix(in srgb, ' + getEntryCatColor(entry) + ' 12%, var(--c-card))'">{{ sub }}</span>
+                  }
+                  @if (entry.feeling) {
+                    <span class="entry-feeling">{{ getFeelingEmoji(entry.feeling) }}</span>
+                  }
+                  <!-- El resum de l'exercici al costat del nom: el que en
+                       diries en veu alta abans d'entrar a mirar sèrie a sèrie. -->
+                  <span class="entry-sum">{{ entrySummary(entry) }}</span>
+                </div>
+                @if (entry.sets.length > 0) {
+                  <div class="entry-sets-col">
+                    @for (set of entry.sets; track $index) {
+                      <div class="entry-set-line" [class.entry-set-line--max]="isMaxSet(entry, set)"
+                           [class.entry-set-line--warmup]="set.warmup">
+                        @if (set.warmup) {
+                          <span class="esl-num esl-num--warmup material-symbols-outlined"
+                                title="Sèrie d'escalfament">local_fire_department</span>
+                        } @else {
+                          <span class="esl-num">{{ workingSetNumber(entry, $index) }}</span>
                         }
-                      </div>
-                    } @else {
-                      <span class="no-sets">Cap sèrie registrada</span>
-                    }
-                    @if (entry.notes) {
-                      <div class="entry-note">
-                        <span class="material-symbols-outlined entry-note-icon" aria-hidden="true">sticky_note_2</span>
-                        <span class="entry-note-text">{{ entry.notes }}</span>
+                        <span class="esl-weight-group">
+                          @if (set.weightLeft != null) {
+                            <span class="esl-weight">E {{ dispW(set.weightLeft) }}<small>{{ unit() }}</small></span>
+                            <span class="esl-weight">D {{ dispW(set.weightRight!) }}<small>{{ unit() }}</small></span>
+                          } @else {
+                            <span class="esl-weight">{{ dispW(set.weight) }}<small>{{ unit() }}</small></span>
+                          }
+                        </span>
+                        <span class="esl-x">×</span>
+                        <span class="esl-reps-group">
+                          <span class="esl-reps">{{ set.reps }}</span>
+                          @for (d of (set.drops ?? []); track $index) {
+                            <span class="esl-drop-stage">
+                              <span class="esl-drop-sep">→</span>
+                              <span class="esl-weight drop">{{ dispW(d.weight) }}<small>{{ unit() }}</small></span>
+                              <span class="esl-x">×</span>
+                              <span class="esl-reps">{{ d.reps }}</span>
+                            </span>
+                          }
+                        </span>
+                        @if (isMaxSet(entry, set)) { <span class="esl-pr">PR</span> }
                       </div>
                     }
                   </div>
-                </div>
-              }
+                } @else {
+                  <span class="no-sets">Cap sèrie registrada</span>
+                }
+                @if (entry.notes) {
+                  <div class="entry-note">
+                    <span class="material-symbols-outlined entry-note-icon" aria-hidden="true">sticky_note_2</span>
+                    <span class="entry-note-text">{{ entry.notes }}</span>
+                  </div>
+                }
+              </div>
             </div>
-          } @else {
-            <span class="no-sets">Cap exercici registrat</span>
           }
-        </section>
-
-        <!-- ── Com ha anat ──
-             El mateix bloc que una sessió d'esport: la sensació d'aquell dia
-             i el que en vas escriure. -->
-        @if (workout().feeling || workout().notes?.trim()) {
-          <section class="wd-block">
-            <span class="wd-block-title">Com ha anat</span>
-            @if (workout().feeling; as feeling) {
-              <div class="wd-feeling-row">
-                <span class="material-symbols-outlined wd-feeling-icon" aria-hidden="true">mood</span>
-                <span class="wd-feeling-label">Sensació</span>
-                <span class="wd-feeling-value">{{ getFeelingEmoji(feeling) }}</span>
-              </div>
-            }
-            @if (workout().notes?.trim(); as note) {
-              <div class="workout-notes">
-                <span class="material-symbols-outlined" aria-hidden="true">notes</span>
-                <span class="workout-notes-text">{{ note }}</span>
-              </div>
-            }
-          </section>
+        } @else {
+          <span class="no-sets">Cap exercici registrat</span>
         }
-
-        <div class="workout-volume-footer">
-          <span>{{ workout().entries.length }} exercici{{ workout().entries.length !== 1 ? 's' : '' }}</span>
-          <span class="wvf-sep">·</span>
-          <span>{{ totalSets() }} sèries@if (totalWarmupSets(); as warm) { <span class="wvf-warmup">+{{ warm }} esc</span>}</span>
-          <span class="wvf-sep">·</span>
-          <span>{{ dispW(totalVolume()) }} {{ unit() }} volum</span>
-        </div>
       }
     </div>
   `,
@@ -198,13 +158,6 @@ import { kgToDisplay } from '../../utils/weight.utils';
     @keyframes wd-spin { to { transform: rotate(360deg); } }
     @media (prefers-reduced-motion: reduce) { .wd-spinner { animation-duration: 2s; } }
 
-    /* ── Blocs, com al detall d'una sessió d'esport ── */
-    .wd-block { display: flex; flex-direction: column; gap: 10px; }
-    .wd-block-title {
-      font-size: 13px; font-weight: 700; color: var(--c-text-3);
-      text-transform: uppercase; letter-spacing: 0.4px;
-    }
-
     /* ── L'ullada: una línia per exercici ── */
     .wd-sum-rows { display: flex; flex-direction: column; gap: 2px; }
     .wd-sum-row {
@@ -225,8 +178,9 @@ import { kgToDisplay } from '../../utils/weight.utils';
 
     /* Un exercici, una targeta: mateixa forma que l'item-card (barra de
        color a l'esquerra, contingut a la dreta) perquè cada exercici es
-       distingeixi del següent sense haver de llegir-se'ls tots seguits. */
-    .wd-entries { display: flex; flex-direction: column; gap: 10px; }
+       distingeixi del següent sense haver de llegir-se'ls tots seguits.
+       Van directes, un darrere l'altre: els separa el gap del contenidor,
+       sense cap llista que els embolcalli. */
     .entry-card {
       display: flex; align-items: stretch;
       border: 1.5px solid var(--c-border-2); border-radius: 14px;
@@ -282,36 +236,9 @@ import { kgToDisplay } from '../../utils/weight.utils';
     .entry-note-icon { font-size: 14px; color: var(--c-brand); flex-shrink: 0; margin-top: 1px; }
     .entry-note-text { font-size: 13px; color: var(--c-text-2); font-style: italic; line-height: 1.45; }
 
-    /* La sensació, amb la mateixa forma de fila que les dades d'un esport. */
-    .wd-feeling-row {
-      display: flex; align-items: center; gap: 8px; min-height: 24px;
-      padding: 8px 10px; border-radius: 10px;
-      background: color-mix(in srgb, var(--ac, var(--c-subtle)) 5%, var(--c-subtle));
-    }
-    .wd-feeling-icon { flex-shrink: 0; font-size: 16px; color: var(--c-text-3); }
-    .wd-feeling-label { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: var(--c-text-2); }
-    .wd-feeling-value { flex-shrink: 0; font-size: 15px; font-weight: 700; color: var(--c-text); }
-
-    .workout-notes {
-      display: flex; align-items: flex-start; gap: 8px;
-      padding: 10px 12px; border-radius: 10px; background: var(--c-subtle);
-      border-left: 3px solid color-mix(in srgb, var(--ac, var(--c-border)) 45%, var(--c-border-2));
-      font-size: 13px; color: var(--c-text-2); line-height: 1.5;
-      .material-symbols-outlined { font-size: 16px; color: var(--c-text-3); flex-shrink: 0; margin-top: 1px; }
-    }
-    .workout-notes-text { flex: 1; min-width: 0; font-style: italic; overflow-wrap: anywhere; }
-
-    .workout-volume-footer {
-      display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap;
-      padding-top: 10px; border-top: 1px solid var(--c-border-2);
-      font-size: 13px; font-weight: 600; color: var(--c-text-3);
-      .wvf-sep { color: var(--c-border-2); }
-      .wvf-warmup { color: #ff9800; margin-left: 3px; }
-    }
-
     /* Plegat dins una targeta del feed: només la llista curta, amb l'aire
-       just. El que hi ha a sota (el peu, les notes, sèrie a sèrie) ja té la
-       seva pàgina. */
+       just. El que hi ha a sota (les notes, sèrie a sèrie) ja té la seva
+       pàgina. */
     .workout-detail--compact { gap: 8px; padding: 8px 12px 10px 14px; }
   `],
 })
@@ -361,21 +288,6 @@ export class WorkoutDetailComponent {
 
   readonly unit = this.settingsService.weightUnit;
   dispW(kg: number): number { return kgToDisplay(kg, this.unit()); }
-
-  readonly totalSets = computed(() =>
-    this.workout().entries.reduce((s, e) => s + e.sets.filter(set => !set.warmup).length, 0));
-
-  readonly totalWarmupSets = computed(() =>
-    this.workout().entries.reduce((s, e) => s + e.sets.filter(set => set.warmup).length, 0));
-
-  readonly totalVolume = computed(() => {
-    const bodyweightKg = this.settingsService.bodyweightKg();
-    return Math.round(this.workout().entries.reduce((t, e) => {
-      const ex  = this.exerciseService.getById(e.exerciseId);
-      const ctx = { bodyweightKg, loadType: ex?.loadType, bodyweightFactor: ex?.bodyweightFactor };
-      return t + e.sets.reduce((s, set) => set.warmup ? s : s + setVolume(set, ctx), 0);
-    }, 0));
-  });
 
   /**
    * El que has fet a l'exercici, en quatre caràcters: «4×10 · 80 kg», o
