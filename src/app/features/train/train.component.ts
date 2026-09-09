@@ -207,6 +207,18 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
           </div>
         }
 
+        <!-- ── Tornar a la consulta ──
+             Només hi és si has entrat a editar des de la consulta: mentre
+             entrenes no cal cap botó de més, que allà no hi ha cap consulta
+             on tornar. No desa res —tot es desa sol—, només apaga l'edició
+             i et torna la pantalla de llegir. -->
+        @if (canStopEditing() && !reorderMode() && !groupingMode()) {
+          <button class="read-btn" (click)="stopEditing()">
+            <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+            Tornar a la consulta
+          </button>
+        }
+
         }
 
         <!-- Mentre s'ordena, la fila es reemplaça per un sol botó de guardar
@@ -570,7 +582,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
 
     /* Passar a editar, amb la mateixa forma que a la pàgina d'una sessió
        d'esport: un botó al final de tot del que s'acaba de llegir. */
-    .edit-btn {
+    .edit-btn, .read-btn {
       display: flex; align-items: center; justify-content: center; gap: 7px;
       width: calc(100% - 32px); box-sizing: border-box;
       margin: 12px 16px 0; padding: 12px; border-radius: 14px;
@@ -1181,6 +1193,10 @@ export class TrainComponent implements OnDestroy {
    *  llegir-lo (`editing()`), i això recorda que ja se n'ha demanat
    *  l'edició. */
   private readonly editRequestedFor = signal<string | null>(null);
+  /** D'on ve l'edició: només si l'has demanada tu des de la consulta hi ha
+   *  una consulta on tornar. Un que s'obre per escriure-hi de bon principi
+   *  —el d'avui, un pla, el que acabes de crear— no en ve de cap. */
+  private readonly editCameFromRead = signal<string | null>(null);
   readonly creating          = signal(false);
   readonly awFeelingOpen     = signal(false);
   readonly feelingLevels5: FeelingLevel[] = [1, 2, 3, 4, 5];
@@ -1360,6 +1376,23 @@ export class TrainComponent implements OnDestroy {
     if (this.editRequestedFor() === w.id) return true;
     if (this.isPlannedWorkout(w)) return true;
     return w.date === this.today();
+  });
+
+  /**
+   * Si des d'aquí es pot tornar a la consulta.
+   *
+   * Només quan hi has entrat: has obert un entrenament per mirar-te'l i has
+   * premut editar. Aleshores hi ha una consulta on tornar, i tornar-hi és un
+   * botó. Si s'ha obert per escriure-hi —el d'avui, un pla, el que acabes de
+   * crear— no: allà l'edició no ve de cap consulta, i oferir-la seria un botó
+   * de més justament quan tens les mans ocupades.
+   *
+   * No hi ha res a desar: l'entrenament es desa sol a cada canvi (SYNC.md), i
+   * això només apaga l'edició.
+   */
+  readonly canStopEditing = computed((): boolean => {
+    const w = this.activeWorkout();
+    return !!w && this.editCameFromRead() === w.id;
   });
 
   readonly activeWorkoutCategories = computed((): string[] => {
@@ -1607,6 +1640,7 @@ export class TrainComponent implements OnDestroy {
         if (suppressNextDateReset) { suppressNextDateReset = false; return; }
         this.activeWorkoutId.set(null);
         this.editRequestedFor.set(null);
+        this.editCameFromRead.set(null);
         this.reorderMode.set(false);
         this.groupingMode.set(false);
         this.planRequested.set(false);
@@ -1678,6 +1712,7 @@ export class TrainComponent implements OnDestroy {
     void this.workoutService.ensureWorkoutEntries(id);
     this.activeWorkoutId.set(id);
     this.editRequestedFor.set(opts.edit ? id : null);
+    this.editCameFromRead.set(null);
     this.pickerCat.set(null);
   }
 
@@ -1685,7 +1720,21 @@ export class TrainComponent implements OnDestroy {
    *  d'aquí és una sessió com la que estàs fent: tot editable. */
   startEditing(): void {
     const w = this.activeWorkout();
-    if (w) this.editRequestedFor.set(w.id);
+    if (!w) return;
+    this.editRequestedFor.set(w.id);
+    this.editCameFromRead.set(w.id);
+  }
+
+  /** El pas enrere de `startEditing()`: torna a la consulta d'on venies. Res a
+   *  desar —cada canvi ja s'ha desat—, així que això només apaga l'edició i
+   *  el que se'n penja (ordenar, agrupar). */
+  stopEditing(): void {
+    this.editRequestedFor.set(null);
+    this.editCameFromRead.set(null);
+    this.reorderMode.set(false);
+    this.groupingMode.set(false);
+    this.workoutMenuOpen.set(false);
+    this.editor?.reset();
   }
 
   /** Ordenar i agrupar canvien l'entrenament, així que només s'ofereixen des
@@ -1712,6 +1761,7 @@ export class TrainComponent implements OnDestroy {
     // vas demanar editar-lo, la petició no et sobreviu la sortida, i tampoc
     // cap dels modes que se'n pengen (ordenar, agrupar).
     this.editRequestedFor.set(null);
+    this.editCameFromRead.set(null);
     this.reorderMode.set(false);
     this.groupingMode.set(false);
     this.workoutMenuOpen.set(false);
