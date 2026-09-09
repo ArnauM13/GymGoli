@@ -636,15 +636,20 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       box-shadow: 0 4px 16px var(--c-shadow-md);
       transition: background 0.15s, transform 0.15s;
       .material-symbols-outlined { font-size: 24px; }
-      &:hover { background: var(--c-subtle); transform: scale(1.06); }
       &:active { transform: scale(0.94); }
       &.aw-menu-fab--open { background: var(--c-subtle); border-color: var(--c-brand); color: var(--c-brand); }
+    }
+    /* Hover només amb ratolí real: en tàctil, el toc que obre el detall deixa
+       l':hover "enganxat" al FAB d'editar —queda seleccionat i més gran sense
+       que ningú l'hagi tocat. */
+    @media (hover: hover) {
+      .aw-menu-fab:hover { background: var(--c-subtle); transform: scale(1.06); }
+      .aw-menu-fab--finish:hover { background: var(--c-brand-dk); border-color: transparent; color: white; }
     }
     /* Posar punt final és el gest que tanca la sessió: mateixa forma que la
        resta, però tenyit de marca perquè destaqui com a acció principal. */
     .aw-menu-fab--finish {
       border-color: transparent; background: var(--c-brand); color: white;
-      &:hover { background: var(--c-brand-dk); border-color: transparent; color: white; }
     }
     .aw-menu-backdrop { position: fixed; inset: 0; z-index: 88; }
     /* ── Save-order button shown while reordering ── */
