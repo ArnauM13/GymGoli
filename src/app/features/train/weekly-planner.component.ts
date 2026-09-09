@@ -50,9 +50,9 @@ const TODAY = (): string => todayStr();
       </div>
 
       @for (day of days; track day.index) {
-        <div class="card-section" [class.day-open]="isDayExpanded(day.index)" [class.day-locked]="isDayLocked(day.index)"
+        <div class="card-section" [class.day-locked]="isDayLocked(day.index)"
              [attr.data-tour]="$first ? 'planner-day' : null">
-          <button type="button" class="day-toggle" (click)="toggleDay(day.index)" [disabled]="isDayLocked(day.index)">
+          <div class="day-header">
             <span class="material-symbols-outlined section-icon">today</span>
             <h2 class="section-title">{{ day.label }}</h2>
             @if (itemCount(day.index) > 0) {
@@ -60,12 +60,11 @@ const TODAY = (): string => todayStr();
             }
             @if (isDayLocked(day.index)) {
               <span class="material-symbols-outlined day-chevron">lock</span>
-            } @else {
-              <span class="material-symbols-outlined day-chevron">{{ isDayExpanded(day.index) ? 'expand_less' : 'expand_more' }}</span>
             }
-          </button>
+          </div>
 
-          @if (!isDayExpanded(day.index)) {
+          @if (isDayLocked(day.index)) {
+          <div class="day-body">
             @if (daySummary(day.index); as summary) {
               @if (summary.length > 0) {
                 <div class="day-summary">
@@ -76,12 +75,11 @@ const TODAY = (): string => todayStr();
                     </span>
                   }
                 </div>
-              } @else if (isDayLocked(day.index)) {
-                <span class="day-summary-rest">Dia ja passat</span>
               } @else {
-                <span class="day-summary-rest">Dia de descans</span>
+                <span class="day-summary-rest">Dia ja passat</span>
               }
             }
+          </div>
           } @else {
           <div class="day-body">
 
@@ -235,15 +233,12 @@ const TODAY = (): string => todayStr();
       border-radius: 18px;
       box-shadow: 0 2px 10px var(--c-shadow);
     }
-    .card-section.day-open { padding-bottom: 16px; }
+    .card-section { padding-bottom: 16px; }
     .card-section.day-locked { opacity: 0.55; }
-    .card-section.day-locked .day-toggle { cursor: default; }
 
-    /* ── Collapsible day header ── */
-    .day-toggle {
+    /* ── Day header ── */
+    .day-header {
       display: flex; align-items: center; gap: 7px; width: 100%;
-      padding: 0; border: none; background: transparent;
-      cursor: pointer; touch-action: manipulation; text-align: left;
     }
     .section-icon  { font-size: 18px; color: var(--c-text-3); font-variation-settings: 'FILL' 0, 'wght' 300; }
     .section-title { margin: 0; flex: 1; font-size: 14px; font-weight: 700; color: var(--c-text-2); letter-spacing: 0.2px; }
@@ -255,7 +250,7 @@ const TODAY = (): string => todayStr();
 
     .day-body { margin-top: 12px; }
 
-    /* ── Collapsed-day summary ── */
+    /* ── Locked-day summary ── */
     .day-summary { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
     .day-summary-chip {
       display: inline-flex; align-items: center; gap: 4px;
@@ -425,10 +420,6 @@ export class WeeklyPlannerComponent {
   readonly gymCategories  = computed(() => this.typeService.types().map(t => t.id));
   readonly days = WEEKDAY_LABELS.map((label, index) => ({ label, index }));
 
-  /** Days shown expanded (collapsed by default so the week is easy to scan
-   *  and plan one day at a time). */
-  private readonly expandedDays = signal<ReadonlySet<number>>(new Set());
-
   /** Monday of a single week to plan (from the calendar's "Planificar" action),
    *  or null when editing the persistent routine from Configuració. */
   readonly weekMonday = this.route.snapshot.queryParamMap.get('week');
@@ -465,21 +456,8 @@ export class WeeklyPlannerComponent {
     return !!this.weekMonday && this.weekMonday < this._today;
   }
 
-  isDayExpanded(dayIndex: number): boolean {
-    return !this.isDayLocked(dayIndex) && this.expandedDays().has(dayIndex);
-  }
-
-  toggleDay(dayIndex: number): void {
-    if (this.isDayLocked(dayIndex)) return;
-    this.expandedDays.update(set => {
-      const next = new Set(set);
-      if (next.has(dayIndex)) next.delete(dayIndex); else next.add(dayIndex);
-      return next;
-    });
-  }
-
-  /** Compact list of what's planned for a collapsed day (gym categories +
-   *  sports), so the user can scan the week without expanding every day. */
+  /** Compact list of what's planned for a locked (past) day (gym categories +
+   *  sports), shown in place of the editable body since it can't change. */
   daySummary(dayIndex: number): { key: string; label: string; icon: string; color: string }[] {
     const items = this.plan().days[dayIndex];
     const out: { key: string; label: string; icon: string; color: string }[] = [];

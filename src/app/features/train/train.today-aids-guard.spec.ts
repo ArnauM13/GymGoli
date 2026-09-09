@@ -86,7 +86,7 @@ describe('TrainComponent — today-only aids never crash the workout view', () =
           manualRestEnabled: signal(false), difficultyScale: signal('emoji'), restTimerSeconds: signal(90),
           dismissedHints: signal<string[]>([]), bodyweightKg: signal(null),
         } },
-        { provide: OfflineService, useValue: { isOffline: signal(false), forceOffline: signal(false) } },
+        { provide: OfflineService, useValue: { isOffline: signal(false) } },
         { provide: TrainerService, useValue: { myTrainer: signal(null), hasTrainer: () => false, getProposalForDate: () => null } },
         { provide: TemplateService, useValue: { templates: signal([]), forCategory: () => [] } },
         { provide: SharedWorkoutService, useValue: {} },
