@@ -25,7 +25,6 @@ import { TrainingTypeService } from '../../core/services/training-type.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { WorkoutService } from '../../core/services/workout.service';
-import { OngoingWorkoutService } from '../../core/services/ongoing-workout.service';
 import { OfflineService } from '../../core/services/offline.service';
 import { ActivityCardComponent } from '../../shared/components/activity-card/activity-card.component';
 import { ActivityIconComponent } from '../../shared/components/activity-icon/activity-icon.component';
@@ -128,14 +127,18 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
         @if (!editing()) {
 
           <!-- ── Llegir ──
-               Un entrenament d'un dia passat s'obre per mirar-se'l, no per
-               fer-lo: primer l'esquema —què vas fer a cada exercici, sèrie a
-               sèrie— i, si el vols tocar, el botó d'editar. És el mateix camí
-               que una sessió d'esport, i abans un entrenament vell queia de
-               dret dins l'editor. -->
-          <div class="detail-card">
-            <app-workout-detail [workout]="w" />
-          </div>
+               Un entrenament s'obre per mirar-se'l, no per fer-lo: primer
+               l'esquema —què vas fer a cada exercici, sèrie a sèrie— i, si el
+               vols tocar, el botó d'editar. És el mateix camí que una sessió
+               d'esport. Les targetes dels exercicis no van dins cap caixa:
+               el detall les treu soltes i el context (com ha anat, el
+               recompte) el posa a part, com fa el detall d'un esport. -->
+          <app-workout-detail class="aw-detail" [workout]="w" />
+
+          <button class="edit-btn" (click)="startEditing()">
+            <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+            Editar l'entrenament
+          </button>
 
         } @else {
 
@@ -217,28 +220,15 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
           </button>
         } @else {
           <!-- ── Botons flotants de l'entrenament actiu ──
-               Ordenar i posar punt final es fan cada dia, així que viuen a la
-               mateixa vista que el menú de tres punts — mateixa família
-               (rodó, flotant) en comptes d'amagar-los dins seu. -->
+               Ordenar es fa cada dia, així que viu a la mateixa vista que el
+               menú de tres punts — mateixa família (rodó, flotant) en comptes
+               d'amagar-lo dins seu. Hi és estiguis llegint o editant: el
+               mode no és cap permís, i prémer-lo ja obre l'editor per tu. -->
           <div class="aw-fab-row">
-            <!-- ── Llegir un entrenament passat ──
-                 L'editar és un FAB més, no un botó al final del detall: la
-                 mateixa família que el menú de tres punts. -->
-            @if (!editing()) {
-              <button class="aw-menu-fab" (click)="startEditing()" aria-label="Editar l'entrenament">
-                <span class="material-symbols-outlined" aria-hidden="true">edit</span>
-              </button>
-            }
-            @if (editing() && !groupingMode() && w.entries.length > 1) {
-              <button class="aw-menu-fab" (click)="reorderMode.set(true); groupingMode.set(false)"
+            @if (!groupingMode() && w.entries.length > 1) {
+              <button class="aw-menu-fab" (click)="startReordering()"
                       aria-label="Ordenar els exercicis">
                 <span class="material-symbols-outlined" aria-hidden="true">swap_vert</span>
-              </button>
-            }
-            @if (editing() && !groupingMode() && activeIsOngoing()) {
-              <button class="aw-menu-fab aw-menu-fab--finish" (click)="finishWorkout()"
-                      aria-label="Acabar l'entrenament">
-                <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
               </button>
             }
 
@@ -246,8 +236,8 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
             @if (workoutMenuOpen()) {
               <div class="aw-menu-backdrop" (click)="workoutMenuOpen.set(false)"></div>
               <div class="aw-menu-dropdown">
-                @if (editing() && (settingsService.supersetsEnabled() || groupingMode())) {
-                  <button class="aw-menu-item" (click)="workoutMenuOpen.set(false); groupingMode.set(!groupingMode()); reorderMode.set(false)">
+                @if (settingsService.supersetsEnabled() || groupingMode()) {
+                  <button class="aw-menu-item" (click)="workoutMenuOpen.set(false); startGrouping()">
                     <span class="material-symbols-outlined">{{ groupingMode() ? 'check' : 'link' }}</span>
                     {{ groupingMode() ? 'Finalitzar agrupació' : 'Agrupar en superset' }}
                   </button>
@@ -577,14 +567,23 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
        xifres han de ser llegibles a mig entrenament, sense tornar a pujar. */
     .aw-hero { display: block; position: sticky; top: 12px; z-index: 10; margin: 12px 16px 0; }
 
-    /* ── Llegir un entrenament passat ──
-       El detall porta la seva vora superior, així que la targeta que
-       l'embolcalla no n'hi posa una altra. La mateixa forma que a la pàgina
-       d'una sessió d'esport. */
-    .detail-card {
-      margin: 12px 16px 0; border-radius: 16px; overflow: hidden;
-      border: 1.5px solid var(--c-border-2); box-shadow: 0 2px 10px var(--c-shadow);
-      background: var(--c-card);
+    /* ── Llegir un entrenament ──
+       El detall no va dins cap caixa: les targetes són els exercicis, i el
+       que d'aquí es posa és només l'aire dels costats. */
+    .aw-detail { display: block; margin: 12px 16px 0; }
+
+    /* Passar a editar, amb la mateixa forma que a la pàgina d'una sessió
+       d'esport: un botó al final del que s'acaba de llegir. */
+    .edit-btn {
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+      width: calc(100% - 32px); box-sizing: border-box;
+      margin: 12px 16px 0; padding: 12px; border-radius: 14px;
+      border: 1.5px solid var(--c-border); background: var(--c-card);
+      font-size: 14px; font-weight: 700; color: var(--c-text-2);
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 19px; }
+      &:hover { border-color: var(--c-brand); color: var(--c-brand); }
+      &:active { transform: scale(0.99); }
     }
     .aw-feeling-row {
       display: flex; align-items: center; justify-content: center; gap: 6px;
@@ -640,16 +639,10 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       &.aw-menu-fab--open { background: var(--c-subtle); border-color: var(--c-brand); color: var(--c-brand); }
     }
     /* Hover només amb ratolí real: en tàctil, el toc que obre el detall deixa
-       l':hover "enganxat" al FAB d'editar —queda seleccionat i més gran sense
-       que ningú l'hagi tocat. */
+       l':hover "enganxat" al FAB —queda seleccionat i més gran sense que
+       ningú l'hagi tocat. */
     @media (hover: hover) {
       .aw-menu-fab:hover { background: var(--c-subtle); transform: scale(1.06); }
-      .aw-menu-fab--finish:hover { background: var(--c-brand-dk); border-color: transparent; color: white; }
-    }
-    /* Posar punt final és el gest que tanca la sessió: mateixa forma que la
-       resta, però tenyit de marca perquè destaqui com a acció principal. */
-    .aw-menu-fab--finish {
-      border-color: transparent; background: var(--c-brand); color: white;
     }
     .aw-menu-backdrop { position: fixed; inset: 0; z-index: 88; }
     /* ── Save-order button shown while reordering ── */
@@ -1130,7 +1123,6 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
 })
 export class TrainComponent implements OnDestroy {
   readonly workoutService  = inject(WorkoutService);
-  private ongoing          = inject(OngoingWorkoutService);
   readonly sportService    = inject(SportService);
   readonly offlineService  = inject(OfflineService);
   readonly trainerService  = inject(TrainerService);
@@ -1186,8 +1178,9 @@ export class TrainComponent implements OnDestroy {
    *  via ?workout=<id> renders straight into the editor on first paint,
    *  without a flash of the dashboard first. */
   readonly activeWorkoutId = signal<string | null>(this.route.snapshot.queryParamMap.get('workout'));
-  /** L'entrenament que s'ha demanat editar. Un de passat s'obre per llegir-lo
-   *  (`editing()`), i això recorda que ja se n'ha demanat l'edició. */
+  /** L'entrenament que s'ha demanat editar. Un entrenament s'obre per
+   *  llegir-lo (`editing()`), i això recorda que ja se n'ha demanat
+   *  l'edició. */
   private readonly editRequestedFor = signal<string | null>(null);
   readonly creating          = signal(false);
   readonly awFeelingOpen     = signal(false);
@@ -1353,28 +1346,19 @@ export class TrainComponent implements OnDestroy {
   /**
    * Si la pàgina és per entrenar o per llegir.
    *
-   * Mana si l'entrenament s'ha donat per acabat. Mentre està en marxa —i
-   * qualsevol acabat de crear ho està— s'obre a l'editor: hi véns a fer-lo, i
-   * un tap des d'Inici t'hi ha de deixar a dins. Un cop acabat s'obre a
-   * l'esquema, com una sessió d'esport: hi véns a mirar-te'l, i tocar-lo és
-   * un pas que es demana. Un pla també s'obre a l'editor: planificar és
+   * Un entrenament es llegeix per defecte: tot el que s'ha registrat es dona
+   * per fet, i obrir-lo és mirar-se'l, com una sessió d'esport. Editar-lo és
+   * el pas següent i es demana —amb el botó del final, o prement qualsevol
+   * dels botons que canvien res (ordenar, agrupar)—, i el que s'acaba de
+   * crear ja hi arriba demanat (`openWorkout(id, { edit: true })`), que hi
+   * véns a omplir-lo. Un pla també s'obre a l'editor: planificar és
    * escriure-hi.
-   *
-   * Que estigui acabat o no només ho sap aquest dispositiu
-   * (`OngoingWorkoutService`); sense cap notícia, es dona per acabat.
    */
   readonly editing = computed((): boolean => {
     const w = this.activeWorkout();
     if (!w) return false;
     if (this.editRequestedFor() === w.id) return true;
-    if (this.isPlannedWorkout(w)) return true;
-    return this.ongoing.isOngoing(w.id);
-  });
-
-  /** Cert mentre l'entrenament obert no s'hagi donat per acabat. */
-  readonly activeIsOngoing = computed((): boolean => {
-    const w = this.activeWorkout();
-    return !!w && !this.isPlannedWorkout(w) && this.ongoing.isOngoing(w.id);
+    return this.isPlannedWorkout(w);
   });
 
   readonly activeWorkoutCategories = computed((): string[] => {
@@ -1694,28 +1678,25 @@ export class TrainComponent implements OnDestroy {
     this.pickerCat.set(null);
   }
 
-  /** Un entrenament acabat es llegeix primer; això és el pas de tocar-lo, i
-   *  a partir d'aquí és una sessió com la que estàs fent: tot editable. */
+  /** Un entrenament es llegeix primer; això és el pas de tocar-lo, i a partir
+   *  d'aquí és una sessió com la que estàs fent: tot editable. */
   startEditing(): void {
     const w = this.activeWorkout();
     if (w) this.editRequestedFor.set(w.id);
   }
 
-  /**
-   * Donar-lo per acabat: es tanca l'editor i la pàgina passa al resum.
-   *
-   * És el gest que fa de punt final, i per això té botó propi i no viu dins
-   * cap menú. No toca l'entrenament —no és cap camp seu—: només aquest
-   * dispositiu deixa de considerar-lo en marxa.
-   */
-  finishWorkout(): void {
-    const w = this.activeWorkout();
-    if (!w) return;
-    this.ongoing.finish(w.id);
-    this.editRequestedFor.set(null);
-    this.reorderMode.set(false);
+  /** Ordenar i agrupar canvien l'entrenament, així que porten l'editor amb
+   *  ells: no cal haver demanat abans d'editar per fer-los. */
+  startReordering(): void {
+    this.startEditing();
+    this.reorderMode.set(true);
     this.groupingMode.set(false);
-    this.feedback.success('Entrenament acabat', 2000);
+  }
+
+  startGrouping(): void {
+    this.startEditing();
+    this.groupingMode.update(v => !v);
+    this.reorderMode.set(false);
   }
 
   /** Ni d'avui ni previst: una sessió que ja va passar. */

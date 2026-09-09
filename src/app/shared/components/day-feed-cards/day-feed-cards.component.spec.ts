@@ -2,7 +2,6 @@ import { NO_ERRORS_SCHEMA, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { DayFeedCardsComponent } from './day-feed-cards.component';
-import { OngoingWorkoutService } from '../../../core/services/ongoing-workout.service';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { SportService } from '../../../core/services/sport.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
@@ -26,8 +25,6 @@ describe('DayFeedCardsComponent', () => {
   let confirm: jasmine.Spy;
 
   beforeEach(async () => {
-    // «En marxa» viu al dispositiu: cada test arrenca sense cap.
-    localStorage.removeItem('gymgoli_ongoing_workouts');
     // Torna l'id de l'entrenament que s'ha d'obrir: un planificat de la
     // rutina no és cap fila fins que es comença, i llavors n'és una de nova.
     startPlannedWorkout = jasmine.createSpy().and.callFake((id: string) => Promise.resolve(id));
@@ -111,47 +108,17 @@ describe('DayFeedCardsComponent', () => {
     });
   });
 
-  // A Inici, un entrenament que encara no s'ha acabat s'obre d'un sol tap:
-  // l'estàs fent. A l'Historial, i per a un esport, no canvia res.
-  describe('un entrenament en marxa, a Inici', () => {
-    const liveDay = () => ({
-      date: '2024-03-05',
-      workouts: [makeWorkout({ id: 'w1', categories: ['push'] })],
-      sports: [],
-    });
-
-    function build(live: boolean): HTMLElement {
-      fixture.componentRef.setInput('day', liveDay());
-      fixture.componentRef.setInput('liveOpensPage', live);
+  // Una activitat registrada es desplega allà mateix, sigui d'avui o de fa
+  // mesos: el feed es llegeix, i canviar-hi res passa per la seva pàgina.
+  describe('tocar una targeta registrada', () => {
+    it('la desplega allà mateix, i el chevron ho diu', () => {
+      fixture.componentRef.setInput('day', {
+        date: '2024-03-05',
+        workouts: [makeWorkout({ id: 'w1', categories: ['push'] })],
+        sports: [],
+      });
       fixture.detectChanges();
-      return fixture.nativeElement as HTMLElement;
-    }
-
-    beforeEach(() => TestBed.inject(OngoingWorkoutService).start('w1'));
-    afterEach(() => localStorage.removeItem('gymgoli_ongoing_workouts'));
-
-    it('hi porta d\'un tap, i el chevron ho diu', () => {
-      const openSpy = spyOn(component.open, 'emit');
-      const el = build(true);
-
-      expect(el.querySelector('.ac-chevron')?.textContent?.trim()).toBe('chevron_right');
-      (el.querySelector('.ac-main') as HTMLElement).click();
-
-      expect(openSpy).toHaveBeenCalledWith('w1');
-      expect(component.expandedWorkoutId()).toBeNull();
-    });
-
-    it("un cop acabat torna a desplegar-se allà mateix", () => {
-      TestBed.inject(OngoingWorkoutService).finish('w1');
-      const el = build(true);
-
-      expect(el.querySelector('.ac-chevron')?.textContent?.trim()).toBe('expand_more');
-      (el.querySelector('.ac-main') as HTMLElement).click();
-      expect(component.expandedWorkoutId()).toBe('w1');
-    });
-
-    it("a l'Historial es desplega igualment, acabat o no", () => {
-      const el = build(false);
+      const el = fixture.nativeElement as HTMLElement;
 
       expect(el.querySelector('.ac-chevron')?.textContent?.trim()).toBe('expand_more');
       (el.querySelector('.ac-main') as HTMLElement).click();
