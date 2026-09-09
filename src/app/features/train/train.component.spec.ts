@@ -284,14 +284,25 @@ describe('TrainComponent', () => {
       return fixture.nativeElement as HTMLElement;
     }
 
-    // Es llegeix a la pantalla de sempre: el mateix editor en consulta, i el
-    // botó d'editar al final de tot.
-    it("una sessió passada s'obre en consulta, amb el botó d'editar al final", () => {
+    /** Canviar de mode viu dins el menú de tres punts: obrir-lo és el pas
+     *  previ a trobar-hi cap dels dos botons. */
+    function openMenu(): HTMLElement {
+      component.workoutMenuOpen.set(true);
+      fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    // Es llegeix a la pantalla de sempre: el mateix editor en consulta, i
+    // editar-la és la primera opció del menú de tres punts.
+    it("una sessió passada s'obre en consulta, amb editar com a primera opció del menú", () => {
       const el = open(makeWorkout({ id: 'old', date: '2024-03-05', categories: ['push'] }));
 
       expect(component.editing()).toBeFalse();
       expect(el.querySelector('app-workout-editor')).toBeTruthy();
-      expect(el.querySelector('.edit-btn')).toBeTruthy();
+
+      openMenu();
+      const items = el.querySelectorAll('.aw-menu-dropdown .aw-menu-item');
+      expect(items[0].classList).toContain('edit-btn');
     });
 
     // El d'avui és el que estàs fent: demanar permís per apuntar-hi una sèrie
@@ -312,7 +323,7 @@ describe('TrainComponent', () => {
       fixture.detectChanges();
 
       expect(component.editing()).toBeTrue();
-      expect((fixture.nativeElement as HTMLElement).querySelector('.edit-btn')).toBeNull();
+      expect(openMenu().querySelector('.edit-btn')).toBeNull();
     });
 
     // Si has entrat a editar des de la consulta, hi ha una consulta on tornar
@@ -324,11 +335,15 @@ describe('TrainComponent', () => {
       fixture.detectChanges();
 
       expect(component.canStopEditing()).toBeTrue();
-      el.querySelector<HTMLButtonElement>('.read-btn')!.click();
+      const items = openMenu().querySelectorAll<HTMLButtonElement>('.aw-menu-dropdown .aw-menu-item');
+      expect(items[0].classList).toContain('read-btn');
+      items[0].click();
       fixture.detectChanges();
 
       expect(component.editing()).toBeFalse();
-      expect(el.querySelector('.read-btn')).toBeNull();
+      // I el menú es tanca sol: el que hi havia darrere ja és la consulta.
+      expect(component.workoutMenuOpen()).toBeFalse();
+      expect(openMenu().querySelector('.read-btn')).toBeNull();
       expect(el.querySelector('.edit-btn')).toBeTruthy();
     });
 
@@ -338,25 +353,26 @@ describe('TrainComponent', () => {
       const el = open(makeWorkout({ id: 'today', date: TODAY, categories: ['push'] }));
 
       expect(component.canStopEditing()).toBeFalse();
-      expect(el.querySelector('.read-btn')).toBeNull();
+      expect(openMenu().querySelector('.read-btn')).toBeNull();
     });
 
     it("un pla tampoc no ofereix tornar a la consulta", () => {
-      const el = open(makeWorkout({ id: 'plan', date: TODAY, status: 'planned', categories: ['push'] }));
+      open(makeWorkout({ id: 'plan', date: TODAY, status: 'planned', categories: ['push'] }));
 
       expect(component.canStopEditing()).toBeFalse();
-      expect(el.querySelector('.read-btn')).toBeNull();
+      expect(openMenu().querySelector('.read-btn')).toBeNull();
     });
 
     // Ordenar i agrupar tenen la seva pròpia sortida: dos botons de sortir
     // alhora no diuen res.
     it("mentre s'ordena no s'ofereix tornar a la consulta", () => {
-      const el = open(makeWorkout({ id: 'old', date: '2024-03-05', categories: ['push'] }));
+      open(makeWorkout({ id: 'old', date: '2024-03-05', categories: ['push'] }));
       component.startEditing();
       component.startReordering();
       fixture.detectChanges();
 
-      expect(el.querySelector('.read-btn')).toBeNull();
+      // Ordenar es menja la fila de botons flotants: no hi ha ni menú.
+      expect(openMenu().querySelector('.read-btn')).toBeNull();
     });
 
     it('un acabat de crear ja ve obert per omplir-lo', () => {
@@ -368,7 +384,7 @@ describe('TrainComponent', () => {
       // Ve obert per escriure-hi: no ve de cap consulta, i per tant no n'hi ha
       // cap on tornar.
       expect(component.canStopEditing()).toBeFalse();
-      expect((fixture.nativeElement as HTMLElement).querySelector('.read-btn')).toBeNull();
+      expect(openMenu().querySelector('.read-btn')).toBeNull();
     });
 
     it('tancar-lo oblida que se n\'havia demanat l\'edició', () => {

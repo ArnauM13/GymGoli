@@ -131,13 +131,8 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
                Desplegat de bon principi i sense res per escriure-hi —ni
                afegir sèries, ni el peu d'accions, ni afegir exercicis—, que
                aquí has vingut a llegir. Tocar-la és el pas següent i el
-               demana el botó del final, com al detall d'una sessió d'esport. -->
+               demana el menú de tres punts, la primera opció de totes. -->
           <app-workout-editor [workout]="w" readOnly />
-
-          <button class="edit-btn" (click)="startEditing()">
-            <span class="material-symbols-outlined" aria-hidden="true">edit</span>
-            Editar l'entrenament
-          </button>
 
         } @else {
 
@@ -207,18 +202,6 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
           </div>
         }
 
-        <!-- ── Tornar a la consulta ──
-             Només hi és si has entrat a editar des de la consulta: mentre
-             entrenes no cal cap botó de més, que allà no hi ha cap consulta
-             on tornar. No desa res —tot es desa sol—, només apaga l'edició
-             i et torna la pantalla de llegir. -->
-        @if (canStopEditing() && !reorderMode() && !groupingMode()) {
-          <button class="read-btn" (click)="stopEditing()">
-            <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
-            Tornar a la consulta
-          </button>
-        }
-
         }
 
         <!-- Mentre s'ordena, la fila es reemplaça per un sol botó de guardar
@@ -232,15 +215,33 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
           </button>
         } @else {
           <!-- ── Botons flotants de l'entrenament actiu ──
-               Un sol botó a la vista: el menú de tres punts. Tot el que es fa
-               de tant en tant (ordenar, agrupar, plantilla, compartir,
-               eliminar) hi viu dins, que un segon botó flotant menja pantalla
-               justament on hi ha els exercicis. -->
+               Un sol botó a la vista: el menú de tres punts. Tot el que no es
+               fa a cada sèrie (canviar de mode, ordenar, agrupar, plantilla,
+               compartir, eliminar) hi viu dins, que un segon botó flotant
+               menja pantalla justament on hi ha els exercicis. -->
           <div class="aw-fab-row">
             <!-- ── Three-dots action menu ── -->
             @if (workoutMenuOpen()) {
               <div class="aw-menu-backdrop" (click)="workoutMenuOpen.set(false)"></div>
               <div class="aw-menu-dropdown">
+                <!-- ── Canviar de mode, primer de tot ──
+                     Passar de llegir a tocar-hi (i tornar) és el que més s'hi
+                     busca: obre el menú i ja hi és, a dalt, sense haver de
+                     llegir-se les altres opcions. Tornar a la consulta només
+                     hi és si has entrat a editar des de la consulta —mentre
+                     entrenes no hi ha cap consulta on tornar—, i mentre
+                     s'agrupa tampoc, que allò té la seva pròpia sortida. -->
+                @if (!editing()) {
+                  <button class="aw-menu-item edit-btn" (click)="workoutMenuOpen.set(false); startEditing()">
+                    <span class="material-symbols-outlined">edit</span>
+                    Editar l'entrenament
+                  </button>
+                } @else if (canStopEditing() && !groupingMode()) {
+                  <button class="aw-menu-item read-btn" (click)="stopEditing()">
+                    <span class="material-symbols-outlined">visibility</span>
+                    Tornar a la consulta
+                  </button>
+                }
                 <!-- Ordenar i agrupar canvien l'entrenament: en consulta no
                      s'ofereixen, que allà no s'hi toca res. -->
                 @if (editing() && !groupingMode() && w.entries.length > 1) {
@@ -580,19 +581,6 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
        xifres han de ser llegibles a mig entrenament, sense tornar a pujar. */
     .aw-hero { display: block; position: sticky; top: 12px; z-index: 10; margin: 12px 16px 0; }
 
-    /* Passar a editar, amb la mateixa forma que a la pàgina d'una sessió
-       d'esport: un botó al final de tot del que s'acaba de llegir. */
-    .edit-btn, .read-btn {
-      display: flex; align-items: center; justify-content: center; gap: 7px;
-      width: calc(100% - 32px); box-sizing: border-box;
-      margin: 12px 16px 0; padding: 12px; border-radius: 14px;
-      border: 1.5px solid var(--c-border); background: var(--c-card);
-      font-size: 14px; font-weight: 700; color: var(--c-text-2);
-      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 19px; }
-      &:hover { border-color: var(--c-brand); color: var(--c-brand); }
-      &:active { transform: scale(0.99); }
-    }
     .aw-feeling-row {
       display: flex; align-items: center; justify-content: center; gap: 6px;
       margin: 4px 16px 0;
