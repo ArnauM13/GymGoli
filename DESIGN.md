@@ -336,7 +336,7 @@ data i li faltaven les xifres.
 
 | | Entrenament | Esport |
 | --- | --- | --- |
-| Detall | `app-workout-detail` — exercicis, sèries, drop sets i PRs | `app-sport-detail` — dades de la sessió, rècords i context |
+| Desplegable | `app-workout-detail` — una línia per exercici amb el que hi has fet | `app-sport-detail compact` — les dades de la sessió |
 | Botó del peu | «Obrir entrenament» → `/train?workout=` | «Obrir sessió» → `/sport/:id` |
 
 Les dues activitats tenen **pàgina pròpia**, i s'hi arriba igual des del feed
@@ -730,26 +730,34 @@ everywhere.
 Both activity pages follow **one shape**, and the page is where you go deep:
 
 1. The card (above) — what it was, at a glance.
-2. The detail, read-only — `app-workout-detail` or `app-sport-detail`, full
-   size: every set, PRs, records, context, footer. A sport session sits inside
-   `.detail-card`, since its detail is plain rows; a workout does not, because
-   its exercises are already cards and boxing them all in one more card only
-   buries them. What isn't an exercise (feeling, notes, the count) is the part
-   that keeps the sport shape: rows and a footer, in a surface of its own.
-3. `.edit-btn` — "Editar l'entrenament" / "Editar la sessió". Editing replaces
-   the reading: the editor (or the form) takes the page on its own.
+2. The detail, read-only. A sport session gets `app-sport-detail` inside
+   `.detail-card`, since its detail is plain rows. A workout gets **the very
+   same editor it is logged in**, in consultation mode
+   (`<app-workout-editor readOnly />`): one screen, not two styles of the same
+   thing. Consultation opens expanded, and everything you write with is off —
+   no add-set row, no per-exercise action footer, no "add exercise", no
+   tappable set.
+3. `.edit-btn` — "Editar l'entrenament" / "Editar la sessió", at the very
+   bottom of what you just read. Editing replaces the reading: the editor (or
+   the form) takes the page on its own.
 
-**Every workout opens on step 2**, like a sport session: what has been logged
-is taken as done, and there is no "finish it" to mark (there used to be; it is
-gone). Only two things skip straight to the editor: a plan (planning is
-writing) and a workout you just created, which arrives with editing already
-asked for — you came to fill it in.
+**The day decides which one you land on.** Today's workout opens straight in
+the editor — it is the one you are doing, and asking permission to log a set
+makes no sense. So does a plan (planning is writing) and a workout you just
+created, which arrives with editing already asked for. Anything older opens in
+consultation: it already happened, and opening it is looking at it. There is no
+"finish it" to mark (there used to be; it is gone) — what is logged is done.
 
-The options don't depend on which of the two you are in. Reordering the
-exercises is a floating button whether you are reading or editing, and
-pressing it opens the editor for you rather than making you tap edit first;
-same for grouping into a superset. The three-dot menu stays for what you
-hardly ever touch (template, share, delete).
+Editing is a mode of that page, not a place: leaving the workout forgets it,
+along with reordering and grouping.
+
+What changes the workout is offered only from the editor. Reordering the
+exercises and grouping into a superset live in the three-dot menu, next to
+what you hardly ever touch (template, share, delete) — a second floating
+button eats the screen exactly where the exercises are. While reordering, the
+menu is replaced by one small "Guardar ordre" primary button (38px, 10px
+radius): you are looking at cards you are dragging, and a 56px pill sits on
+top of one.
 
 Once you tap edit, a workout behaves exactly like the one you are doing right
 now: everything is editable, live-saved, nothing read-only about it.

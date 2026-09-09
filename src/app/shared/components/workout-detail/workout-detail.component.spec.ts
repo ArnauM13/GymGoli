@@ -18,10 +18,9 @@ function makeWorkout(overrides: Partial<Workout> = {}): Workout {
 describe('WorkoutDetailComponent', () => {
   let ensureWorkoutEntries: jasmine.Spy;
 
-  function build(workout: Workout, compact = false): HTMLElement {
+  function build(workout: Workout): HTMLElement {
     const fixture = TestBed.createComponent(WorkoutDetailComponent);
     fixture.componentRef.setInput('workout', workout);
-    fixture.componentRef.setInput('compact', compact);
     fixture.detectChanges();
     return fixture.nativeElement as HTMLElement;
   }
@@ -52,16 +51,16 @@ describe('WorkoutDetailComponent', () => {
     }).compileComponents();
   });
 
-  // Desplegat dins una targeta del feed és una ullada, com el detall d'una
-  // sessió d'esport: què has fet a cada exercici i prou.
-  describe('plegat dins la targeta (compact)', () => {
+  // Desplegat dins una targeta del feed és una ullada, i res més: la lectura
+  // sencera viu a la pàgina de l'entrenament, que és l'editor en consulta.
+  describe('l\'ullada del feed', () => {
     it('resumeix cada exercici en una línia', () => {
       const el = build(makeWorkout({
         entries: [
           entry({ sets: [{ weight: 80, reps: 10 }, { weight: 80, reps: 8 }, { weight: 70, reps: 8 }] }),
           entry({ exerciseId: 'e2', exerciseName: 'Fons', sets: [{ weight: 0, reps: 12 }] }),
         ],
-      }), true);
+      }));
 
       expect(summaries(el)).toEqual([
         { name: 'Press banca', value: '3×8-10 · 80 kg' },
@@ -73,20 +72,20 @@ describe('WorkoutDetailComponent', () => {
       const el = build(makeWorkout({
         notes: 'Bon dia', feeling: 4,
         entries: [entry({ notes: 'Fluix', sets: [{ weight: 80, reps: 10 }] })],
-      }), true);
+      }));
 
       expect(el.querySelector('.entry-set-line')).toBeNull();
-      expect(el.querySelector('.wd-extra')).toBeNull();
+      expect(el.querySelector('.entry-card')).toBeNull();
       expect(el.querySelector('.wd-footer')).toBeNull();
       expect(el.querySelector('.wd-notes')).toBeNull();
-      expect(el.querySelector('.wd-block-title')).toBeNull();
       expect(el.textContent).not.toContain('Bon dia');
+      expect(el.textContent).not.toContain('Fluix');
     });
 
     it('les sèries d\'escalfament no compten al resum', () => {
       const el = build(makeWorkout({
         entries: [entry({ sets: [{ weight: 40, reps: 12, warmup: true }, { weight: 90, reps: 5 }] })],
-      }), true);
+      }));
 
       expect(summaries(el)[0].value).toBe('1×5 · 90 kg');
     });
@@ -95,71 +94,17 @@ describe('WorkoutDetailComponent', () => {
       const el = build(makeWorkout({
         entries: Array.from({ length: 7 }, (_, i) =>
           entry({ exerciseId: `e${i}`, exerciseName: `Exercici ${i}`, sets: [{ weight: 20, reps: 10 }] })),
-      }), true);
+      }));
 
       expect(summaries(el).length).toBe(5);
       expect(el.querySelector('.wd-more')?.textContent).toContain('+2');
     });
   });
 
-  // A la pàgina de l'entrenament s'hi entra a fons: sèrie a sèrie, com ha
-  // anat i el compte del dia.
-  describe('sencer', () => {
-    it('ensenya cada sèrie i el resum de l\'exercici', () => {
-      const el = build(makeWorkout({
-        entries: [entry({ sets: [{ weight: 80, reps: 10 }, { weight: 90, reps: 6 }] })],
-      }));
-
-      expect(el.querySelectorAll('.entry-set-line').length).toBe(2);
-      expect(el.querySelector('.entry-sum')?.textContent?.trim()).toBe('2×6-10 · 90 kg');
-      expect(el.querySelector('.esl-pr')).toBeTruthy();
-    });
-
-    // Les úniques targetes són els exercicis: van soltes, no dins cap caixa
-    // que les agrupi totes.
-    it('ensenya els exercicis directes, sense cap bloc pare', () => {
-      const el = build(makeWorkout({
-        entries: [
-          entry({ sets: [{ weight: 80, reps: 10 }] }),
-          entry({ exerciseId: 'e2', exerciseName: 'Fons', sets: [{ weight: 0, reps: 12 }] }),
-        ],
-      }));
-
-      const root = el.querySelector('.workout-detail');
-      expect(root?.querySelectorAll(':scope > .entry-card').length).toBe(2);
-    });
-
-    // El que no és cap exercici es llegeix com al detall d'una sessió
-    // d'esport: bloc a part amb titolet, la nota amb el seu filet i un peu.
-    it('separa com ha anat en un bloc propi, com una sessió d\'esport', () => {
-      const el = build(makeWorkout({
-        feeling: 4, notes: 'Bon dia',
-        entries: [entry({ sets: [{ weight: 80, reps: 10 }] })],
-      }));
-
-      const blocks = Array.from(el.querySelectorAll('.wd-block-title')).map(n => n.textContent?.trim());
-      expect(blocks).toEqual(['Com ha anat']);
-      expect(el.querySelector('.wd-extra .wd-value')?.textContent?.trim()).toBeTruthy();
-      expect(el.querySelector('.wd-notes')?.textContent).toContain('Bon dia');
-    });
-
-    it('compta exercicis, sèries i volum al peu', () => {
-      const el = build(makeWorkout({
-        entries: [entry({ sets: [{ weight: 80, reps: 10 }, { weight: 40, reps: 10, warmup: true }] })],
-      }));
-
-      const footer = el.querySelector('.wd-footer')?.textContent ?? '';
-      expect(footer).toContain('1 exercici');
-      expect(footer).toContain('1 sèries');
-      expect(footer).toContain('+1 esc');
-      expect(footer).toContain('800');
-    });
-  });
-
-  // De l'historial vell només se'n baixa el resum de la targeta: obrir el
-  // detall és el moment de demanar-ne les sèries.
+  // De l'historial vell només se'n baixa el resum de la targeta: desplegar-la
+  // és el moment de demanar-ne les sèries.
   it('demana les sèries quan la sessió només porta el resum', () => {
-    const el = build(makeWorkout({ entriesLoaded: false, exerciseCount: 3 } as Partial<Workout>), true);
+    const el = build(makeWorkout({ entriesLoaded: false, exerciseCount: 3 } as Partial<Workout>));
     expect(ensureWorkoutEntries).toHaveBeenCalledWith('w1');
     expect(el.querySelector('.wd-pending')).toBeTruthy();
   });

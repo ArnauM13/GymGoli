@@ -62,7 +62,7 @@ export interface DayFeedEntry {
         }
 
         @if (expandedWorkoutId() === w.id && !isPlanned(w)) {
-          <app-workout-detail [workout]="w" compact />
+          <app-workout-detail [workout]="w" />
           <div class="ac-detail-actions">
             <button class="ac-open-btn" (click)="open.emit(w.id)">
               <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>

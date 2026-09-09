@@ -28,7 +28,6 @@ import { WorkoutService } from '../../core/services/workout.service';
 import { OfflineService } from '../../core/services/offline.service';
 import { ActivityCardComponent } from '../../shared/components/activity-card/activity-card.component';
 import { ActivityIconComponent } from '../../shared/components/activity-icon/activity-icon.component';
-import { WorkoutDetailComponent } from '../../shared/components/workout-detail/workout-detail.component';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
 import { AppHintService } from '../../core/services/app-hint.service';
@@ -69,7 +68,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
   selector: 'app-train',
   standalone: true,
   imports: [
-    FormsModule, A11yModule, WorkoutEditorComponent, WorkoutDetailComponent,
+    FormsModule, A11yModule, WorkoutEditorComponent,
     PageHeaderComponent, ActivityCardComponent, ActivityIconComponent,
   ],
   template: `
@@ -127,13 +126,13 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
         @if (!editing()) {
 
           <!-- ── Llegir ──
-               Un entrenament s'obre per mirar-se'l, no per fer-lo: primer
-               l'esquema —què vas fer a cada exercici, sèrie a sèrie— i, si el
-               vols tocar, el botó d'editar. És el mateix camí que una sessió
-               d'esport. Les targetes dels exercicis no van dins cap caixa:
-               el detall les treu soltes i el context (com ha anat, el
-               recompte) el posa a part, com fa el detall d'un esport. -->
-          <app-workout-detail class="aw-detail" [workout]="w" />
+               Una sessió que ja va passar s'obre per mirar-se-la, i es mira a
+               la pantalla de sempre: el mateix editor, en mode consulta.
+               Desplegat de bon principi i sense res per escriure-hi —ni
+               afegir sèries, ni el peu d'accions, ni afegir exercicis—, que
+               aquí has vingut a llegir. Tocar-la és el pas següent i el
+               demana el botó del final, com al detall d'una sessió d'esport. -->
+          <app-workout-editor [workout]="w" readOnly />
 
           <button class="edit-btn" (click)="startEditing()">
             <span class="material-symbols-outlined" aria-hidden="true">edit</span>
@@ -210,33 +209,35 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
 
         }
 
-        <!-- While reordering, the whole row is replaced by a single
-             "save order" button — the reorder is persisted live on each drop,
-             so this just leaves reorder mode. -->
+        <!-- Mentre s'ordena, la fila es reemplaça per un sol botó de guardar
+             —l'ordre es desa a cada moviment, així que això només surt del
+             mode. Petit, com qualsevol altre botó de la casa: no ha de tapar
+             els exercicis que estàs movent. -->
         @if (reorderMode()) {
-          <button class="aw-reorder-save-fab" (click)="reorderMode.set(false)">
+          <button class="aw-reorder-save-btn" (click)="reorderMode.set(false)">
             <span class="material-symbols-outlined">check</span>
             Guardar ordre
           </button>
         } @else {
           <!-- ── Botons flotants de l'entrenament actiu ──
-               Ordenar es fa cada dia, així que viu a la mateixa vista que el
-               menú de tres punts — mateixa família (rodó, flotant) en comptes
-               d'amagar-lo dins seu. Hi és estiguis llegint o editant: el
-               mode no és cap permís, i prémer-lo ja obre l'editor per tu. -->
+               Un sol botó a la vista: el menú de tres punts. Tot el que es fa
+               de tant en tant (ordenar, agrupar, plantilla, compartir,
+               eliminar) hi viu dins, que un segon botó flotant menja pantalla
+               justament on hi ha els exercicis. -->
           <div class="aw-fab-row">
-            @if (!groupingMode() && w.entries.length > 1) {
-              <button class="aw-menu-fab" (click)="startReordering()"
-                      aria-label="Ordenar els exercicis">
-                <span class="material-symbols-outlined" aria-hidden="true">swap_vert</span>
-              </button>
-            }
-
             <!-- ── Three-dots action menu ── -->
             @if (workoutMenuOpen()) {
               <div class="aw-menu-backdrop" (click)="workoutMenuOpen.set(false)"></div>
               <div class="aw-menu-dropdown">
-                @if (settingsService.supersetsEnabled() || groupingMode()) {
+                <!-- Ordenar i agrupar canvien l'entrenament: en consulta no
+                     s'ofereixen, que allà no s'hi toca res. -->
+                @if (editing() && !groupingMode() && w.entries.length > 1) {
+                  <button class="aw-menu-item" (click)="workoutMenuOpen.set(false); startReordering()">
+                    <span class="material-symbols-outlined">swap_vert</span>
+                    Ordenar exercicis
+                  </button>
+                }
+                @if (editing() && (settingsService.supersetsEnabled() || groupingMode())) {
                   <button class="aw-menu-item" (click)="workoutMenuOpen.set(false); startGrouping()">
                     <span class="material-symbols-outlined">{{ groupingMode() ? 'check' : 'link' }}</span>
                     {{ groupingMode() ? 'Finalitzar agrupació' : 'Agrupar en superset' }}
@@ -567,13 +568,8 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
        xifres han de ser llegibles a mig entrenament, sense tornar a pujar. */
     .aw-hero { display: block; position: sticky; top: 12px; z-index: 10; margin: 12px 16px 0; }
 
-    /* ── Llegir un entrenament ──
-       El detall no va dins cap caixa: les targetes són els exercicis, i el
-       que d'aquí es posa és només l'aire dels costats. */
-    .aw-detail { display: block; margin: 12px 16px 0; }
-
     /* Passar a editar, amb la mateixa forma que a la pàgina d'una sessió
-       d'esport: un botó al final del que s'acaba de llegir. */
+       d'esport: un botó al final de tot del que s'acaba de llegir. */
     .edit-btn {
       display: flex; align-items: center; justify-content: center; gap: 7px;
       width: calc(100% - 32px); box-sizing: border-box;
@@ -645,20 +641,23 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       .aw-menu-fab:hover { background: var(--c-subtle); transform: scale(1.06); }
     }
     .aw-menu-backdrop { position: fixed; inset: 0; z-index: 88; }
-    /* ── Save-order button shown while reordering ── */
-    .aw-reorder-save-fab {
+    /* ── Guardar l'ordre, mentre s'ordena ──
+       Un botó primari de la casa (10px de radi, 13px de lletra), no un FAB:
+       mentre mous exercicis el que has de veure són els exercicis, i una
+       pastilla de 56px al damunt en tapa un. */
+    .aw-reorder-save-btn {
       position: fixed; right: 20px;
       bottom: calc(var(--nav-height) + 16px);
       z-index: 89;
-      display: flex; align-items: center; gap: 8px;
-      height: 56px; padding: 0 22px; border-radius: 28px;
+      display: flex; align-items: center; gap: 6px;
+      height: 38px; padding: 0 16px; border-radius: 10px;
       border: none; background: var(--c-brand); color: #fff;
-      font-size: 15px; font-weight: 700; letter-spacing: 0.2px;
+      font-size: 13px; font-weight: 700;
       cursor: pointer; touch-action: manipulation;
-      box-shadow: 0 4px 16px rgba(var(--c-brand-rgb), 0.4), 0 1px 4px var(--c-shadow);
+      box-shadow: 0 3px 12px rgba(var(--c-brand-rgb), 0.35), 0 1px 4px var(--c-shadow);
       transition: background 0.15s, transform 0.15s;
-      .material-symbols-outlined { font-size: 24px; }
-      &:hover { background: var(--c-brand-dk); transform: scale(1.04); }
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { background: var(--c-brand-dk); }
       &:active { transform: scale(0.96); }
     }
     /* ── Contextual "save as template" nudge ── */
@@ -1346,19 +1345,21 @@ export class TrainComponent implements OnDestroy {
   /**
    * Si la pàgina és per entrenar o per llegir.
    *
-   * Un entrenament es llegeix per defecte: tot el que s'ha registrat es dona
-   * per fet, i obrir-lo és mirar-se'l, com una sessió d'esport. Editar-lo és
-   * el pas següent i es demana —amb el botó del final, o prement qualsevol
-   * dels botons que canvien res (ordenar, agrupar)—, i el que s'acaba de
-   * crear ja hi arriba demanat (`openWorkout(id, { edit: true })`), que hi
-   * véns a omplir-lo. Un pla també s'obre a l'editor: planificar és
-   * escriure-hi.
+   * Ho decideix el dia. El d'avui s'obre per entrenar: és el que estàs fent, i
+   * fer-te demanar permís per apuntar-hi una sèrie no té cap sentit. Un pla,
+   * igual —planificar és escriure-hi— i el que s'acaba de crear hi arriba
+   * demanat (`openWorkout(id, { edit: true })`), que hi véns a omplir-lo.
+   *
+   * La resta —el d'ahir, el de la setmana passada— s'obre en consulta: allò
+   * ja va passar i obrir-ho és mirar-s'ho, com una sessió d'esport. Tocar-ho
+   * és el pas següent i el demana el botó del final.
    */
   readonly editing = computed((): boolean => {
     const w = this.activeWorkout();
     if (!w) return false;
     if (this.editRequestedFor() === w.id) return true;
-    return this.isPlannedWorkout(w);
+    if (this.isPlannedWorkout(w)) return true;
+    return w.date === this.today();
   });
 
   readonly activeWorkoutCategories = computed((): string[] => {
@@ -1606,6 +1607,8 @@ export class TrainComponent implements OnDestroy {
         if (suppressNextDateReset) { suppressNextDateReset = false; return; }
         this.activeWorkoutId.set(null);
         this.editRequestedFor.set(null);
+        this.reorderMode.set(false);
+        this.groupingMode.set(false);
         this.planRequested.set(false);
         this.pickerCat.set(null);
       });
@@ -1685,16 +1688,15 @@ export class TrainComponent implements OnDestroy {
     if (w) this.editRequestedFor.set(w.id);
   }
 
-  /** Ordenar i agrupar canvien l'entrenament, així que porten l'editor amb
-   *  ells: no cal haver demanat abans d'editar per fer-los. */
+  /** Ordenar i agrupar canvien l'entrenament, així que només s'ofereixen des
+   *  de l'editor: el menú no els ensenya en mode consulta. Són excloents
+   *  entre ells —moure i seleccionar alhora no vol dir res. */
   startReordering(): void {
-    this.startEditing();
     this.reorderMode.set(true);
     this.groupingMode.set(false);
   }
 
   startGrouping(): void {
-    this.startEditing();
     this.groupingMode.update(v => !v);
     this.reorderMode.set(false);
   }
@@ -1706,7 +1708,13 @@ export class TrainComponent implements OnDestroy {
 
   closeWorkout(): void {
     this.activeWorkoutId.set(null);
+    // Sortir de l'entrenament el deixa com el trobaràs la propera vegada: si
+    // vas demanar editar-lo, la petició no et sobreviu la sortida, i tampoc
+    // cap dels modes que se'n pengen (ordenar, agrupar).
     this.editRequestedFor.set(null);
+    this.reorderMode.set(false);
+    this.groupingMode.set(false);
+    this.workoutMenuOpen.set(false);
     this.editor?.reset();
     // Return to wherever the workout was opened from — the home feed, the
     // calendar (when registering a past day), etc. — instead of always
