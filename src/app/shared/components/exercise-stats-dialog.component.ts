@@ -248,7 +248,7 @@ export class ExerciseStatsDialogComponent {
 
   goToCharts(): void {
     this.dialogRef?.close();
-    this.router.navigate(['/charts'], { queryParams: { exerciseId: this.resolvedId() } });
+    this.router.navigate(['/charts/exercises'], { queryParams: { exerciseId: this.resolvedId() } });
   }
 
   getFeelingEmoji(level: FeelingLevel): string {

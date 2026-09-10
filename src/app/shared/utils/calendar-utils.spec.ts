@@ -1,6 +1,7 @@
 import { Workout } from '../../core/models/workout.model';
 import {
-  addDays, catDotBackground, mondayOf, sportDotBackground, workoutCategories,
+  addDays, catDotBackground, mondayOf, monthLabelOf, monthStartOf, sameSpanLastMonth,
+  sportDotBackground, workoutCategories,
 } from './calendar-utils';
 
 function makeWorkout(overrides: Partial<Workout> = {}): Workout {
@@ -102,6 +103,33 @@ describe('calendar-utils', () => {
       expect(result).toContain('conic-gradient');
       expect(result).toContain('#1E88E5');
       expect(result).toContain('#43A047');
+    });
+  });
+
+  describe('monthStartOf()', () => {
+    it('torna l\'1 del mes d\'aquesta data', () => {
+      expect(monthStartOf('2024-03-17')).toBe('2024-03-01');
+      expect(monthStartOf('2024-12-31')).toBe('2024-12-01');
+    });
+  });
+
+  describe('monthLabelOf()', () => {
+    it('escriu el mes i l\'any en català', () => {
+      expect(monthLabelOf('2024-03-17')).toBe('Març 2024');
+    });
+  });
+
+  describe('sameSpanLastMonth()', () => {
+    it('agafa el mateix tros de mes, de l\'1 fins al mateix dia', () => {
+      expect(sameSpanLastMonth('2024-03-10')).toEqual({ from: '2024-02-01', to: '2024-02-10' });
+    });
+
+    it('s\'atura a l\'últim dia quan el mes passat és més curt', () => {
+      expect(sameSpanLastMonth('2024-03-31')).toEqual({ from: '2024-02-01', to: '2024-02-29' });
+    });
+
+    it('travessa el canvi d\'any', () => {
+      expect(sameSpanLastMonth('2024-01-05')).toEqual({ from: '2023-12-01', to: '2023-12-05' });
     });
   });
 });

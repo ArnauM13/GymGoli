@@ -80,10 +80,25 @@ export const routes: Routes = [
       import('./features/training-types/training-types.component').then(m => m.TrainingTypesComponent),
   },
   {
+    // Progrés té tres pantalles: el resum (el mes i la setmana), els insights
+    // i el detall d'exercicis i esports. Són separades perquè són tres
+    // preguntes diferents, i juntes no es llegia cap de les tres.
     path: 'charts',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./features/charts/charts.component').then(m => m.ChartsComponent),
+      import('./features/charts/progress.component').then(m => m.ProgressComponent),
+  },
+  {
+    path: 'charts/insights',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/charts/progress-insights.component').then(m => m.ProgressInsightsComponent),
+  },
+  {
+    path: 'charts/exercises',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/charts/progress-detail.component').then(m => m.ProgressDetailComponent),
   },
   {
     path: 'settings',

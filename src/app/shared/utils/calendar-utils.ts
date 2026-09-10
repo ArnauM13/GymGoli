@@ -66,3 +66,30 @@ export function sportDotBackground(colors: string[]): string {
   const step = 100 / colors.length;
   return `conic-gradient(${colors.map((c, i) => `${c} ${Math.round(i * step)}% ${Math.round((i + 1) * step)}%`).join(', ')})`;
 }
+
+/** El primer dia del mes d'aquesta data. Local, com tot el que és una data. */
+export function monthStartOf(dateStr: string): string {
+  return `${dateStr.slice(0, 7)}-01`;
+}
+
+/** «Setembre 2026», per encapçalar un resum mensual. */
+export function monthLabelOf(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00');
+  return `${MONTHS_CA[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+/**
+ * El mateix tram de dies del mes passat: de l'1 fins al mateix dia del mes.
+ *
+ * Comparar deu dies d'aquest mes amb els trenta del passat diria que has
+ * baixat sempre, i no seria veritat: la comparació ha de mesurar el mateix
+ * tros de mes. Quan el mes passat és més curt (el 31 de març contra el
+ * febrer), el tram s'acaba l'últim dia que hi ha.
+ */
+export function sameSpanLastMonth(dateStr: string): { from: string; to: string } {
+  const d     = new Date(dateStr + 'T12:00:00');
+  const first = new Date(d.getFullYear(), d.getMonth() - 1, 1, 12);
+  const last  = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+  const end   = new Date(first.getFullYear(), first.getMonth(), Math.min(d.getDate(), last), 12);
+  return { from: toDateStr(first), to: toDateStr(end) };
+}
