@@ -835,10 +835,10 @@ export class WorkoutService {
   }
 
   // ── Create ───────────────────────────────────────────────────────────────
-  /** `sessionGroupId` fa néixer l'entrenament dins d'una sessió que ja hi és
-   *  —la cinta que s'afegeix a l'anada al gimnàs—; sense ell, l'entrenament és
-   *  una sessió ell sol, com sempre. Vegeu `shared/utils/session-group.utils`. */
-  async createWorkoutForDate(date: string, category?: string, sessionGroupId?: string): Promise<string> {
+  /** L'entrenament neix sempre com una sessió ell sol. Si va ser la mateixa
+   *  anada que una altra activitat del dia, unir-les es fa després i des de
+   *  l'entrenament (`app-session-merge`, `SessionGroupService`). */
+  async createWorkoutForDate(date: string, category?: string): Promise<string> {
     const id         = crypto.randomUUID();
     const newWorkout: Workout = {
       id, date,
@@ -847,7 +847,6 @@ export class WorkoutService {
       category,
       createdAt:  new Date(),
       status:     'done',
-      sessionGroupId,
     };
     this.store.put(newWorkout);
     this.syncService.notifyPending(true);
@@ -924,7 +923,9 @@ export class WorkoutService {
    */
   async startPlannedWorkout(workoutId: string): Promise<string> {
     if (!isRoutineProjection(workoutId)) {
-      this._updateWorkout(workoutId, { status: 'done' });
+      // El pla passa a estar fet **ara**: `createdAt` diu quan es va apuntar i
+      // `startedAt`, quan s'ha començat. És el segon el que ordena el dia.
+      this._updateWorkout(workoutId, { status: 'done', startedAt: new Date() });
       return workoutId;
     }
 
@@ -941,14 +942,14 @@ export class WorkoutService {
   }
 
   async createWorkoutFromTemplate(
-    date: string, category: string, templateEntries: WorkoutEntry[], sessionGroupId?: string,
+    date: string, category: string, templateEntries: WorkoutEntry[],
   ): Promise<string> {
     const entries: WorkoutEntry[] = templateEntries.map(e => ({
       exerciseId: e.exerciseId,
       exerciseName: e.exerciseName,
       sets: [],
     }));
-    const id = await this.createWorkoutForDate(date, category, sessionGroupId);
+    const id = await this.createWorkoutForDate(date, category);
     if (entries.length > 0) {
       await this._updateWorkout(id, { entries });
     }

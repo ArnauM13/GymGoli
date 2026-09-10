@@ -19,7 +19,7 @@ import {
   workoutCardColor, workoutCardStats, workoutPrimaryColor, workoutPrimaryIcon, workoutTypeLabel,
 } from '../../utils/workout-card.utils';
 import {
-  ActivityItem, SessionGroup, detachedLine, groupDayFeed, groupIcons, groupTitle,
+  ActivityItem, SessionGroup, activityOf, groupDayFeed, groupIcons, groupTitle, splitLine,
 } from '../../utils/session-group.utils';
 
 export interface DayFeedEntry {
@@ -59,102 +59,99 @@ export interface DayFeedEntry {
           </div>
         }
 
-        @for (w of group.workouts; track w.id) {
-          <app-activity-card
-              [accent]="workoutPrimaryColor(w)" [barColor]="workoutCardColor(w)"
-              [icon]="workoutPrimaryIcon(w)" mascot="marley"
-              [title]="workoutTypeLabel(w)" [note]="w.notes ?? ''"
-              [stats]="workoutStats(w)"
-              [feeling]="w.feeling ? emojiOf(w.feeling) : ''"
-              [planned]="isPlanned(w)" interactive
-              [expandable]="!isPlanned(w)"
-              [expanded]="expandedWorkoutId() === w.id"
-              (cardClick)="handleWorkoutClick(w)">
+        <!-- Les activitats van per ordre cronològic —la que s'ha fet abans,
+             abans—, i per això les dues menes es pinten al mateix bucle: una
+             cursa del matí ha de sortir per davant del gimnàs de la tarda
+             encara que siguin de taules diferents. -->
+        @for (item of group.items; track itemKey(item)) {
+          @if (item.kind === 'workout') {
+            <app-activity-card
+                [accent]="workoutPrimaryColor(item.workout)" [barColor]="workoutCardColor(item.workout)"
+                [icon]="workoutPrimaryIcon(item.workout)" mascot="marley"
+                [title]="workoutTypeLabel(item.workout)" [note]="item.workout.notes ?? ''"
+                [stats]="workoutStats(item.workout)"
+                [feeling]="item.workout.feeling ? emojiOf(item.workout.feeling) : ''"
+                [planned]="isPlanned(item.workout)" interactive
+                [expandable]="!isPlanned(item.workout)"
+                [expanded]="expandedWorkoutId() === item.workout.id"
+                (cardClick)="handleWorkoutClick(item.workout)">
 
-            @if (isPlanned(w)) {
-              <div class="ac-actions" cardActions>
-                <button class="ac-act ac-act--del" (click)="deletePlan(w)"
-                        aria-label="Eliminar planificació">
-                  <span class="material-symbols-outlined" aria-hidden="true">delete</span>
-                </button>
-                <button class="ac-act ac-act--start" (click)="startPlan(w)" aria-label="Comença">
-                  <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
-                </button>
-              </div>
-            }
-
-            @if (expandedWorkoutId() === w.id && !isPlanned(w)) {
-              <app-workout-detail [workout]="w" />
-              <div class="ac-detail-actions">
-                @if (group.grouped) {
-                  <button class="ac-side-btn" (click)="detach({ kind: 'workout', workout: w })">
-                    <span class="material-symbols-outlined" aria-hidden="true">link_off</span>
-                    Separa
+              @if (isPlanned(item.workout)) {
+                <div class="ac-actions" cardActions>
+                  <button class="ac-act ac-act--del" (click)="deletePlan(item.workout)"
+                          aria-label="Eliminar planificació">
+                    <span class="material-symbols-outlined" aria-hidden="true">delete</span>
                   </button>
-                }
-                <button class="ac-side-btn" (click)="addToSession({ kind: 'workout', workout: w }, w.date)">
-                  <span class="material-symbols-outlined" aria-hidden="true">add</span>
-                  Afegeix a la sessió
-                </button>
-                <button class="ac-open-btn" (click)="open.emit(w.id)">
-                  <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>
-                  Obrir
-                </button>
-              </div>
-            }
-          </app-activity-card>
-        }
-
-        @for (item of group.sports; track item.session.id) {
-          <app-activity-card
-              [accent]="item.sport.color" [icon]="item.sport.icon" mascot="xoco"
-              [title]="item.sport.name" [subtype]="sportSubtype(item)"
-              [note]="item.session.notes ?? ''" [stats]="sportStats(item)"
-              [feeling]="item.session.feeling ? emojiOf(item.session.feeling) : ''"
-              [planned]="isSportPlanned(item)" interactive
-              expandable [expanded]="expandedSportId() === item.session.id"
-              (cardClick)="toggleSportExpand(item)">
-
-            @if (isSportPlanned(item)) {
-              <div class="ac-actions" cardActions>
-                <button class="ac-act ac-act--del" (click)="deleteSportPlan(item)"
-                        aria-label="Eliminar planificació">
-                  <span class="material-symbols-outlined" aria-hidden="true">delete</span>
-                </button>
-                <!-- Un pla de demà encara no es pot haver fet: el botó de
-                     registrar només surt quan el dia ja ha arribat. -->
-                @if (item.session.date <= today()) {
-                  <button class="ac-act ac-act--start" (click)="registerSportPlan(item)"
-                          aria-label="Registrar">
+                  <button class="ac-act ac-act--start" (click)="startPlan(item.workout)" aria-label="Comença">
                     <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
                   </button>
-                }
-              </div>
-            }
+                </div>
+              }
 
-            @if (expandedSportId() === item.session.id) {
-              <app-sport-detail [sport]="item.sport" [session]="item.session" compact />
-              <div class="ac-detail-actions">
-                @if (group.grouped) {
-                  <button class="ac-side-btn" (click)="detach({ kind: 'sport', sport: item.sport, session: item.session })">
-                    <span class="material-symbols-outlined" aria-hidden="true">link_off</span>
-                    Separa
+              @if (expandedWorkoutId() === item.workout.id && !isPlanned(item.workout)) {
+                <app-workout-detail [workout]="item.workout" />
+                <div class="ac-detail-actions">
+                  <button class="ac-open-btn" (click)="open.emit(item.workout.id)">
+                    <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>
+                    Obrir
                   </button>
-                }
-                @if (!isSportPlanned(item)) {
-                  <button class="ac-side-btn"
-                          (click)="addToSession({ kind: 'sport', sport: item.sport, session: item.session }, item.session.date)">
-                    <span class="material-symbols-outlined" aria-hidden="true">add</span>
-                    Afegeix a la sessió
+                </div>
+              }
+            </app-activity-card>
+
+          } @else {
+            <app-activity-card
+                [accent]="item.sport.color" [icon]="item.sport.icon" mascot="xoco"
+                [title]="item.sport.name" [subtype]="sportSubtype(item)"
+                [note]="item.session.notes ?? ''" [stats]="sportStats(item)"
+                [feeling]="item.session.feeling ? emojiOf(item.session.feeling) : ''"
+                [planned]="isSportPlanned(item)" interactive
+                expandable [expanded]="expandedSportId() === item.session.id"
+                (cardClick)="toggleSportExpand(item)">
+
+              @if (isSportPlanned(item)) {
+                <div class="ac-actions" cardActions>
+                  <button class="ac-act ac-act--del" (click)="deleteSportPlan(item)"
+                          aria-label="Eliminar planificació">
+                    <span class="material-symbols-outlined" aria-hidden="true">delete</span>
                   </button>
-                }
-                <button class="ac-open-btn" (click)="openSport.emit(item)">
-                  <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>
-                  Obrir
-                </button>
-              </div>
-            }
-          </app-activity-card>
+                  <!-- Un pla de demà encara no es pot haver fet: el botó de
+                       registrar només surt quan el dia ja ha arribat. -->
+                  @if (item.session.date <= today()) {
+                    <button class="ac-act ac-act--start" (click)="registerSportPlan(item)"
+                            aria-label="Registrar">
+                      <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
+                    </button>
+                  }
+                </div>
+              }
+
+              @if (expandedSportId() === item.session.id) {
+                <app-sport-detail [sport]="item.sport" [session]="item.session" compact />
+                <div class="ac-detail-actions">
+                  <button class="ac-open-btn"
+                          (click)="openSport.emit({ sport: item.sport, session: item.session })">
+                    <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>
+                    Obrir
+                  </button>
+                </div>
+              }
+            </app-activity-card>
+          }
+        }
+
+        <!-- ── Desfer la sessió ──
+             Unir-les es fa des de l'activitat; desfer-ho, des d'aquí: el botó
+             és de la caixa, no de cap targeta de dins, perquè el que separa és
+             la sessió sencera. A baix a la dreta, l'últim que es llegeix del
+             bloc i sense pes: no és el pas que s'espera de ningú. -->
+        @if (group.grouped) {
+          <div class="sg-foot">
+            <button class="sg-split" (click)="split(group)" [disabled]="splitting() === group.key">
+              <span class="material-symbols-outlined" aria-hidden="true">link_off</span>
+              Separar sessions
+            </button>
+          </div>
         }
 
       </div>
@@ -226,16 +223,19 @@ export interface DayFeedEntry {
       &:hover { background: color-mix(in srgb, var(--ac, var(--c-card)) 15%, var(--c-card)); color: var(--c-text); }
     }
 
-    /* Ajuntar i separar són accions de segon terme: mateixa alçada que obrir,
-       però sense el color de l'activitat, que és per al pas que s'espera. */
-    .ac-side-btn {
+    /* ── Separar la sessió, al peu de la caixa ──
+       Separar és de segon terme: sense fons ni vora, a baix a la dreta i en
+       el to apagat del text de suport. Qui hi arriba hi va a posta. */
+    .sg-foot { display: flex; justify-content: flex-end; padding: 2px 2px 0; }
+    .sg-split {
       display: inline-flex; align-items: center; gap: 5px;
-      height: 34px; padding: 0 12px; border-radius: 10px;
-      border: 1.5px solid var(--c-border-2); background: var(--c-card);
-      color: var(--c-text-3); font-size: 12.5px; font-weight: 700;
+      height: 30px; padding: 0 9px; border-radius: 9px;
+      border: none; background: transparent;
+      color: var(--c-text-3); font-size: 12px; font-weight: 700;
       cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 17px; }
-      &:hover { color: var(--c-text-2); border-color: var(--c-text-3); }
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover:not(:disabled) { color: var(--c-text-2); background: color-mix(in srgb, var(--c-text) 6%, transparent); }
+      &:disabled { opacity: 0.5; cursor: default; }
     }
   `],
 })
@@ -269,14 +269,7 @@ export class DayFeedCardsComponent {
   readonly hideVolume = input(false, { transform: booleanAttribute });
   /** Obrir l'entrenament desplegat, a la pàgina d'Entrenar. */
   readonly open = output<string>();
-  /**
-   * Afegir una activitat a una sessió que ja hi és. Porta el dia i l'id del
-   * grup —creat aquí si l'activitat encara no en tenia—, i qui ho reculli
-   * duu l'usuari a triar què hi afegeix: el que registri neix dins d'aquesta
-   * sessió.
-   */
-  readonly addActivity = output<{ date: string; groupId: string }>();
-  /** El mateix per a una sessió d'esport: la targeta només la llegeix, i
+  /** Una sessió d'esport: la targeta només la llegeix, i
    *  canviar-hi res passa per la pàgina que la sap registrar. */
   readonly openSport = output<{ sport: Sport; session: SportSession }>();
 
@@ -303,36 +296,34 @@ export class DayFeedCardsComponent {
   readonly groupTitle = groupTitle;
 
   groupCount(group: SessionGroup): string {
-    return `${group.workouts.length + group.sports.length} activitats`;
+    return `${group.items.length} activitats`;
   }
+
+  /** La clau de la targeta al bucle: l'id de l'activitat, sigui de la mena
+   *  que sigui. */
+  itemKey(item: ActivityItem): string {
+    return activityOf(item).id;
+  }
+
+  /** La sessió que s'està separant, perquè el botó no s'accioni dos cops. */
+  readonly splitting = signal<string | null>(null);
 
   /**
-   * Obre el pas d'afegir una activitat a aquesta sessió.
-   *
-   * Si l'activitat encara no era de cap grup, ara passa a ser-ne la primera:
-   * l'etiqueta s'escriu abans de marxar, perquè el que es registri tot seguit
-   * pugui néixer amb la mateixa. Quedar-se aquí a mitges no deixa res per
-   * netejar — una activitat sola amb grup es compta i es pinta igual.
+   * Desfà la sessió: les seves activitats tornen a comptar cadascuna per ella
+   * mateixa. No es toca res del que hi ha dins —les sèries, les mètriques i
+   * els rècords es queden on eren—, només deixen de ser la mateixa anada.
    */
-  async addToSession(item: ActivityItem, date: string): Promise<void> {
+  async split(group: SessionGroup): Promise<void> {
+    if (this.splitting()) return;
+    this.splitting.set(group.key);
     try {
-      const groupId = await this.sessionGroups.ensureGroupId(item);
-      this.addActivity.emit({ date, groupId });
-    } catch {
-      this.feedback.error('Error en obrir la sessió', 2500);
-    }
-  }
-
-  /** Treu l'activitat de la sessió: torna a comptar com una de sola. */
-  async detach(item: ActivityItem): Promise<void> {
-    try {
-      await this.sessionGroups.detach(item);
-      // Ho diu el gos de l'activitat que en surt: el Marley si és del gimnàs,
-      // el Xoco si és d'esport.
-      const { mascot, message } = detachedLine(item);
+      await this.sessionGroups.split(group.items);
+      const { mascot, message } = splitLine(group);
       this.feedback.success(message, 2000, mascot);
     } catch {
       this.feedback.error('Error en separar', 2500);
+    } finally {
+      this.splitting.set(null);
     }
   }
 

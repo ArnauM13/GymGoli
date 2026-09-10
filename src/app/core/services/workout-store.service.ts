@@ -47,7 +47,7 @@ export const RETAINED_MONTHS = 3;
  * qui són, que és el filtre de la consulta.
  */
 export const WORKOUT_COLUMNS =
-  'id,date,category,categories,entries,notes,feeling,source_proposal_id,created_at,updated_at,status,planned_source,session_group_id';
+  'id,date,category,categories,entries,notes,feeling,source_proposal_id,created_at,started_at,updated_at,status,planned_source,session_group_id';
 
 /** Una entrada d'un JSON antic pot venir sense `sets`. Normalitzar-ho aquí
  *  garanteix que cap consumidor pugui petar a `entry.sets.length`. */
@@ -71,6 +71,7 @@ export function toWorkout(row: Record<string, unknown>): Workout {
     feeling:          (row['feeling'] as FeelingLevel | undefined) ?? undefined,
     sourceProposalId: (row['source_proposal_id'] as string | null | undefined) ?? undefined,
     createdAt:        new Date(row['created_at'] as string),
+    startedAt:        row['started_at'] ? new Date(row['started_at'] as string) : undefined,
     updatedAt:        row['updated_at'] ? new Date(row['updated_at'] as string) : undefined,
     status:           (row['status'] as WorkoutStatus | undefined) ?? 'done',
     plannedSource:    (row['planned_source'] as PlannedSource | undefined) ?? undefined,
@@ -82,7 +83,7 @@ export function toWorkout(row: Record<string, unknown>): Workout {
  *  per a tot el que mira enrere (quant fa que no toques empenta, quantes
  *  setmanes seguides), sense baixar el gruix de l'historial. */
 export const WORKOUT_SUMMARY_COLUMNS =
-  'id,date,category,categories,notes,feeling,status,planned_source,source_proposal_id,created_at,updated_at,exercise_names,session_group_id';
+  'id,date,category,categories,notes,feeling,status,planned_source,source_proposal_id,created_at,started_at,updated_at,exercise_names,session_group_id';
 
 /** Fila de Supabase demanada en mode targeta → entrenament sense sèries. */
 export function toWorkoutSummary(row: Record<string, unknown>): Workout {
@@ -107,6 +108,9 @@ export function toRow(w: Workout, uid: string): Record<string, unknown> {
     planned_source:     w.plannedSource ?? null,
     source_proposal_id: w.sourceProposalId ?? null,
     session_group_id:   w.sessionGroupId ?? null,
+    // Quan es va començar de debò, si no és quan es va crear la fila: un pla
+    // apuntat dilluns i fet dimecres. És el que ordena el dia.
+    started_at:         w.startedAt ? w.startedAt.toISOString() : null,
     updated_at:         (w.updatedAt ?? new Date()).toISOString(),
   };
   if (w.category) row['category'] = w.category;
@@ -127,6 +131,7 @@ function recordFromJson(raw: Record<string, unknown>): WorkoutRecord | null {
       feeling:          (w['feeling'] as FeelingLevel | undefined) ?? undefined,
       sourceProposalId: (w['sourceProposalId'] as string | null | undefined) ?? undefined,
       createdAt:        new Date(w['createdAt'] as string),
+      startedAt:        w['startedAt'] ? new Date(w['startedAt'] as string) : undefined,
       updatedAt:        w['updatedAt'] ? new Date(w['updatedAt'] as string) : undefined,
       status:           (w['status'] as WorkoutStatus | undefined) ?? 'done',
       plannedSource:    (w['plannedSource'] as PlannedSource | undefined) ?? undefined,

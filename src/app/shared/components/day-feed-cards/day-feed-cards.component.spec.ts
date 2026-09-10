@@ -337,31 +337,26 @@ describe('DayFeedCardsComponent', () => {
       expect(el.querySelectorAll('app-activity-card').length).toBe(2);
     });
 
-    it('afegir-hi una activitat crea el grup i porta a registrar-la', async () => {
-      const addSpy = spyOn(component.addActivity, 'emit');
-      const w = makeWorkout({ id: 'w1', date: '2024-03-05' });
+    it('el botó de separar és de la caixa, a baix, i no de cap targeta', () => {
+      fixture.componentRef.setInput('day', day('g1', 'g1'));
+      fixture.detectChanges();
 
-      await component.addToSession({ kind: 'workout', workout: w }, '2024-03-05');
-
-      expect(setWorkoutGroup).toHaveBeenCalledWith('w1', jasmine.any(String));
-      const groupId = setWorkoutGroup.calls.mostRecent().args[1] as string;
-      expect(addSpy).toHaveBeenCalledWith({ date: '2024-03-05', groupId });
+      const el = fixture.nativeElement as HTMLElement;
+      const foot = el.querySelector('.sg--grouped > .sg-foot');
+      expect(foot?.querySelector('.sg-split')?.textContent).toContain('Separar sessions');
+      // I no hi és quan cada activitat ja va sola.
+      fixture.componentRef.setInput('day', day());
+      fixture.detectChanges();
+      expect(el.querySelector('.sg-split')).toBeNull();
     });
 
-    it('afegir-hi una activitat quan ja n\'hi ha una de sessió reaprofita el grup', async () => {
-      const addSpy = spyOn(component.addActivity, 'emit');
-      const w = makeWorkout({ id: 'w1', date: '2024-03-05', sessionGroupId: 'g1' });
+    it('separar desfà la sessió sencera', async () => {
+      fixture.componentRef.setInput('day', day('g1', 'g1'));
+      fixture.detectChanges();
 
-      await component.addToSession({ kind: 'workout', workout: w }, '2024-03-05');
+      await component.split(component.groups()[0]);
 
-      expect(setWorkoutGroup).not.toHaveBeenCalled();
-      expect(addSpy).toHaveBeenCalledWith({ date: '2024-03-05', groupId: 'g1' });
-    });
-
-    it('separar una activitat la treu del grup', async () => {
-      const session = { id: 'sess1', date: '2024-03-05', sportId: 'padel', createdAt: new Date(), sessionGroupId: 'g1' };
-      await component.detach({ kind: 'sport', sport: SPORT, session });
-
+      expect(setWorkoutGroup).toHaveBeenCalledWith('w1', undefined);
       expect(setSportGroup).toHaveBeenCalledWith('sess1', '2024-03-05', null);
     });
   });
