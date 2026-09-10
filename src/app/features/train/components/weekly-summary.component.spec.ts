@@ -16,8 +16,13 @@ describe('WeeklySummaryComponent', () => {
   let mockSettings: ReturnType<typeof signal<UserSettings>>;
   let mockHasGoal:  ReturnType<typeof signal<boolean>>;
   let mockLoaded:   ReturnType<typeof signal<boolean>>;
-  let gymDays:      string[];
-  let sportDays:    string[];
+  /** Una activitat registrada: el dia, i el grup si comparteix sessió amb una
+   *  altra («al gimnàs i, en acabar, vint minuts de cinta»). */
+  type Logged = string | { date: string; group: string };
+  const dayOf   = (x: Logged): string => typeof x === 'string' ? x : x.date;
+  const groupOf = (x: Logged): string | undefined => typeof x === 'string' ? undefined : x.group;
+  let gymDays:      Logged[];
+  let sportDays:    Logged[];
 
   beforeEach(async () => {
     jasmine.clock().install();
@@ -41,8 +46,23 @@ describe('WeeklySummaryComponent', () => {
             fitnessGoal:   signal(null),
           },
         },
-        { provide: WorkoutService, useValue: { getDoneWorkoutsForDate: (d: string) => gymDays.filter(x => x === d) } },
-        { provide: SportService,   useValue: { getSportSessionsForDate: (d: string) => sportDays.filter(x => x === d) } },
+        {
+          provide: WorkoutService,
+          useValue: {
+            getDoneWorkoutsForDate: (d: string) => gymDays.filter(x => dayOf(x) === d)
+              .map((x, i) => ({ id: `w-${d}-${i}`, date: d, sessionGroupId: groupOf(x) })),
+          },
+        },
+        {
+          provide: SportService,
+          useValue: {
+            getSportSessionsForDate: (d: string) => sportDays.filter(x => dayOf(x) === d)
+              .map((x, i) => ({
+                sport:   { id: 'sp' },
+                session: { id: `s-${d}-${i}`, date: d, sessionGroupId: groupOf(x) },
+              })),
+          },
+        },
       ],
       schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();
@@ -88,6 +108,29 @@ describe('WeeklySummaryComponent', () => {
       sportDays = ['2025-04-21'];
 
       expect(component.weekBars()[0].done).toBe(3);
+    });
+
+    it('compta com una sola sessió el que s\'ha fet d\'una tirada', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, goalMode: 'combined', weeklyActivityGoal: 4 });
+      // Al gimnàs i, en acabar, vint minuts de cinta: dues activitats, una
+      // anada. El futbol de l'endemà sí que és una sessió a part.
+      gymDays   = [{ date: '2025-04-21', group: 'g1' }];
+      sportDays = [{ date: '2025-04-21', group: 'g1' }, '2025-04-22'];
+
+      expect(component.weekBars()[0].done).toBe(2);
+    });
+
+    it('els objectius per tipus continuen comptant activitats, no anades', () => {
+      mockSettings.set({
+        ...DEFAULT_USER_SETTINGS,
+        goalMode: 'separate', weeklyGymGoal: 2, weeklySportGoal: 1,
+      });
+      gymDays   = [{ date: '2025-04-21', group: 'g1' }];
+      sportDays = [{ date: '2025-04-21', group: 'g1' }];
+
+      const bars = component.weekBars();
+      expect(bars[0].done).toBe(1);
+      expect(bars[1].done).toBe(1);
     });
 
     it('never draws past the end of the bar', () => {

@@ -6,6 +6,7 @@ import { WorkoutService } from '../../../core/services/workout.service';
 import { SportService } from '../../../core/services/sport.service';
 import { addDays, mondayOf } from '../../../shared/utils/calendar-utils';
 import { todayStr } from '../../../shared/utils/date.utils';
+import { countSessions } from '../../../shared/utils/session-group.utils';
 
 const TODAY = (): string => todayStr();
 
@@ -120,11 +121,13 @@ export class WeeklySummaryComponent {
     if (s.goalMode === 'combined' || !s.goalMode) {
       const total = s.weeklyActivityGoal;
       if (!total) return [];
-      // Es compten sessions, no dies: dos entrenaments el mateix dia són dos.
-      // És el mateix criteri que a Progrés, i han de dir el mateix.
-      const sessions = doneDays.reduce((acc, d) =>
-        acc + this.workoutService.getDoneWorkoutsForDate(d).length
-            + this.sportService.getSportSessionsForDate(d).length, 0);
+      // Es compten sessions, no dies ni files: dues anades el mateix dia són
+      // dues, però el gimnàs i la cinta de després en són una. És el mateix
+      // criteri que a Progrés, i han de dir el mateix.
+      const sessions = doneDays.reduce((acc, d) => acc + countSessions([
+        ...this.workoutService.getDoneWorkoutsForDate(d),
+        ...this.sportService.getSportSessionsForDate(d).map(s => s.session),
+      ]), 0);
       const fitnessGoal = this.settingsService.fitnessGoal();
       const iconMap: Record<string, string> = {
         strength: 'fitness_center', fitness: 'directions_run',
@@ -136,6 +139,9 @@ export class WeeklySummaryComponent {
       return [mk(icon, sessions, total, 'both')];
     }
 
+    // Els objectius per tipus continuen comptant activitats: si el teu
+    // objectiu és «3 de gimnàs», els vint minuts de cinta no te'l fan pujar
+    // ni te'l roben.
     const gymGoal   = s.weeklyGymGoal;
     const sportGoal = s.weeklySportGoal;
     const gymDone   = doneDays.reduce((acc, d) => acc + this.workoutService.getDoneWorkoutsForDate(d).length, 0);

@@ -13,6 +13,7 @@ import { TrainingTypeService } from './training-type.service';
 import { UserSettingsService } from './user-settings.service';
 import { WorkoutService } from './workout.service';
 import { workoutVolume } from '../../shared/utils/workout-card.utils';
+import { countSessions } from '../../shared/utils/session-group.utils';
 import { daysBetween, offsetDate, toDateStr } from '../../shared/utils/date.utils';
 import {
   dateRange,
@@ -262,15 +263,27 @@ export class FitnessMetricsService {
     return { mode, combined, gym, sport, has, total };
   });
 
-  /** Índex 0 = setmana en curs (dilluns → avui); la resta, setmanes tancades. */
+  /**
+   * Índex 0 = setmana en curs (dilluns → avui); la resta, setmanes tancades.
+   *
+   * `gym` i `sport` compten **activitats** —són el que miren els objectius per
+   * tipus: tres de gimnàs són tres, hi hagi hagut cinta o no— i `total` compta
+   * **sessions**: el gimnàs i la cinta de després són una sola anada. Vegeu
+   * `shared/utils/session-group.utils`.
+   */
   private _weekStats(today: string, workouts: Workout[], sessions: SportSession[], n: number): WeekStat[] {
     const out: WeekStat[] = [];
     for (let i = 0; i < n; i++) {
-      const monday = mondayOfWeek(offsetDate(today, -(i * 7)));
-      const end    = i === 0 ? today : offsetDate(monday, 6);
-      const gym    = workouts.filter(w => w.date >= monday && w.date <= end).length;
-      const sport  = sessions.filter(s => s.date >= monday && s.date <= end).length;
-      out.push({ monday, end, gym, sport, total: gym + sport });
+      const monday    = mondayOfWeek(offsetDate(today, -(i * 7)));
+      const end       = i === 0 ? today : offsetDate(monday, 6);
+      const gymDone   = workouts.filter(w => w.date >= monday && w.date <= end);
+      const sportDone = sessions.filter(s => s.date >= monday && s.date <= end);
+      out.push({
+        monday, end,
+        gym:   gymDone.length,
+        sport: sportDone.length,
+        total: countSessions([...gymDone, ...sportDone]),
+      });
     }
     return out;
   }
@@ -613,7 +626,12 @@ export class FitnessMetricsService {
     // d'arribar sempre surt "molt per sobre de la seva mitjana", perquè la
     // mitjana la fan setmanes buides d'abans que existís.
     const weekAgo = offsetDate(today, -7);
-    const last7   = allDates.filter(d => d > weekAgo && d <= today).length;
+    // Sessions, no files: qui va al gimnàs i després corre vint minuts ha
+    // sortit un cop de casa, i la càrrega de la setmana ho ha de dir així.
+    const last7   = countSessions([
+      ...workouts.filter(w => w.date > weekAgo && w.date <= today),
+      ...sessions.filter(s => s.date > weekAgo && s.date <= today),
+    ]);
     const lived   = weeks.slice(1, 9).filter(w => hist.first !== null && w.monday >= hist.first);
     const avg8    = mean(lived.map(w => w.total));
     if (lived.length >= 4 && last7 >= 5 && avg8 >= 1 && last7 >= avg8 * 1.6) {

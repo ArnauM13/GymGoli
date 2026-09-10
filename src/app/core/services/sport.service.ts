@@ -31,7 +31,7 @@ interface PendingSportOp { op: SportOpKind; id: string; row: Record<string, unkn
  *  `duration_minutes`, la columna que va substituir `duration` i que ningú
  *  llegeix des de fa migracions. */
 const SPORT_SESSION_COLUMNS =
-  'id,date,sport_id,subtype_id,duration,feeling,metrics,notes,status,planned_source,created_at';
+  'id,date,sport_id,subtype_id,duration,feeling,metrics,notes,status,planned_source,created_at,session_group_id';
 
 function toSport(row: Record<string, unknown>): Sport {
   return {
@@ -57,6 +57,7 @@ function toSportSession(row: Record<string, unknown>): SportSession {
     notes:     (row['notes'] as string | null) ?? undefined,
     status:    (row['status'] as SportSessionStatus | undefined) ?? 'done',
     plannedSource: (row['planned_source'] as PlannedSource | null) ?? undefined,
+    sessionGroupId: (row['session_group_id'] as string | null) ?? undefined,
     createdAt: new Date(row['created_at'] as string),
   };
 }
@@ -74,6 +75,7 @@ function sportSessionFromCache(raw: Record<string, unknown>): SportSession {
     notes:     (raw['notes'] as string | undefined) ?? undefined,
     status:    (raw['status'] as SportSessionStatus | undefined) ?? 'done',
     plannedSource: (raw['plannedSource'] as PlannedSource | undefined) ?? undefined,
+    sessionGroupId: (raw['sessionGroupId'] as string | undefined) ?? undefined,
     createdAt: new Date(raw['createdAt'] as string),
   };
 }
@@ -898,6 +900,7 @@ export class SportService {
     data: { subtypeId?: string; duration?: number; feeling?: FeelingLevel; metrics?: Record<string, string | number>; notes?: string },
     status: SportSessionStatus = 'done',
     plannedSource?: PlannedSource,
+    sessionGroupId?: string,
   ): Promise<string> {
     const uid = this._uid();
     const id  = crypto.randomUUID();
@@ -910,6 +913,7 @@ export class SportService {
       notes:     data.notes,
       status,
       plannedSource,
+      sessionGroupId,
       createdAt: new Date(),
     };
 
@@ -927,10 +931,33 @@ export class SportService {
       metrics:    data.metrics   ?? null,
       notes:      data.notes     ?? null,
       status,
-      planned_source: plannedSource ?? null,
+      planned_source:   plannedSource ?? null,
+      session_group_id: sessionGroupId ?? null,
     };
     await this._pushOrQueue(uid, { op: 'insert', id, row });
     return id;
+  }
+
+  /**
+   * Posa la sessió d'esport dins d'una sessió agrupada, o la'n separa amb
+   * `null`: els vint minuts de cinta passen a ser part de l'anada al gimnàs.
+   *
+   * Escriu només aquesta columna — la resta de la fila no s'hi toca — i segueix
+   * el camí de sempre: primer la cau del dispositiu, després el servidor (o la
+   * cua, si ara no hi ha xarxa).
+   */
+  async setSessionGroup(sessionId: string, date: string, sessionGroupId: string | null): Promise<void> {
+    const uid = this._uid();
+
+    const key    = date.substring(0, 7);
+    const bucket = this._monthCache.get(key) ?? [];
+    this._monthCache.set(key, bucket.map(s =>
+      s.id === sessionId ? { ...s, sessionGroupId: sessionGroupId ?? undefined } : s
+    ));
+    this._rebuild();
+    this._writeSessionsToStorage(uid, key, this._monthCache.get(key)!);
+
+    await this._pushOrQueue(uid, { op: 'update', id: sessionId, row: { session_group_id: sessionGroupId } });
   }
 
   /**

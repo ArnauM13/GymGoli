@@ -1,4 +1,4 @@
-import { Component, booleanAttribute, inject, input, output, signal } from '@angular/core';
+import { Component, booleanAttribute, computed, inject, input, output, signal } from '@angular/core';
 
 import { ActivityCardComponent } from '../activity-card/activity-card.component';
 import { SportDetailComponent } from '../sport-detail/sport-detail.component';
@@ -7,6 +7,7 @@ import { Sport, SportSession } from '../../../core/models/sport.model';
 import { FeelingLevel, Workout } from '../../../core/models/workout.model';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { SportService } from '../../../core/services/sport.service';
+import { SessionGroupService } from '../../../core/services/session-group.service';
 import { TodayService } from '../../../core/services/today.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 import { ExerciseService } from '../../../core/services/exercise.service';
@@ -17,6 +18,7 @@ import {
   formatFeeling, isWorkoutPlanned, sportCardStats,
   workoutCardColor, workoutCardStats, workoutPrimaryColor, workoutPrimaryIcon, workoutTypeLabel,
 } from '../../utils/workout-card.utils';
+import { ActivityItem, SessionGroup, groupDayFeed } from '../../utils/session-group.utils';
 
 export interface DayFeedEntry {
   date: string;
@@ -37,85 +39,156 @@ export interface DayFeedEntry {
   standalone: true,
   imports: [ActivityCardComponent, SportDetailComponent, WorkoutDetailComponent],
   template: `
-    @for (w of day()?.workouts ?? []; track w.id) {
-      <app-activity-card
-          [accent]="workoutPrimaryColor(w)" [barColor]="workoutCardColor(w)"
-          [icon]="workoutPrimaryIcon(w)" mascot="marley"
-          [title]="workoutTypeLabel(w)" [note]="w.notes ?? ''"
-          [stats]="workoutStats(w)"
-          [feeling]="w.feeling ? emojiOf(w.feeling) : ''"
-          [planned]="isPlanned(w)" interactive
-          [expandable]="!isPlanned(w)"
-          [expanded]="expandedWorkoutId() === w.id"
-          (cardClick)="handleWorkoutClick(w)">
+    @for (group of groups(); track group.key) {
+      <div class="sg" [class.sg--grouped]="group.grouped">
 
-        @if (isPlanned(w)) {
-          <div class="ac-actions" cardActions>
-            <button class="ac-act ac-act--del" (click)="deletePlan(w)"
-                    aria-label="Eliminar planificació">
-              <span class="material-symbols-outlined" aria-hidden="true">delete</span>
-            </button>
-            <button class="ac-act ac-act--start" (click)="startPlan(w)" aria-label="Comença">
-              <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
-            </button>
+        <!-- Una sessió amb més d'una activitat es llegeix com una de sola: la
+             capçalera diu de què està feta i les targetes queden a dins. Amb una
+             sola activitat no hi ha capçalera ni caixa — es pinta com sempre. -->
+        @if (group.grouped) {
+          <div class="sg-head">
+            <span class="sg-icons" aria-hidden="true">
+              @for (ic of groupIcons(group); track $index) {
+                <span class="material-symbols-outlined sg-icon" [style.color]="ic.color">{{ ic.icon }}</span>
+              }
+            </span>
+            <span class="sg-title">{{ groupTitle(group) }}</span>
+            <span class="sg-count">{{ groupCount(group) }}</span>
           </div>
         }
 
-        @if (expandedWorkoutId() === w.id && !isPlanned(w)) {
-          <app-workout-detail [workout]="w" />
-          <div class="ac-detail-actions">
-            <button class="ac-open-btn" (click)="open.emit(w.id)">
-              <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>
-              Obrir entrenament
-            </button>
-          </div>
-        }
-      </app-activity-card>
-    }
+        @for (w of group.workouts; track w.id) {
+          <app-activity-card
+              [accent]="workoutPrimaryColor(w)" [barColor]="workoutCardColor(w)"
+              [icon]="workoutPrimaryIcon(w)" mascot="marley"
+              [title]="workoutTypeLabel(w)" [note]="w.notes ?? ''"
+              [stats]="workoutStats(w)"
+              [feeling]="w.feeling ? emojiOf(w.feeling) : ''"
+              [planned]="isPlanned(w)" interactive
+              [expandable]="!isPlanned(w)"
+              [expanded]="expandedWorkoutId() === w.id"
+              (cardClick)="handleWorkoutClick(w)">
 
-    @for (item of day()?.sports ?? []; track item.session.id) {
-      <app-activity-card
-          [accent]="item.sport.color" [icon]="item.sport.icon" mascot="xoco"
-          [title]="item.sport.name" [subtype]="sportSubtype(item)"
-          [note]="item.session.notes ?? ''" [stats]="sportStats(item)"
-          [feeling]="item.session.feeling ? emojiOf(item.session.feeling) : ''"
-          [planned]="isSportPlanned(item)" interactive
-          expandable [expanded]="expandedSportId() === item.session.id"
-          (cardClick)="toggleSportExpand(item)">
-
-        @if (isSportPlanned(item)) {
-          <div class="ac-actions" cardActions>
-            <button class="ac-act ac-act--del" (click)="deleteSportPlan(item)"
-                    aria-label="Eliminar planificació">
-              <span class="material-symbols-outlined" aria-hidden="true">delete</span>
-            </button>
-            <!-- Un pla de demà encara no es pot haver fet: el botó de
-                 registrar només surt quan el dia ja ha arribat. -->
-            @if (item.session.date <= today()) {
-              <button class="ac-act ac-act--start" (click)="registerSportPlan(item)"
-                      aria-label="Registrar">
-                <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
-              </button>
+            @if (isPlanned(w)) {
+              <div class="ac-actions" cardActions>
+                <button class="ac-act ac-act--del" (click)="deletePlan(w)"
+                        aria-label="Eliminar planificació">
+                  <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+                </button>
+                <button class="ac-act ac-act--start" (click)="startPlan(w)" aria-label="Comença">
+                  <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
+                </button>
+              </div>
             }
-          </div>
+
+            @if (expandedWorkoutId() === w.id && !isPlanned(w)) {
+              <app-workout-detail [workout]="w" />
+              <div class="ac-detail-actions">
+                @if (group.grouped) {
+                  <button class="ac-side-btn" (click)="detach({ kind: 'workout', workout: w })">
+                    <span class="material-symbols-outlined" aria-hidden="true">link_off</span>
+                    Separa
+                  </button>
+                }
+                <button class="ac-side-btn" (click)="addToSession({ kind: 'workout', workout: w }, w.date)">
+                  <span class="material-symbols-outlined" aria-hidden="true">add</span>
+                  Afegeix-hi
+                </button>
+                <button class="ac-open-btn" (click)="open.emit(w.id)">
+                  <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>
+                  Obrir entrenament
+                </button>
+              </div>
+            }
+          </app-activity-card>
         }
 
-        @if (expandedSportId() === item.session.id) {
-          <app-sport-detail [sport]="item.sport" [session]="item.session" compact />
-          <div class="ac-detail-actions">
-            <button class="ac-open-btn" (click)="openSport.emit(item)">
-              <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>
-              Obrir sessió
-            </button>
-          </div>
+        @for (item of group.sports; track item.session.id) {
+          <app-activity-card
+              [accent]="item.sport.color" [icon]="item.sport.icon" mascot="xoco"
+              [title]="item.sport.name" [subtype]="sportSubtype(item)"
+              [note]="item.session.notes ?? ''" [stats]="sportStats(item)"
+              [feeling]="item.session.feeling ? emojiOf(item.session.feeling) : ''"
+              [planned]="isSportPlanned(item)" interactive
+              expandable [expanded]="expandedSportId() === item.session.id"
+              (cardClick)="toggleSportExpand(item)">
+
+            @if (isSportPlanned(item)) {
+              <div class="ac-actions" cardActions>
+                <button class="ac-act ac-act--del" (click)="deleteSportPlan(item)"
+                        aria-label="Eliminar planificació">
+                  <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+                </button>
+                <!-- Un pla de demà encara no es pot haver fet: el botó de
+                     registrar només surt quan el dia ja ha arribat. -->
+                @if (item.session.date <= today()) {
+                  <button class="ac-act ac-act--start" (click)="registerSportPlan(item)"
+                          aria-label="Registrar">
+                    <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
+                  </button>
+                }
+              </div>
+            }
+
+            @if (expandedSportId() === item.session.id) {
+              <app-sport-detail [sport]="item.sport" [session]="item.session" compact />
+              <div class="ac-detail-actions">
+                @if (group.grouped) {
+                  <button class="ac-side-btn" (click)="detach({ kind: 'sport', sport: item.sport, session: item.session })">
+                    <span class="material-symbols-outlined" aria-hidden="true">link_off</span>
+                    Separa
+                  </button>
+                }
+                @if (!isSportPlanned(item)) {
+                  <button class="ac-side-btn"
+                          (click)="addToSession({ kind: 'sport', sport: item.sport, session: item.session }, item.session.date)">
+                    <span class="material-symbols-outlined" aria-hidden="true">add</span>
+                    Afegeix-hi
+                  </button>
+                }
+                <button class="ac-open-btn" (click)="openSport.emit(item)">
+                  <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>
+                  Obrir sessió
+                </button>
+              </div>
+            }
+          </app-activity-card>
         }
-      </app-activity-card>
+
+      </div>
     }
   `,
   styles: [`
     /* La targeta és compartida; d'aquí només és l'aire que se'n deixa entre
        una activitat i la següent. */
     app-activity-card { display: block; margin-bottom: 10px; }
+
+    /* ── Una sessió amb més d'una activitat ──
+       La caixa és el que diu «això és una sola anada»: les targetes de dins no
+       canvien de forma —es continuen desplegant i obrint igual—, només queden
+       encaixades. Una sessió d'una sola activitat no té caixa: es pinta com
+       s'ha pintat sempre. */
+    .sg--grouped {
+      border: 1.5px solid var(--c-border-2); border-radius: 16px;
+      background: color-mix(in srgb, var(--c-text) 3%, var(--c-card));
+      padding: 8px; margin-bottom: 10px;
+      app-activity-card:last-child { margin-bottom: 0; }
+    }
+
+    .sg-head {
+      display: flex; align-items: center; gap: 7px;
+      padding: 3px 6px 9px;
+    }
+    .sg-icons { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+    .sg-icon  { font-size: 17px; }
+    .sg-title {
+      font-size: 12.5px; font-weight: 700; color: var(--c-text-2);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .sg-count {
+      margin-left: auto; flex-shrink: 0;
+      font-size: 11.5px; font-weight: 700; color: var(--c-text-3);
+    }
 
     /* ── Botons d'un pla, al costat de la targeta ── */
     .ac-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding-right: 9px; }
@@ -137,7 +210,7 @@ export interface DayFeedEntry {
 
     /* ── Peu del desplegable: obrir l'activitat sencera ── */
     .ac-detail-actions {
-      display: flex; justify-content: flex-end;
+      display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 6px;
       padding: 0 12px 10px; background: var(--c-card);
     }
     .ac-open-btn {
@@ -150,11 +223,24 @@ export interface DayFeedEntry {
       .material-symbols-outlined { font-size: 17px; }
       &:hover { background: color-mix(in srgb, var(--ac, var(--c-card)) 15%, var(--c-card)); color: var(--c-text); }
     }
+
+    /* Ajuntar i separar són accions de segon terme: mateixa alçada que obrir,
+       però sense el color de l'activitat, que és per al pas que s'espera. */
+    .ac-side-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      height: 34px; padding: 0 12px; border-radius: 10px;
+      border: 1.5px solid var(--c-border-2); background: var(--c-card);
+      color: var(--c-text-3); font-size: 12.5px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 17px; }
+      &:hover { color: var(--c-text-2); border-color: var(--c-text-3); }
+    }
   `],
 })
 export class DayFeedCardsComponent {
   private workoutService = inject(WorkoutService);
   private sportService    = inject(SportService);
+  private sessionGroups   = inject(SessionGroupService);
   private settingsService = inject(UserSettingsService);
   private exerciseService = inject(ExerciseService);
   private feedback       = inject(FeedbackService);
@@ -164,12 +250,30 @@ export class DayFeedCardsComponent {
   readonly today = inject(TodayService).today;
 
   readonly day  = input<DayFeedEntry | null>(null);
+
+  /**
+   * L'activitat del dia repartida en sessions.
+   *
+   * Una activitat sense grup surt sola, com sempre; les que en comparteixen un
+   * queden juntes dins d'una caixa. Els dies d'abans que això existís no en
+   * tenen cap, o sigui que es pinten exactament igual que abans.
+   */
+  readonly groups = computed((): SessionGroup[] =>
+    groupDayFeed(this.day()?.workouts ?? [], this.day()?.sports ?? [])
+  );
   /** El volum és la xifra que menys es mira d'un cop d'ull i la que més
    *  amplada es menja; a Activitat recent, on les targetes s'apilen, se
    *  n'amaga. A la targeta del dia i a l'Historial s'hi queda. */
   readonly hideVolume = input(false, { transform: booleanAttribute });
   /** Obrir l'entrenament desplegat, a la pàgina d'Entrenar. */
   readonly open = output<string>();
+  /**
+   * Afegir una activitat a una sessió que ja hi és. Porta el dia i l'id del
+   * grup —creat aquí si l'activitat encara no en tenia—, i qui ho reculli
+   * duu l'usuari a triar què hi afegeix: el que registri neix dins d'aquesta
+   * sessió.
+   */
+  readonly addActivity = output<{ date: string; groupId: string }>();
   /** El mateix per a una sessió d'esport: la targeta només la llegeix, i
    *  canviar-hi res passa per la pàgina que la sap registrar. */
   readonly openSport = output<{ sport: Sport; session: SportSession }>();
@@ -191,6 +295,55 @@ export class DayFeedCardsComponent {
       loadTypeOf: this.exerciseService.loadTypeOf,
       bodyweightFactorOf: this.exerciseService.bodyweightFactorOf,
     }, { hideVolume: this.hideVolume() });
+  }
+
+  /** Les icones de les activitats de la sessió, amb el seu color: és el que
+   *  fa reconèixer d'un cop d'ull de què està feta l'anada. */
+  groupIcons(group: SessionGroup): { icon: string; color: string }[] {
+    return [
+      ...group.workouts.map(w => ({ icon: workoutPrimaryIcon(w), color: workoutPrimaryColor(w) })),
+      ...group.sports.map(s => ({ icon: s.sport.icon, color: s.sport.color })),
+    ];
+  }
+
+  /** «Empenta · Córrer»: els noms de les activitats, en el mateix ordre que
+   *  les targetes de sota. */
+  groupTitle(group: SessionGroup): string {
+    return [
+      ...group.workouts.map(w => workoutTypeLabel(w)),
+      ...group.sports.map(s => s.sport.name),
+    ].join(' · ');
+  }
+
+  groupCount(group: SessionGroup): string {
+    return `${group.workouts.length + group.sports.length} activitats`;
+  }
+
+  /**
+   * Obre el pas d'afegir una activitat a aquesta sessió.
+   *
+   * Si l'activitat encara no era de cap grup, ara passa a ser-ne la primera:
+   * l'etiqueta s'escriu abans de marxar, perquè el que es registri tot seguit
+   * pugui néixer amb la mateixa. Quedar-se aquí a mitges no deixa res per
+   * netejar — una activitat sola amb grup es compta i es pinta igual.
+   */
+  async addToSession(item: ActivityItem, date: string): Promise<void> {
+    try {
+      const groupId = await this.sessionGroups.ensureGroupId(item);
+      this.addActivity.emit({ date, groupId });
+    } catch {
+      this.feedback.error('Error en obrir la sessió', 2500);
+    }
+  }
+
+  /** Treu l'activitat de la sessió: torna a comptar com una de sola. */
+  async detach(item: ActivityItem): Promise<void> {
+    try {
+      await this.sessionGroups.detach(item);
+      this.feedback.success('Activitat separada', 2000);
+    } catch {
+      this.feedback.error('Error en separar', 2500);
+    }
   }
 
   emojiOf(level: FeelingLevel): string {

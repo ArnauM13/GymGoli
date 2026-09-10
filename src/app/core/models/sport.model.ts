@@ -43,6 +43,10 @@ export interface SportSession {
   notes?: string;
   status?: SportSessionStatus; // absent = 'done' (retrocompat)
   plannedSource?: PlannedSource;
+  /** Les activitats que en comparteixen un són la mateixa sessió — vegeu
+   *  `Workout.sessionGroupId` i `shared/utils/session-group.utils`. Absent
+   *  vol dir que la sessió d'esport és una sessió ella sola. */
+  sessionGroupId?: string;
   createdAt: Date;
 }
 

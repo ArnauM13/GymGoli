@@ -1,7 +1,7 @@
 import { computed } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
-import { WorkoutStoreService, mergeWorkouts } from './workout-store.service';
+import { WorkoutStoreService, mergeWorkouts, toRow, toWorkout } from './workout-store.service';
 import { Workout, WorkoutSet } from '../models/workout.model';
 
 function makeWorkout(id: string, date: string, sets: WorkoutSet[] = []): Workout {
@@ -218,6 +218,41 @@ describe('WorkoutStoreService', () => {
 
       expect(store.get('w1')!.entries.length).toBe(2);
       expect(store.isPending('w1')).toBeTrue();
+    });
+  });
+
+  describe('sessions agrupades', () => {
+    it('el grup sobreviu a tancar i tornar a obrir l\'app', () => {
+      store.put({ ...makeWorkout('w1', thisMonth()), sessionGroupId: 'g1' });
+
+      const other = TestBed.inject(WorkoutStoreService);
+      other.reset();
+      other.hydrate('user-1');
+
+      expect(other.get('w1')!.sessionGroupId).toBe('g1');
+    });
+
+    it('viatja al servidor i en torna', () => {
+      const row = toRow({ ...makeWorkout('w1', thisMonth()), sessionGroupId: 'g1' }, 'user-1');
+      expect(row['session_group_id']).toBe('g1');
+      expect(toWorkout({ ...row, created_at: new Date().toISOString() }).sessionGroupId).toBe('g1');
+    });
+
+    it('una sessió sense grup hi va com a buida, i torna sense grup', () => {
+      // És tot l'historial d'abans que els grups existissin: ha de continuar
+      // comportant-se exactament igual.
+      const row = toRow(makeWorkout('w1', thisMonth()), 'user-1');
+      expect(row['session_group_id']).toBeNull();
+      expect(toWorkout({ ...row, created_at: new Date().toISOString() }).sessionGroupId).toBeUndefined();
+    });
+
+    it('en un conflicte mana el costat modificat més tard, com la resta de camps', () => {
+      const base = makeWorkout('w1', thisMonth());
+      const mine   = { ...base, sessionGroupId: 'g1', updatedAt: new Date(1000) };
+      const theirs = { ...base, sessionGroupId: undefined, updatedAt: new Date(2000) };
+
+      expect(mergeWorkouts(mine, theirs).sessionGroupId).toBeUndefined();
+      expect(mergeWorkouts(theirs, mine).sessionGroupId).toBeUndefined();
     });
   });
 

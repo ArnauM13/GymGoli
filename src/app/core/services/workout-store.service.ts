@@ -47,7 +47,7 @@ export const RETAINED_MONTHS = 3;
  * qui són, que és el filtre de la consulta.
  */
 export const WORKOUT_COLUMNS =
-  'id,date,category,categories,entries,notes,feeling,source_proposal_id,created_at,updated_at,status,planned_source';
+  'id,date,category,categories,entries,notes,feeling,source_proposal_id,created_at,updated_at,status,planned_source,session_group_id';
 
 /** Una entrada d'un JSON antic pot venir sense `sets`. Normalitzar-ho aquí
  *  garanteix que cap consumidor pugui petar a `entry.sets.length`. */
@@ -74,6 +74,7 @@ export function toWorkout(row: Record<string, unknown>): Workout {
     updatedAt:        row['updated_at'] ? new Date(row['updated_at'] as string) : undefined,
     status:           (row['status'] as WorkoutStatus | undefined) ?? 'done',
     plannedSource:    (row['planned_source'] as PlannedSource | undefined) ?? undefined,
+    sessionGroupId:   (row['session_group_id'] as string | null | undefined) ?? undefined,
   };
 }
 
@@ -81,7 +82,7 @@ export function toWorkout(row: Record<string, unknown>): Workout {
  *  per a tot el que mira enrere (quant fa que no toques empenta, quantes
  *  setmanes seguides), sense baixar el gruix de l'historial. */
 export const WORKOUT_SUMMARY_COLUMNS =
-  'id,date,category,categories,notes,feeling,status,planned_source,source_proposal_id,created_at,updated_at,exercise_names';
+  'id,date,category,categories,notes,feeling,status,planned_source,source_proposal_id,created_at,updated_at,exercise_names,session_group_id';
 
 /** Fila de Supabase demanada en mode targeta → entrenament sense sèries. */
 export function toWorkoutSummary(row: Record<string, unknown>): Workout {
@@ -105,6 +106,7 @@ export function toRow(w: Workout, uid: string): Record<string, unknown> {
     status:             w.status ?? 'done',
     planned_source:     w.plannedSource ?? null,
     source_proposal_id: w.sourceProposalId ?? null,
+    session_group_id:   w.sessionGroupId ?? null,
     updated_at:         (w.updatedAt ?? new Date()).toISOString(),
   };
   if (w.category) row['category'] = w.category;
@@ -128,6 +130,7 @@ function recordFromJson(raw: Record<string, unknown>): WorkoutRecord | null {
       updatedAt:        w['updatedAt'] ? new Date(w['updatedAt'] as string) : undefined,
       status:           (w['status'] as WorkoutStatus | undefined) ?? 'done',
       plannedSource:    (w['plannedSource'] as PlannedSource | undefined) ?? undefined,
+      sessionGroupId:   (w['sessionGroupId'] as string | undefined) ?? undefined,
     },
     // Les cauen antigues eren llistes d'entrenaments pelats, sense revisions.
     // Venien del servidor, o sigui que ja estaven sincronitzades.

@@ -18,6 +18,8 @@ describe('DayFeedCardsComponent', () => {
   let component: DayFeedCardsComponent;
   let fixture: ReturnType<typeof TestBed.createComponent<DayFeedCardsComponent>>;
   let startPlannedWorkout: jasmine.Spy;
+  let setWorkoutGroup: jasmine.Spy;
+  let setSportGroup: jasmine.Spy;
   let deleteWorkout: jasmine.Spy;
   let updateSession: jasmine.Spy;
   let deleteSession: jasmine.Spy;
@@ -33,13 +35,15 @@ describe('DayFeedCardsComponent', () => {
     deleteSession = jasmine.createSpy().and.resolveTo(undefined);
     startPlannedSession = jasmine.createSpy().and.resolveTo(undefined);
     confirm = jasmine.createSpy().and.resolveTo(true);
+    setWorkoutGroup = jasmine.createSpy().and.resolveTo(undefined);
+    setSportGroup   = jasmine.createSpy().and.resolveTo(undefined);
 
     await TestBed.configureTestingModule({
       imports: [DayFeedCardsComponent],
       providers: [
-        { provide: WorkoutService, useValue: { startPlannedWorkout, deleteWorkout } },
+        { provide: WorkoutService, useValue: { startPlannedWorkout, deleteWorkout, setSessionGroup: setWorkoutGroup } },
         { provide: SportService, useValue: {
-          updateSession, deleteSession, startPlannedSession,
+          updateSession, deleteSession, startPlannedSession, setSessionGroup: setSportGroup,
           sessions: signal([]),
           sportHistoryLoaded: () => false,
           loadSessionsForSport: jasmine.createSpy().and.resolveTo(undefined),
@@ -296,6 +300,69 @@ describe('DayFeedCardsComponent', () => {
 
       (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('.ac-open-btn')!.click();
       expect(openSportSpy).toHaveBeenCalledWith(day.sports[0]);
+    });
+  });
+
+  describe('sessions agrupades', () => {
+    const SPORT = { id: 'padel', name: 'Pàdel', icon: 'sports_tennis', color: '#000', subtypes: [], metricDefs: [], createdAt: new Date() };
+    const day = (workoutGroup?: string, sportGroup?: string) => ({
+      date: '2024-03-05',
+      workouts: [makeWorkout({ id: 'w1', date: '2024-03-05', sessionGroupId: workoutGroup })],
+      sports: [{
+        sport: SPORT,
+        session: { id: 'sess1', date: '2024-03-05', sportId: 'padel', duration: 60, createdAt: new Date(), sessionGroupId: sportGroup },
+      }],
+    });
+
+    it('sense grup, cada activitat és una targeta solta i no hi ha cap caixa', () => {
+      fixture.componentRef.setInput('day', day());
+      fixture.detectChanges();
+
+      expect(component.groups().length).toBe(2);
+      expect((fixture.nativeElement as HTMLElement).querySelector('.sg--grouped')).toBeNull();
+    });
+
+    it('el que s\'ha fet d\'una tirada es llegeix com una sola sessió', () => {
+      fixture.componentRef.setInput('day', day('g1', 'g1'));
+      fixture.detectChanges();
+
+      const groups = component.groups();
+      expect(groups.length).toBe(1);
+      expect(groups[0].grouped).toBeTrue();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('.sg--grouped')).toBeTruthy();
+      expect(el.querySelector('.sg-count')?.textContent).toContain('2 activitats');
+      // I les dues activitats hi continuen sent, cadascuna amb la seva targeta.
+      expect(el.querySelectorAll('app-activity-card').length).toBe(2);
+    });
+
+    it('afegir-hi una activitat crea el grup i porta a registrar-la', async () => {
+      const addSpy = spyOn(component.addActivity, 'emit');
+      const w = makeWorkout({ id: 'w1', date: '2024-03-05' });
+
+      await component.addToSession({ kind: 'workout', workout: w }, '2024-03-05');
+
+      expect(setWorkoutGroup).toHaveBeenCalledWith('w1', jasmine.any(String));
+      const groupId = setWorkoutGroup.calls.mostRecent().args[1] as string;
+      expect(addSpy).toHaveBeenCalledWith({ date: '2024-03-05', groupId });
+    });
+
+    it('afegir-hi una activitat quan ja n\'hi ha una de sessió reaprofita el grup', async () => {
+      const addSpy = spyOn(component.addActivity, 'emit');
+      const w = makeWorkout({ id: 'w1', date: '2024-03-05', sessionGroupId: 'g1' });
+
+      await component.addToSession({ kind: 'workout', workout: w }, '2024-03-05');
+
+      expect(setWorkoutGroup).not.toHaveBeenCalled();
+      expect(addSpy).toHaveBeenCalledWith({ date: '2024-03-05', groupId: 'g1' });
+    });
+
+    it('separar una activitat la treu del grup', async () => {
+      const session = { id: 'sess1', date: '2024-03-05', sportId: 'padel', createdAt: new Date(), sessionGroupId: 'g1' };
+      await component.detach({ kind: 'sport', sport: SPORT, session });
+
+      expect(setSportGroup).toHaveBeenCalledWith('sess1', '2024-03-05', null);
     });
   });
 

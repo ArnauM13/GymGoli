@@ -321,6 +321,21 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
           </div>
         }
 
+        <!-- ── S'hi ve a afegir una activitat a una sessió que ja hi és ──
+             Tot el que es registri des d'aquí (un entrenament o un esport)
+             neix dins d'aquella sessió: la del gimnàs i la cinta de després
+             es llegeixen com una anada, i compten com una. -->
+        @if (joinGroupId()) {
+          <div class="date-context date-context--join">
+            <span class="material-symbols-outlined dc-icon">link</span>
+            <div class="dc-info">
+              <span class="dc-eyebrow">Afegint a la sessió</span>
+              <span class="dc-date">{{ selectedDateLabel() }}</span>
+            </div>
+            <button class="dc-cancel" (click)="cancelJoin()">Deixar-ho</button>
+          </div>
+        }
+
         <!-- ── Trainer proposal card ── -->
         @if (activeProposal(); as prop) {
           <div class="proposal-card">
@@ -1060,6 +1075,14 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
     .dc-info { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
     .dc-eyebrow { font-size: 11px; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase; color: var(--c-brand); }
     .dc-date { font-size: 15px; font-weight: 700; color: var(--c-text); }
+    .date-context--join { border-color: color-mix(in srgb, var(--c-brand) 45%, transparent); }
+    .dc-cancel {
+      flex-shrink: 0; height: 30px; padding: 0 11px; border-radius: 9px;
+      border: 1.5px solid var(--c-border-2); background: var(--c-card);
+      color: var(--c-text-3); font-size: 12px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      &:hover { color: var(--c-text-2); border-color: var(--c-text-3); }
+    }
     .proposal-card {
       margin: 16px 16px 0;
       padding: 14px 14px 12px;
@@ -1151,6 +1174,25 @@ export class TrainComponent implements OnDestroy {
     validDateParam(this.route.snapshot.queryParamMap.get('date')) ?? this.today()
   );
   readonly sportToggling   = signal(false);
+  /**
+   * La sessió a la qual s'hi ve a afegir una activitat
+   * (`/train?date=…&sessio=<grup>`), quan s'hi ve.
+   *
+   * Es llegeix del snapshot com el dia i l'entrenament, i el dia hi va
+   * enganxat: un grup és sempre d'una jornada, o sigui que canviar de dia el
+   * deixa sense sentit i el treu. Vegeu `shared/utils/session-group.utils`.
+   */
+  private readonly _joinGroupId   = signal<string | null>(
+    this.route.snapshot.queryParamMap.get('sessio')
+  );
+  private readonly _joinGroupDate = signal<string | null>(
+    this.route.snapshot.queryParamMap.get('sessio')
+      ? validDateParam(this.route.snapshot.queryParamMap.get('date')) ?? this.today()
+      : null
+  );
+  readonly joinGroupId = computed((): string | null =>
+    this._joinGroupDate() === this.selectedDate() ? this._joinGroupId() : null
+  );
   /**
    * S'hi ha vingut a planificar el dia, no a fer-lo (`/train?date=…&plan=1`).
    *
@@ -1559,6 +1601,12 @@ export class TrainComponent implements OnDestroy {
       // Sempre, no només quan hi és: tornar a Entrenar sense demanar-ho vol
       // dir que ja no s'hi ve a planificar.
       this.planRequested.set(params['plan'] === '1');
+      // El mateix per a la sessió que s'està ampliant: en marxar d'aquí
+      // (obrint el que s'acaba de crear, posem per cas) l'adreça ja no la
+      // porta, i afegir-hi deixa d'estar en marxa.
+      const joinGroup = params['sessio'] ?? null;
+      this._joinGroupId.set(joinGroup);
+      this._joinGroupDate.set(joinGroup ? linkDate ?? this.today() : null);
 
       const goToDay = (day: string): void => {
         if (this.selectedDate() === day) return;
@@ -1921,15 +1969,31 @@ export class TrainComponent implements OnDestroy {
     if (this.workoutMenuOpen())  { this.workoutMenuOpen.set(false); }
   }
 
-  /** Create a planned workout (future date) or a live one (today/past), then open it. */
+  /** Create a planned workout (future date) or a live one (today/past), then open it.
+   *
+   *  Si s'hi ve a ampliar una sessió, l'entrenament neix amb el seu grup i
+   *  passa a ser-ne una activitat més. Planificar no: un pla encara no és cap
+   *  anada, i el grup diu com s'ha fet una cosa, no com es farà. */
   private async _createForSelectedDate(cat: ExerciseCategory, entries: WorkoutEntry[]): Promise<string> {
     if (this.planning()) {
       return this.workoutService.createPlannedWorkout(this.selectedDate(), cat, entries);
     }
+    const group = this.joinGroupId() ?? undefined;
     if (entries.length) {
-      return this.workoutService.createWorkoutFromTemplate(this.selectedDate(), cat, entries);
+      return this.workoutService.createWorkoutFromTemplate(this.selectedDate(), cat, entries, group);
     }
-    return this.workoutService.createWorkoutForDate(this.selectedDate(), cat);
+    return this.workoutService.createWorkoutForDate(this.selectedDate(), cat, group);
+  }
+
+  /** Deixa d'afegir a la sessió i es queda al dia, per si t'hi has ficat
+   *  sense voler: el que es registri a partir d'ara torna a ser una sessió
+   *  pel seu compte. */
+  cancelJoin(): void {
+    this._joinGroupId.set(null);
+    this._joinGroupDate.set(null);
+    this.router.navigate(['/train'], {
+      queryParams: { date: this.selectedDate() }, replaceUrl: true,
+    });
   }
 
   async pickerStartEmpty(): Promise<void> {
@@ -2026,7 +2090,9 @@ export class TrainComponent implements OnDestroy {
     try {
       let workoutId = this.activeWorkout()?.id;
       if (!workoutId) {
-        workoutId = await this.workoutService.createWorkoutForDate(this.selectedDate(), defaultCategory);
+        workoutId = await this.workoutService.createWorkoutForDate(
+          this.selectedDate(), defaultCategory, this.joinGroupId() ?? undefined,
+        );
         // Acabat de crear i amb un exercici a dins: s'obre per omplir-lo,
         // encara que el dia sigui d'abans d'avui.
         this.openWorkout(workoutId, { edit: true });
@@ -2078,8 +2144,17 @@ export class TrainComponent implements OnDestroy {
     this.pickerCat.set(null);
 
     const date     = this.selectedDate();
+    const group    = this.joinGroupId();
     const existing = this.sportService.getSessionForDate(date, sport.id);
-    if (existing) { this._openSportSession(existing.id); return; }
+    if (existing) {
+      // Ja hi és: no se'n crea una altra, s'hi va. I si s'hi ha vingut a
+      // ampliar una sessió, aquesta hi entra — que és el que s'ha demanat.
+      if (group && existing.sessionGroupId !== group) {
+        await this.sportService.setSessionGroup(existing.id, date, group);
+      }
+      this._openSportSession(existing.id);
+      return;
+    }
 
     // Planificar un esport segueix la mateixa regla que un entrenament: el
     // dia encara ha de venir, o s'ha demanat deixar-lo apuntat.
@@ -2091,6 +2166,7 @@ export class TrainComponent implements OnDestroy {
         { duration: TrainComponent.DEFAULT_MINUTES },
         planning ? 'planned' : 'done',
         planning ? 'manual' : undefined,
+        planning ? undefined : group ?? undefined,
       );
       this._openSportSession(id, true);
     } catch {

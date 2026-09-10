@@ -94,7 +94,8 @@ const RECENT_DAYS = 30;
         <div class="today-body">
           @if (previewFeedEntry(); as day) {
             <app-day-feed-cards [day]="day" (open)="goToWorkout($event)"
-                                (openSport)="goToSportSession($event)" />
+                                (openSport)="goToSportSession($event)"
+                                (addActivity)="goToAddActivity($event)" />
           } @else {
             <div class="today-empty">
               <span class="material-symbols-outlined today-empty-icon">bedtime</span>
@@ -203,7 +204,8 @@ const RECENT_DAYS = 30;
                 <div class="feed-day">
                   <div class="feed-day-header">{{ dayLabel(day.date) }}</div>
                   <app-day-feed-cards [day]="day" hideVolume (open)="goToWorkout($event)"
-                                      (openSport)="goToSportSession($event)" />
+                                      (openSport)="goToSportSession($event)"
+                                      (addActivity)="goToAddActivity($event)" />
                 </div>
               }
             }
@@ -647,6 +649,15 @@ export class HomeComponent {
 
   goToWorkout(workoutId: string): void {
     this.router.navigate(['/train'], { queryParams: { workout: workoutId } });
+  }
+
+  /**
+   * Afegir una activitat a una sessió que ja hi és: es va a Entrenar amb el
+   * dia i el grup, i el que s'hi registri —un entrenament o un esport— neix
+   * dins d'aquella sessió.
+   */
+  goToAddActivity(e: { date: string; groupId: string }): void {
+    this.router.navigate(['/train'], { queryParams: { date: e.date, sessio: e.groupId } });
   }
 
   /** Una sessió d'esport té pàgina pròpia, igual que un entrenament. */
