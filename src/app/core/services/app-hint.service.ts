@@ -59,7 +59,7 @@ const DISCOVERY_HINTS: AppHint[] = [
     id: 'discover-progress',
     icon: 'bar_chart',
     title: 'Mira el teu progrés',
-    body: 'Gràfiques, resum i seguiment de l\'objectiu setmanal amb tot el teu historial.',
+    body: 'El resum del mes i de la setmana, els insights del que hem vist a les teves dades i l\'evolució de cada exercici i cada esport.',
     route: '/charts',
     cta: 'Veure progrés',
   },

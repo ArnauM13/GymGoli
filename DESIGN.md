@@ -813,6 +813,44 @@ Per això el botó de la targeta del dia **només surt quan el dia és avui**: u
 de futur ja té «Planifica aquest dia» a dalt, i duplicar-lo dins la targeta
 seria dir dues vegades el mateix.
 
+### Les tres pantalles de Progrés
+
+Progrés no és una pàgina, són tres, i cadascuna respon una pregunta diferent.
+Juntes no es llegia cap de les tres: el resum quedava enterrat sota la llista
+d'exercicis i els insights no hi eren.
+
+| Pantalla | Ruta | Què respon |
+| --- | --- | --- |
+| Resum | `/charts` | Com va el mes, i com va la setmana |
+| Insights | `/charts/insights` | Què hem vist a les teves dades |
+| Detall | `/charts/exercises` | Com evoluciona **aquest** exercici o **aquest** esport |
+
+De gran a petit i de dalt a baix: el mes primer (el tros de temps on un canvi
+ja es nota), la setmana a sota (la que encara es pot moure avui) i, al final
+de tot, les dues portes al detall com a targetes amb la seva barra de color.
+
+Regles que les mantenen honestes:
+
+- **El mes es compara amb el mateix tram del mes passat**, no amb el mes
+  sencer (`sameSpanLastMonth()`). Deu dies contra trenta sempre diria que has
+  baixat, i no seria veritat.
+- **Baixar no és una falta.** La fletxa cap avall va en gris, no en vermell, i
+  la fletxa hi és sempre — el color mai és l'únic senyal.
+- **Les barres del mes són setmanes retallades al mes**: la primera i l'última
+  no són setmanes senceres i no s'han de llegir com si ho fossin. Mateixes
+  normes de gràfic que el full d'insight (dues files, la ratlla de referència
+  amb nom, l'escala inclou l'objectiu, `role="img"` amb totes les barres
+  llegides).
+- **A Insights hi són tots i no se'n tanca cap.** A Inici en surt un, el que
+  toca avui; aquí s'hi va a mirar, així que la pàgina no apunta res —ni
+  «mostrat avui» ni fites celebrades—: veure una llista no és que t'ho hagin
+  dit. S'agrupen per família (`INSIGHT_LEVEL`), amb una línia que diu què hi
+  busques.
+- **Al detall, exercicis i esports no es barregen**: un commutador a dalt, no
+  una llista amb tot dins. Un exercici i un esport no es comparen amb res del
+  mateix. Obrir un esport demana el seu historial i només el seu
+  (`loadSessionsForSport`), que és el que cal per parlar de marques i mitjanes.
+
 ### Insight card & detail sheet
 
 The card on `home` is a **headline**: one figure with the period it belongs
@@ -1023,6 +1061,7 @@ When in doubt, look at how it's done in:
 | `features/library/library.component.ts` | Page header, filter chips, item cards with category color bar |
 | `features/settings/settings.component.ts` | Collapsible section cards, setting row, nav row, danger actions |
 | `shared/components/fitness-insights/fitness-insights.component.ts` | Color-tinted item cards with dynamic accent |
+| `features/charts/progress.component.ts` | Stat tiles with a comparison, CSS bar chart, nav cards into sub-pages |
 
 ---
 
