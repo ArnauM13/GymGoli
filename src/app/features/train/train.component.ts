@@ -334,7 +334,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
               <span class="dc-eyebrow">Afegint a la sessió</span>
               <span class="dc-date">{{ selectedDateLabel() }}</span>
             </div>
-            <button class="dc-cancel" (click)="cancelJoin()" aria-label="Deixa d'afegir-hi">
+            <button class="dc-cancel" (click)="cancelJoin()" aria-label="No afegeixis">
               <span class="material-symbols-outlined" aria-hidden="true">close</span>
             </button>
           </div>
