@@ -334,7 +334,9 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
               <span class="dc-eyebrow">Afegint a la sessió</span>
               <span class="dc-date">{{ selectedDateLabel() }}</span>
             </div>
-            <button class="dc-cancel" (click)="cancelJoin()">Deixa d'afegir-hi</button>
+            <button class="dc-cancel" (click)="cancelJoin()" aria-label="Deixa d'afegir-hi">
+              <span class="material-symbols-outlined" aria-hidden="true">close</span>
+            </button>
           </div>
         }
 
@@ -1079,10 +1081,11 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
     .dc-date { font-size: 15px; font-weight: 700; color: var(--c-text); }
     .date-context--join { border-color: color-mix(in srgb, var(--c-brand) 45%, transparent); }
     .dc-cancel {
-      flex-shrink: 0; height: 30px; padding: 0 11px; border-radius: 9px;
+      flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
       border: 1.5px solid var(--c-border-2); background: var(--c-card);
-      color: var(--c-text-3); font-size: 12px; font-weight: 700;
-      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      color: var(--c-text-3); cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 18px; }
       &:hover { color: var(--c-text-2); border-color: var(--c-text-3); }
     }
     .proposal-card {
