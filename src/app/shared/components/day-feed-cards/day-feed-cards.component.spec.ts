@@ -358,6 +358,55 @@ describe('DayFeedCardsComponent', () => {
       expect(addSpy).toHaveBeenCalledWith({ date: '2024-03-05', groupId: 'g1' });
     });
 
+    it('unir dues sessions del dia les deixa amb el mateix grup', async () => {
+      fixture.componentRef.setInput('day', day());
+      fixture.detectChanges();
+
+      const [first, second] = component.groups();
+      expect(component.canMerge(first)).toBeTrue();
+      expect(component.mergeTargets(first).map(g => g.key)).toEqual([second.key]);
+
+      await component.mergeWith(first, second);
+
+      expect(setWorkoutGroup).toHaveBeenCalledTimes(1);
+      const groupId = setWorkoutGroup.calls.mostRecent().args[1] as string;
+      expect(setSportGroup).toHaveBeenCalledWith('sess1', '2024-03-05', groupId);
+    });
+
+    it('unir amb una sessió que ja té grup no en crea cap de nou', async () => {
+      fixture.componentRef.setInput('day', day(undefined, 'g1'));
+      fixture.detectChanges();
+
+      const [workoutGroup, sportGroup] = component.groups();
+      await component.mergeWith(workoutGroup, sportGroup);
+
+      expect(setSportGroup).not.toHaveBeenCalled();
+      expect(setWorkoutGroup).toHaveBeenCalledOnceWith('w1', 'g1');
+    });
+
+    it('sense cap altra sessió al dia no hi ha res a unir', () => {
+      fixture.componentRef.setInput('day', { date: '2024-03-05', workouts: [makeWorkout({ id: 'w1', date: '2024-03-05' })], sports: [] });
+      fixture.detectChanges();
+
+      expect(component.canMerge(component.groups()[0])).toBeFalse();
+    });
+
+    it('una planificació no és cap anada: no surt entre les candidates', () => {
+      fixture.componentRef.setInput('day', {
+        date: '2024-03-05',
+        workouts: [
+          makeWorkout({ id: 'w1', date: '2024-03-05' }),
+          makeWorkout({ id: 'w2', date: '2024-03-05', status: 'planned' }),
+        ],
+        sports: [],
+      });
+      fixture.detectChanges();
+
+      const [done] = component.groups();
+      expect(component.mergeTargets(done)).toEqual([]);
+      expect(component.canMerge(done)).toBeFalse();
+    });
+
     it('separar una activitat la treu del grup', async () => {
       const session = { id: 'sess1', date: '2024-03-05', sportId: 'padel', createdAt: new Date(), sessionGroupId: 'g1' };
       await component.detach({ kind: 'sport', sport: SPORT, session });

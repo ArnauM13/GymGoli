@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 
 import { SportService } from './sport.service';
 import { WorkoutService } from './workout.service';
-import { ActivityItem, activityOf } from '../../shared/utils/session-group.utils';
+import { ActivityItem, activityOf, dateOf } from '../../shared/utils/session-group.utils';
 
 /**
  * Ajuntar i separar activitats d'una mateixa sessió.
@@ -36,6 +36,42 @@ export class SessionGroupService {
 
     const groupId = crypto.randomUUID();
     await this.join(item, groupId);
+    return groupId;
+  }
+
+  /**
+   * Ajunta dues sessions que ja hi són en una de sola.
+   *
+   * Fins ara ampliar una sessió volia dir registrar-hi una activitat nova;
+   * però el gimnàs i la cinta sovint ja estan tots dos apuntats abans que
+   * te n'adonis que van ser la mateixa anada. Ajuntar-les no en toca cap
+   * contingut: totes les activitats de les dues bandes passen a portar el
+   * mateix `sessionGroupId`, i prou.
+   *
+   * **Només del mateix dia.** Un grup a cavall de dos dies trencaria el
+   * magatzem local (partit per mes) i les peticions per trams, o sigui que
+   * aquí es comprova i es rebutja abans d'escriure res.
+   *
+   * Es queda l'id de grup que ja existeix —el de la primera banda que en
+   * tingui— perquè s'escriguin les mínimes files: ajuntar una activitat
+   * solta a una sessió de tres només toca la solta.
+   */
+  async merge(a: ActivityItem[], b: ActivityItem[]): Promise<string> {
+    if (!a.length || !b.length) throw new Error('Cal una activitat a cada banda');
+
+    const items = [...a, ...b];
+    const day   = dateOf(items[0]);
+    if (items.some(i => dateOf(i) !== day)) {
+      throw new Error('Una sessió no surt mai d\'un dia');
+    }
+
+    const groupId = items.map(i => activityOf(i).sessionGroupId).find(Boolean)
+      ?? crypto.randomUUID();
+
+    for (const item of items) {
+      if (activityOf(item).sessionGroupId === groupId) continue;
+      await this.join(item, groupId);
+    }
     return groupId;
   }
 
