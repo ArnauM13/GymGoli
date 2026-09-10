@@ -1,11 +1,21 @@
 import { Component, inject } from '@angular/core';
 import { MAT_SNACK_BAR_DATA, MatSnackBarRef } from '@angular/material/snack-bar';
 
+import { MASCOTS, Mascot } from '../../../core/models/mascot.model';
+
 export type FeedbackVariant = 'success' | 'error' | 'info';
 
 export interface FeedbackToastData {
   message: string;
   variant: FeedbackVariant;
+  /**
+   * Qui ho diu, quan ho diu un gos.
+   *
+   * La cara substitueix el glif del toast: el color de la barra ja diu si ha
+   * anat bé, i qui parla és el que li dona la veu. Sense gos, el toast és el
+   * de sempre — i els errors no en porten mai (vegeu `MASCOTES.md`).
+   */
+  mascot?: Mascot;
 }
 
 const VARIANT_ICON: Record<FeedbackVariant, string> = {
@@ -20,7 +30,11 @@ const VARIANT_ICON: Record<FeedbackVariant, string> = {
   template: `
     <div class="fb-toast" [class]="'fb-toast--' + data.variant">
       <div class="fb-bar"></div>
-      <span class="material-symbols-outlined fb-icon">{{ icon }}</span>
+      @if (dog; as d) {
+        <img class="fb-dog" [src]="d.avatar" [alt]="d.alt">
+      } @else {
+        <span class="material-symbols-outlined fb-icon">{{ icon }}</span>
+      }
       <span class="fb-msg">{{ data.message }}</span>
       <button type="button" class="fb-close" (click)="dismiss()" aria-label="Tancar">
         <span class="material-symbols-outlined">close</span>
@@ -48,6 +62,10 @@ const VARIANT_ICON: Record<FeedbackVariant, string> = {
     .fb-toast--success .fb-icon { color: #43a047; }
     .fb-toast--error   .fb-icon { color: #ef5350; }
     .fb-toast--info    .fb-icon { color: var(--c-brand); }
+    .fb-dog {
+      width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%;
+      object-fit: cover; display: block;
+    }
     .fb-msg { flex: 1; font-size: 13.5px; font-weight: 600; line-height: 1.4; }
     .fb-close {
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
@@ -68,6 +86,8 @@ export class FeedbackToastComponent {
   readonly data = inject<FeedbackToastData>(MAT_SNACK_BAR_DATA);
   private readonly ref = inject(MatSnackBarRef<FeedbackToastComponent>);
   readonly icon = VARIANT_ICON[this.data.variant];
+  /** La cara de qui ho diu, quan el missatge té veu. */
+  readonly dog = this.data.mascot ? MASCOTS[this.data.mascot] : null;
 
   dismiss(): void {
     this.ref.dismiss();

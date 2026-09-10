@@ -1,3 +1,4 @@
+import { Mascot } from '../../core/models/mascot.model';
 import { Sport, SportSession } from '../../core/models/sport.model';
 import { Workout } from '../../core/models/workout.model';
 import { workoutPrimaryColor, workoutPrimaryIcon, workoutTypeLabel } from './workout-card.utils';
@@ -135,4 +136,46 @@ export function groupDayFeed(
 
   for (const g of groups) g.grouped = g.workouts.length + g.sports.length > 1;
   return groups;
+}
+
+// ── La veu ───────────────────────────────────────────────────────────────────
+
+/**
+ * Qui parla d'aquestes sessions: el Marley si tot és de gimnàs, el Xoco si
+ * tot és d'esport, i tots dos quan l'anada barreja les dues coses —que és
+ * justament el cas que fa existir els grups.
+ */
+export function sessionMascot(...groups: SessionGroup[]): Mascot {
+  const gym   = groups.some(g => g.workouts.length > 0);
+  const sport = groups.some(g => g.sports.length > 0);
+  if (gym && sport) return 'both';
+  return sport ? 'xoco' : 'marley';
+}
+
+/** Un missatge amb qui el diu: el gos hi posa la cara i la frase. */
+export interface MascotLine {
+  mascot: Mascot;
+  message: string;
+}
+
+/**
+ * El que es diu quan dues sessions passen a ser una.
+ *
+ * Curt i sense deures, com mana `MASCOTES.md`: confirma el que acaba de
+ * passar i para. Amb els dos gossos alhora el missatge és transversal i porta
+ * menys gos i més dada.
+ */
+export function unifiedLine(...groups: SessionGroup[]): MascotLine {
+  const mascot = sessionMascot(...groups);
+  const message = mascot === 'marley' ? 'Tot en una sessió.'
+                : mascot === 'xoco'   ? 'Tot d\'una tirada!'
+                :                       'Una sola sessió.';
+  return { mascot, message };
+}
+
+/** I el que es diu quan una activitat en torna a sortir. */
+export function detachedLine(item: ActivityItem): MascotLine {
+  return item.kind === 'workout'
+    ? { mascot: 'marley', message: 'Cadascú pel seu compte.' }
+    : { mascot: 'xoco',   message: 'Aquesta ja va sola!' };
 }

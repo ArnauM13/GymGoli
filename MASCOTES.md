@@ -86,6 +86,20 @@ sense problema: també sap estar quiet, si hi ha companyia.
 | Detall d'un insight (full que puja des de la targeta) | el mateix que la targeta | Avatar gran a la capçalera, **sense veu**: allà s'explica la dada |
 | Feed del dia (`home`) | Marley als entrenaments, Xoco als esports | Xapa sobre la icona d'activitat |
 | Barres d'objectiu setmanal | Marley al gym, Xoco a l'esport, tots dos si l'objectiu és combinat | Avatar a l'esquerra |
+| Confirmació d'una acció (toast) | el gos del que s'ha tocat; tots dos si la sessió barreja gimnàs i esport | Cara al lloc del glif, amb la frase seva |
+
+### El toast
+
+Les confirmacions que porten gos són les que parlen del que acabes de fer amb
+les teves activitats: unir dues sessions, separar-ne una. La cara ocupa el
+lloc del glif —la barra de color ja diu que ha anat bé— i la frase és curta,
+d'una línia: «Tot en una sessió.», «Aquesta ja va sola!».
+
+**Cap error no el diu un gos.** `FeedbackService.error()` no accepta mascota a
+posta: cap dels dos dona males notícies, i posar-hi una cara contenta davant
+d'un «no s'ha pogut» és exactament el que la regla 3 vol evitar. La resta de
+toasts (guardat, esborrat, coses de configuració) es queden com estan: no tot
+ha de portar gos, o la broma es gasta.
 
 ### La icona d'activitat
 

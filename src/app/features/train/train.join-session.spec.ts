@@ -59,6 +59,7 @@ describe('TrainComponent — ampliar una sessió que ja hi és', () => {
   let merge: jasmine.Spy;
   let join: jasmine.Spy;
   let goBack: jasmine.Spy;
+  let success: jasmine.Spy;
 
   function setup(opts: {
     workouts?: Workout[];
@@ -69,7 +70,8 @@ describe('TrainComponent — ampliar una sessió que ja hi és', () => {
     const sports   = opts.sports ?? [];
     merge  = jasmine.createSpy('merge').and.resolveTo('g1');
     join   = jasmine.createSpy('join').and.resolveTo(undefined);
-    goBack = jasmine.createSpy('goBack');
+    goBack  = jasmine.createSpy('goBack');
+    success = jasmine.createSpy('success');
 
     const query: Record<string, string> = { date: TODAY };
     if (opts.sessio !== null) query['sessio'] = opts.sessio ?? 'g1';
@@ -116,7 +118,7 @@ describe('TrainComponent — ampliar una sessió que ja hi és', () => {
         { provide: WorkoutProfileService, useValue: { profile: signal({ gym: { push: P, pull: P, legs: P }, favoriteSport: null, recentSport: null, minRecovery: 2 }) } },
         { provide: AppHintService, useValue: { isDismissed: () => false, dismiss: () => {} } },
         { provide: MatDialog, useValue: { open: () => {}, openDialogs: [] } },
-        { provide: FeedbackService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
+        { provide: FeedbackService, useValue: { success, error: () => {}, info: () => {} } },
         { provide: ConfirmDialogService, useValue: { confirm: () => Promise.resolve(false) } },
         { provide: NavigationHistoryService, useValue: { goBack } },
       ],
@@ -157,6 +159,8 @@ describe('TrainComponent — ampliar una sessió que ja hi és', () => {
     expect((mine[0] as { workout: Workout }).workout.id).toBe('w1');
     expect((target[0] as { session: SportSession }).session.id).toBe('s1');
     expect(goBack).toHaveBeenCalled();
+    // Gimnàs i esport en una sola anada: ho diuen tots dos gossos.
+    expect(success).toHaveBeenCalledWith('Una sola sessió.', jasmine.any(Number), 'both');
   });
 
   it('sense la sessió carregada, el que es tria hi entra igualment', async () => {

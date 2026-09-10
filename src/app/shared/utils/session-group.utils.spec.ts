@@ -1,6 +1,9 @@
 import { Sport, SportSession } from '../../core/models/sport.model';
 import { Workout } from '../../core/models/workout.model';
-import { countSessions, dateOf, groupDayFeed, itemsOf, sessionKey } from './session-group.utils';
+import {
+  countSessions, dateOf, detachedLine, groupDayFeed, itemsOf, sessionKey,
+  sessionMascot, unifiedLine,
+} from './session-group.utils';
 
 function w(id: string, sessionGroupId?: string): Workout {
   return { id, date: '2025-04-21', entries: [], createdAt: new Date(), sessionGroupId };
@@ -89,6 +92,34 @@ describe('session-group.utils', () => {
     it('una activitat solta és una sessió d\'un element', () => {
       const [group] = groupDayFeed([w('a')], []);
       expect(itemsOf(group)).toEqual([{ kind: 'workout', workout: w('a') }]);
+    });
+  });
+
+  describe('la veu', () => {
+    const gym   = () => groupDayFeed([w('a')], [])[0];
+    const sport = () => groupDayFeed([], [s('b')])[0];
+    const mixed = () => groupDayFeed([w('a', 'g1')], [s('b', 'g1')])[0];
+
+    it('parla el gos de la mena d\'activitat', () => {
+      expect(sessionMascot(gym())).toBe('marley');
+      expect(sessionMascot(sport())).toBe('xoco');
+    });
+
+    it('barrejant gimnàs i esport hi són tots dos', () => {
+      expect(sessionMascot(mixed())).toBe('both');
+      expect(sessionMascot(gym(), sport())).toBe('both');
+    });
+
+    it('unir-les ho diu qui toca, i curt', () => {
+      expect(unifiedLine(gym())).toEqual({ mascot: 'marley', message: 'Tot en una sessió.' });
+      expect(unifiedLine(sport())).toEqual({ mascot: 'xoco', message: 'Tot d\'una tirada!' });
+      // Transversal: menys gos i més dada, com mana MASCOTES.md.
+      expect(unifiedLine(gym(), sport())).toEqual({ mascot: 'both', message: 'Una sola sessió.' });
+    });
+
+    it('separar-ne una la diu el gos de l\'activitat que en surt', () => {
+      expect(detachedLine({ kind: 'workout', workout: w('a') }).mascot).toBe('marley');
+      expect(detachedLine({ kind: 'sport', ...s('b') }).mascot).toBe('xoco');
     });
   });
 });

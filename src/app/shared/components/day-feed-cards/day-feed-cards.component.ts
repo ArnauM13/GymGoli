@@ -18,7 +18,9 @@ import {
   formatFeeling, isWorkoutPlanned, sportCardStats,
   workoutCardColor, workoutCardStats, workoutPrimaryColor, workoutPrimaryIcon, workoutTypeLabel,
 } from '../../utils/workout-card.utils';
-import { ActivityItem, SessionGroup, groupDayFeed, groupIcons, groupTitle } from '../../utils/session-group.utils';
+import {
+  ActivityItem, SessionGroup, detachedLine, groupDayFeed, groupIcons, groupTitle,
+} from '../../utils/session-group.utils';
 
 export interface DayFeedEntry {
   date: string;
@@ -325,7 +327,10 @@ export class DayFeedCardsComponent {
   async detach(item: ActivityItem): Promise<void> {
     try {
       await this.sessionGroups.detach(item);
-      this.feedback.success('Activitat separada', 2000);
+      // Ho diu el gos de l'activitat que en surt: el Marley si és del gimnàs,
+      // el Xoco si és d'esport.
+      const { mascot, message } = detachedLine(item);
+      this.feedback.success(message, 2000, mascot);
     } catch {
       this.feedback.error('Error en separar', 2500);
     }

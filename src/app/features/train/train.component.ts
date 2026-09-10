@@ -39,7 +39,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { NavigationHistoryService } from '../../core/services/navigation-history.service';
 import { SessionGroupService } from '../../core/services/session-group.service';
 import {
-  SessionGroup, groupDayFeed, groupIcons, groupTitle, itemsOf,
+  SessionGroup, groupDayFeed, groupIcons, groupTitle, itemsOf, unifiedLine,
 } from '../../shared/utils/session-group.utils';
 import { TodayService } from '../../core/services/today.service';
 import {
@@ -2093,7 +2093,10 @@ export class TrainComponent implements OnDestroy {
         // que s'ha triat, i l'id de la sessió ja el portem de l'enllaç.
         for (const item of itemsOf(target)) await this.sessionGroups.join(item, groupId);
       }
-      this.feedback.success('Sessions unides', 2000);
+      // Qui ho diu surt del que ha quedat: tots dos gossos quan l'anada
+      // barreja gimnàs i esport, que és el cas que fa existir els grups.
+      const { mascot, message } = unifiedLine(...(mine ? [mine, target] : [target]));
+      this.feedback.success(message, 2200, mascot);
       this._joinGroupId.set(null);
       this._joinGroupDate.set(null);
       this.navHistory.goBack('/home');
