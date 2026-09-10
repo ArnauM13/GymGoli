@@ -310,8 +310,10 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
         <!-- ══ DASHBOARD MODE ══ -->
         <app-page-header title="Entrenament" [showBack]="true" />
 
-        <!-- ── Context d'un dia que no és avui (registrar passat / planificar futur) ── -->
-        @if (!isToday() || planning()) {
+        <!-- ── Context d'un dia que no és avui (registrar passat / planificar futur) ──
+             S'amaga quan s'hi ve a afegir a una sessió: el banner de sota ja diu
+             el dia, i repetir-lo com a «Registrant» confonia més que ajudava. -->
+        @if ((!isToday() || planning()) && !joinGroupId()) {
           <div class="date-context" [class.date-context--past]="isSelectedPast()">
             <span class="material-symbols-outlined dc-icon">{{ isSelectedPast() ? 'history' : 'event_upcoming' }}</span>
             <div class="dc-info">
@@ -332,7 +334,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
               <span class="dc-eyebrow">Afegint a la sessió</span>
               <span class="dc-date">{{ selectedDateLabel() }}</span>
             </div>
-            <button class="dc-cancel" (click)="cancelJoin()">Deixar-ho</button>
+            <button class="dc-cancel" (click)="cancelJoin()">Deixa d'afegir-hi</button>
           </div>
         }
 
