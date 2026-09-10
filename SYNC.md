@@ -411,6 +411,40 @@ Els tests: `session-group.utils.spec.ts`, el bloc «sessions agrupades» de
 
 ---
 
+## 5c. L'ordre d'un dia: quan es va fer cada cosa
+
+Un dia es llegeix com es va viure: la cursa del matí abans del gimnàs de la
+tarda. L'hora que ho ordena és `COALESCE(started_at, created_at)`, i
+`started_at` és un `timestamptz` opcional a `workouts` i a `sport_sessions`
+(migració 035).
+
+**Només s'escriu quan un pla passa a estar fet.** Un pàdel apuntat dilluns per
+dijous es va crear dilluns; si el dia s'ordenés per `created_at`, un cop jugat
+sortiria per davant de tot el que s'havia fet abans aquell dia. La resta de
+files es queden a NULL, que vol dir el que ja volia dir: van néixer amb
+l'activitat, i `created_at` ja és l'hora bona. La migració no reescriu ni una
+fila.
+
+Com el grup, és una columna escalar d'una fila que ja se sincronitza: puja pel
+camí de sempre i en un conflicte es resol com la resta de camps. Viatja al
+feed (`activity_feed` la torna com una columna més), perquè un pla ja fet
+s'ha de col·locar bé sense baixar-se cap sèrie.
+
+Les invariants:
+
+1. **Un pla no té hora**: encara no ha passat, i per això va sempre al davant
+   del que ja s'ha fet aquell dia. Baixa al seu lloc en fer-se.
+2. **L'ordre és de dins a fora**: les activitats d'una sessió unida
+   s'ordenen entre elles, i les sessions del dia entre elles per la primera
+   activitat que se'n va fer.
+3. **Qui ordena és qui pinta** (`groupDayFeed()`, a
+   `shared/utils/session-group.utils.ts`), no la consulta: el servidor només
+   ha de tornar un ordre total i estable per a la paginació.
+
+Els tests: el bloc «l'ordre del dia» de `session-group.utils.spec.ts`.
+
+---
+
 ## 6. Quant es guarda al dispositiu
 
 El local **no** és una còpia de tot l'historial. Es guarden els mesos de la

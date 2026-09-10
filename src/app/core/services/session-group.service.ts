@@ -23,23 +23,6 @@ export class SessionGroupService {
   private sportService   = inject(SportService);
 
   /**
-   * L'id de la sessió d'aquesta activitat, creant-lo si encara no en tenia.
-   *
-   * És el primer pas d'«afegeix-hi una activitat»: la que ja hi ha passa a ser
-   * el primer element del grup. Una activitat que es quedi sola amb un grup no
-   * és cap problema —es compta i es pinta igual que si no en tingués—, o sigui
-   * que obrir el flux i no acabar-lo no deixa res per netejar.
-   */
-  async ensureGroupId(item: ActivityItem): Promise<string> {
-    const existing = activityOf(item).sessionGroupId;
-    if (existing) return existing;
-
-    const groupId = crypto.randomUUID();
-    await this.join(item, groupId);
-    return groupId;
-  }
-
-  /**
    * Ajunta dues sessions que ja hi són en una de sola.
    *
    * Fins ara ampliar una sessió volia dir registrar-hi una activitat nova;
@@ -97,5 +80,19 @@ export class SessionGroupService {
       return;
     }
     await this.sportService.setSessionGroup(item.session.id, item.session.date, null);
+  }
+
+  /**
+   * Desfà la sessió sencera: cada activitat torna a comptar per ella mateixa.
+   *
+   * Separar és una sola acció —la sessió unida es parteix del tot—, i per això
+   * es fa amb totes les activitats de cop: deixar-ne dues de tres juntes no és
+   * el que demana qui toca «separar». Les que ja anaven soltes no s'escriuen.
+   */
+  async split(items: ActivityItem[]): Promise<void> {
+    for (const item of items) {
+      if (!activityOf(item).sessionGroupId) continue;
+      await this.detach(item);
+    }
   }
 }

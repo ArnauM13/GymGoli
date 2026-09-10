@@ -254,6 +254,82 @@ describe('SportService', () => {
         jasmine.objectContaining({ status: 'done' }));
     }));
 
+    it('registrar un pla li posa l\'hora de quan s\'ha fet', fakeAsync(() => {
+      // El dia s'ordena per quan es va fer cada cosa, no per quan es va
+      // apuntar: fins que no es fa, la sessió no en té (vegeu SYNC.md §5c).
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+
+      void service.logSession('2024-03-06', 'running', {}, 'planned', 'routine');
+      tick();
+      const id = service.plannedSessions().find(s => s.sportId === 'running')!.id;
+      expect(service.plannedSessions().find(s => s.id === id)?.startedAt).toBeUndefined();
+
+      void service.updateSession(id, '2024-03-06', { duration: 60 }, 'done');
+      tick();
+
+      expect(service.sessions().find(s => s.id === id)?.startedAt).toEqual(jasmine.any(Date));
+      expect(supabaseMock.updateSpy).toHaveBeenCalledWith(
+        jasmine.objectContaining({ started_at: jasmine.any(String) }));
+    }));
+
+    it('editar una sessió feta no li toca l\'hora', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+
+      void service.logSession('2024-03-06', 'running', {}, 'done');
+      tick();
+      const id = service.sessions().find(s => s.sportId === 'running')!.id;
+
+      void service.updateSession(id, '2024-03-06', { duration: 45 });
+      tick();
+
+      // Va néixer amb l'activitat: `createdAt` ja és l'hora bona.
+      expect(service.sessions().find(s => s.id === id)?.startedAt).toBeUndefined();
+      expect(supabaseMock.updateSpy.calls.mostRecent().args[0] as Record<string, unknown>)
+        .not.toEqual(jasmine.objectContaining({ started_at: jasmine.anything() }));
+    }));
+
+    it('registrar un pla li posa l\'hora de quan s\'ha fet', fakeAsync(() => {
+      // El dia s'ordena per quan es va fer cada cosa, no per quan es va
+      // apuntar: fins que no es fa, la sessió no en té (vegeu SYNC.md §5c).
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+
+      void service.logSession('2024-03-06', 'running', {}, 'planned', 'routine');
+      tick();
+      const id = service.plannedSessions().find(s => s.sportId === 'running')!.id;
+      expect(service.plannedSessions().find(s => s.id === id)?.startedAt).toBeUndefined();
+
+      void service.updateSession(id, '2024-03-06', { duration: 60 }, 'done');
+      tick();
+
+      expect(service.sessions().find(s => s.id === id)?.startedAt).toEqual(jasmine.any(Date));
+      expect(supabaseMock.updateSpy).toHaveBeenCalledWith(
+        jasmine.objectContaining({ started_at: jasmine.any(String) }));
+    }));
+
+    it('editar una sessió feta no li toca l\'hora', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+
+      void service.logSession('2024-03-06', 'running', {}, 'done');
+      tick();
+      const id = service.sessions().find(s => s.sportId === 'running')!.id;
+
+      void service.updateSession(id, '2024-03-06', { duration: 45 });
+      tick();
+
+      // Va néixer amb l'activitat: `createdAt` ja és l'hora bona.
+      expect(service.sessions().find(s => s.id === id)?.startedAt).toBeUndefined();
+      expect(supabaseMock.updateSpy.calls.mostRecent().args[0] as Record<string, unknown>)
+        .not.toEqual(jasmine.objectContaining({ started_at: jasmine.anything() }));
+    }));
+
     it('no toca l\'estat quan no se li passa', fakeAsync(() => {
       uid.set('user-1');
       TestBed.flushEffects();

@@ -118,6 +118,17 @@ export interface Workout {
   /** Set when this workout was created by accepting a trainer proposal */
   sourceProposalId?: string | null;
   createdAt: Date;
+  /**
+   * Quan l'entrenament es va començar de debò, si no és quan es va crear la
+   * fila.
+   *
+   * Un pla apuntat dilluns per dimecres neix dilluns: `createdAt` diu quan es
+   * va apuntar, i això, quan es va fer. És el que ordena el dia —el que s'ha
+   * fet abans surt abans—, o sigui que només s'escriu en el moment en què un
+   * pla passa a estar fet. Absent vol dir que la fila va néixer amb
+   * l'activitat i `createdAt` ja és l'hora bona.
+   */
+  startedAt?: Date;
   /** Last time the workout's contents changed (any set/entry/feeling/notes
    *  edit). Used to tell whether a session is still being trained right now. */
   updatedAt?: Date;

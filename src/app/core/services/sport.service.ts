@@ -31,7 +31,7 @@ interface PendingSportOp { op: SportOpKind; id: string; row: Record<string, unkn
  *  `duration_minutes`, la columna que va substituir `duration` i que ningú
  *  llegeix des de fa migracions. */
 const SPORT_SESSION_COLUMNS =
-  'id,date,sport_id,subtype_id,duration,feeling,metrics,notes,status,planned_source,created_at,session_group_id';
+  'id,date,sport_id,subtype_id,duration,feeling,metrics,notes,status,planned_source,created_at,started_at,session_group_id';
 
 function toSport(row: Record<string, unknown>): Sport {
   return {
@@ -59,6 +59,7 @@ function toSportSession(row: Record<string, unknown>): SportSession {
     plannedSource: (row['planned_source'] as PlannedSource | null) ?? undefined,
     sessionGroupId: (row['session_group_id'] as string | null) ?? undefined,
     createdAt: new Date(row['created_at'] as string),
+    startedAt: row['started_at'] ? new Date(row['started_at'] as string) : undefined,
   };
 }
 
@@ -77,6 +78,7 @@ function sportSessionFromCache(raw: Record<string, unknown>): SportSession {
     plannedSource: (raw['plannedSource'] as PlannedSource | undefined) ?? undefined,
     sessionGroupId: (raw['sessionGroupId'] as string | undefined) ?? undefined,
     createdAt: new Date(raw['createdAt'] as string),
+    startedAt: raw['startedAt'] ? new Date(raw['startedAt'] as string) : undefined,
   };
 }
 
@@ -900,7 +902,6 @@ export class SportService {
     data: { subtypeId?: string; duration?: number; feeling?: FeelingLevel; metrics?: Record<string, string | number>; notes?: string },
     status: SportSessionStatus = 'done',
     plannedSource?: PlannedSource,
-    sessionGroupId?: string,
   ): Promise<string> {
     const uid = this._uid();
     const id  = crypto.randomUUID();
@@ -913,7 +914,6 @@ export class SportService {
       notes:     data.notes,
       status,
       plannedSource,
-      sessionGroupId,
       createdAt: new Date(),
     };
 
@@ -932,7 +932,10 @@ export class SportService {
       notes:      data.notes     ?? null,
       status,
       planned_source:   plannedSource ?? null,
-      session_group_id: sessionGroupId ?? null,
+      session_group_id: null,
+      // La fila neix amb l'activitat: `created_at` ja és l'hora que ordena el
+      // dia. `started_at` només s'escriu quan un pla passa a estar fet.
+      started_at:       null,
     };
     await this._pushOrQueue(uid, { op: 'insert', id, row });
     return id;
@@ -982,13 +985,19 @@ export class SportService {
 
     const uid = this._uid();
 
+    // El pla passa a estar fet ara: és aquesta hora la que l'ordena dins del
+    // dia, no la de quan es va apuntar (vegeu `SportSession.startedAt`).
+    const startedAt = new Date();
+
     const key    = date.substring(0, 7);
     const bucket = this._monthCache.get(key) ?? [];
-    this._monthCache.set(key, bucket.map(s => s.id === id ? { ...s, status: 'done' } : s));
+    this._monthCache.set(key, bucket.map(s => s.id === id ? { ...s, status: 'done', startedAt } : s));
     this._rebuild();
     this._writeSessionsToStorage(uid, key, this._monthCache.get(key)!);
 
-    await this._pushOrQueue(uid, { op: 'update', id, row: { status: 'done' } });
+    await this._pushOrQueue(uid, {
+      op: 'update', id, row: { status: 'done', started_at: startedAt.toISOString() },
+    });
     return id;
   }
 
@@ -1007,6 +1016,12 @@ export class SportService {
   ): Promise<void> {
     const uid = this._uid();
 
+    // Omplir les dades d'un pla és fer-lo: el moment en què passa a estar fet
+    // és el que l'ordena dins del dia (vegeu `SportSession.startedAt`).
+    const current   = this._sessions().find(s => s.id === id);
+    const promoting = status === 'done' && (current?.status ?? 'done') === 'planned';
+    const startedAt = promoting ? new Date() : undefined;
+
     const key    = date.substring(0, 7);
     const bucket = this._monthCache.get(key) ?? [];
     this._monthCache.set(key, bucket.map(s => s.id === id
@@ -1014,6 +1029,8 @@ export class SportService {
           ...s, subtypeId: data.subtypeId, duration: data.duration,
           feeling: data.feeling, metrics: data.metrics, notes: data.notes,
           status: status ?? s.status,
+          // Fora del moment de fer-lo, l'hora que ja tenia no es toca.
+          startedAt: promoting ? startedAt : s.startedAt,
         }
       : s
     ));
@@ -1028,6 +1045,7 @@ export class SportService {
       notes:      data.notes     ?? null,
     };
     if (status) row['status'] = status;
+    if (promoting) row['started_at'] = startedAt!.toISOString();
     await this._pushOrQueue(uid, { op: 'update', id, row });
   }
 

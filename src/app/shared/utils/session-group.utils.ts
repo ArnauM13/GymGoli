@@ -46,8 +46,7 @@ export function dateOf(item: ActivityItem): string {
 }
 
 /**
- * Les activitats d'una mateixa sessió, tal com es pinten: els entrenaments
- * primer i els esports després, com abans d'existir els grups.
+ * Les activitats d'una mateixa sessió, per ordre cronològic.
  */
 export interface SessionGroup {
   /** L'id del grup quan n'hi ha, i si no el de l'activitat que va sola: així
@@ -56,8 +55,10 @@ export interface SessionGroup {
   /** Cert quan la sessió té més d'una activitat — l'únic cas en què la
    *  targeta canvia de forma. */
   grouped: boolean;
-  workouts: Workout[];
-  sports:   { sport: Sport; session: SportSession }[];
+  /** Les activitats de la sessió, de la que s'ha fet abans a la de després.
+   *  Barrejades: si has corregut i després has anat al gimnàs, la cursa va
+   *  primer encara que siguin de menes diferents. */
+  items: ActivityItem[];
 }
 
 /** La clau per la qual dues activitats són la mateixa sessió. Sense grup,
@@ -82,60 +83,100 @@ export function countSessions(activities: GroupableActivity[]): number {
   return keys.size;
 }
 
-/** Les activitats d'una sessió com a elements, en el mateix ordre que es
- *  pinten: és el que es passa a qui ajunta o separa. */
-export function itemsOf(group: SessionGroup): ActivityItem[] {
-  return [
-    ...group.workouts.map((workout): ActivityItem => ({ kind: 'workout', workout })),
-    ...group.sports.map(({ sport, session }): ActivityItem => ({ kind: 'sport', sport, session })),
-  ];
+/**
+ * Quan va passar l'activitat: el que ordena el dia.
+ *
+ * `startedAt` només hi és quan no coincideix amb l'alta de la fila —un pla
+ * apuntat dilluns i fet dimecres—, i llavors mana ell: el dia s'ordena per
+ * quan es va fer cada cosa, no per quan es va apuntar. Sense ell, la fila va
+ * néixer quan l'activitat va començar i `createdAt` ja diu l'hora.
+ */
+export function activityTime(item: ActivityItem): number {
+  const a = item.kind === 'workout' ? item.workout : item.session;
+  return (a.startedAt ?? a.createdAt).getTime();
+}
+
+/** Un pla encara no ha passat: no té hora amb què ordenar-se entre el que ja
+ *  s'ha fet, i per això va sempre al davant. */
+export function isPlannedItem(item: ActivityItem): boolean {
+  const a = item.kind === 'workout' ? item.workout : item.session;
+  return (a.status ?? 'done') === 'planned';
 }
 
 /** Les icones de les activitats de la sessió, amb el seu color: és el que fa
  *  reconèixer d'un cop d'ull de què està feta l'anada. */
 export function groupIcons(group: SessionGroup): { icon: string; color: string }[] {
-  return [
-    ...group.workouts.map(w => ({ icon: workoutPrimaryIcon(w), color: workoutPrimaryColor(w) })),
-    ...group.sports.map(s => ({ icon: s.sport.icon, color: s.sport.color })),
-  ];
+  return group.items.map(item => item.kind === 'workout'
+    ? { icon: workoutPrimaryIcon(item.workout), color: workoutPrimaryColor(item.workout) }
+    : { icon: item.sport.icon, color: item.sport.color });
 }
 
 /** «Empenta · Córrer»: els noms de les activitats, en el mateix ordre que les
  *  icones i les targetes. */
 export function groupTitle(group: SessionGroup): string {
-  return [
-    ...group.workouts.map(w => workoutTypeLabel(w)),
-    ...group.sports.map(s => s.sport.name),
-  ].join(' · ');
+  return group.items
+    .map(item => item.kind === 'workout' ? workoutTypeLabel(item.workout) : item.sport.name)
+    .join(' · ');
 }
 
 /**
- * Agrupa l'activitat d'un dia en sessions, mantenint l'ordre d'abans: una
- * sessió es col·loca on hi ha la primera de les seves activitats, i les que
- * no comparteixen grup surten soltes, exactament com sempre.
+ * Agrupa l'activitat d'un dia en sessions, per ordre cronològic.
+ *
+ * Un dia es llegeix com es va viure: el que s'ha fet abans surt abans, i les
+ * activitats d'una mateixa sessió també queden ordenades entre elles. El que
+ * encara està planificat va al davant de tot —no ha passat, no té hora amb
+ * què ordenar-se— i baixa al seu lloc l'endemà de fer-se, perquè llavors ja
+ * en té una (`activityTime`).
  */
 export function groupDayFeed(
   workouts: Workout[],
   sports: { sport: Sport; session: SportSession }[],
 ): SessionGroup[] {
+  const items: ActivityItem[] = [
+    ...workouts.map((workout): ActivityItem => ({ kind: 'workout', workout })),
+    ...sports.map(({ sport, session }): ActivityItem => ({ kind: 'sport', sport, session })),
+  ];
+
   const byKey  = new Map<string, SessionGroup>();
   const groups: SessionGroup[] = [];
 
-  const groupFor = (a: GroupableActivity): SessionGroup => {
-    const key = sessionKey(a);
+  for (const item of items) {
+    const key      = sessionKey(activityOf(item));
     const existing = byKey.get(key);
-    if (existing) return existing;
-    const created: SessionGroup = { key, grouped: false, workouts: [], sports: [] };
+    if (existing) { existing.items.push(item); continue; }
+
+    const created: SessionGroup = { key, grouped: false, items: [item] };
     byKey.set(key, created);
     groups.push(created);
-    return created;
-  };
+  }
 
-  for (const w of workouts) groupFor(w).workouts.push(w);
-  for (const s of sports)   groupFor(s.session).sports.push(s);
+  for (const g of groups) {
+    g.items.sort(byWhenItHappened);
+    g.grouped = g.items.length > 1;
+  }
 
-  for (const g of groups) g.grouped = g.workouts.length + g.sports.length > 1;
-  return groups;
+  // Els plans primer; la resta, de la sessió més matinera a la més tardana.
+  return groups.sort((a, b) =>
+    Number(!groupIsPlanned(a)) - Number(!groupIsPlanned(b))
+    || groupTime(a) - groupTime(b)
+  );
+}
+
+/** L'ordre de dins d'una sessió, i el de les sessions entre elles: el que ha
+ *  passat abans va abans, i el que encara no ha passat, al davant. */
+function byWhenItHappened(a: ActivityItem, b: ActivityItem): number {
+  return Number(!isPlannedItem(a)) - Number(!isPlannedItem(b))
+    || activityTime(a) - activityTime(b);
+}
+
+/** Una sessió és un pla mentre no se n'hagi fet res. */
+function groupIsPlanned(group: SessionGroup): boolean {
+  return group.items.every(isPlannedItem);
+}
+
+/** L'hora d'una sessió és la de la primera activitat que se'n va fer. */
+function groupTime(group: SessionGroup): number {
+  return Math.min(...group.items.map(activityTime));
 }
 
 // ── La veu ───────────────────────────────────────────────────────────────────
@@ -146,8 +187,8 @@ export function groupDayFeed(
  * justament el cas que fa existir els grups.
  */
 export function sessionMascot(...groups: SessionGroup[]): Mascot {
-  const gym   = groups.some(g => g.workouts.length > 0);
-  const sport = groups.some(g => g.sports.length > 0);
+  const gym   = groups.some(g => g.items.some(i => i.kind === 'workout'));
+  const sport = groups.some(g => g.items.some(i => i.kind === 'sport'));
   if (gym && sport) return 'both';
   return sport ? 'xoco' : 'marley';
 }
@@ -173,9 +214,17 @@ export function unifiedLine(...groups: SessionGroup[]): MascotLine {
   return { mascot, message };
 }
 
-/** I el que es diu quan una activitat en torna a sortir. */
-export function detachedLine(item: ActivityItem): MascotLine {
-  return item.kind === 'workout'
-    ? { mascot: 'marley', message: 'Cadascú pel seu compte.' }
-    : { mascot: 'xoco',   message: 'Aquesta ja va sola!' };
+/**
+ * I el que es diu quan una sessió unida es torna a partir.
+ *
+ * Separar és una sola acció —la sessió es desfà sencera—, o sigui que qui ho
+ * diu surt del que hi havia dins: tots dos gossos quan l'anada barrejava
+ * gimnàs i esport.
+ */
+export function splitLine(group: SessionGroup): MascotLine {
+  const mascot = sessionMascot(group);
+  const message = mascot === 'marley' ? 'Cadascú pel seu compte.'
+                : mascot === 'xoco'   ? 'Aquesta ja va sola!'
+                :                       'Cada activitat, la seva sessió.';
+  return { mascot, message };
 }

@@ -40,18 +40,6 @@ describe('SessionGroupService', () => {
     service = TestBed.inject(SessionGroupService);
   });
 
-  describe('ensureGroupId()', () => {
-    it('reaprofita el grup que l\'activitat ja tenia', async () => {
-      expect(await service.ensureGroupId(workout('w1', 'g1'))).toBe('g1');
-      expect(setWorkoutGroup).not.toHaveBeenCalled();
-    });
-
-    it('sense grup, en crea un i l\'hi escriu', async () => {
-      const id = await service.ensureGroupId(workout('w1'));
-      expect(setWorkoutGroup).toHaveBeenCalledWith('w1', id);
-    });
-  });
-
   describe('merge()', () => {
     it('dues activitats soltes passen a ser una sola sessió', async () => {
       const id = await service.merge([workout('w1')], [sport('s1')]);
@@ -97,6 +85,22 @@ describe('SessionGroupService', () => {
   describe('detach()', () => {
     it('treu l\'activitat del grup', async () => {
       await service.detach(sport('s1', 'g1'));
+      expect(setSportGroup).toHaveBeenCalledWith('s1', '2025-04-21', null);
+    });
+  });
+
+  describe('split()', () => {
+    it('desfà la sessió sencera: cada activitat torna a anar sola', async () => {
+      await service.split([workout('w1', 'g1'), sport('s1', 'g1')]);
+
+      expect(setWorkoutGroup).toHaveBeenCalledWith('w1', undefined);
+      expect(setSportGroup).toHaveBeenCalledWith('s1', '2025-04-21', null);
+    });
+
+    it('el que ja anava sol no s\'escriu', async () => {
+      await service.split([workout('w1'), sport('s1', 'g1')]);
+
+      expect(setWorkoutGroup).not.toHaveBeenCalled();
       expect(setSportGroup).toHaveBeenCalledWith('s1', '2025-04-21', null);
     });
   });

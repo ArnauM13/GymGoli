@@ -55,6 +55,9 @@ interface FeedRow {
   feeling:         number | null;
   notes:           string | null;
   created_at:      string;
+  /** Quan l'activitat es va fer, si no és quan es va crear la fila (un pla
+   *  apuntat un dia i fet un altre). És el que ordena el dia. */
+  started_at:      string | null;
   updated_at:      string | null;
   category:        string | null;
   categories:      string[] | null;
@@ -81,6 +84,7 @@ function toSummary(r: FeedRow): Workout {
     notes:         r.notes ?? undefined,
     feeling:       (r.feeling as FeelingLevel | null) ?? undefined,
     createdAt:     new Date(r.created_at),
+    startedAt:     r.started_at ? new Date(r.started_at) : undefined,
     updatedAt:     r.updated_at ? new Date(r.updated_at) : undefined,
     status:        (r.item_status as WorkoutStatus | null) ?? 'done',
     plannedSource: (r.planned_source as PlannedSource | null) ?? undefined,
@@ -107,6 +111,7 @@ function toSession(r: FeedRow): SportSession {
     plannedSource: (r.planned_source as PlannedSource | null) ?? undefined,
     sessionGroupId: r.session_group_id ?? undefined,
     createdAt:     new Date(r.created_at),
+    startedAt:     r.started_at ? new Date(r.started_at) : undefined,
   };
 }
 

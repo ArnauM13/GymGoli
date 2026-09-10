@@ -48,6 +48,10 @@ export interface SportSession {
    *  vol dir que la sessió d'esport és una sessió ella sola. */
   sessionGroupId?: string;
   createdAt: Date;
+  /** Quan la sessió es va fer de debò, si no és quan es va crear la fila —un
+   *  pàdel apuntat per dijous i jugat dijous. Vegeu `Workout.startedAt`: és
+   *  el que ordena el dia. */
+  startedAt?: Date;
 }
 
 /** Selectable Material Symbol icons for sports. */
