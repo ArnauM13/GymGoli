@@ -430,6 +430,35 @@ Regles que la fan llegible:
   sobre l'historial **sencer** (`loadAllSessions`) i no surt fins que hi és
   tot: una fita comptada a mitges enganya més que no dir-ne res.
 
+### 4b. Sessió amb més d'una activitat (`.sg--grouped`)
+
+Al gimnàs i, en acabar, vint minuts de cinta: dues activitats i **una sola
+anada**. Es llegeixen com una sense deixar de ser dues.
+
+```
+┌ 🏋 🏃  Empenta · Córrer              2 activitats ┐   ← capçalera
+│  ┌──────────────────────────────────────────────┐ │
+│  │ [barra] Empenta          6 exerc · 21 sèr    │ │   ← la targeta de sempre
+│  └──────────────────────────────────────────────┘ │
+│  ┌──────────────────────────────────────────────┐ │
+│  │ [barra] Córrer           20 min              │ │
+│  └──────────────────────────────────────────────┘ │
+└───────────────────────────────────────────────────┘
+```
+
+- **La caixa és tot el que canvia.** Vora d'1,5px, radi 16px, fons un pèl
+  tenyit (`color-mix(in srgb, var(--c-text) 3%, var(--c-card))`) i 8px de
+  padding. Les targetes de dins són exactament les mateixes: mateixa barra de
+  5px, mateix desplegable, mateixa pàgina en obrir-les.
+- **Una sessió d'una sola activitat no té caixa.** Es pinta com s'ha pintat
+  sempre — és el cas de tot l'historial anterior i del dia a dia normal.
+- **La capçalera identifica, no repeteix**: les icones de les activitats amb el
+  seu color, els noms separats per `·`, i a la dreta quantes n'hi ha. Cap
+  xifra: les xifres són de cada activitat.
+- **Ajuntar i separar viuen al desplegable**, com a accions de segon terme
+  (`.ac-side-btn`, sense el color de l'activitat): «Afegeix-hi» porta a
+  registrar l'activitat que hi entrarà, «Separa» la'n treu. El botó que espera
+  l'usuari —obrir l'activitat— es queda l'últim i amb el color.
 
 ---
 

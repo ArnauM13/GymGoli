@@ -473,7 +473,7 @@ describe('TrainComponent', () => {
       component.selectType('push');
       await component.pickerStartEmpty();
 
-      expect(workoutService.createWorkoutForDate).toHaveBeenCalledWith(TODAY, 'push');
+      expect(workoutService.createWorkoutForDate).toHaveBeenCalledWith(TODAY, 'push', undefined);
       expect(workoutService.createPlannedWorkout).not.toHaveBeenCalled();
     });
   });
@@ -537,7 +537,7 @@ describe('TrainComponent', () => {
       await component.startSportSession(sport);
 
       expect(sportService['logSession']).toHaveBeenCalledWith(
-        TODAY, 's1', jasmine.objectContaining({ duration: 60 }), 'done', undefined);
+        TODAY, 's1', jasmine.objectContaining({ duration: 60 }), 'done', undefined, undefined);
       expect(navigateSpy).toHaveBeenCalledWith(['/sport', 'new-sess'], { queryParams: { nova: 1 } });
     });
 
@@ -546,7 +546,7 @@ describe('TrainComponent', () => {
       await component.startSportSession(sport);
 
       expect(sportService['logSession']).toHaveBeenCalledWith(
-        '2999-01-01', 's1', jasmine.any(Object), 'planned', 'manual');
+        '2999-01-01', 's1', jasmine.any(Object), 'planned', 'manual', undefined);
     });
 
     it("no en crea una altra si el dia ja en té: hi va", async () => {

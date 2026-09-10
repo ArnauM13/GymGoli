@@ -125,6 +125,19 @@ export interface Workout {
   status?: WorkoutStatus;
   plannedSource?: PlannedSource;
   /**
+   * Les activitats que comparteixen aquest id són **la mateixa sessió**: una
+   * anada al gimnàs que acaba amb vint minuts de cinta són dues activitats i
+   * una sola sortida de casa.
+   *
+   * Absent vol dir el que volia dir abans que això existís — l'activitat és
+   * una sessió ella sola —, i per això tot l'historial anterior es continua
+   * llegint i comptant igual.
+   *
+   * Un grup no surt mai d'un dia: el magatzem està partit per mes i el feed es
+   * demana per trams. Vegeu `shared/utils/session-group.utils`.
+   */
+  sessionGroupId?: string;
+  /**
    * Fals quan la sessió s'ha demanat en mode targeta: hi ha el dia, el tipus,
    * la sensació i la nota, però `entries` encara és buit perquè les sèries no
    * s'han baixat. Es demanen en obrir-la (`ensureWorkoutEntries`).

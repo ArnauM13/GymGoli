@@ -368,6 +368,49 @@ el servidor l'havia arribat a veure, deixa una **làpida**
 
 ---
 
+## 5b. Sessions agrupades: una anada, diverses activitats
+
+Al gimnàs i, en acabar, vint minuts de cinta són **dues activitats i una
+sola anada**. Gimnàs al matí i futbol a la tarda també són dues activitats,
+però són dues sortides de casa. El que ho distingeix és una etiqueta:
+`session_group_id`, un uuid opcional a `workouts` i a `sport_sessions`
+(migració 034). Les activitats que en comparteixen un són la mateixa sessió.
+
+**No hi ha cap taula de sessions, i és a posta.** És una columna escalar més
+d'una fila que ja se sincronitza:
+
+- puja pel camí de sempre (`rev` / `syncedRev`), sense cap objecte nou a la
+  cua;
+- en un conflicte, `mergeWorkouts()` la resol com la resta de camps que no són
+  exercicis: mana la versió modificada més tard;
+- no hi ha cap fila mestra que pugui quedar òrfena ni cap esborrat en cascada:
+  si al grup hi queda una sola activitat, el grup ja no vol dir res i tot es
+  llegeix i es compta com si no hi fos.
+
+Les invariants:
+
+1. **Absent vol dir el que volia dir abans que existís**: l'activitat és una
+   sessió ella sola. Per això tot l'historial anterior continua comptant igual
+   i la migració no reescriu ni una fila.
+2. **Un grup viu dins d'un sol dia.** El magatzem està partit per mes i
+   l'activitat es demana per trams; un grup a cavall de dos dies els trencaria
+   tots dos. Qui agrupa només ajunta activitats del mateix dia.
+3. **Comptar sessions és comptar claus**, no files: `countSessions()`
+   (`shared/utils/session-group.utils.ts`) compta els grups diferents més les
+   activitats que no en tenen.
+4. **Els objectius per tipus continuen comptant activitats.** «3 de gimnàs» no
+   puja ni baixa perquè la cinta de després hi vagi enganxada; el que compta
+   anades és el que es llegeix com a sessions (l'objectiu combinat, la càrrega
+   dels últims 7 dies).
+
+El grup viatja al feed (`activity_feed` el torna com una columna més), i per
+això una sessió agrupada es pinta sencera sense baixar-se cap sèrie.
+
+Els tests: `session-group.utils.spec.ts`, el bloc «sessions agrupades» de
+`workout-store.service.spec.ts` i el de `day-feed-cards.component.spec.ts`.
+
+---
+
 ## 6. Quant es guarda al dispositiu
 
 El local **no** és una còpia de tot l'historial. Es guarden els mesos de la
@@ -490,6 +533,7 @@ sobre `navigator.locks` perquè només una hi vagi.
 - Una resposta incompleta no és prova que res s'hagi esborrat.
 - Un esborrat sense cobertura ha de deixar làpida.
 - Cap sessió sense sèries pot entrar al magatzem.
+- Una activitat sense grup és una sessió ella sola, i un grup no surt del dia.
 - Cap consulta sencera es pot llançar dues vegades alhora.
 - Els tests que ho subjecten són `workout-store.service.spec.ts`,
   `sync.service.spec.ts`, `supabase-page.util.spec.ts` i els blocs

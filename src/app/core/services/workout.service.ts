@@ -835,7 +835,10 @@ export class WorkoutService {
   }
 
   // ── Create ───────────────────────────────────────────────────────────────
-  async createWorkoutForDate(date: string, category?: string): Promise<string> {
+  /** `sessionGroupId` fa néixer l'entrenament dins d'una sessió que ja hi és
+   *  —la cinta que s'afegeix a l'anada al gimnàs—; sense ell, l'entrenament és
+   *  una sessió ell sol, com sempre. Vegeu `shared/utils/session-group.utils`. */
+  async createWorkoutForDate(date: string, category?: string, sessionGroupId?: string): Promise<string> {
     const id         = crypto.randomUUID();
     const newWorkout: Workout = {
       id, date,
@@ -844,6 +847,7 @@ export class WorkoutService {
       category,
       createdAt:  new Date(),
       status:     'done',
+      sessionGroupId,
     };
     this.store.put(newWorkout);
     this.syncService.notifyPending(true);
@@ -936,17 +940,33 @@ export class WorkoutService {
     return id;
   }
 
-  async createWorkoutFromTemplate(date: string, category: string, templateEntries: WorkoutEntry[]): Promise<string> {
+  async createWorkoutFromTemplate(
+    date: string, category: string, templateEntries: WorkoutEntry[], sessionGroupId?: string,
+  ): Promise<string> {
     const entries: WorkoutEntry[] = templateEntries.map(e => ({
       exerciseId: e.exerciseId,
       exerciseName: e.exerciseName,
       sets: [],
     }));
-    const id = await this.createWorkoutForDate(date, category);
+    const id = await this.createWorkoutForDate(date, category, sessionGroupId);
     if (entries.length > 0) {
       await this._updateWorkout(id, { entries });
     }
     return id;
+  }
+
+  // ── Sessions agrupades ────────────────────────────────────────────────────
+  /**
+   * Posa l'entrenament dins d'una sessió, o el treu del grup amb `undefined`.
+   *
+   * És un camp escalar més: puja pel camí de sempre i, en un conflicte entre
+   * dispositius, `mergeWorkouts()` es queda el del costat modificat més tard.
+   * No hi ha cap fila de grup a crear ni a esborrar.
+   */
+  async setSessionGroup(workoutId: string, sessionGroupId: string | undefined): Promise<void> {
+    const workout = this._find(workoutId);
+    if (!workout || workout.sessionGroupId === sessionGroupId) return;
+    await this._updateWorkout(workoutId, { sessionGroupId });
   }
 
   // ── Mutations ─────────────────────────────────────────────────────────────

@@ -67,6 +67,7 @@ interface FeedRow {
   subtype_id:      string | null;
   duration:        number | null;
   metrics:         Record<string, string | number> | null;
+  session_group_id: string | null;
 }
 
 function toSummary(r: FeedRow): Workout {
@@ -83,6 +84,7 @@ function toSummary(r: FeedRow): Workout {
     updatedAt:     r.updated_at ? new Date(r.updated_at) : undefined,
     status:        (r.item_status as WorkoutStatus | null) ?? 'done',
     plannedSource: (r.planned_source as PlannedSource | null) ?? undefined,
+    sessionGroupId: r.session_group_id ?? undefined,
     exerciseNames: r.exercise_names ?? undefined,
     exerciseCount: r.exercise_count ?? 0,
     setCount:      r.set_count ?? 0,
@@ -103,6 +105,7 @@ function toSession(r: FeedRow): SportSession {
     notes:         r.notes ?? undefined,
     status:        (r.item_status as SportSession['status'] | null) ?? 'done',
     plannedSource: (r.planned_source as PlannedSource | null) ?? undefined,
+    sessionGroupId: r.session_group_id ?? undefined,
     createdAt:     new Date(r.created_at),
   };
 }
