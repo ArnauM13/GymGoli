@@ -37,6 +37,12 @@ export function activityOf(item: ActivityItem): GroupableActivity {
   return item.kind === 'workout' ? item.workout : item.session;
 }
 
+/** El dia de l'element. Un grup no surt mai d'un dia, o sigui que és el
+ *  primer que es mira abans d'ajuntar dues sessions. */
+export function dateOf(item: ActivityItem): string {
+  return item.kind === 'workout' ? item.workout.date : item.session.date;
+}
+
 /**
  * Les activitats d'una mateixa sessió, tal com es pinten: els entrenaments
  * primer i els esports després, com abans d'existir els grups.
@@ -72,6 +78,15 @@ export function countSessions(activities: GroupableActivity[]): number {
   const keys = new Set<string>();
   for (const a of activities) keys.add(sessionKey(a));
   return keys.size;
+}
+
+/** Les activitats d'una sessió com a elements, en el mateix ordre que es
+ *  pinten: és el que es passa a qui ajunta o separa. */
+export function itemsOf(group: SessionGroup): ActivityItem[] {
+  return [
+    ...group.workouts.map((workout): ActivityItem => ({ kind: 'workout', workout })),
+    ...group.sports.map(({ sport, session }): ActivityItem => ({ kind: 'sport', sport, session })),
+  ];
 }
 
 /**

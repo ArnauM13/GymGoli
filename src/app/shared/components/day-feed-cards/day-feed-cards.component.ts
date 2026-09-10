@@ -18,7 +18,7 @@ import {
   formatFeeling, isWorkoutPlanned, sportCardStats,
   workoutCardColor, workoutCardStats, workoutPrimaryColor, workoutPrimaryIcon, workoutTypeLabel,
 } from '../../utils/workout-card.utils';
-import { ActivityItem, SessionGroup, groupDayFeed } from '../../utils/session-group.utils';
+import { ActivityItem, SessionGroup, groupDayFeed, itemsOf } from '../../utils/session-group.utils';
 
 export interface DayFeedEntry {
   date: string;
@@ -90,6 +90,12 @@ export interface DayFeedEntry {
                     Separa
                   </button>
                 }
+                @if (canMerge(group)) {
+                  <button class="ac-side-btn" (click)="toggleMergePicker(group)">
+                    <span class="material-symbols-outlined" aria-hidden="true">merge</span>
+                    Uneix
+                  </button>
+                }
                 <button class="ac-side-btn" (click)="addToSession({ kind: 'workout', workout: w }, w.date)">
                   <span class="material-symbols-outlined" aria-hidden="true">add</span>
                   Afegeix a la sessió
@@ -140,6 +146,12 @@ export interface DayFeedEntry {
                   </button>
                 }
                 @if (!isSportPlanned(item)) {
+                  @if (canMerge(group)) {
+                    <button class="ac-side-btn" (click)="toggleMergePicker(group)">
+                      <span class="material-symbols-outlined" aria-hidden="true">merge</span>
+                      Uneix
+                    </button>
+                  }
                   <button class="ac-side-btn"
                           (click)="addToSession({ kind: 'sport', sport: item.sport, session: item.session }, item.session.date)">
                     <span class="material-symbols-outlined" aria-hidden="true">add</span>
@@ -153,6 +165,28 @@ export interface DayFeedEntry {
               </div>
             }
           </app-activity-card>
+        }
+
+        <!-- ── Uneix amb una altra sessió del dia ──
+             Les candidates són les altres sessions d'aquest mateix dia: tocar-ne
+             una les ajunta allà mateix, sense sortir de la llista ni obrir res. -->
+        @if (mergePickerKey() === group.key) {
+          <div class="sg-merge">
+            <span class="sg-merge-title">Uneix aquesta sessió amb…</span>
+            <div class="sg-merge-list">
+              @for (target of mergeTargets(group); track target.key) {
+                <button class="sg-merge-opt" (click)="mergeWith(group, target)">
+                  <span class="sg-icons" aria-hidden="true">
+                    @for (ic of groupIcons(target); track $index) {
+                      <span class="material-symbols-outlined sg-icon" [style.color]="ic.color">{{ ic.icon }}</span>
+                    }
+                  </span>
+                  {{ groupTitle(target) }}
+                </button>
+              }
+              <button class="sg-merge-cancel" (click)="mergePickerKey.set(null)">Cancel·la</button>
+            </div>
+          </div>
         }
 
       </div>
@@ -189,6 +223,24 @@ export interface DayFeedEntry {
       margin-left: auto; flex-shrink: 0;
       font-size: 11.5px; font-weight: 700; color: var(--c-text-3);
     }
+
+    /* ── Triar amb quina sessió s'ajunta ──
+       Xapes com les dels filtres: la llista és curta —les altres sessions del
+       dia— i s'ha de poder llegir de què està feta cadascuna abans de tocar. */
+    .sg-merge { padding: 2px 4px 4px; }
+    .sg-merge-title { display: block; font-size: 11.5px; font-weight: 700; color: var(--c-text-3); padding: 0 2px 6px; }
+    .sg-merge-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .sg-merge-opt, .sg-merge-cancel {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 6px 12px; border-radius: 20px;
+      border: 1.5px solid var(--c-border-2); background: var(--c-card);
+      font-size: 12px; font-weight: 600; color: var(--c-text-2);
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 15px; }
+    }
+    .sg-merge-opt:hover { border-color: var(--c-brand); color: var(--c-brand); }
+    .sg-merge-cancel { color: var(--c-text-3); border-style: dashed; }
+    .sg-merge-cancel:hover { color: var(--c-text-2); border-color: var(--c-text-3); }
 
     /* ── Botons d'un pla, al costat de la targeta ── */
     .ac-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding-right: 9px; }
@@ -278,6 +330,8 @@ export class DayFeedCardsComponent {
    *  canviar-hi res passa per la pàgina que la sap registrar. */
   readonly openSport = output<{ sport: Sport; session: SportSession }>();
 
+  /** La sessió que està triant amb quina s'ajunta, si n'hi ha cap. */
+  readonly mergePickerKey    = signal<string | null>(null);
   readonly expandedSportId   = signal<string | null>(null);
   readonly expandedWorkoutId = signal<string | null>(null);
 
@@ -333,6 +387,47 @@ export class DayFeedCardsComponent {
       this.addActivity.emit({ date, groupId });
     } catch {
       this.feedback.error('Error en obrir la sessió', 2500);
+    }
+  }
+
+  /**
+   * Les altres sessions del dia amb què es pot ajuntar aquesta.
+   *
+   * Tot el que es veu en aquesta llista ja és del mateix dia —la targeta pinta
+   * un dia i prou—, o sigui que aquí només en queden fora les planificades:
+   * un pla encara no és cap anada, i ajuntar-l'hi no voldria dir res.
+   */
+  mergeTargets(group: SessionGroup): SessionGroup[] {
+    return this.groups().filter(g => g.key !== group.key && !this.isPlannedGroup(g));
+  }
+
+  /** Ajuntar demana dues sessions: sense cap altra al dia, el botó no hi és. */
+  canMerge(group: SessionGroup): boolean {
+    return !this.isPlannedGroup(group) && this.mergeTargets(group).length > 0;
+  }
+
+  private isPlannedGroup(group: SessionGroup): boolean {
+    return group.workouts.some(w => this.isPlanned(w))
+        || group.sports.some(s => this.isSportPlanned(s));
+  }
+
+  toggleMergePicker(group: SessionGroup): void {
+    this.mergePickerKey.update(key => key === group.key ? null : group.key);
+  }
+
+  /**
+   * Ajunta aquesta sessió amb la que s'ha triat: totes dues passen a ser una
+   * sola anada. Cap activitat no canvia de contingut —les sèries, les
+   * mètriques i els rècords es queden on eren—, i «Separa» les torna a
+   * deixar soltes una per una.
+   */
+  async mergeWith(group: SessionGroup, target: SessionGroup): Promise<void> {
+    this.mergePickerKey.set(null);
+    try {
+      await this.sessionGroups.merge(itemsOf(group), itemsOf(target));
+      this.feedback.success('Sessions unides', 2000);
+    } catch {
+      this.feedback.error('Error en unir les sessions', 2500);
     }
   }
 

@@ -1,6 +1,6 @@
 import { Sport, SportSession } from '../../core/models/sport.model';
 import { Workout } from '../../core/models/workout.model';
-import { countSessions, groupDayFeed, sessionKey } from './session-group.utils';
+import { countSessions, dateOf, groupDayFeed, itemsOf, sessionKey } from './session-group.utils';
 
 function w(id: string, sessionGroupId?: string): Workout {
   return { id, date: '2025-04-21', entries: [], createdAt: new Date(), sessionGroupId };
@@ -76,6 +76,19 @@ describe('session-group.utils', () => {
 
     it('sense res, cap grup', () => {
       expect(groupDayFeed([], [])).toEqual([]);
+    });
+  });
+
+  describe('itemsOf()', () => {
+    it('torna les activitats de la sessió, entrenaments primer', () => {
+      const [group] = groupDayFeed([w('a', 'g1')], [s('b', 'g1')]);
+      expect(itemsOf(group).map(i => i.kind)).toEqual(['workout', 'sport']);
+      expect(itemsOf(group).map(dateOf)).toEqual(['2025-04-21', '2025-04-21']);
+    });
+
+    it('una activitat solta és una sessió d\'un element', () => {
+      const [group] = groupDayFeed([w('a')], []);
+      expect(itemsOf(group)).toEqual([{ kind: 'workout', workout: w('a') }]);
     });
   });
 });
