@@ -1,5 +1,6 @@
 import { Sport, SportSession } from '../../core/models/sport.model';
 import { Workout } from '../../core/models/workout.model';
+import { workoutPrimaryColor, workoutPrimaryIcon, workoutTypeLabel } from './workout-card.utils';
 
 /**
  * Una sessió és una **anada**, no una fila.
@@ -87,6 +88,24 @@ export function itemsOf(group: SessionGroup): ActivityItem[] {
     ...group.workouts.map((workout): ActivityItem => ({ kind: 'workout', workout })),
     ...group.sports.map(({ sport, session }): ActivityItem => ({ kind: 'sport', sport, session })),
   ];
+}
+
+/** Les icones de les activitats de la sessió, amb el seu color: és el que fa
+ *  reconèixer d'un cop d'ull de què està feta l'anada. */
+export function groupIcons(group: SessionGroup): { icon: string; color: string }[] {
+  return [
+    ...group.workouts.map(w => ({ icon: workoutPrimaryIcon(w), color: workoutPrimaryColor(w) })),
+    ...group.sports.map(s => ({ icon: s.sport.icon, color: s.sport.color })),
+  ];
+}
+
+/** «Empenta · Córrer»: els noms de les activitats, en el mateix ordre que les
+ *  icones i les targetes. */
+export function groupTitle(group: SessionGroup): string {
+  return [
+    ...group.workouts.map(w => workoutTypeLabel(w)),
+    ...group.sports.map(s => s.sport.name),
+  ].join(' · ');
 }
 
 /**

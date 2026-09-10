@@ -37,6 +37,10 @@ import { ExerciseSuggestionService } from '../../core/services/exercise-suggesti
 import { ExerciseSuggestion } from '../../shared/utils/exercise-suggestion.util';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { NavigationHistoryService } from '../../core/services/navigation-history.service';
+import { SessionGroupService } from '../../core/services/session-group.service';
+import {
+  SessionGroup, groupDayFeed, groupIcons, groupTitle, itemsOf,
+} from '../../shared/utils/session-group.utils';
 import { TodayService } from '../../core/services/today.service';
 import {
   ActivityStat,
@@ -338,6 +342,34 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
               <span class="material-symbols-outlined" aria-hidden="true">close</span>
             </button>
           </div>
+
+          <!-- El que ja s'ha fet aquest dia va primer: ajuntar dues activitats
+               apuntades és el cas de sempre —el gimnàs i la cinta ja hi són
+               tots dos—, i registrar-ne una de nova ve després. -->
+          @if (joinTargets().length) {
+            <div class="card-section">
+              <div class="section-header">
+                <span class="material-symbols-outlined section-icon">merge</span>
+                <h2 class="section-title">Unir amb</h2>
+              </div>
+              <p class="section-hint">Del mateix dia</p>
+              <div class="join-list">
+                @for (target of joinTargets(); track target.key) {
+                  <button class="join-btn" (click)="joinExisting(target)" [disabled]="joining()">
+                    <span class="join-icons" aria-hidden="true">
+                      @for (ic of groupIcons(target); track $index) {
+                        <span class="material-symbols-outlined join-icon" [style.color]="ic.color">{{ ic.icon }}</span>
+                      }
+                    </span>
+                    <span class="join-name">{{ groupTitle(target) }}</span>
+                    <span class="material-symbols-outlined join-go" aria-hidden="true">add_link</span>
+                  </button>
+                }
+              </div>
+            </div>
+
+            <p class="join-new">Nova activitat</p>
+          }
         }
 
         <!-- ── Trainer proposal card ── -->
@@ -1088,6 +1120,33 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       .material-symbols-outlined { font-size: 18px; }
       &:hover { color: var(--c-text-2); border-color: var(--c-text-3); }
     }
+
+    /* ── Unir amb una sessió que ja hi és ──
+       Una fila per sessió, amb les icones de què està feta: la llista és
+       curta —les altres sessions del dia— i s'ha de reconèixer d'un cop
+       d'ull quina és quina abans de tocar-la. */
+    .join-list { display: flex; flex-direction: column; gap: 8px; }
+    .join-btn {
+      display: flex; align-items: center; gap: 10px; width: 100%;
+      padding: 11px 12px; border-radius: 14px;
+      border: 1.5px solid var(--c-border-2); background: var(--c-card);
+      color: var(--c-text); font-size: 13.5px; font-weight: 700; text-align: left;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      &:hover:not(:disabled) { border-color: var(--c-brand); background: color-mix(in srgb, var(--c-brand) 6%, var(--c-card)); }
+      &:disabled { opacity: 0.5; cursor: default; }
+    }
+    .join-icons { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+    .join-icon  { font-size: 19px; }
+    .join-name  { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .join-go    { flex-shrink: 0; font-size: 19px; color: var(--c-brand); }
+
+    /* El títol que separa el que ja hi és del que es registra de nou. */
+    .join-new {
+      margin: 20px 16px -4px;
+      font-size: 12px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+      color: var(--c-text-3);
+    }
+
     .proposal-card {
       margin: 16px 16px 0;
       padding: 14px 14px 12px;
@@ -1163,6 +1222,7 @@ export class TrainComponent implements OnDestroy {
   readonly router          = inject(Router);
   private route            = inject(ActivatedRoute);
   private navHistory       = inject(NavigationHistoryService);
+  private sessionGroups    = inject(SessionGroupService);
   private dialog           = inject(MatDialog);
   private feedback         = inject(FeedbackService);
   private confirmDialog    = inject(ConfirmDialogService);
@@ -1988,6 +2048,60 @@ export class TrainComponent implements OnDestroy {
       return this.workoutService.createWorkoutFromTemplate(this.selectedDate(), cat, entries, group);
     }
     return this.workoutService.createWorkoutForDate(this.selectedDate(), cat, group);
+  }
+
+  /**
+   * Les altres sessions d'aquest dia: les candidates a unir-s'hi.
+   *
+   * Només les fetes —un pla encara no és cap anada— i sense la que s'està
+   * ampliant, que és la que l'usuari ve d'obrir.
+   */
+  readonly joinTargets = computed((): SessionGroup[] => {
+    const groupId = this.joinGroupId();
+    if (!groupId) return [];
+    return this._dayGroups().filter(g => g.key !== groupId);
+  });
+
+  private readonly _dayGroups = computed((): SessionGroup[] => groupDayFeed(
+    this.workoutService.getDoneWorkoutsForDate(this.selectedDate()),
+    this.sportService.getSportSessionsForDate(this.selectedDate()),
+  ));
+
+  readonly groupIcons = groupIcons;
+  readonly groupTitle = groupTitle;
+  readonly joining    = signal(false);
+
+  /**
+   * Uneix la sessió triada amb la que s'està ampliant: totes dues passen a
+   * ser una sola anada, sense registrar res de nou.
+   *
+   * Res del contingut no es toca —cada activitat es queda amb les seves
+   * sèries i les seves mètriques—; l'única cosa que canvia és de quina sessió
+   * són. Fet això, ja no hi ha res a afegir aquí: es torna d'on s'ha vingut.
+   */
+  async joinExisting(target: SessionGroup): Promise<void> {
+    const groupId = this.joinGroupId();
+    if (!groupId || this.joining()) return;
+
+    this.joining.set(true);
+    try {
+      const mine = this._dayGroups().find(g => g.key === groupId);
+      if (mine) {
+        await this.sessionGroups.merge(itemsOf(mine), itemsOf(target));
+      } else {
+        // El dia d'aquell grup encara no és carregat: el que hi entra és el
+        // que s'ha triat, i l'id de la sessió ja el portem de l'enllaç.
+        for (const item of itemsOf(target)) await this.sessionGroups.join(item, groupId);
+      }
+      this.feedback.success('Sessions unides', 2000);
+      this._joinGroupId.set(null);
+      this._joinGroupDate.set(null);
+      this.navHistory.goBack('/home');
+    } catch {
+      this.feedback.error('Error en unir', 2500);
+    } finally {
+      this.joining.set(false);
+    }
   }
 
   /** Deixa d'afegir a la sessió i es queda al dia, per si t'hi has ficat
