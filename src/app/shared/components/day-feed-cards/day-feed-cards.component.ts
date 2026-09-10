@@ -92,7 +92,7 @@ export interface DayFeedEntry {
                 }
                 <button class="ac-side-btn" (click)="addToSession({ kind: 'workout', workout: w }, w.date)">
                   <span class="material-symbols-outlined" aria-hidden="true">add</span>
-                  Afegeix-hi
+                  Afegeix a la sessió
                 </button>
                 <button class="ac-open-btn" (click)="open.emit(w.id)">
                   <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>
@@ -143,7 +143,7 @@ export interface DayFeedEntry {
                   <button class="ac-side-btn"
                           (click)="addToSession({ kind: 'sport', sport: item.sport, session: item.session }, item.session.date)">
                     <span class="material-symbols-outlined" aria-hidden="true">add</span>
-                    Afegeix-hi
+                    Afegeix a la sessió
                   </button>
                 }
                 <button class="ac-open-btn" (click)="openSport.emit(item)">

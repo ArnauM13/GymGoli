@@ -456,9 +456,10 @@ anada**. Es llegeixen com una sense deixar de ser dues.
   seu color, els noms separats per `·`, i a la dreta quantes n'hi ha. Cap
   xifra: les xifres són de cada activitat.
 - **Ajuntar i separar viuen al desplegable**, com a accions de segon terme
-  (`.ac-side-btn`, sense el color de l'activitat): «Afegeix-hi» porta a
-  registrar l'activitat que hi entrarà, «Separa» la'n treu. El botó que espera
-  l'usuari —obrir l'activitat— es queda l'últim i amb el color.
+  (`.ac-side-btn`, sense el color de l'activitat): «Afegeix a la sessió» porta
+  a registrar l'activitat que hi entrarà —el nom diu on va a parar, no només
+  que "hi" afegeix res—, «Separa» la'n treu. El botó que espera l'usuari
+  —obrir l'activitat— es queda l'últim i amb el color.
 
 ---
 
