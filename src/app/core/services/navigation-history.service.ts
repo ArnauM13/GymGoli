@@ -37,11 +37,15 @@ export class NavigationHistoryService {
   /** Navigates to the last visited place with a different route than the
    *  current one. Falls back to `fallback` when there's nowhere to go. */
   goBack(fallback = '/home'): void {
+    // `restoreScroll` avisa el `ScrollRestoreService`: anar enrere per aquí
+    // no és cap `popstate`, però per a qui ho fa és tornar, i tornar vol dir
+    // trobar-ho on ho havies deixat.
+    const extras = { state: { restoreScroll: true } };
     if (this.stack.length < 2) {
-      this.router.navigateByUrl(fallback);
+      this.router.navigateByUrl(fallback, extras);
       return;
     }
     this.stack.pop();
-    this.router.navigateByUrl(this.stack[this.stack.length - 1]);
+    this.router.navigateByUrl(this.stack[this.stack.length - 1], extras);
   }
 }
