@@ -14,7 +14,6 @@ describe('WeeklySummaryComponent', () => {
   let fixture: ComponentFixture<WeeklySummaryComponent>;
   let component: WeeklySummaryComponent;
   let mockSettings: ReturnType<typeof signal<UserSettings>>;
-  let mockHasGoal:  ReturnType<typeof signal<boolean>>;
   let mockLoaded:   ReturnType<typeof signal<boolean>>;
   /** Una activitat registrada: el dia, i el grup si comparteix sessió amb una
    *  altra («al gimnàs i, en acabar, vint minuts de cinta»). */
@@ -28,8 +27,9 @@ describe('WeeklySummaryComponent', () => {
     jasmine.clock().install();
     jasmine.clock().mockDate(new Date(MOCK_DATE + 'T12:00:00'));
 
-    mockSettings = signal<UserSettings>({ ...DEFAULT_USER_SETTINGS });
-    mockHasGoal  = signal(true);
+    mockSettings = signal<UserSettings>({
+      ...DEFAULT_USER_SETTINGS, goalMode: 'combined', weeklyActivityGoal: 3,
+    });
     mockLoaded   = signal(true);
     gymDays      = [];
     sportDays    = [];
@@ -40,10 +40,9 @@ describe('WeeklySummaryComponent', () => {
         {
           provide: UserSettingsService,
           useValue: {
-            settings:      mockSettings,
-            hasWeeklyGoal: mockHasGoal,
-            loaded:        mockLoaded,
-            fitnessGoal:   signal(null),
+            settings:    mockSettings,
+            loaded:      mockLoaded,
+            fitnessGoal: signal(null),
           },
         },
         {
@@ -79,7 +78,7 @@ describe('WeeklySummaryComponent', () => {
     });
 
     it('stays hidden without a weekly goal', () => {
-      mockHasGoal.set(false);
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, weeklyActivityGoal: null });
       expect(component.show()).toBeFalse();
     });
 
@@ -164,6 +163,60 @@ describe('WeeklySummaryComponent', () => {
     it('draws nothing when the combined goal is not set', () => {
       mockSettings.set({ ...DEFAULT_USER_SETTINGS, goalMode: 'combined', weeklyActivityGoal: null });
       expect(component.weekBars()).toEqual([]);
+    });
+  });
+
+  describe('l\'objectiu és de la setmana', () => {
+    /** Objectiu d'ara: 4. Fins al 20 d'abril, era 2. */
+    function raisedGoalThisWeek(): void {
+      mockSettings.set({
+        ...DEFAULT_USER_SETTINGS,
+        goalMode: 'combined', weeklyActivityGoal: 4,
+        goalHistory: [
+          { effectiveFrom: '1970-01-05', goalMode: 'combined', weeklyActivityGoal: 2, weeklyGymGoal: null, weeklySportGoal: null },
+          { effectiveFrom: '2025-04-21', goalMode: 'combined', weeklyActivityGoal: 4, weeklyGymGoal: null, weeklySportGoal: null },
+        ],
+      });
+    }
+
+    it('la setmana en curs porta l\'objectiu d\'ara', () => {
+      raisedGoalThisWeek();
+      gymDays = ['2025-04-21'];
+
+      expect(component.weekBars()[0].target).toBe(4);
+    });
+
+    it('una setmana tancada conserva el que es demanava llavors', () => {
+      raisedGoalThisWeek();
+      fixture.componentRef.setInput('weekDate', '2025-04-16'); // setmana anterior
+      gymDays = ['2025-04-15', '2025-04-16'];
+
+      const bars = component.weekBars();
+      expect(bars[0].target).toBe(2);
+      expect(bars[0].done).toBe(2);
+      expect(bars[0].pct).toBe(100);
+    });
+
+    it('una setmana d\'abans de tenir objectiu no ensenya barra', () => {
+      mockSettings.set({
+        ...DEFAULT_USER_SETTINGS,
+        goalMode: 'combined', weeklyActivityGoal: 3,
+        goalHistory: [
+          { effectiveFrom: '1970-01-05', goalMode: 'combined', weeklyActivityGoal: null, weeklyGymGoal: null, weeklySportGoal: null },
+          { effectiveFrom: '2025-04-21', goalMode: 'combined', weeklyActivityGoal: 3, weeklyGymGoal: null, weeklySportGoal: null },
+        ],
+      });
+      fixture.componentRef.setInput('weekDate', '2025-04-16');
+
+      expect(component.show()).toBeFalse();
+      expect(component.weekBars()).toEqual([]);
+    });
+
+    it('sense història, una setmana passada llegeix l\'objectiu d\'ara', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, goalMode: 'combined', weeklyActivityGoal: 3 });
+      fixture.componentRef.setInput('weekDate', '2025-04-16');
+
+      expect(component.weekBars()[0].target).toBe(3);
     });
   });
 

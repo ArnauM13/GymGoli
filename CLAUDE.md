@@ -53,5 +53,9 @@ tests que les subjecten són allà.
   `new Date().toISOString()` (that's the UTC day, so the app changes day
   hours late). For anything reactive to "today", read `TodayService.today()`
   — it ticks at the user's local midnight.
+- **L'objectiu setmanal és de cada setmana**: per a una setmana concreta es
+  resol amb `goalForWeek()` (`core/models/weekly-goal.model.ts`), mai llegint
+  `weeklyActivityGoal` i companyia, que són l'objectiu d'ara. Canviar-lo val
+  des de la setmana en curs; les tancades conserven el seu
 - Tests use `jasmine.clock().mockDate(...)` for date-dependent logic
 - Develop on a feature branch, never push to `main` directly without a PR

@@ -1,5 +1,6 @@
 import { Component, computed, effect, inject, input, linkedSignal, output, signal } from '@angular/core';
 import { CATEGORY_COLORS, ExerciseCategory } from '../../../core/models/exercise.model';
+import { goalForWeek } from '../../../core/models/weekly-goal.model';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { SportService } from '../../../core/services/sport.service';
@@ -525,10 +526,18 @@ export class InlineDatePickerComponent {
 
   // ── Weekly goal progress ──────────────────────────────────────────────────
 
-  readonly goalMode        = computed(() => this.settingsSvc.goalMode());
-  readonly weeklyGoal      = computed(() => this.settingsSvc.weeklyActivityGoal());
-  readonly weeklyGymGoal   = computed(() => this.settingsSvc.weeklyGymGoal());
-  readonly weeklySportGoal = computed(() => this.settingsSvc.weeklySportGoal());
+  /**
+   * L'objectiu de la setmana que s'està mirant, que no té per què ser el d'ara:
+   * una setmana tancada porta el que et proposaves llavors. Vegeu
+   * `core/models/weekly-goal.model.ts`.
+   */
+  private readonly weekGoal = computed(() =>
+    goalForWeek(this.settingsSvc.settings(), this.weekStart(), this.todayStr));
+
+  readonly goalMode        = computed(() => this.weekGoal().goalMode);
+  readonly weeklyGoal      = computed(() => this.weekGoal().weeklyActivityGoal);
+  readonly weeklyGymGoal   = computed(() => this.weekGoal().weeklyGymGoal);
+  readonly weeklySportGoal = computed(() => this.weekGoal().weeklySportGoal);
 
   readonly weeklyDone = computed(() =>
     this.weekDays().filter(d => !d.isFuture && (d.hasWorkout || d.hasSport)).length

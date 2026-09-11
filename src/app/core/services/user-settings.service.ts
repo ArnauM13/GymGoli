@@ -4,7 +4,11 @@ import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { onAppResume } from './app-resume.util';
 import { DEFAULT_USER_SETTINGS, DifficultyScale, FitnessGoal, ThemeMode, UserSettings } from '../models/user-settings.model';
+import {
+  GoalSnapshot, WeeklyGoal, currentGoal, goalForWeek, stampWeeklyGoal, touchesGoal,
+} from '../models/weekly-goal.model';
 import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../models/weekly-plan.model';
+import { todayStr } from '../../shared/utils/date.utils';
 
 /**
  * Els paràmetres de l'usuari, amb el mateix criteri que la resta de l'app:
@@ -22,6 +26,11 @@ import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../models/weekly-plan.model';
  * **I el que no ha pujat es recorda.** Un canvi fet sense cobertura es perdia
  * en silenci; ara espera a `gymgoli_settings_pending_<uid>` fins que arriba, i
  * mentrestant mana per damunt del que digui el servidor.
+ *
+ * **L'objectiu setmanal deixa rastre.** Tocar-lo no és canviar un número: és
+ * dir què et proposes **des d'aquesta setmana**. Per això cada canvi deixa una
+ * fita a `goalHistory` i les setmanes ja tancades conserven la seva — vegeu
+ * `models/weekly-goal.model.ts`.
  */
 @Injectable({ providedIn: 'root' })
 export class UserSettingsService {
@@ -45,12 +54,7 @@ export class UserSettingsService {
    *  independent of {@link metricsEnabled}: the weekly goal and the personalised
    *  insights are separate concepts — you can track a goal without insights, and
    *  insights merely lean on the goal (plus routines/history) when it exists. */
-  readonly hasWeeklyGoal       = computed(() => {
-    const s = this._settings();
-    return (s.goalMode ?? 'combined') === 'combined'
-      ? s.weeklyActivityGoal != null
-      : s.weeklyGymGoal != null || s.weeklySportGoal != null;
-  });
+  readonly hasWeeklyGoal       = computed(() => currentGoal(this._settings()).has);
   readonly themeMode           = computed(() => this._settings().themeMode ?? 'system' as ThemeMode);
   readonly darkMode            = computed(() => {
     const mode = this.themeMode();
@@ -79,6 +83,17 @@ export class UserSettingsService {
   readonly dismissedProposalDates      = computed(() => this._settings().dismissedProposalDates ?? []);
   readonly dismissedRoutinePlans       = computed(() => this._settings().dismissedRoutinePlans ?? []);
   readonly guidedTourDone              = computed(() => this._settings().guidedTourDone ?? false);
+  readonly goalHistory                 = computed((): GoalSnapshot[] => this._settings().goalHistory ?? []);
+  /** L'objectiu d'ara: el de la setmana en curs i les que vindran. */
+  readonly currentGoal                 = computed((): WeeklyGoal => currentGoal(this._settings()));
+
+  /**
+   * L'objectiu que manava la setmana d'una data. Les setmanes tancades van a
+   * buscar la fita que els toca; la d'ara i les futures porten el d'ara.
+   */
+  goalForWeek(date: string): WeeklyGoal {
+    return goalForWeek(this._settings(), date, todayStr());
+  }
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -177,12 +192,20 @@ export class UserSettingsService {
     if (!uid) return;
     if (!Object.keys(patch).length) return;
 
-    const next = { ...this._settings(), ...patch };
+    // Canviar l'objectiu és canviar-lo **des d'aquesta setmana**: es deixa
+    // fita al dilluns d'avui i les d'abans no es toquen, que és el que fa que
+    // una setmana tancada conservi l'objectiu que li tocava.
+    const prev  = this._settings();
+    const write = touchesGoal(patch)
+      ? { ...patch, goalHistory: stampWeeklyGoal(prev.goalHistory, prev, { ...prev, ...patch }, todayStr()) }
+      : patch;
+
+    const next = { ...prev, ...write };
     this._settings.set(next);
     this._writeLocalStorage(uid, next);
     // A la cua abans d'intentar res: si la pujada falla o l'usuari tanca
     // l'app ara mateix, el canvi continua constant com a pendent.
-    this._writePending(uid, { ...this._readPending(uid), ...patch });
+    this._writePending(uid, { ...this._readPending(uid), ...write });
 
     await this._pushPending(uid);
   }

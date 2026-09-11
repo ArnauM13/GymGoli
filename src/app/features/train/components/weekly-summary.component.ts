@@ -1,6 +1,7 @@
 import { Component, computed, inject, input } from '@angular/core';
 
 import { MASCOTS, Mascot, MascotMeta } from '../../../core/models/mascot.model';
+import { goalForWeek } from '../../../core/models/weekly-goal.model';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 import { WorkoutService } from '../../../core/services/workout.service';
 import { SportService } from '../../../core/services/sport.service';
@@ -98,9 +99,17 @@ export class WeeklySummaryComponent {
   /** The date whose week should be shown. Defaults to today. */
   readonly weekDate = input<string | null>(null);
 
+  /**
+   * L'objectiu **d'aquella setmana**, no el d'ara: una setmana tancada es
+   * llegeix contra el que et proposaves llavors, encara que després l'hagis
+   * apujat. Vegeu `core/models/weekly-goal.model.ts`.
+   */
+  private readonly _goal = computed(() =>
+    goalForWeek(this.settingsService.settings(), this.weekDate() ?? TODAY(), TODAY()));
+
   // The weekly-goal progress strip is tied to having a goal, not to the
   // personalised-insights toggle — the two are separate features.
-  readonly show = computed(() => this.settingsService.hasWeeklyGoal() && this.settingsService.loaded());
+  readonly show = computed(() => this._goal().has && this.settingsService.loaded());
 
   private readonly _weekDates = computed((): string[] => {
     const monday = mondayOf(this.weekDate() ?? TODAY());
@@ -108,7 +117,7 @@ export class WeeklySummaryComponent {
   });
 
   readonly weekBars = computed(() => {
-    const s        = this.settingsService.settings();
+    const goal     = this._goal();
     const days     = this._weekDates();
     const today    = TODAY();
     const doneDays = days.filter(d => d <= today);
@@ -118,8 +127,8 @@ export class WeeklySummaryComponent {
       pct: Math.min(100, Math.round(done / Math.max(1, target) * 100)),
     });
 
-    if (s.goalMode === 'combined' || !s.goalMode) {
-      const total = s.weeklyActivityGoal;
+    if (goal.goalMode === 'combined') {
+      const total = goal.weeklyActivityGoal;
       if (!total) return [];
       // Es compten sessions, no dies ni files: dues anades el mateix dia són
       // dues, però el gimnàs i la cinta de després en són una. És el mateix
@@ -142,8 +151,8 @@ export class WeeklySummaryComponent {
     // Els objectius per tipus continuen comptant activitats: si el teu
     // objectiu és «3 de gimnàs», els vint minuts de cinta no te'l fan pujar
     // ni te'l roben.
-    const gymGoal   = s.weeklyGymGoal;
-    const sportGoal = s.weeklySportGoal;
+    const gymGoal   = goal.weeklyGymGoal;
+    const sportGoal = goal.weeklySportGoal;
     const gymDone   = doneDays.reduce((acc, d) => acc + this.workoutService.getDoneWorkoutsForDate(d).length, 0);
     const spDone    = doneDays.reduce((acc, d) => acc + this.sportService.getSportSessionsForDate(d).length, 0);
     const bars = [];
