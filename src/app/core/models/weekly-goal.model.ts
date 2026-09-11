@@ -18,6 +18,12 @@ import type { GoalMode } from './user-settings.model';
  * l'objectiu d'ara —el que s'edita a Perfil, el que veu l'entrenador— i són
  * els que manen per a la setmana en curs i les futures. La història només
  * contesta pel passat.
+ *
+ * **Cap setmana demana que en triïs un de nou.** L'objectiu d'ara es manté
+ * setmana rere setmana fins que el canviïs: una setmana sense fita no és una
+ * setmana sense objectiu, és una setmana que porta el de sempre. Només es
+ * guarda fita quan el número canvia, que és l'únic moment en què el passat i
+ * el present deixen de ser el mateix.
  */
 
 /** Els quatre camps que formen un objectiu setmanal. */
@@ -104,8 +110,9 @@ export function currentGoal(s: GoalState): WeeklyGoal {
  * L'objectiu que manava la setmana d'una data.
  *
  * La setmana en curs i les futures porten el d'ara: mentre la setmana és
- * oberta, l'objectiu encara es pot ajustar. Les tancades van a buscar la fita
- * que els toca.
+ * oberta, l'objectiu encara es pot ajustar, i quan arribi la que ve es trobarà
+ * el mateix sense que ningú hagi hagut de tornar-lo a dir. Les tancades van a
+ * buscar la fita que els toca.
  *
  * Sense cap fita es contesta amb el d'ara, que és el que feia l'app abans
  * d'existir la història: qui no l'ha canviat mai no té cap passat diferent a

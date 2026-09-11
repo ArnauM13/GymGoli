@@ -90,8 +90,9 @@ function asSectionId(value: string | null): SectionId | null {
 
             <h3 class="subsection-title">Objectiu setmanal</h3>
             <p class="section-desc">
-              Val des d'aquesta setmana ({{ currentWeekLabel() }}) endavant. Les
-              que ja han passat es queden amb l'objectiu que tenien.
+              Es manté cada setmana fins que el canviïs. El canvi val des
+              d'aquesta setmana ({{ currentWeekLabel() }}); les que ja han
+              passat es queden amb el seu.
             </p>
 
               <!-- Mode selector -->

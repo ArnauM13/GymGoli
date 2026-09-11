@@ -69,6 +69,25 @@ describe('weekly-goal.model', () => {
       expect(goalForWeek(state, '2025-05-06', TODAY).total).toBe(4);
     });
 
+    it('la setmana que ve hereta el mateix objectiu sense tocar res', () => {
+      // Arriba el dilluns següent i ningú ha canviat res ni ha afegit cap
+      // fita: l'objectiu continua sent el mateix, no cal tornar-lo a dir.
+      const nextWeek = '2025-04-30';
+      expect(goalForWeek(state, nextWeek, nextWeek).total).toBe(4);
+      expect(goalForWeek(state, nextWeek, nextWeek).has).toBeTrue();
+    });
+
+    it('i el mes que ve, i el següent: es manté fins que el canviïs', () => {
+      expect(goalForWeek(state, '2025-07-16', '2025-07-16').total).toBe(4);
+    });
+
+    it('quan la setmana del canvi ja és passat, continua sent la seva', () => {
+      // La fita del 21 d'abril no serveix només per a aquella setmana: mana
+      // fins que n'arribi una altra.
+      expect(goalForWeek(state, MONDAY, '2025-06-04').total).toBe(4);
+      expect(goalForWeek(state, '2025-05-12', '2025-06-04').total).toBe(4);
+    });
+
     it('una setmana tancada conserva el que es demanava llavors', () => {
       expect(goalForWeek(state, '2025-04-16', TODAY).total).toBe(2);
     });

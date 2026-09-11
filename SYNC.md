@@ -556,6 +556,8 @@ març convertia el gener en un mes fallit, perquè les setmanes velles es
 mesuraven contra el que et proposes avui. Ara cada canvi deixa una fita a
 `goalHistory` amb el dilluns des del qual mana, i una setmana tancada
 conserva la seva — només s'escriu al dilluns d'aquesta setmana, mai enrere.
+Cap setmana no en demana un de nou: l'objectiu d'ara es manté fins que el
+canviïs, i una setmana sense fita és una setmana que porta el de sempre.
 Viu dins del mateix jsonb i no en una taula a part per la mateixa raó que la
 resta: així puja per la cua de pendents i un canvi fet sense cobertura no es
 perd. Les regles i els tests són a `core/models/weekly-goal.model.ts`.
