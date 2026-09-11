@@ -5,7 +5,10 @@ import { UserSettingsService } from './user-settings.service';
 import { SupabaseService } from './supabase.service';
 import { AuthService } from './auth.service';
 import { DEFAULT_USER_SETTINGS } from '../models/user-settings.model';
+import { GOAL_EPOCH } from '../models/weekly-goal.model';
 import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../models/weekly-plan.model';
+import { addDays, mondayOf } from '../../shared/utils/calendar-utils';
+import { todayStr } from '../../shared/utils/date.utils';
 
 interface SelectResult { data: { settings: Record<string, unknown> } | null; error: unknown | null; }
 
@@ -220,6 +223,76 @@ describe('UserSettingsService', () => {
       expect(payload.user_id).toBe('user-1');
       expect(payload.settings.weightUnit).toBe('lb');
       expect(localStorage.getItem(PENDING_KEY('user-1'))).toBeNull();
+    }));
+  });
+
+  describe('l\'objectiu setmanal', () => {
+    // Sense rellotge fals: `fakeAsync` ja mana sobre el temps i no deixa que
+    // el de jasmine hi digui res. Les setmanes es calculen des d'avui amb les
+    // mateixes utilitats que fa servir el servei, i qui comprova quin dilluns
+    // toca és `weekly-goal.model.spec.ts`, que no necessita rellotge.
+    const TODAY     = todayStr();
+    const MONDAY    = mondayOf(TODAY);
+    const LAST_WEEK = addDays(MONDAY, -3);
+
+    function login(): void {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+    }
+
+    it('deixa fita a aquesta setmana i guarda el que hi havia abans', fakeAsync(() => {
+      selectResult = { data: { settings: { weeklyActivityGoal: 3 } }, error: null };
+      login();
+
+      service.update({ weeklyActivityGoal: 4 });
+      tick();
+
+      expect(service.goalHistory()).toEqual([
+        jasmine.objectContaining({ effectiveFrom: GOAL_EPOCH, weeklyActivityGoal: 3 }),
+        jasmine.objectContaining({ effectiveFrom: MONDAY,    weeklyActivityGoal: 4 }),
+      ]);
+    }));
+
+    it('la setmana passada conserva el seu objectiu, la d\'ara porta el nou', fakeAsync(() => {
+      selectResult = { data: { settings: { weeklyActivityGoal: 3 } }, error: null };
+      login();
+
+      service.update({ weeklyActivityGoal: 4 });
+      tick();
+
+      expect(service.goalForWeek(LAST_WEEK).total).toBe(3);
+      expect(service.goalForWeek(TODAY).total).toBe(4);
+      expect(service.currentGoal().total).toBe(4);
+    }));
+
+    it('puja la història amb el canvi: el servidor n\'ha de saber', fakeAsync(() => {
+      login();
+      service.update({ weeklyActivityGoal: 4 });
+      tick();
+
+      const patch = rpcSpy.calls.mostRecent().args[1].p_patch;
+      expect(patch.weeklyActivityGoal).toBe(4);
+      expect(patch.goalHistory.length).toBe(2);
+    }));
+
+    it('un canvi que no és d\'objectiu no toca la història', fakeAsync(() => {
+      login();
+      service.update({ weightUnit: 'lb' });
+      tick();
+
+      expect(service.goalHistory()).toEqual([]);
+      expect('goalHistory' in rpcSpy.calls.mostRecent().args[1].p_patch).toBeFalse();
+    }));
+
+    it('canviar de mode també deixa fita', fakeAsync(() => {
+      login();
+      service.update({ goalMode: 'separate', weeklyGymGoal: 2 });
+      tick();
+
+      expect(service.goalHistory()[1]).toEqual(jasmine.objectContaining({
+        effectiveFrom: MONDAY, goalMode: 'separate', weeklyGymGoal: 2,
+      }));
     }));
   });
 

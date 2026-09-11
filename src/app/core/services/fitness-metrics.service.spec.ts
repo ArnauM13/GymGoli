@@ -1053,4 +1053,76 @@ describe('FitnessMetricsService', () => {
       expect(service.goalStreak()).toBe(3);
     });
   });
+
+  // Una setmana es mesura contra l'objectiu que tenia llavors: apujar-lo avui
+  // no converteix el mes passat en un mes fallit, ni al revés.
+  describe('cada setmana amb el seu objectiu', () => {
+    /** Objectiu de `now` des d'aquesta setmana; abans era `was`. */
+    function raisedThisWeek(was: number, now: number): void {
+      mockSettings.set({
+        ...DEFAULT_USER_SETTINGS,
+        goalMode: 'combined', weeklyActivityGoal: now,
+        goalHistory: [
+          { effectiveFrom: '1970-01-05', goalMode: 'combined', weeklyActivityGoal: was, weeklyGymGoal: null, weeklySportGoal: null },
+          { effectiveFrom: monday(0),    goalMode: 'combined', weeklyActivityGoal: now, weeklyGymGoal: null, weeklySportGoal: null },
+        ],
+      });
+    }
+
+    it('les setmanes que van complir el seu objectiu continuen comptant', () => {
+      raisedThisWeek(2, 4);
+      // 2 activitats per setmana: l'objectiu d'abans es complia; el d'ara, no.
+      mockWorkouts.set(spread(1, 5, 2).map(dd => makeWorkout(dd)));
+      mockToday.set(THURSDAY);
+
+      expect(service.goalStreak()).toBe(0);          // la d'ara es queda curta
+      expect(find('ratxa_en_joc')).toBeDefined();    // però la ratxa d'abans hi és
+      expect(find('ratxa_en_joc')!.title).toBe('5 setmanes seguides');
+    });
+
+    it('sense la història, el canvi d\'avui reescrivia el passat', () => {
+      mockSettings.set({ ...DEFAULT_USER_SETTINGS, goalMode: 'combined', weeklyActivityGoal: 4 });
+      mockWorkouts.set(spread(1, 5, 2).map(dd => makeWorkout(dd)));
+      mockToday.set(THURSDAY);
+
+      expect(find('ratxa_en_joc')).toBeUndefined();
+    });
+
+    it('baixar l\'objectiu no regala setmanes velles', () => {
+      // Abans en demanava 4 i no arribava; ara en demana 2.
+      mockSettings.set({
+        ...DEFAULT_USER_SETTINGS,
+        goalMode: 'combined', weeklyActivityGoal: 2,
+        goalHistory: [
+          { effectiveFrom: '1970-01-05', goalMode: 'combined', weeklyActivityGoal: 4, weeklyGymGoal: null, weeklySportGoal: null },
+          { effectiveFrom: monday(0),    goalMode: 'combined', weeklyActivityGoal: 2, weeklyGymGoal: null, weeklySportGoal: null },
+        ],
+      });
+      mockWorkouts.set(spread(0, 5, 2).map(dd => makeWorkout(dd)));
+
+      // Només la setmana en curs, que és l'única que demanava 2.
+      expect(service.goalStreak()).toBe(1);
+    });
+
+    it('el gràfic no dibuixa la ratlla quan l\'objectiu ha canviat pel mig', () => {
+      // Fa quatre setmanes en demanava 2; des de llavors, 4.
+      mockSettings.set({
+        ...DEFAULT_USER_SETTINGS,
+        goalMode: 'combined', weeklyActivityGoal: 4,
+        goalHistory: [
+          { effectiveFrom: '1970-01-05', goalMode: 'combined', weeklyActivityGoal: 2, weeklyGymGoal: null, weeklySportGoal: null },
+          { effectiveFrom: monday(4),    goalMode: 'combined', weeklyActivityGoal: 4, weeklyGymGoal: null, weeklySportGoal: null },
+        ],
+      });
+      const days: string[] = [];
+      for (let w = 1; w <= 13; w++) days.push(...weekDates(w, 2));
+      mockWorkouts.set(days.map(dd => makeWorkout(dd)));
+
+      const detail = find('compliment_objectiu')?.detail;
+      expect(detail).toBeDefined();
+      // Les 12 setmanes del gràfic no demanaven totes el mateix: una sola
+      // ratlla en deixaria unes quantes injustament curtes.
+      expect(detail!.chart!.reference).toBeUndefined();
+    });
+  });
 });

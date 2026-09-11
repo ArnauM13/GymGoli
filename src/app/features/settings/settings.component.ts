@@ -11,6 +11,7 @@ import { TrainingTypeService } from '../../core/services/training-type.service';
 import { SportService } from '../../core/services/sport.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { WorkoutService } from '../../core/services/workout.service';
+import { TodayService } from '../../core/services/today.service';
 import { OnboardingTourService } from '../../core/services/onboarding-tour.service';
 import { TrainerService } from '../../core/services/trainer.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
@@ -21,6 +22,7 @@ import {
   FITNESS_GOAL_EMOJIS, FITNESS_GOAL_LABELS, CATALOG_VERSION,
 } from '../../core/models/user-settings.model';
 import { todayStr } from '../../shared/utils/date.utils';
+import { mondayOf, weekRangeLabel } from '../../shared/utils/calendar-utils';
 
 /**
  * Les seccions plegables del Perfil. L'ordre de la llista és l'ordre a la
@@ -87,6 +89,11 @@ function asSectionId(value: string | null): SectionId | null {
             <div class="setting-divider"></div>
 
             <h3 class="subsection-title">Objectiu setmanal</h3>
+            <p class="section-desc">
+              Es manté cada setmana fins que el canviïs. El canvi val des
+              d'aquesta setmana ({{ currentWeekLabel() }}); les que ja han
+              passat es queden amb el seu.
+            </p>
 
               <!-- Mode selector -->
               <div class="mode-selector">
@@ -1092,6 +1099,7 @@ export class SettingsComponent {
   private sportService     = inject(SportService);
   private typeService      = inject(TrainingTypeService);
   private workoutService   = inject(WorkoutService);
+  private todayService     = inject(TodayService);
   private router           = inject(Router);
   private route            = inject(ActivatedRoute);
   private feedback         = inject(FeedbackService);
@@ -1302,6 +1310,13 @@ export class SettingsComponent {
   toggleMetrics(): void {
     this.settingsService.update({ metricsEnabled: !this.settingsService.metricsEnabled() });
   }
+
+  /**
+   * La setmana a la qual s'enganxa el que es toqui aquí. L'objectiu és d'una
+   * setmana, no de l'app: dir-ne quina evita que algú es pensi que està
+   * reescrivint el mes passat. Vegeu `core/models/weekly-goal.model.ts`.
+   */
+  readonly currentWeekLabel = computed(() => weekRangeLabel(mondayOf(this.todayService.today())));
 
   setGoalMode(mode: GoalMode): void {
     this.settingsService.update({ goalMode: mode });

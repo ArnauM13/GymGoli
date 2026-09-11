@@ -10,6 +10,8 @@ import { FitnessMetricsService } from '../../core/services/fitness-metrics.servi
 import { SportService } from '../../core/services/sport.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { TodayService } from '../../core/services/today.service';
+import { DEFAULT_USER_SETTINGS } from '../../core/models/user-settings.model';
+import { GoalSnapshot } from '../../core/models/weekly-goal.model';
 import { Workout } from '../../core/models/workout.model';
 import { SportSession } from '../../core/models/sport.model';
 
@@ -21,6 +23,9 @@ interface GoalConfig {
   weeklyActivityGoal?: number | null;
   weeklyGymGoal?: number | null;
   weeklySportGoal?: number | null;
+  /** Els objectius de setmanes passades, si la prova en necessita (l'objectiu
+   *  és de cada setmana: vegeu `core/models/weekly-goal.model.ts`). */
+  goalHistory?: GoalSnapshot[];
 }
 
 function gym(date: string, over: Partial<Workout> = {}): Workout {
@@ -63,16 +68,25 @@ describe('ProgressComponent', () => {
     };
 
     const goal = opts.goal ?? {};
+    const goalFields = {
+      goalMode:           goal.goalMode ?? 'combined' as const,
+      weeklyActivityGoal: goal.weeklyActivityGoal === undefined ? 3 : goal.weeklyActivityGoal,
+      weeklyGymGoal:      goal.weeklyGymGoal      === undefined ? 3 : goal.weeklyGymGoal,
+      weeklySportGoal:    goal.weeklySportGoal    === undefined ? 2 : goal.weeklySportGoal,
+    };
     const mockSettingsService = {
+      settings: signal({
+        ...DEFAULT_USER_SETTINGS, ...goalFields, goalHistory: goal.goalHistory ?? [],
+      }),
       weightUnit:         signal<'kg' | 'lb'>('kg'),
       darkMode:           signal(false),
       bodyweightKg:       signal(null),
-      goalMode:           signal(goal.goalMode ?? 'combined'),
       // `null` és un valor vàlid («sense objectiu»), així que només s'omple
       // el que no s'ha dit.
-      weeklyActivityGoal: signal(goal.weeklyActivityGoal === undefined ? 3 : goal.weeklyActivityGoal),
-      weeklyGymGoal:      signal(goal.weeklyGymGoal      === undefined ? 3 : goal.weeklyGymGoal),
-      weeklySportGoal:    signal(goal.weeklySportGoal    === undefined ? 2 : goal.weeklySportGoal),
+      goalMode:           signal(goalFields.goalMode),
+      weeklyActivityGoal: signal(goalFields.weeklyActivityGoal),
+      weeklyGymGoal:      signal(goalFields.weeklyGymGoal),
+      weeklySportGoal:    signal(goalFields.weeklySportGoal),
     };
 
     TestBed.configureTestingModule({
@@ -241,6 +255,46 @@ describe('ProgressComponent', () => {
       expect(combined.count).toBe(1);
       expect(combined.target).toBeNull();
       expect(combined.done).toBeFalse();
+    });
+  });
+
+  describe('chartGoal()', () => {
+    function snap(effectiveFrom: string, activity: number): GoalSnapshot {
+      return {
+        effectiveFrom, goalMode: 'combined',
+        weeklyActivityGoal: activity, weeklyGymGoal: null, weeklySportGoal: null,
+      };
+    }
+
+    it('dibuixa la ratlla quan totes les setmanes del mes demanaven el mateix', () => {
+      setup({ today: '2024-03-12', goal: { weeklyActivityGoal: 3 } });
+      expect(component.chartGoal()).toBe(3);
+    });
+
+    it('suma els dos objectius quan van per separat', () => {
+      setup({
+        today: '2024-03-12',
+        goal: { goalMode: 'separate', weeklyActivityGoal: null, weeklyGymGoal: 3, weeklySportGoal: 2 },
+      });
+      expect(component.chartGoal()).toBe(5);
+    });
+
+    it('no en dibuixa cap si l\'objectiu va canviar enmig del mes', () => {
+      // Fins al 10 de març en demanava 2; des de l'11, 4. Una sola ratlla
+      // deixaria les primeres setmanes injustament curtes.
+      setup({
+        today: '2024-03-12',
+        goal: {
+          weeklyActivityGoal: 4,
+          goalHistory: [snap('1970-01-05', 2), snap('2024-03-11', 4)],
+        },
+      });
+      expect(component.chartGoal()).toBeNull();
+    });
+
+    it('sense objectiu no hi ha ratlla', () => {
+      setup({ today: '2024-03-12', goal: { weeklyActivityGoal: null } });
+      expect(component.chartGoal()).toBeNull();
     });
   });
 

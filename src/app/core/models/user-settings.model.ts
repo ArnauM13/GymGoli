@@ -1,3 +1,4 @@
+import type { GoalSnapshot } from './weekly-goal.model';
 import { WeeklyPlan } from './weekly-plan.model';
 
 export type GoalMode = 'combined' | 'separate';
@@ -35,6 +36,14 @@ export interface UserSettings {
   weeklyGymGoal: number | null;
   weeklySportGoal: number | null;
   goalMode: GoalMode;
+  /**
+   * Els objectius de les setmanes passades, cadascun amb el dilluns des del
+   * qual manava. Els camps de dalt són l'objectiu d'ara —el de la setmana en
+   * curs i les següents—; aquí hi ha el que valia abans, perquè apujar-lo
+   * avui no reescrigui les setmanes que ja s'han viscut. Vegeu
+   * `weekly-goal.model.ts`.
+   */
+  goalHistory: GoalSnapshot[];
   themeMode: ThemeMode;
   weightUnit: WeightUnit;
   restTimerSeconds: number;
@@ -111,6 +120,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   weeklyGymGoal: null,
   weeklySportGoal: null,
   goalMode: 'combined',
+  goalHistory: [],
   themeMode: 'system',
   weightUnit: 'kg',
   restTimerSeconds: 90,

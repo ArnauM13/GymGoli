@@ -3,6 +3,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 
+import { goalForWeek } from '../../core/models/weekly-goal.model';
 import { ExerciseService } from '../../core/services/exercise.service';
 import { FitnessMetricsService } from '../../core/services/fitness-metrics.service';
 import { SportService } from '../../core/services/sport.service';
@@ -533,10 +534,23 @@ export class ProgressComponent {
    * La ratlla de referència del gràfic: l'objectiu d'una setmana, sigui com
    * sigui que se l'hagi marcat. Sense objectiu no hi ha ratlla — una línia
    * sense nom seria una decoració que l'usuari hauria d'endevinar.
+   *
+   * I si l'objectiu va canviar enmig del mes, tampoc: l'objectiu és de cada
+   * setmana (vegeu `core/models/weekly-goal.model.ts`), i una sola ratlla
+   * diria que unes setmanes es van quedar curtes quan van complir el seu.
    */
   readonly chartGoal = computed((): number | null => {
-    if (this.goalMode() === 'combined') return this.weeklyGoal();
-    const total = (this.weeklyGymGoal() ?? 0) + (this.weeklySportGoal() ?? 0);
+    const { from, to } = this.month();
+    const settings = this.settingsService.settings();
+    const today    = this.todayService.today();
+
+    const totals = new Set<number>();
+    for (let monday = mondayOf(from); monday <= mondayOf(to); monday = addDays(monday, 7)) {
+      const g = goalForWeek(settings, monday, today);
+      if (g.has) totals.add(g.total);
+    }
+    if (totals.size !== 1) return null;
+    const total = [...totals][0];
     return total > 0 ? total : null;
   });
 

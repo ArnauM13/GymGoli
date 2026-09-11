@@ -5,6 +5,7 @@ import { FitnessInsight, INSIGHT_LEVEL } from '../models/insight.model';
 import { Mascot } from '../models/mascot.model';
 import { pickVariant } from '../models/mascot.voice';
 import { Sport, SportSession } from '../models/sport.model';
+import { WeeklyGoal, currentGoal, goalForWeek } from '../models/weekly-goal.model';
 import { FEELING_LABEL, FeelingLevel, Workout, setMaxWeight } from '../models/workout.model';
 import { ExerciseService } from './exercise.service';
 import { SportService } from './sport.service';
@@ -81,35 +82,33 @@ interface WeekStat {
   gym:    number;
   sport:  number;
   total:  number;
+  /**
+   * L'objectiu que manava **aquella** setmana, no el d'ara: apujar-lo al març
+   * no converteix el gener en un mes fluix. Vegeu
+   * `models/weekly-goal.model.ts`.
+   */
+  goal:   WeeklyGoal;
 }
 
-/** Objectiu setmanal normalitzat, sigui quin sigui el mode. */
-interface GoalCfg {
-  mode:     'combined' | 'separate';
-  combined: number | null;
-  gym:      number | null;
-  sport:    number | null;
-  has:      boolean;
-  /** Activitats/setmana que representa l'objectiu, per comparar amb mitjanes. */
-  total:    number;
-}
-
-function goalMet(w: WeekStat, g: GoalCfg): boolean {
+function goalMet(w: WeekStat): boolean {
+  const g = w.goal;
   if (!g.has) return false;
-  if (g.mode === 'separate') {
-    return (g.gym === null || w.gym >= g.gym) && (g.sport === null || w.sport >= g.sport);
+  if (g.goalMode === 'separate') {
+    return (g.weeklyGymGoal   === null || w.gym   >= g.weeklyGymGoal)
+        && (g.weeklySportGoal === null || w.sport >= g.weeklySportGoal);
   }
-  return g.combined !== null && w.total >= g.combined;
+  return g.weeklyActivityGoal !== null && w.total >= g.weeklyActivityGoal;
 }
 
-/** Quantes activitats falten aquesta setmana per assolir l'objectiu. */
-function goalMissing(w: WeekStat, g: GoalCfg): number {
-  if (g.mode === 'separate') {
-    const gymMiss = g.gym   !== null ? Math.max(0, g.gym   - w.gym)   : 0;
-    const spMiss  = g.sport !== null ? Math.max(0, g.sport - w.sport) : 0;
+/** Quantes activitats falten aquesta setmana per assolir el seu objectiu. */
+function goalMissing(w: WeekStat): number {
+  const g = w.goal;
+  if (g.goalMode === 'separate') {
+    const gymMiss = g.weeklyGymGoal   !== null ? Math.max(0, g.weeklyGymGoal   - w.gym)   : 0;
+    const spMiss  = g.weeklySportGoal !== null ? Math.max(0, g.weeklySportGoal - w.sport) : 0;
     return gymMiss + spMiss;
   }
-  return g.combined !== null ? Math.max(0, g.combined - w.total) : 0;
+  return g.weeklyActivityGoal !== null ? Math.max(0, g.weeklyActivityGoal - w.total) : 0;
 }
 
 /**
@@ -117,14 +116,15 @@ function goalMissing(w: WeekStat, g: GoalCfg): number {
  * el període el posa la frase que l'envolta, que és qui sap si parla de la
  * setmana en curs o d'una altra.
  */
-function goalProgressStr(w: WeekStat, g: GoalCfg): string {
-  if (g.mode === 'separate') {
+function goalProgressStr(w: WeekStat): string {
+  const g = w.goal;
+  if (g.goalMode === 'separate') {
     const parts: string[] = [];
-    if (g.gym   !== null) parts.push(`gym ${w.gym}/${g.gym}`);
-    if (g.sport !== null) parts.push(`esport ${w.sport}/${g.sport}`);
+    if (g.weeklyGymGoal   !== null) parts.push(`gym ${w.gym}/${g.weeklyGymGoal}`);
+    if (g.weeklySportGoal !== null) parts.push(`esport ${w.sport}/${g.weeklySportGoal}`);
     return parts.join(' · ');
   }
-  return `${w.total}/${g.combined}`;
+  return `${w.total}/${g.weeklyActivityGoal}`;
 }
 
 /**
@@ -190,7 +190,7 @@ export class FitnessMetricsService {
     const workouts = this.workoutService.doneWorkouts();
     const sessions = this.sportService.sessions();
     const sports   = this.sportService.sports();
-    const goal     = this._goalCfg();
+    const goal     = this._currentGoal();
 
     const weeks = this._weekStats(today, workouts, sessions, 14);
 
@@ -215,15 +215,14 @@ export class FitnessMetricsService {
    * d'on surt tot el que se'n digui.
    */
   readonly goalStreak = computed((): number => {
-    const g = this._goalCfg();
-    if (!g.has) return 0;
+    if (!this._currentGoal().has) return 0;
 
     const today = this.todayService.today();
     const weeks = this._weekStats(today, this.workoutService.doneWorkouts(), this.sportService.sessions(), 53);
 
     let streak = 0;
     for (const w of weeks) {
-      if (!goalMet(w, g)) break;
+      if (!goalMet(w)) break;
       streak++;
     }
     return streak;
@@ -235,15 +234,14 @@ export class FitnessMetricsService {
    * acabar de qualsevol manera.
    */
   private readonly _closedStreakWeeks = computed((): WeekStat[] => {
-    const g = this._goalCfg();
-    if (!g.has) return [];
+    if (!this._currentGoal().has) return [];
 
     const today = this.todayService.today();
     const weeks = this._weekStats(today, this.workoutService.doneWorkouts(), this.sportService.sessions(), 53);
 
     const out: WeekStat[] = [];
     for (const w of weeks.slice(1)) {
-      if (!goalMet(w, g)) break;
+      if (!goalMet(w)) break;
       out.push(w);
     }
     return out;
@@ -252,16 +250,14 @@ export class FitnessMetricsService {
   /** Igual que `goalStreak` però només amb setmanes ja tancades. */
   private readonly _closedStreak = computed((): number => this._closedStreakWeeks().length);
 
-  private readonly _goalCfg = computed((): GoalCfg => {
-    const s        = this.settingsService.settings();
-    const mode     = s.goalMode === 'separate' ? 'separate' : 'combined';
-    const combined = s.weeklyActivityGoal ?? null;
-    const gym      = s.weeklyGymGoal ?? null;
-    const sport    = s.weeklySportGoal ?? null;
-    const has      = mode === 'combined' ? combined !== null : gym !== null || sport !== null;
-    const total    = mode === 'combined' ? (combined ?? 0) : (gym ?? 0) + (sport ?? 0);
-    return { mode, combined, gym, sport, has, total };
-  });
+  /**
+   * L'objectiu d'ara. És el que s'anomena quan es parla de l'objectiu com a
+   * cosa present —«l'objectiu és 3, l'apugem a 4?»— i el que diu si hi ha res
+   * a explicar. Per mirar si una setmana es va assolir, en canvi, mana el seu
+   * (`WeekStat.goal`).
+   */
+  private readonly _currentGoal = computed((): WeeklyGoal =>
+    currentGoal(this.settingsService.settings()));
 
   /**
    * Índex 0 = setmana en curs (dilluns → avui); la resta, setmanes tancades.
@@ -272,6 +268,7 @@ export class FitnessMetricsService {
    * `shared/utils/session-group.utils`.
    */
   private _weekStats(today: string, workouts: Workout[], sessions: SportSession[], n: number): WeekStat[] {
+    const settings = this.settingsService.settings();
     const out: WeekStat[] = [];
     for (let i = 0; i < n; i++) {
       const monday    = mondayOfWeek(offsetDate(today, -(i * 7)));
@@ -283,6 +280,7 @@ export class FitnessMetricsService {
         gym:   gymDone.length,
         sport: sportDone.length,
         total: countSessions([...gymDone, ...sportDone]),
+        goal:  goalForWeek(settings, monday, today),
       });
     }
     return out;
@@ -299,15 +297,22 @@ export class FitnessMetricsService {
   /**
    * La ratlla de l'objectiu al gràfic. Sense objectiu no hi ha ratlla: una
    * línia sense nom seria una decoració que l'usuari hauria d'endevinar.
+   *
+   * I si l'objectiu va canviar enmig de les setmanes dibuixades, tampoc: una
+   * sola ratlla diria que unes setmanes es van quedar curtes quan en realitat
+   * van complir el que es demanaven llavors.
    */
-  private _goalLine(g: GoalCfg): { value: number; label: string } | undefined {
-    return g.total > 0 ? { value: g.total, label: `objectiu ${g.total}` } : undefined;
+  private _goalLine(weeks: WeekStat[]): { value: number; label: string } | undefined {
+    const totals = new Set(weeks.filter(w => w.goal.has).map(w => w.goal.total));
+    if (totals.size !== 1) return undefined;
+    const total = [...totals][0];
+    return total > 0 ? { value: total, label: `objectiu ${total}` } : undefined;
   }
 
   // ── Nivell 1 · Objectiu ────────────────────────────────────────────────────
 
   private _goalInsights(
-    today: string, weeks: WeekStat[], g: GoalCfg, hist: History,
+    today: string, weeks: WeekStat[], g: WeeklyGoal, hist: History,
   ): FitnessInsight[] {
     if (!g.has || !hist.first) return [];
 
@@ -364,8 +369,8 @@ export class FitnessMetricsService {
           chart: {
             caption: 'Activitats per setmana',
             range: dateRange(closed[7].monday, closed[0].end),
-            bars: weekBars(closed.slice(0, 8), { highlight: w => goalMet(w, g) }),
-            reference: this._goalLine(g),
+            bars: weekBars(closed.slice(0, 8), { highlight: w => goalMet(w) }),
+            reference: this._goalLine(closed.slice(0, 8)),
           },
           facts: [
             { label: 'Setmanes seguides', value: plural(closedStreak, 'setmana', 'setmanes'), note: span },
@@ -381,8 +386,8 @@ export class FitnessMetricsService {
     // ── Ratxa en joc ─────────────────────────────────────────────────────────
     // L'únic insight que mira la setmana en curs, i és a propòsit: una ratxa
     // que es pot mantenir avui és el que empeny de debò.
-    if (lateWeek && closedStreak >= 2 && !goalMet(weeks[0], g)) {
-      const missing = goalMissing(weeks[0], g);
+    if (lateWeek && closedStreak >= 2 && !goalMet(weeks[0])) {
+      const missing = goalMissing(weeks[0]);
       // La ratxa pot ser més llarga que les setmanes que tenim a mà.
       const streakFrom = weeks[Math.min(closedStreak, weeks.length - 1)];
       out.push({
@@ -390,7 +395,7 @@ export class FitnessMetricsService {
         mascot: 'both',
         emoji: '🔥',
         title: `${closedStreak} setmanes seguides`,
-        stat: `Aquesta setmana, ${goalProgressStr(weeks[0], g)}`,
+        stat: `Aquesta setmana, ${goalProgressStr(weeks[0])}`,
         message: missing === 1
           ? `Amb una més la mantens. ${pickVariant(['Hi som a temps.', 'Encara hi ets.', 'Tu diràs.'], today + 'ratxa_en_joc')}`
           : `Amb ${missing} més la mantens. Queden dies.`,
@@ -404,7 +409,7 @@ export class FitnessMetricsService {
             caption: 'Activitats per setmana',
             range: dateRange(weeks[7].monday, today),
             bars: weekBars(weeks.slice(0, 8), { lastIsCurrent: true, highlight: (_w, i, n) => i === n - 1 }),
-            reference: this._goalLine(g),
+            reference: this._goalLine(weeks.slice(0, 8)),
           },
           facts: [
             {
@@ -412,7 +417,7 @@ export class FitnessMetricsService {
               note: dateRange(streakFrom.monday, weeks[1].end),
             },
             {
-              label: 'Aquesta setmana', value: goalProgressStr(weeks[0], g),
+              label: 'Aquesta setmana', value: goalProgressStr(weeks[0]),
               note: dateRange(weeks[0].monday, today),
             },
             { label: 'Per mantenir-la', value: plural(missing, 'activitat', 'activitats') },
@@ -444,7 +449,7 @@ export class FitnessMetricsService {
             caption: 'Activitats per setmana',
             range: dateRange(closed[7].monday, closed[0].end),
             bars: weekBars(closed.slice(0, 8), { highlight: (_w, i, n) => i >= n - 4 }),
-            reference: this._goalLine(g),
+            reference: this._goalLine(closed.slice(0, 8)),
           },
           facts: [
             {
@@ -463,7 +468,7 @@ export class FitnessMetricsService {
     // Un objectiu que no es toca gairebé mai no motiva ningú. Millor un de
     // més petit que sí es compleixi: la proposta és baixar-lo, no entrenar més.
     const last6   = closed.slice(0, 6);
-    const met6    = last6.filter(w => goalMet(w, g)).length;
+    const met6    = last6.filter(w => goalMet(w)).length;
     const avg6    = mean(last6.map(w => w.total));
     const suggest = Math.max(1, Math.round(avg6));
     const sixWeeks = last6.length ? dateRange(last6[last6.length - 1].monday, last6[0].end) : '';
@@ -489,7 +494,7 @@ export class FitnessMetricsService {
             // Aquí la història és la ratlla, no cap setmana: la marcada és
             // l'última, perquè el número escrit sigui el més recent.
             bars: weekBars(last6, { highlight: (_w, i, n) => i === n - 1 }),
-            reference: this._goalLine(g),
+            reference: this._goalLine(last6),
           },
           facts: [
             { label: 'Setmanes assolides', value: `${met6} de 6`, note: sixWeeks },
@@ -505,9 +510,9 @@ export class FitnessMetricsService {
     // ── Compliment a llarg termini ───────────────────────────────────────────
     // 12 setmanes és prou lluny perquè l'usuari ja no ho recordi.
     const last12 = closed.slice(0, 12);
-    const met12  = last12.filter(w => goalMet(w, g)).length;
+    const met12  = last12.filter(w => goalMet(w)).length;
     const recent6 = met6;
-    const older6  = closed.slice(6, 12).filter(w => goalMet(w, g)).length;
+    const older6  = closed.slice(6, 12).filter(w => goalMet(w)).length;
     const twelveWeeks = last12.length ? dateRange(last12[last12.length - 1].monday, last12[0].end) : '';
     if (has12Weeks && met12 > 0 && met12 < 12) {
       const improving = recent6 > older6;
@@ -529,8 +534,8 @@ export class FitnessMetricsService {
           chart: {
             caption: 'Activitats per setmana',
             range: twelveWeeks,
-            bars: weekBars(last12, { highlight: w => goalMet(w, g) }),
-            reference: this._goalLine(g),
+            bars: weekBars(last12, { highlight: w => goalMet(w) }),
+            reference: this._goalLine(last12),
           },
           facts: [
             {

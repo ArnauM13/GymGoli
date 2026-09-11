@@ -551,6 +551,17 @@ abans, un canvi fet sense cobertura es perdia en silenci. Mentre esperi, mana
 per damunt del que contesti el servidor, que és la mateixa regla que els
 entrenaments.
 
+**L'objectiu setmanal és d'una setmana.** Era un número i prou: apujar-lo al
+març convertia el gener en un mes fallit, perquè les setmanes velles es
+mesuraven contra el que et proposes avui. Ara cada canvi deixa una fita a
+`goalHistory` amb el dilluns des del qual mana, i una setmana tancada
+conserva la seva — només s'escriu al dilluns d'aquesta setmana, mai enrere.
+Cap setmana no en demana un de nou: l'objectiu d'ara es manté fins que el
+canviïs, i una setmana sense fita és una setmana que porta el de sempre.
+Viu dins del mateix jsonb i no en una taula a part per la mateixa raó que la
+resta: així puja per la cua de pendents i un canvi fet sense cobertura no es
+perd. Les regles i els tests són a `core/models/weekly-goal.model.ts`.
+
 **El pany entre pestanyes de la sessió.** Supabase rota el testimoni de refresc
 cada cop que el fa servir. Amb dues pestanyes obertes, les dues hi arriben
 alhora, les dues envien el mateix testimoni i la segona el troba gastat: la
@@ -567,6 +578,7 @@ sobre `navigator.locks` perquè només una hi vagi.
 - Una resposta incompleta no és prova que res s'hagi esborrat.
 - Un esborrat sense cobertura ha de deixar làpida.
 - Cap sessió sense sèries pot entrar al magatzem.
+- Cap canvi d'objectiu pot tocar una setmana ja tancada.
 - Una activitat sense grup és una sessió ella sola, i un grup no surt del dia.
 - Cap consulta sencera es pot llançar dues vegades alhora.
 - Els tests que ho subjecten són `workout-store.service.spec.ts`,
