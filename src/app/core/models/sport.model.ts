@@ -54,19 +54,41 @@ export interface SportSession {
   startedAt?: Date;
 }
 
-/** Selectable Material Symbol icons for sports. */
+/** Selectable Material Symbol icons for sports.
+ *
+ *  Van per famílies perquè qui busca la seva no llegeix la llista: hi passa
+ *  l'ull per sobre i mira on cau el seu esport. Treure'n cap trencaria els
+ *  esports que ja la fan servir —la icona es guarda amb l'esport—, així que
+ *  la llista només creix. */
 export const SPORT_ICONS: string[] = [
-  'sports_soccer', 'sports_tennis', 'directions_run', 'directions_walk',
-  'sports_basketball', 'sports_handball', 'pool', 'pedal_bike',
-  'sports_volleyball', 'sports_golf', 'hiking', 'sports_martial_arts',
-  'downhill_skiing', 'kitesurfing', 'surfing', 'sports_rugby', 'ice_skating',
+  // Pilota
+  'sports_soccer', 'sports_basketball', 'sports_volleyball', 'sports_handball',
+  'sports_rugby', 'sports_football', 'sports_baseball', 'sports_cricket',
+  'sports_hockey', 'sports_tennis', 'pickleball', 'sports_golf',
+  // Córrer i caminar
+  'directions_run', 'sprint', 'directions_walk', 'nordic_walking', 'hiking',
+  // Rodes i patins
+  'pedal_bike', 'skateboarding', 'roller_skating', 'ice_skating',
+  // Aigua
+  'pool', 'scuba_diving', 'surfing', 'kitesurfing', 'rowing', 'kayaking', 'sailing',
+  // Neu
+  'downhill_skiing', 'snowboarding', 'snowshoeing', 'sledding',
+  // Cos i combat: ioga, gimnàstica i arts marcials
+  'self_improvement', 'sports_gymnastics', 'sports_martial_arts', 'sports_mma',
+  'sports_kabaddi',
+  // Aire, i les dues genèriques per a tot el que no hi surt
+  'paragliding', 'fitness_center', 'sports',
 ];
 
-/** Preset colours for sports. */
+/** Preset colours for sports: tons plens, que és el que distingeix un esport
+ *  d'un altre d'un cop d'ull al calendari i a l'activitat. Els tipus
+ *  d'entrenament porten la mateixa roda un to més clar. */
 export const SPORT_COLORS: string[] = [
   '#43A047', '#FB8C00', '#8E24AA', '#1E88E5',
   '#E53935', '#00ACC1', '#F4511E', '#7CB342',
   '#6D4C41', '#546E7A', '#F9A825', '#AD1457',
+  '#3949AB', '#5E35B1', '#00897B', '#C0CA33',
+  '#D81B60', '#039BE5', '#EF6C00', '#616161',
 ];
 
 /**
@@ -182,7 +204,7 @@ export const DEFAULT_SPORTS: Pick<Sport, 'name' | 'icon' | 'color' | 'subtypes' 
     metricDefs: [_m('match_type'), _m('result'), _m('sets_won'), _m('sets_lost')],
   },
   {
-    name: 'Yoga', icon: 'sports_martial_arts', color: '#8E24AA',
+    name: 'Yoga', icon: 'self_improvement', color: '#8E24AA',
     subtypes: [
       { id: 'hatha',       name: 'Hatha' },
       { id: 'vinyasa',     name: 'Vinyasa' },

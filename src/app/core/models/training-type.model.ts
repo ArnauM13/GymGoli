@@ -29,19 +29,32 @@ export const DEFAULT_TRAINING_TYPES: TrainingType[] = [
   { id: 'legs', name: 'Cames',   icon: 'directions_run',    color: '#81c784', muscles: 'Quàdriceps · Isquiotibials · Glutis', builtIn: true },
 ];
 
-/** Selectable Material Symbol icons for training types. */
+/** Selectable Material Symbol icons for training types, per famílies —com les
+ *  dels esports—. La primera és la que porta un tipus nou, i cap no se'n treu:
+ *  la icona es guarda amb el tipus. */
 export const TRAINING_TYPE_ICONS: string[] = [
-  'fitness_center', 'sports_gymnastics', 'directions_run', 'exercise',
-  'sprint', 'self_improvement', 'sports_martial_arts', 'accessibility_new',
-  'front_hand', 'back_hand', 'skateboarding', 'rowing', 'cardio_load',
-  'health_and_safety', 'bolt', 'whatshot',
+  // Força
+  'fitness_center', 'exercise', 'sports_gymnastics', 'front_hand', 'back_hand',
+  'accessibility_new', 'monitor_weight',
+  // Cardio i resistència
+  'directions_run', 'sprint', 'speed', 'cardio_load', 'stairs', 'steps',
+  'pedal_bike', 'skateboarding', 'pool', 'rowing', 'hiking',
+  // Combat
+  'sports_martial_arts', 'sports_mma', 'sports_kabaddi',
+  // Mobilitat i recuperació
+  'self_improvement', 'spa', 'psychology', 'health_and_safety',
+  // Intensitat
+  'bolt', 'whatshot', 'local_fire_department', 'timer',
 ];
 
-/** Preset colours for training types (kept distinct from the built-ins). */
+/** Preset colours for training types: la mateixa roda que els esports, un to
+ *  més clar. La primera és la d'Empenta, que és la que porta un tipus nou. */
 export const TRAINING_TYPE_COLORS: string[] = [
   '#e57373', '#64b5f6', '#81c784', '#ffb74d',
   '#ba68c8', '#4db6ac', '#f06292', '#7986cb',
   '#a1887f', '#90a4ae', '#dce775', '#4fc3f7',
+  '#9575cd', '#4dd0e1', '#aed581', '#ffd54f',
+  '#ff8a65', '#fff176', '#f48fb1', '#bdbdbd',
 ];
 
 // ── Runtime registry ─────────────────────────────────────────────────────────
