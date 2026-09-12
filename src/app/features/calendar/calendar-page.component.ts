@@ -16,7 +16,7 @@ import { ExerciseService } from '../../core/services/exercise.service';
 import { SportService } from '../../core/services/sport.service';
 import { AuthService } from '../../core/services/auth.service';
 import { addDays } from '../../shared/utils/calendar-utils';
-import { feedDayLabel, workoutCategoryList } from '../../shared/utils/workout-card.utils';
+import { compactDayLabel, feedDayLabel, workoutCategoryList } from '../../shared/utils/workout-card.utils';
 import { CalendarComponent } from '../../shared/components/calendar/calendar.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { FilterBarComponent } from '../../shared/components/filter-bar/filter-bar.component';
@@ -24,8 +24,18 @@ import { DayFeedCardsComponent, DayFeedEntry } from '../../shared/components/day
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { TrainingTypeService } from '../../core/services/training-type.service';
 
-/** El valor de `?range=` que demana l'abast curt. Inici l'hi porta. */
-const RANGE_RECENT = '30d';
+/**
+ * Llegeix `?range=`: `30d` són els últims trenta dies, i qualsevol altra cosa
+ * (o res) vol dir tot l'historial. És el contracte que fa servir el botó
+ * d'Inici; admet qualsevol nombre de dies perquè un enllaç guardat amb `7d` o
+ * `90d` continuï dient el que diu.
+ */
+function parseRangeParam(raw: string | null | undefined): number | null {
+  const m = /^(\d+)d$/.exec(raw ?? '');
+  if (!m) return null;
+  const days = parseInt(m[1], 10);
+  return days > 0 ? days : null;
+}
 
 @Component({
   selector: 'app-calendar-page',
@@ -39,7 +49,7 @@ const RANGE_RECENT = '30d';
 
       <!-- ── Cerca i filtres (sempre visibles) — el calendari és un filtre més ──
            Els filtres van en fila pròpia (stackFilters): aquí n'hi ha de
-           tres menes —l'abast, els tipus d'entrenament i els esports— i
+           tres menes —el període, els tipus d'entrenament i els esports— i
            encabir-los al costat de la cerca els deixava tots estrets. -->
       <app-filter-bar
         searchPlaceholder="Cerca per exercici..."
@@ -49,29 +59,49 @@ const RANGE_RECENT = '30d';
         [(sortDesc)]="sortDesc"
         [(category)]="filterCat"
         [(sport)]="filterSport">
-        <button class="cal-filter-btn"
-                [class.cal-filter-btn--active]="calendarOpen() || !!selectedDate()"
-                (click)="calendarOpen.set(!calendarOpen())"
-                [attr.aria-label]="calendarOpen() ? 'Amaga el calendari' : 'Filtra per data'"
-                [attr.aria-expanded]="calendarOpen()" title="Filtra per data">
-          <span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>
-          @if (selectedDate()) { <span class="cal-filter-dot" aria-hidden="true"></span> }
-        </button>
-
-        <!-- ── Abast: els últims 30 dies ──
-             És per on s'hi arriba des d'Inici (?range=30d), i des d'aquí es
-             treu amb un toc per veure-ho tot. -->
-        <button filterLead class="range-chip" [class.range-chip--active]="recentOnly()"
-                [attr.aria-pressed]="recentOnly()" (click)="toggleRecentOnly()"
-                title="Només els últims 30 dies">
-          <span class="material-symbols-outlined" aria-hidden="true">history</span>
-          30 dies
-        </button>
+        <!-- ── El període: un sol xip que diu qui mana ──
+             Sempre hi és i sempre diu el que hi ha posat —«Tot», «30 dies» o
+             el dia triat—, perquè el filtre que fa feina no es pugui llegir
+             en cap altre lloc que aquí. Obre el calendari, que és on es
+             canvia; la ✕ només surt quan hi ha res a treure. -->
+        <span filterLead class="period-wrap">
+          <button class="period-chip" [class.period-chip--on]="hasPeriodFilter()"
+                  [class.period-chip--split]="hasPeriodFilter()"
+                  (click)="calendarOpen.set(!calendarOpen())"
+                  [attr.aria-expanded]="calendarOpen()"
+                  [attr.aria-label]="'Període: ' + periodLabel() + '. Tria'">
+            <span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>
+            <span class="period-label">{{ periodLabel() }}</span>
+            <span class="material-symbols-outlined period-chevron" aria-hidden="true">expand_more</span>
+          </button>
+          @if (hasPeriodFilter()) {
+            <button class="period-clear" (click)="clearPeriod()" aria-label="Treure el filtre de període">
+              <span class="material-symbols-outlined" aria-hidden="true">close</span>
+            </button>
+          }
+        </span>
       </app-filter-bar>
 
-      <!-- ── Calendari plegable (filtre per data) ── -->
+      <!-- ── Calendari plegable: tots els filtres de temps, junts ──
+           Els abasts i el dia són la mateixa pregunta feta de dues maneres
+           («els últims X dies» o «aquell dia»), així que viuen al mateix
+           calaix i s'exclouen: triar-ne un deixa l'altre. -->
       <div class="cal-collapse" [class.cal-collapse--open]="calendarOpen()">
         <div class="cal-collapse-inner">
+          <div class="range-row" role="group" aria-label="Període">
+            @for (opt of rangeOptions; track opt.days) {
+              <button class="range-chip" [class.range-chip--active]="rangeDays() === opt.days"
+                      [attr.aria-pressed]="rangeDays() === opt.days"
+                      (click)="setRange(opt.days)">
+                {{ opt.label }}
+              </button>
+            }
+            <button class="range-chip" [class.range-chip--active]="!hasPeriodFilter()"
+                    [attr.aria-pressed]="!hasPeriodFilter()"
+                    (click)="clearPeriod()">
+              Tot
+            </button>
+          </div>
           <div class="calendar-wrap">
             <app-calendar [selectedDate]="selectedDate()" [allowFuturePlanning]="true"
                           (dateSelected)="selectDate($event)" />
@@ -81,16 +111,19 @@ const RANGE_RECENT = '30d';
 
       @if (selectedDate(); as sel) {
 
-        <!-- ── Dia seleccionat al calendari: què s'hi ha fet ── -->
+        <!-- ── Dia seleccionat al calendari: què s'hi ha fet ──
+             Aquí només s'hi navega de dia en dia. Treure el filtre és feina
+             del xip de període de dalt, que és on sempre es llegeix: tenir-hi
+             dues ✕ per al mateix filtre, a dos pams l'una de l'altra, era una
+             de sobrera. -->
         <div class="date-chip-row">
           <button class="day-nav-btn" (click)="shiftSelectedDate(-1)" aria-label="Dia anterior">
             <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
           </button>
-          <button class="date-chip" (click)="selectDate(sel)" aria-label="Treure el filtre de data">
+          <span class="date-chip">
             <span class="material-symbols-outlined" aria-hidden="true">event</span>
             {{ selectedDateLabel() }}
-            <span class="material-symbols-outlined date-chip-x" aria-hidden="true">close</span>
-          </button>
+          </span>
           <button class="day-nav-btn" (click)="shiftSelectedDate(1)" aria-label="Dia següent">
             <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
           </button>
@@ -222,46 +255,68 @@ const RANGE_RECENT = '30d';
   styles: [`
     .page { padding: 0 0 16px; }
 
-    /* ── Calendar-as-filter toggle (projected into the filter bar) ── */
-    .cal-filter-btn {
-      position: relative;
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-      width: 34px; height: 34px; border-radius: 50%;
-      border: 1.5px solid var(--c-border); background: var(--c-card);
-      color: var(--c-text-2);
-      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 18px; }
-      &:not(.cal-filter-btn--active):hover { border-color: var(--c-brand); color: var(--c-brand); }
-      &.cal-filter-btn--active {
-        background: var(--c-brand); color: white; border-color: var(--c-brand);
-        box-shadow: 0 2px 6px color-mix(in srgb, var(--c-brand) 35%, transparent);
-      }
-      &:focus-visible { outline: 2px solid var(--c-brand); outline-offset: 2px; }
-    }
-    /* ── Abast de dies (xip projectat a la fila de filtres) ──
+    /* ── El xip de període (projectat a la fila de filtres) ──
        Porta text, no només icona: és l'únic filtre que no diu «de quina mena»
-       sinó «de quan», i una rodona més no ho hauria explicat. */
-    .range-chip {
+       sinó «de quan», i una rodona més no ho hauria explicat. Quan hi ha res
+       posat es parteix en dos —el cos obre el calendari, la ✕ el treu— i les
+       dues meitats es llegeixen com una sola peça. */
+    .period-wrap { display: flex; align-items: center; flex-shrink: 0; }
+    .period-chip {
       display: flex; align-items: center; gap: 4px; flex-shrink: 0;
-      height: 34px; padding: 0 12px; box-sizing: border-box;
+      height: 34px; padding: 0 10px 0 12px; box-sizing: border-box;
       border: 1.5px solid var(--c-border); border-radius: 999px;
       background: var(--c-card); color: var(--c-text-2);
       font-size: 12px; font-weight: 700; white-space: nowrap;
       cursor: pointer; touch-action: manipulation; transition: all 0.15s;
       .material-symbols-outlined { font-size: 16px; }
+      &:not(.period-chip--on):hover { border-color: var(--c-brand); color: var(--c-brand); }
+      &.period-chip--on {
+        background: var(--c-brand); color: white; border-color: var(--c-brand);
+        box-shadow: 0 2px 6px color-mix(in srgb, var(--c-brand) 35%, transparent);
+      }
+      &:focus-visible { outline: 2px solid var(--c-brand); outline-offset: 2px; }
+    }
+    .period-chip--split { border-radius: 999px 0 0 999px; border-right-color: transparent; padding-right: 6px; }
+    /* Xarxa de seguretat: cap etiqueta no empeny els altres filtres fora de
+       la vista, per llarga que sigui. */
+    .period-label { max-width: 42vw; overflow: hidden; text-overflow: ellipsis; }
+    .period-chevron { opacity: 0.75; margin-left: -1px; }
+    /* La meitat de treure: mateix fons, vora compartida i prou amplada per al
+       dit (34px d'alt, com tota la fila). */
+    .period-clear {
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      width: 30px; height: 34px; box-sizing: border-box;
+      border: 1.5px solid var(--c-brand); border-left: none; border-radius: 0 999px 999px 0;
+      background: var(--c-brand); color: white;
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s;
+      .material-symbols-outlined { font-size: 15px; }
+      &:hover { background: var(--c-brand-dk); }
+      &:focus-visible { outline: 2px solid var(--c-text); outline-offset: 2px; }
+    }
+
+    /* ── Els abasts, dins el calendari ──
+       Van amb el calendari i no a la fila de filtres perquè són la mateixa
+       pregunta que triar un dia: de quan a quan. La fila de filtres només en
+       diu el resultat. */
+    .range-row {
+      display: flex; align-items: center; gap: 6px;
+      margin: 4px 0 0; padding: 8px 16px 0;
+      overflow-x: auto; scrollbar-width: none;
+      &::-webkit-scrollbar { display: none; }
+    }
+    .range-chip {
+      display: flex; align-items: center; flex-shrink: 0;
+      height: 32px; padding: 0 14px; box-sizing: border-box;
+      border: 1.5px solid var(--c-border); border-radius: 999px;
+      background: var(--c-card); color: var(--c-text-2);
+      font-size: 12px; font-weight: 700; white-space: nowrap;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
       &:not(.range-chip--active):hover { border-color: var(--c-brand); color: var(--c-brand); }
       &.range-chip--active {
         background: var(--c-brand); color: white; border-color: var(--c-brand);
         box-shadow: 0 2px 6px color-mix(in srgb, var(--c-brand) 35%, transparent);
       }
       &:focus-visible { outline: 2px solid var(--c-brand); outline-offset: 2px; }
-    }
-
-    /* Small dot marking that a specific day is currently filtering the list. */
-    .cal-filter-dot {
-      position: absolute; top: 4px; right: 4px;
-      width: 7px; height: 7px; border-radius: 50%;
-      background: #fff; box-shadow: 0 0 0 2px var(--c-brand);
     }
 
     /* ── Collapsible calendar ── */
@@ -293,19 +348,14 @@ const RANGE_RECENT = '30d';
     .date-chip-row {
       display: flex; align-items: center; gap: 8px; margin: 0 16px 12px;
     }
+    /* El dia que s'està mirant: rètol, no botó — ja no treu res. */
     .date-chip {
-      display: inline-flex; align-items: center; gap: 4px; flex: 1; justify-content: center;
-      height: 34px; padding: 0 6px 0 10px; border-radius: 17px;
+      display: inline-flex; align-items: center; gap: 5px; flex: 1; justify-content: center;
+      height: 34px; padding: 0 12px; border-radius: 17px;
       border: 1.5px solid var(--c-brand);
       background: rgba(var(--c-brand-rgb), 0.1); color: var(--c-brand);
-      font-size: 12px; font-weight: 700; text-transform: capitalize;
-      cursor: pointer; touch-action: manipulation; white-space: nowrap;
+      font-size: 12px; font-weight: 700; white-space: nowrap;
       .material-symbols-outlined { font-size: 16px; }
-      .date-chip-x {
-        font-size: 16px; border-radius: 50%; background: rgba(var(--c-brand-rgb), 0.18);
-        padding: 1px;
-      }
-      &:hover { background: rgba(var(--c-brand-rgb), 0.16); }
     }
     .register-past-btn {
       display: flex; align-items: center; justify-content: center; gap: 7px;
@@ -321,7 +371,7 @@ const RANGE_RECENT = '30d';
     .rpb-date {
       padding: 2px 9px; border-radius: 999px;
       background: rgba(var(--c-brand-rgb), 0.14);
-      font-size: 12px; font-weight: 700; text-transform: capitalize;
+      font-size: 12px; font-weight: 700;
     }
 
     /* ── Activity feed, grouped by day (same cards as Inici) ── */
@@ -436,19 +486,56 @@ export class CalendarPageComponent implements OnDestroy {
   readonly filterSport   = signal<string | null>(null);
   readonly searchQuery   = signal('');
 
-  /** Quants dies enrere arriba la llista quan hi ha l'abast posat. Inici hi
-   *  entra amb aquest filtre ja marcat (`/calendar?range=30d`). */
-  static readonly RECENT_DAYS = 30;
+  // ── El període ───────────────────────────────────────────────────────────
+  //
+  // «Els últims X dies» i «aquell dia» són la mateixa pregunta —de quan a
+  // quan— feta de dues maneres, i per això **s'exclouen**: triar un dia al
+  // calendari treu l'abast i triar un abast treu el dia. Si convisquessin, el
+  // xip de la fila diria una cosa i la llista n'ensenyaria una altra.
 
-  /** L'abast curt: només els últims 30 dies. */
-  readonly recentOnly = signal(false);
+  /** Els abasts que s'ofereixen, del més curt al més llarg. */
+  readonly rangeOptions: { days: number; label: string }[] = [
+    { days: 7,  label: '7 dies'  },
+    { days: 30, label: '30 dies' },
+    { days: 90, label: '3 mesos' },
+  ];
 
-  toggleRecentOnly(): void { this.recentOnly.update(v => !v); }
+  /** Quants dies enrere arriba la llista, o `null` per tot l'historial.
+   *  Inici hi entra amb l'abast de 30 dies (`/calendar?range=30d`). */
+  readonly rangeDays = signal<number | null>(null);
 
-  /** El primer dia de l'abast curt (avui inclòs). */
-  private readonly recentStart = computed(() => {
+  /** Posa un abast. Treu el dia: el període és un de sol. */
+  setRange(days: number | null): void {
+    this.rangeDays.set(days);
+    if (days !== null) this.selectedDate.set(null);
+  }
+
+  /** Tot l'historial: ni abast ni dia. */
+  clearPeriod(): void {
+    this.rangeDays.set(null);
+    this.selectedDate.set(null);
+  }
+
+  readonly hasPeriodFilter = computed(() => !!this.selectedDate() || this.rangeDays() !== null);
+
+  /** El que diu el xip de la fila de filtres: sempre el filtre que fa feina,
+   *  mai una etiqueta fixa. */
+  readonly periodLabel = computed(() => {
+    const sel = this.selectedDate();
+    // Curt a posta: el dia sencer («dilluns, 8 de setembre») es menjava la
+    // fila de filtres ell sol i deixava els tipus i els esports fora de vista.
+    if (sel) return compactDayLabel(sel, this.workoutService.todayDateString());
+    const days = this.rangeDays();
+    if (days === null) return 'Tot';
+    return this.rangeOptions.find(o => o.days === days)?.label ?? `${days} dies`;
+  });
+
+  /** El primer dia de l'abast (avui inclòs), o `null` si no n'hi ha cap. */
+  private readonly rangeStart = computed(() => {
+    const days = this.rangeDays();
+    if (days === null) return null;
     const from = new Date(this.workoutService.todayDateString() + 'T12:00:00');
-    from.setDate(from.getDate() - (CalendarPageComponent.RECENT_DAYS - 1));
+    from.setDate(from.getDate() - (days - 1));
     return this._toDateStr(from);
   });
 
@@ -518,16 +605,18 @@ export class CalendarPageComponent implements OnDestroy {
   private _emptyStreak = 0;
 
   /** Amb un filtre posat no hi ha res més a carregar: la resposta del servidor
-   *  ja porta totes les coincidències de tot l'historial. Amb l'abast curt
-   *  tampoc: el tram té final, i és avui menys trenta dies. */
+   *  ja porta totes les coincidències de tot l'historial. Amb un abast posat
+   *  tampoc: el tram té final, i és avui menys els dies que digui. */
   readonly hasMore = computed(() =>
-    !this._reachedEnd() && !this.recentOnly() && !this.searchQuery().trim() && !this.filterCat()
+    !this._reachedEnd() && this.rangeDays() === null
+    && !this.searchQuery().trim() && !this.filterCat()
   );
 
   /** El primer dia carregat: l'1 del mes més antic que s'ha demanat, o el
-   *  primer dia de l'abast curt si hi és. */
+   *  primer dia de l'abast si n'hi ha cap de posat. */
   private readonly windowStart = computed(() => {
-    if (this.recentOnly()) return this.recentStart();
+    const from = this.rangeStart();
+    if (from) return from;
     const today = new Date(this.workoutService.todayDateString() + 'T12:00:00');
     const start = new Date(today.getFullYear(), today.getMonth() - this.monthsBack(), 1);
     return this._toDateStr(start);
@@ -535,7 +624,7 @@ export class CalendarPageComponent implements OnDestroy {
 
   readonly hasActiveFilter = computed(
     () => !!this.filterCat() || !!this.filterSport() || !!this.searchQuery()
-       || !!this.selectedDate() || this.recentOnly()
+       || this.hasPeriodFilter()
   );
 
   /**
@@ -557,7 +646,7 @@ export class CalendarPageComponent implements OnDestroy {
     // L'abast curt talla per baix sigui quin sigui l'altre filtre: buscar un
     // exercici amb els «30 dies» posats pregunta pels últims 30 dies, no per
     // tota la vida.
-    const floor   = this.recentOnly() ? this.recentStart() : null;
+    const floor   = this.rangeStart();
 
     // ── Amb cerca o filtre: des de les coincidències ────────────────────────
     // La resposta del servidor porta les que hi ha, escampades per anys. Fer
@@ -618,7 +707,8 @@ export class CalendarPageComponent implements OnDestroy {
 
   /** El rang que hi ha carregat, per tancar la llista amb alguna cosa útil. */
   readonly loadedRangeLabel = computed(() => {
-    if (this.recentOnly()) return `Últims ${CalendarPageComponent.RECENT_DAYS} dies`;
+    const days = this.rangeDays();
+    if (days !== null) return `Últims ${this.periodLabel()}`;
     const start = new Date(this.windowStart() + 'T12:00:00');
     const label = start.toLocaleDateString('ca-ES', { month: 'long', year: 'numeric' });
     return `Des de ${label}`;
@@ -665,7 +755,7 @@ export class CalendarPageComponent implements OnDestroy {
     this.exerciseService.ensureLoaded();
     this.sportService.ensureLoaded();
 
-    // ── L'abast el diu l'adreça ────────────────────────────────────────
+    // ── El període el diu l'adreça ─────────────────────────────────────
     //
     // Inici hi entra amb `/calendar?range=30d`: el seu botó és una drecera a
     // «l'últim mes» i qui hi arriba no ha de tornar a filtrar res. Entrar-hi
@@ -674,7 +764,7 @@ export class CalendarPageComponent implements OnDestroy {
     // Es llegeix a cada arribada, no només al muntar-se: la ruta es manté
     // viva (AppReuseStrategy), i sense això el segon cop que toquessis el
     // botó d'Inici et trobaries l'Historial tal com l'havies deixat.
-    this.recentOnly.set(this.route.snapshot.queryParamMap.get('range') === RANGE_RECENT);
+    this.setRange(parseRangeParam(this.route.snapshot.queryParamMap.get('range')));
 
     let previousPath = this.router.url.split('?')[0];
     this.router.events
@@ -687,15 +777,27 @@ export class CalendarPageComponent implements OnDestroy {
         // desfer el filtre que acabes de treure amb el dit.
         if (!arrivedNow) return;
         const params = this.router.parseUrl(e.urlAfterRedirects).queryParams as Record<string, string | undefined>;
-        this.recentOnly.set(params['range'] === RANGE_RECENT);
+        const days   = parseRangeParam(params['range'] ?? null);
+        // Arribar-hi sense abast vol dir tot l'historial, i això inclou treure
+        // el dia que hi hagués: el període és el que digui l'adreça.
+        if (days === null) this.clearPeriod();
+        else this.setRange(days);
       });
 
-    // L'abast curt es menja el mes anterior gairebé sempre; sense demanar-lo
-    // la llista es tallaria a l'1 de mes.
+    // Un abast pot arrencar mesos enrere (tres, el més llarg) i la llista es
+    // tallaria a l'1 del mes carregat. Es demanen tots els que toca.
     effect(() => {
-      if (!this.recentOnly() || !this.authService.uid()) return;
-      const start = new Date(this.recentStart() + 'T12:00:00');
-      untracked(() => { void this._ensureMonth(start.getFullYear(), start.getMonth()); });
+      const from = this.rangeStart();
+      if (!from || !this.authService.uid()) return;
+      untracked(() => {
+        const start  = new Date(from + 'T12:00:00');
+        const today  = new Date(this.workoutService.todayDateString() + 'T12:00:00');
+        const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+        while (cursor <= today) {
+          void this._ensureMonth(cursor.getFullYear(), cursor.getMonth());
+          cursor.setMonth(cursor.getMonth() + 1);
+        }
+      });
     });
 
     // Càrrega inicial: l'últim mes. Tracking uid() so the first load fires
@@ -812,8 +914,12 @@ export class CalendarPageComponent implements OnDestroy {
     return feedDayLabel(date, this.workoutService.todayDateString());
   }
 
+  /** Triar un dia és triar un període: treu l'abast que hi hagués, perquè el
+   *  xip de la fila no pugui dir «30 dies» mentre la llista n'ensenya un. */
   selectDate(date: string): void {
-    this.selectedDate.set(this.selectedDate() === date ? null : date);
+    const next = this.selectedDate() === date ? null : date;
+    this.selectedDate.set(next);
+    if (next) this.rangeDays.set(null);
   }
 
   shiftSelectedDate(delta: number): void {

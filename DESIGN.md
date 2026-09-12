@@ -835,7 +835,7 @@ plena. L'acció de la pàgina és entrenar; això és anar a mirar.
 
 | Filtre | Forma | Per què |
 | --- | --- | --- |
-| Abast (`30 dies`) | xip amb text, projectat a `[filterLead]` | És l'únic que diu «de quan» i no «de quina mena» |
+| Període | xip amb text, projectat a `[filterLead]` | És l'únic que diu «de quan» i no «de quina mena» |
 | Tipus d'entrenament | rodona amb la icona i el color del tipus | Sempre són els mateixos tres o quatre |
 | Esports configurats | rodona amb la icona i el color de l'esport | L'usuari els ha triat ell: la icona ja els identifica |
 
@@ -846,8 +846,31 @@ visible, marges negatius perquè arribi a la vora de la pantalla), i un
 
 **Els dos filtres de mena s'exclouen.** Cap activitat és un tipus de gimnàs i
 un esport a la vegada, així que triar-ne un treu l'altre: tenir-los tots dos
-posats no hauria ensenyat mai res. L'abast, en canvi, es combina amb tot —
+posats no hauria ensenyat mai res. El període, en canvi, es combina amb tot —
 talla per baix sigui quin sigui l'altre filtre, cerca inclosa.
+
+### El període: un filtre, sempre a la vista
+
+«Els últims X dies» i «aquell dia» són **la mateixa pregunta** —de quan a
+quan— feta de dues maneres. Per això:
+
+- **Viuen al mateix calaix.** Els abasts (`7 dies`, `30 dies`, `3 mesos`,
+  `Tot`) són una fila de xips dins el calendari plegable, just sobre la
+  graella. Triar un dia i triar un abast es fan al mateix lloc.
+- **S'exclouen.** `setRange()` treu el dia i `selectDate()` treu l'abast. Si
+  convisquessin, el xip diria una cosa i la llista n'ensenyaria una altra.
+- **Es llegeixen en un sol lloc.** El xip `.period-chip` de la fila de filtres
+  diu **sempre** el que hi ha posat: «Tot», «30 dies» o el dia en curt
+  (`compactDayLabel()` — «8 de set.», que el dia sencer es menjava la fila).
+  Tenyit quan filtra, neutre quan no.
+- **Es treu en un sol lloc.** Amb període posat, el xip es parteix: el cos
+  obre el calendari i la ✕ el treu. El rètol del dia que hi ha sobre la
+  llista és només un rètol, amb les fletxes de dia anterior/següent al
+  costat: dues ✕ per al mateix filtre, a dos pams l'una de l'altra, era una
+  de sobrera.
+
+L'adreça hi entra: `?range=30d` (qualsevol `<n>d`) posa l'abast, i sense
+paràmetre vol dir tot l'historial. És el contracte de la drecera d'Inici.
 
 ### Les tres pantalles de Progrés
 

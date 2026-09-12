@@ -200,8 +200,8 @@ describe('CalendarPageComponent', () => {
       expect(component.hasActiveFilter()).toBeTrue();
     });
 
-    it("és cert amb l'abast de 30 dies posat", () => {
-      component.recentOnly.set(true);
+    it("és cert amb un abast posat", () => {
+      component.setRange(30);
       expect(component.hasActiveFilter()).toBeTrue();
     });
 
@@ -318,34 +318,75 @@ describe('CalendarPageComponent', () => {
     });
   });
 
-  // ── Abast: els últims 30 dies ────────────────────────────────────────────
+  // ── El període: abasts i dia, un de sol ──────────────────────────────────
 
-  describe('recentOnly', () => {
-    it("arrenca apagat quan a l'adreça no hi ha cap abast", () => {
-      expect(component.recentOnly()).toBeFalse();
+  describe('període', () => {
+    it("arrenca a «Tot» quan a l'adreça no hi ha cap abast", () => {
+      expect(component.rangeDays()).toBeNull();
+      expect(component.hasPeriodFilter()).toBeFalse();
+      expect(component.periodLabel()).toBe('Tot');
     });
 
-    it("toggleRecentOnly() el posa i el treu", () => {
-      component.toggleRecentOnly();
-      expect(component.recentOnly()).toBeTrue();
-      component.toggleRecentOnly();
-      expect(component.recentOnly()).toBeFalse();
+    it('el xip diu sempre el filtre que hi ha posat', () => {
+      component.setRange(7);
+      expect(component.periodLabel()).toBe('7 dies');
+      component.setRange(90);
+      expect(component.periodLabel()).toBe('3 mesos');
+      component.selectDate(TODAY);
+      expect(component.periodLabel()).toBe('Avui');
+      component.clearPeriod();
+      expect(component.periodLabel()).toBe('Tot');
     });
 
-    it('talla el que queda més enrere de 30 dies', () => {
+    // El xip no pot dir «30 dies» mentre la llista ensenya un dia concret.
+    it('triar un dia treu l\'abast', () => {
+      component.setRange(30);
+      component.selectDate(daysAgo(3));
+      expect(component.rangeDays()).toBeNull();
+      expect(component.selectedDate()).toBe(daysAgo(3));
+    });
+
+    it("i triar un abast treu el dia", () => {
+      component.selectDate(daysAgo(3));
+      component.setRange(30);
+      expect(component.selectedDate()).toBeNull();
+      expect(component.rangeDays()).toBe(30);
+    });
+
+    it('clearPeriod() els treu tots dos', () => {
+      component.selectDate(daysAgo(3));
+      component.clearPeriod();
+      expect(component.selectedDate()).toBeNull();
+      expect(component.rangeDays()).toBeNull();
+      expect(component.hasPeriodFilter()).toBeFalse();
+    });
+
+    it("talla el que queda més enrere de l'abast", () => {
       const within = daysAgo(29);
       const older  = daysAgo(45);
       doneByDate[within] = [makeWorkout({ id: 'w-within', date: within })];
       doneByDate[older]  = [makeWorkout({ id: 'w-older',  date: older })];
       workoutsSignal.set([...doneByDate[within], ...doneByDate[older]]);
 
-      component.recentOnly.set(true);
+      component.setRange(30);
       const dates = component.feedDays().map(d => d.date);
       expect(dates).toContain(within);
       expect(dates).not.toContain(older);
     });
 
-    it("talla també amb una cerca posada: el tram manda", () => {
+    it('un abast més curt talla més amunt', () => {
+      const within = daysAgo(3);
+      const older  = daysAgo(20);
+      doneByDate[within] = [makeWorkout({ id: 'w-within', date: within })];
+      doneByDate[older]  = [makeWorkout({ id: 'w-older',  date: older })];
+      workoutsSignal.set([...doneByDate[within], ...doneByDate[older]]);
+
+      component.setRange(7);
+      const dates = component.feedDays().map(d => d.date);
+      expect(dates).toEqual([within]);
+    });
+
+    it("talla també amb una cerca posada: el tram mana", () => {
       const older = daysAgo(45);
       doneByDate[older] = [makeWorkout({
         id: 'w-older', date: older,
@@ -353,30 +394,37 @@ describe('CalendarPageComponent', () => {
       })];
       workoutsSignal.set(doneByDate[older]);
 
-      component.recentOnly.set(true);
+      component.setRange(30);
       component.searchQuery.set('banca');
       expect(component.feedDays()).toEqual([]);
     });
 
     it("no ofereix carregar-ne més: el tram té final", () => {
-      component.recentOnly.set(true);
+      component.setRange(30);
       expect(component.hasMore()).toBeFalse();
     });
 
     it('tanca la llista dient de quin tram parla', () => {
-      component.recentOnly.set(true);
+      component.setRange(30);
       expect(component.loadedRangeLabel()).toBe('Últims 30 dies');
     });
 
-    it("demana el mes on comença el tram, que sol ser l'anterior", () => {
+    it("demana tots els mesos que toca l'abast, no només el primer", () => {
       const wEnsure = TestBed.inject(WorkoutService).ensureMonthLoaded as jasmine.Spy;
       wEnsure.calls.reset();
-      component.recentOnly.set(true);
+      component.setRange(90);
       fixture.detectChanges();
 
       const start = new Date(TODAY + 'T12:00:00');
-      start.setDate(start.getDate() - 29);
-      expect(wEnsure).toHaveBeenCalledWith(start.getFullYear(), start.getMonth());
+      start.setDate(start.getDate() - 89);
+      const today = new Date(TODAY + 'T12:00:00');
+      const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+      const wanted: [number, number][] = [];
+      while (cursor <= today) {
+        wanted.push([cursor.getFullYear(), cursor.getMonth()]);
+        cursor.setMonth(cursor.getMonth() + 1);
+      }
+      for (const [y, m] of wanted) expect(wEnsure).toHaveBeenCalledWith(y, m);
     });
   });
 
