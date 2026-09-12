@@ -2,7 +2,9 @@ import {
   Component, computed, effect, ElementRef, inject,
   OnDestroy, signal, untracked, viewChild,
 } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, NavigationEnd, Router, RouterLink } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { filter } from 'rxjs/operators';
 import {
   CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS,
   ExerciseCategory,
@@ -22,6 +24,9 @@ import { DayFeedCardsComponent, DayFeedEntry } from '../../shared/components/day
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { TrainingTypeService } from '../../core/services/training-type.service';
 
+/** El valor de `?range=` que demana l'abast curt. Inici l'hi porta. */
+const RANGE_RECENT = '30d';
+
 @Component({
   selector: 'app-calendar-page',
   standalone: true,
@@ -32,12 +37,18 @@ import { TrainingTypeService } from '../../core/services/training-type.service';
       <!-- ── Page header ── -->
       <app-page-header title="Historial" />
 
-      <!-- ── Cerca i filtres (sempre visibles) — el calendari és un filtre més ── -->
+      <!-- ── Cerca i filtres (sempre visibles) — el calendari és un filtre més ──
+           Els filtres van en fila pròpia (stackFilters): aquí n'hi ha de
+           tres menes —l'abast, els tipus d'entrenament i els esports— i
+           encabir-los al costat de la cerca els deixava tots estrets. -->
       <app-filter-bar
         searchPlaceholder="Cerca per exercici..."
+        [stackFilters]="true"
+        [sports]="sportService.sports()"
         [(searchQuery)]="searchQuery"
         [(sortDesc)]="sortDesc"
-        [(category)]="filterCat">
+        [(category)]="filterCat"
+        [(sport)]="filterSport">
         <button class="cal-filter-btn"
                 [class.cal-filter-btn--active]="calendarOpen() || !!selectedDate()"
                 (click)="calendarOpen.set(!calendarOpen())"
@@ -45,6 +56,16 @@ import { TrainingTypeService } from '../../core/services/training-type.service';
                 [attr.aria-expanded]="calendarOpen()" title="Filtra per data">
           <span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>
           @if (selectedDate()) { <span class="cal-filter-dot" aria-hidden="true"></span> }
+        </button>
+
+        <!-- ── Abast: els últims 30 dies ──
+             És per on s'hi arriba des d'Inici (?range=30d), i des d'aquí es
+             treu amb un toc per veure-ho tot. -->
+        <button filterLead class="range-chip" [class.range-chip--active]="recentOnly()"
+                [attr.aria-pressed]="recentOnly()" (click)="toggleRecentOnly()"
+                title="Només els últims 30 dies">
+          <span class="material-symbols-outlined" aria-hidden="true">history</span>
+          30 dies
         </button>
       </app-filter-bar>
 
@@ -217,6 +238,25 @@ import { TrainingTypeService } from '../../core/services/training-type.service';
       }
       &:focus-visible { outline: 2px solid var(--c-brand); outline-offset: 2px; }
     }
+    /* ── Abast de dies (xip projectat a la fila de filtres) ──
+       Porta text, no només icona: és l'únic filtre que no diu «de quina mena»
+       sinó «de quan», i una rodona més no ho hauria explicat. */
+    .range-chip {
+      display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+      height: 34px; padding: 0 12px; box-sizing: border-box;
+      border: 1.5px solid var(--c-border); border-radius: 999px;
+      background: var(--c-card); color: var(--c-text-2);
+      font-size: 12px; font-weight: 700; white-space: nowrap;
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 16px; }
+      &:not(.range-chip--active):hover { border-color: var(--c-brand); color: var(--c-brand); }
+      &.range-chip--active {
+        background: var(--c-brand); color: white; border-color: var(--c-brand);
+        box-shadow: 0 2px 6px color-mix(in srgb, var(--c-brand) 35%, transparent);
+      }
+      &:focus-visible { outline: 2px solid var(--c-brand); outline-offset: 2px; }
+    }
+
     /* Small dot marking that a specific day is currently filtering the list. */
     .cal-filter-dot {
       position: absolute; top: 4px; right: 4px;
@@ -381,6 +421,7 @@ export class CalendarPageComponent implements OnDestroy {
   private authService     = inject(AuthService);
   private feedback        = inject(FeedbackService);
   private router          = inject(Router);
+  private route           = inject(ActivatedRoute);
 
   private typeService     = inject(TrainingTypeService);
   readonly gymCategories = computed(() => this.typeService.types().map(t => t.id));
@@ -391,7 +432,25 @@ export class CalendarPageComponent implements OnDestroy {
   readonly selectedDate  = signal<string | null>(null);
   readonly sortDesc      = signal(true);
   readonly filterCat     = signal<ExerciseCategory | null>(null);
+  /** L'id de l'esport filtrat. Exclusiu amb `filterCat` — ho mana la barra. */
+  readonly filterSport   = signal<string | null>(null);
   readonly searchQuery   = signal('');
+
+  /** Quants dies enrere arriba la llista quan hi ha l'abast posat. Inici hi
+   *  entra amb aquest filtre ja marcat (`/calendar?range=30d`). */
+  static readonly RECENT_DAYS = 30;
+
+  /** L'abast curt: només els últims 30 dies. */
+  readonly recentOnly = signal(false);
+
+  toggleRecentOnly(): void { this.recentOnly.update(v => !v); }
+
+  /** El primer dia de l'abast curt (avui inclòs). */
+  private readonly recentStart = computed(() => {
+    const from = new Date(this.workoutService.todayDateString() + 'T12:00:00');
+    from.setDate(from.getDate() - (CalendarPageComponent.RECENT_DAYS - 1));
+    return this._toDateStr(from);
+  });
 
   // ── Day planning (today / future dates) ─────────────────────────────────
   readonly isFutureOrToday = computed(() => {
@@ -459,18 +518,24 @@ export class CalendarPageComponent implements OnDestroy {
   private _emptyStreak = 0;
 
   /** Amb un filtre posat no hi ha res més a carregar: la resposta del servidor
-   *  ja porta totes les coincidències de tot l'historial. */
-  readonly hasMore = computed(() => !this._reachedEnd() && !this.searchQuery().trim() && !this.filterCat());
+   *  ja porta totes les coincidències de tot l'historial. Amb l'abast curt
+   *  tampoc: el tram té final, i és avui menys trenta dies. */
+  readonly hasMore = computed(() =>
+    !this._reachedEnd() && !this.recentOnly() && !this.searchQuery().trim() && !this.filterCat()
+  );
 
-  /** El primer dia carregat: l'1 del mes més antic que s'ha demanat. */
+  /** El primer dia carregat: l'1 del mes més antic que s'ha demanat, o el
+   *  primer dia de l'abast curt si hi és. */
   private readonly windowStart = computed(() => {
+    if (this.recentOnly()) return this.recentStart();
     const today = new Date(this.workoutService.todayDateString() + 'T12:00:00');
     const start = new Date(today.getFullYear(), today.getMonth() - this.monthsBack(), 1);
     return this._toDateStr(start);
   });
 
   readonly hasActiveFilter = computed(
-    () => !!this.filterCat() || !!this.searchQuery() || !!this.selectedDate()
+    () => !!this.filterCat() || !!this.filterSport() || !!this.searchQuery()
+       || !!this.selectedDate() || this.recentOnly()
   );
 
   /**
@@ -484,10 +549,15 @@ export class CalendarPageComponent implements OnDestroy {
     const all = this.workoutService.workouts();
     this.sportService.sessions(); this.sportService.sports();
 
-    const sel    = this.selectedDate();
-    const today  = this.workoutService.todayDateString();
-    const search = this.searchQuery().trim().toLowerCase();
-    const cat    = this.filterCat();
+    const sel     = this.selectedDate();
+    const today   = this.workoutService.todayDateString();
+    const search  = this.searchQuery().trim().toLowerCase();
+    const cat     = this.filterCat();
+    const sportId = this.filterSport();
+    // L'abast curt talla per baix sigui quin sigui l'altre filtre: buscar un
+    // exercici amb els «30 dies» posats pregunta pels últims 30 dies, no per
+    // tota la vida.
+    const floor   = this.recentOnly() ? this.recentStart() : null;
 
     // ── Amb cerca o filtre: des de les coincidències ────────────────────────
     // La resposta del servidor porta les que hi ha, escampades per anys. Fer
@@ -496,20 +566,26 @@ export class CalendarPageComponent implements OnDestroy {
     // «carregar-ne més» quedava desactivat), i fer-lo des de la primera
     // coincidència voldria dir recórrer milers de dies buits per pintar-ne
     // quatre.
-    if (!sel && (search || cat)) {
+    if (!sel && (search || cat || sportId)) {
       const byDate = new Map<string, DayFeedEntry>();
       const bucket = (date: string): DayFeedEntry => {
         let d = byDate.get(date);
         if (!d) { d = { date, workouts: [], sports: [] }; byDate.set(date, d); }
         return d;
       };
-      for (const w of all) {
-        if (!this._matchesWorkout(w, cat, search)) continue;
-        bucket(w.date).workouts.push(w);
+      // Un filtre d'esport deixa els entrenaments fora d'entrada: un esport no
+      // és cap tipus d'entrenament.
+      if (!sportId) {
+        for (const w of all) {
+          if (floor && w.date < floor) continue;
+          if (!this._matchesWorkout(w, cat, search)) continue;
+          bucket(w.date).workouts.push(w);
+        }
       }
       if (!cat) {
         for (const item of this.sportService.allSportSessionPairs()) {
-          if (!this._matchesSport(item, cat, search)) continue;
+          if (floor && item.session.date < floor) continue;
+          if (!this._matchesSport(item, cat, sportId, search)) continue;
           bucket(item.session.date).sports.push(item);
         }
       }
@@ -525,7 +601,7 @@ export class CalendarPageComponent implements OnDestroy {
     const cursor = new Date(to + 'T12:00:00');
     while (this._toDateStr(cursor) >= from) {
       const dateStr = this._toDateStr(cursor);
-      const workouts = [
+      const workouts = sportId ? [] : [
         ...this.workoutService.getPlannedForDate(dateStr),
         ...this.workoutService.getDoneWorkoutsForDate(dateStr),
       ].filter(w => this._matchesWorkout(w, cat, search));
@@ -533,7 +609,7 @@ export class CalendarPageComponent implements OnDestroy {
         ...this.sportService.getSportSessionsForDate(dateStr),
         // Un dia d'avui endavant també ensenya el que hi ha planificat.
         ...(dateStr >= today ? this.sportService.getPlannedSportSessionsForDate(dateStr) : []),
-      ].filter(item => this._matchesSport(item, cat, search));
+      ].filter(item => this._matchesSport(item, cat, sportId, search));
       if (workouts.length > 0 || sports.length > 0) days.push({ date: dateStr, workouts, sports });
       cursor.setDate(cursor.getDate() - 1);
     }
@@ -542,6 +618,7 @@ export class CalendarPageComponent implements OnDestroy {
 
   /** El rang que hi ha carregat, per tancar la llista amb alguna cosa útil. */
   readonly loadedRangeLabel = computed(() => {
+    if (this.recentOnly()) return `Últims ${CalendarPageComponent.RECENT_DAYS} dies`;
     const start = new Date(this.windowStart() + 'T12:00:00');
     const label = start.toLocaleDateString('ca-ES', { month: 'long', year: 'numeric' });
     return `Des de ${label}`;
@@ -558,9 +635,14 @@ export class CalendarPageComponent implements OnDestroy {
   }
 
   /** Un filtre de tipus d'entrenament (empenta, tracció...) no aplica als
-   *  esports, així que els amaga; la cerca sí que hi busca pel nom. */
-  private _matchesSport(item: { sport: Sport; session: SportSession }, cat: ExerciseCategory | null, search: string): boolean {
+   *  esports, així que els amaga; un filtre d'esport en deixa passar el seu i
+   *  prou, i la cerca hi busca pel nom. */
+  private _matchesSport(
+    item: { sport: Sport; session: SportSession },
+    cat: ExerciseCategory | null, sportId: string | null, search: string,
+  ): boolean {
     if (cat) return false;
+    if (sportId && item.sport.id !== sportId) return false;
     if (!search) return true;
     const sub = item.session.subtypeId
       ? (item.sport.subtypes.find(s => s.id === item.session.subtypeId)?.name ?? '')
@@ -582,6 +664,39 @@ export class CalendarPageComponent implements OnDestroy {
   constructor() {
     this.exerciseService.ensureLoaded();
     this.sportService.ensureLoaded();
+
+    // ── L'abast el diu l'adreça ────────────────────────────────────────
+    //
+    // Inici hi entra amb `/calendar?range=30d`: el seu botó és una drecera a
+    // «l'últim mes» i qui hi arriba no ha de tornar a filtrar res. Entrar-hi
+    // sense el paràmetre (la pestanya de baix) vol dir tot l'historial.
+    //
+    // Es llegeix a cada arribada, no només al muntar-se: la ruta es manté
+    // viva (AppReuseStrategy), i sense això el segon cop que toquessis el
+    // botó d'Inici et trobaries l'Historial tal com l'havies deixat.
+    this.recentOnly.set(this.route.snapshot.queryParamMap.get('range') === RANGE_RECENT);
+
+    let previousPath = this.router.url.split('?')[0];
+    this.router.events
+      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd), takeUntilDestroyed())
+      .subscribe(e => {
+        const path       = e.urlAfterRedirects.split('?')[0];
+        const arrivedNow = previousPath !== '/calendar' && path === '/calendar';
+        previousPath = path;
+        // Només en arribar-hi de fora: navegar dins la mateixa pàgina no ha de
+        // desfer el filtre que acabes de treure amb el dit.
+        if (!arrivedNow) return;
+        const params = this.router.parseUrl(e.urlAfterRedirects).queryParams as Record<string, string | undefined>;
+        this.recentOnly.set(params['range'] === RANGE_RECENT);
+      });
+
+    // L'abast curt es menja el mes anterior gairebé sempre; sense demanar-lo
+    // la llista es tallaria a l'1 de mes.
+    effect(() => {
+      if (!this.recentOnly() || !this.authService.uid()) return;
+      const start = new Date(this.recentStart() + 'T12:00:00');
+      untracked(() => { void this._ensureMonth(start.getFullYear(), start.getMonth()); });
+    });
 
     // Càrrega inicial: l'últim mes. Tracking uid() so the first load fires
     // once auth resolves on cold start.

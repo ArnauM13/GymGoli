@@ -18,11 +18,6 @@ import { AppHintService } from '../../core/services/app-hint.service';
 import { TodayService } from '../../core/services/today.service';
 import { feedDayLabel } from '../../shared/utils/workout-card.utils';
 import { addDays, mondayOf } from '../../shared/utils/calendar-utils';
-import { toDateStr } from '../../shared/utils/date.utils';
-
-/** Fins on arriba "Activitat recent" a Inici. Tot el que queda més enrere
- *  viu a l'Historial, que hi té cerca, filtres i calendari. */
-const RECENT_DAYS = 30;
 
 @Component({
   selector: 'app-home',
@@ -162,62 +157,22 @@ const RECENT_DAYS = 30;
         <app-discovery-hint />
       }
 
-      <!-- ── Activitat recent (últims 30 dies) ── -->
-      <!-- Plegada de sèrie, com les seccions del Perfil: Inici s'obre amb el
-           dia d'avui a la vista, no amb un mes de scroll a sota. -->
-      <div class="card-section history-card" [class.history-card--open]="historyOpen()">
-        <h2 class="section-heading">
-          <button class="section-header" (click)="toggleHistory()" [attr.aria-expanded]="historyOpen()">
-            <span class="material-symbols-outlined section-icon" aria-hidden="true">history</span>
-            <span class="section-title">Activitat recent</span>
-            <span class="section-hint">30 dies</span>
-            <span class="material-symbols-outlined section-chevron" aria-hidden="true">expand_more</span>
-          </button>
-        </h2>
-
-        @if (historyOpen()) {
-          <div class="history-body">
-            <!-- L'esquelet només mentre falti la finestra que aquesta secció
-                 ensenya. Abans mirava «hi ha alguna consulta en marxa», i
-                 parpellejava per consultes que no tenien res a veure. -->
-            @if ((!workoutService.hasRecentWindow() || !sportService.sportsLoaded()) && historyFeedDays().length === 0) {
-              <div class="feed-sk">
-                @for (_ of [1,2,3]; track $index) {
-                  <div class="sk-card-ph">
-                    <div class="sk sk-card-bar"></div>
-                    <div class="sk-card-body">
-                      <div class="sk sk-line sk-line--55"></div>
-                      <div class="sk sk-line sk-line--30"></div>
-                    </div>
-                  </div>
-                }
-              </div>
-            } @else if (historyFeedDays().length === 0) {
-              <div class="empty-state">
-                <span class="material-symbols-outlined empty-icon">fitness_center</span>
-                <h2>Encara no hi ha res</h2>
-                <p>Els teus entrenaments anteriors apareixeran aquí.</p>
-              </div>
-            } @else {
-              @for (day of historyFeedDays(); track day.date) {
-                <div class="feed-day">
-                  <div class="feed-day-header">{{ dayLabel(day.date) }}</div>
-                  <app-day-feed-cards [day]="day" hideVolume (open)="goToWorkout($event)"
-                                      (openSport)="goToSportSession($event)" />
-                </div>
-              }
-            }
-
-            <!-- Inici només ensenya el que és recent; tot el que hi ha abans viu
-                 a l'Historial, que té cerca, filtres i calendari. -->
-            <a class="history-all-link" routerLink="/calendar">
-              <span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>
-              Veure tot l'historial
-              <span class="material-symbols-outlined hal-arrow" aria-hidden="true">chevron_right</span>
-            </a>
-          </div>
-        }
-      </div>
+      <!-- ── Activitat recent ──
+           Una drecera, no una llista. Inici és la pantalla del dia d'avui, i
+           tenir-hi el mes sencer plegat a sota volia dir mantenir dues
+           lectures de la mateixa cosa: aquí el botó, i l'Historial —que ja hi
+           té cerca, filtres i calendari— fa la feina. Hi entra amb els últims
+           30 dies filtrats, que és el que la secció ensenyava. -->
+      <a class="recent-link" routerLink="/calendar" [queryParams]="{ range: '30d' }">
+        <span class="rl-icon-wrap" aria-hidden="true">
+          <span class="material-symbols-outlined rl-icon">history</span>
+        </span>
+        <span class="rl-text">
+          <span class="rl-title">Activitat recent</span>
+          <span class="rl-sub">Els últims 30 dies a l'Historial</span>
+        </span>
+        <span class="material-symbols-outlined rl-arrow" aria-hidden="true">chevron_right</span>
+      </a>
 
     </div>
   `,
@@ -400,103 +355,37 @@ const RECENT_DAYS = 30;
       &:hover { background: var(--c-subtle); color: var(--c-text-2); }
     }
 
-    /* ── "Historial" section card ── */
-    .history-card {
-      margin: 16px 16px 0;
-      padding: 14px 14px 16px;
-      background: var(--c-card);
-      border-radius: 18px;
-      box-shadow: 0 2px 10px var(--c-shadow);
+    /* ── Drecera a l'Historial ──
+       Fila d'una sola línia de lectura: icona tenyida, què hi trobaràs i el
+       xebró que diu que se'n va a una altra pantalla. Tenyida i no plena,
+       perquè per pes queda per sota del botó del dia, que és l'acció. */
+    .recent-link {
+      display: flex; align-items: center; gap: 12px;
+      margin: 16px 16px 0; padding: 12px 14px;
+      border: 1.5px solid var(--c-border-2); border-radius: 16px;
+      background: var(--c-card); box-shadow: 0 2px 10px var(--c-shadow);
+      text-decoration: none; cursor: pointer; touch-action: manipulation;
+      transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+      &:hover {
+        border-color: color-mix(in srgb, var(--c-brand) 45%, var(--c-border));
+        box-shadow: 0 4px 14px var(--c-shadow);
+      }
+      &:active { transform: scale(0.99); }
+      &:focus-visible { outline: 2px solid var(--c-brand); outline-offset: 2px; }
     }
-    /* Plegada és una sola fila: el coixí ha de quedar igual a dalt i a baix. */
-    .history-card:not(.history-card--open) { padding-bottom: 14px; }
-    /* La capçalera és el botó que plega la targeta. Sense canvi de fons: en
-       tàctil el gris del :hover es queda enganxat a la secció acabada d'obrir;
-       el xebró ja diu si està oberta. */
-    .section-heading { margin: 0; }
-    .section-header {
-      display: flex; align-items: center; gap: 7px;
-      width: 100%; padding: 0; border: none; background: none;
-      text-align: left; font: inherit;
-      cursor: pointer; touch-action: manipulation;
-      -webkit-tap-highlight-color: transparent;
+    .rl-icon-wrap {
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      width: 36px; height: 36px; border-radius: 11px;
+      background: color-mix(in srgb, var(--c-brand) 12%, transparent);
     }
-    .section-icon  { font-size: 18px; color: var(--c-text-3); font-variation-settings: 'FILL' 0, 'wght' 300; }
-    .section-title { margin: 0; flex: 1; font-size: 14px; font-weight: 700; color: var(--c-text-2); letter-spacing: 0.2px; }
-    .section-hint {
-      flex-shrink: 0; padding: 2px 8px; border-radius: 999px;
-      background: var(--c-subtle); color: var(--c-text-3);
-      font-size: 10.5px; font-weight: 700; letter-spacing: 0.2px;
+    .rl-icon { font-size: 21px; color: var(--c-brand); font-variation-settings: 'FILL' 0, 'wght' 400; }
+    .rl-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .rl-title { font-size: 14px; font-weight: 800; color: var(--c-text); letter-spacing: -0.1px; }
+    .rl-sub {
+      font-size: 11.5px; font-weight: 600; color: var(--c-text-3); line-height: 1.3;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .section-chevron {
-      font-size: 20px; color: var(--c-text-3); flex-shrink: 0;
-      transition: transform 0.2s;
-    }
-    .history-card--open .section-chevron { transform: rotate(180deg); }
-
-    .history-body { padding-top: 12px; animation: section-open 0.18s ease-out; }
-    @keyframes section-open {
-      from { opacity: 0; transform: translateY(-4px); }
-      to   { opacity: 1; transform: none; }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .history-body { animation: none; }
-      .section-chevron { transition: none; }
-    }
-
-    .history-all-link {
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      margin-top: 4px; padding: 10px; border-radius: 12px;
-      border: 1.5px solid var(--c-border-2); background: var(--c-subtle);
-      color: var(--c-text-2); font-size: 12.5px; font-weight: 700; text-decoration: none;
-      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 17px; color: var(--c-text-3); }
-      &:hover { border-color: var(--c-brand); color: var(--c-brand); .material-symbols-outlined { color: var(--c-brand); } }
-    }
-    .hal-arrow { margin-left: -2px; }
-
-    /* ── Activity feed ── */
-    .feed-day { margin: 0 0 14px; }
-    .feed-day-header {
-      font-size: 11px; font-weight: 700; color: var(--c-text-3);
-      text-transform: uppercase; letter-spacing: 0.3px;
-      margin-bottom: 6px;
-    }
-    .feed-sk { display: flex; flex-direction: column; gap: 8px; }
-
-    /* ── Empty state ── */
-    .empty-state {
-      display: flex; flex-direction: column; align-items: center;
-      gap: 10px; padding: 40px 24px; text-align: center;
-      .empty-icon { font-size: 56px; color: var(--c-border); }
-      h2 { margin: 0; font-size: 18px; font-weight: 600; color: var(--c-text); }
-      p { margin: 0; font-size: 14px; color: var(--c-text-2); }
-    }
-
-    /* ── Skeleton ── */
-    @keyframes sk-shimmer {
-      from { background-position: -300px 0; }
-      to   { background-position: calc(300px + 100%) 0; }
-    }
-    .sk {
-      background: linear-gradient(90deg, var(--c-border-2) 0%, var(--c-border) 40%, var(--c-border-2) 80%);
-      background-size: 600px 100%;
-      animation: sk-shimmer 1.5s ease-in-out infinite;
-      border-radius: 8px;
-    }
-    .sk-card-ph {
-      display: flex; align-items: stretch;
-      border: 1.5px solid var(--c-border-2); border-radius: 14px;
-      overflow: hidden; margin-bottom: 12px;
-    }
-    .sk-card-bar { width: 5px; min-height: 52px; flex-shrink: 0; border-radius: 0; }
-    .sk-card-body {
-      flex: 1; padding: 10px;
-      display: flex; flex-direction: column; gap: 7px;
-    }
-    .sk-line      { height: 12px; }
-    .sk-line--55  { width: 55%; }
-    .sk-line--30  { width: 30%; height: 10px; }
+    .rl-arrow { font-size: 20px; flex-shrink: 0; color: var(--c-text-3); }
   `],
 })
 export class HomeComponent {
@@ -633,10 +522,6 @@ export class HomeComponent {
     this.router.navigate(['/train'], { queryParams: { date: this.effectiveDate() } });
   }
 
-  dayLabel(date: string): string {
-    return feedDayLabel(date, this.today());
-  }
-
   selectDate(date: string): void {
     this.selectedDate.set(this.selectedDate() === date ? null : date);
   }
@@ -679,52 +564,6 @@ export class HomeComponent {
     this.settingsService.update({ routineHintDismissed: true });
   }
 
-  // ── Activitat recent (agrupada per dia, només els últims 30 dies) ───────
-
-  /** Els dies amb activitat dins la finestra recent, del més nou al més vell.
-   *
-   *  Inici ensenya què has fet últimament, no tot el que has fet mai: la
-   *  llista completa (amb cerca i filtres) és la pàgina d'Historial. */
-  readonly feedDays = computed(() => {
-    // Establish reactivity on the underlying data (mirrors the calendar) so the
-    // feed fills in as soon as a month's workouts/sports load, rather than
-    // staying empty until the user interacts with a day.
-    this.workoutService.workouts(); this.sportService.sessions(); this.sportService.sports();
-    const days: DayFeedEntry[] = [];
-    const cursor = new Date(this.today() + 'T12:00:00');
-
-    for (let i = 0; i < RECENT_DAYS; i++) {
-      const dateStr  = toDateStr(cursor);
-      const done     = this.workoutService.getDoneWorkoutsForDate(dateStr);
-      const planned  = this.workoutService.getPlannedForDate(dateStr);
-      const workouts = [...planned, ...done];
-      const sports   = [
-        ...this.sportService.getPlannedSportSessionsForDate(dateStr),
-        ...this.sportService.getSportSessionsForDate(dateStr),
-      ];
-      if (workouts.length > 0 || sports.length > 0) days.push({ date: dateStr, workouts, sports });
-      cursor.setDate(cursor.getDate() - 1);
-    }
-    return days;
-  });
-
-  /** "Activitat recent" arrenca plegada: Inici és per al dia d'avui, i el mes
-   *  anterior només s'obre si el vas a buscar. No es recorda entre visites —
-   *  igual que les seccions del Perfil, cada entrada torna a la portada. */
-  readonly historyOpen = signal(false);
-
-  toggleHistory(): void { this.historyOpen.update(v => !v); }
-
-  /** La línia de temps recent, sense el dia que la targeta de dalt ja ensenya.
-   *
-   *  "Avui" i "Activitat recent" quedaven una sota l'altra amb les mateixes
-   *  targetes: l'entrenament d'avui es veia dues vegades a la mateixa
-   *  pantalla. Aquí hi ha el que has fet *abans*, i si encara no hi ha res
-   *  l'estat buit ja ho diu. */
-  readonly historyFeedDays = computed(() =>
-    this.feedDays().filter(d => d.date !== this.effectiveDate())
-  );
-
   constructor() {
     this.sportService.ensureLoaded();
 
@@ -734,11 +573,6 @@ export class HomeComponent {
       this._ensureMonthLoaded(parseInt(yearStr), parseInt(monthStr) - 1);
     });
 
-    // La finestra de 30 dies es menja el mes anterior gairebé sempre, així que
-    // es carrega d'entrada: sense això l'activitat recent es talla a l'1 de mes.
-    const earliest = new Date(this.today() + 'T12:00:00');
-    earliest.setDate(earliest.getDate() - (RECENT_DAYS - 1));
-    this._ensureMonthLoaded(earliest.getFullYear(), earliest.getMonth());
   }
 
   private _ensureMonthLoaded(year: number, month: number): void {

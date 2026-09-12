@@ -2,6 +2,8 @@ import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 
+import { provideRouter } from '@angular/router';
+
 import { CalendarPageComponent } from './calendar-page.component';
 import { WorkoutService } from '../../core/services/workout.service';
 import { ExerciseService } from '../../core/services/exercise.service';
@@ -91,6 +93,7 @@ describe('CalendarPageComponent', () => {
     await TestBed.configureTestingModule({
       imports:   [CalendarPageComponent],
       providers: [
+        provideRouter([]),
         { provide: WorkoutService,      useValue: mockWorkoutService },
         { provide: ExerciseService,     useValue: mockExerciseService },
         { provide: SportService,        useValue: mockSportService },
@@ -192,6 +195,16 @@ describe('CalendarPageComponent', () => {
       expect(component.hasActiveFilter()).toBeTrue();
     });
 
+    it("és cert amb un esport filtrat", () => {
+      component.filterSport.set('s1');
+      expect(component.hasActiveFilter()).toBeTrue();
+    });
+
+    it("és cert amb l'abast de 30 dies posat", () => {
+      component.recentOnly.set(true);
+      expect(component.hasActiveFilter()).toBeTrue();
+    });
+
     it('is false after all filters are cleared', () => {
       component.filterCat.set('push');
       component.filterCat.set(null);
@@ -265,6 +278,105 @@ describe('CalendarPageComponent', () => {
       sportsByDate[TODAY] = [{ sport: makeSport(), session: makeSession() }];
       component.searchQuery.set('córrer');
       expect(component.feedDays()[0].sports.length).toBe(1);
+    });
+  });
+
+  // ── Filtre per esport ────────────────────────────────────────────────────
+
+  describe('filterSport', () => {
+    it("deixa passar només les sessions d'aquell esport", () => {
+      const run  = makeSport({ id: 's-run',  name: 'Córrer' });
+      const padel = makeSport({ id: 's-padel', name: 'Pàdel', icon: 'sports_tennis', color: '#1E88E5' });
+      sportsByDate[TODAY] = [
+        { sport: run,   session: makeSession({ id: 'ss-run',   sportId: 's-run' }) },
+        { sport: padel, session: makeSession({ id: 'ss-padel', sportId: 's-padel' }) },
+      ];
+
+      component.filterSport.set('s-padel');
+      const days = component.feedDays();
+      expect(days.length).toBe(1);
+      expect(days[0].sports.map(i => i.session.id)).toEqual(['ss-padel']);
+    });
+
+    it('amaga els entrenaments: un esport no és cap tipus de gimnàs', () => {
+      doneByDate[TODAY]   = [makeWorkout({ id: 'w-today' })];
+      workoutsSignal.set(doneByDate[TODAY]);
+      sportsByDate[TODAY] = [{ sport: makeSport(), session: makeSession() }];
+
+      component.filterSport.set('s1');
+      const days = component.feedDays();
+      expect(days.length).toBe(1);
+      expect(days[0].workouts).toEqual([]);
+      expect(days[0].sports.length).toBe(1);
+    });
+
+    // Els esports arriben amb els trams, no amb una cerca al servidor: rascant
+    // avall se'n poden trobar de més antics.
+    it("no tanca la paginació: hi ha mesos per anar a buscar", () => {
+      component.filterSport.set('s1');
+      expect(component.hasMore()).toBeTrue();
+    });
+  });
+
+  // ── Abast: els últims 30 dies ────────────────────────────────────────────
+
+  describe('recentOnly', () => {
+    it("arrenca apagat quan a l'adreça no hi ha cap abast", () => {
+      expect(component.recentOnly()).toBeFalse();
+    });
+
+    it("toggleRecentOnly() el posa i el treu", () => {
+      component.toggleRecentOnly();
+      expect(component.recentOnly()).toBeTrue();
+      component.toggleRecentOnly();
+      expect(component.recentOnly()).toBeFalse();
+    });
+
+    it('talla el que queda més enrere de 30 dies', () => {
+      const within = daysAgo(29);
+      const older  = daysAgo(45);
+      doneByDate[within] = [makeWorkout({ id: 'w-within', date: within })];
+      doneByDate[older]  = [makeWorkout({ id: 'w-older',  date: older })];
+      workoutsSignal.set([...doneByDate[within], ...doneByDate[older]]);
+
+      component.recentOnly.set(true);
+      const dates = component.feedDays().map(d => d.date);
+      expect(dates).toContain(within);
+      expect(dates).not.toContain(older);
+    });
+
+    it("talla també amb una cerca posada: el tram manda", () => {
+      const older = daysAgo(45);
+      doneByDate[older] = [makeWorkout({
+        id: 'w-older', date: older,
+        entries: [{ exerciseId: 'e1', exerciseName: 'Press banca', sets: [] }],
+      })];
+      workoutsSignal.set(doneByDate[older]);
+
+      component.recentOnly.set(true);
+      component.searchQuery.set('banca');
+      expect(component.feedDays()).toEqual([]);
+    });
+
+    it("no ofereix carregar-ne més: el tram té final", () => {
+      component.recentOnly.set(true);
+      expect(component.hasMore()).toBeFalse();
+    });
+
+    it('tanca la llista dient de quin tram parla', () => {
+      component.recentOnly.set(true);
+      expect(component.loadedRangeLabel()).toBe('Últims 30 dies');
+    });
+
+    it("demana el mes on comença el tram, que sol ser l'anterior", () => {
+      const wEnsure = TestBed.inject(WorkoutService).ensureMonthLoaded as jasmine.Spy;
+      wEnsure.calls.reset();
+      component.recentOnly.set(true);
+      fixture.detectChanges();
+
+      const start = new Date(TODAY + 'T12:00:00');
+      start.setDate(start.getDate() - 29);
+      expect(wEnsure).toHaveBeenCalledWith(start.getFullYear(), start.getMonth());
     });
   });
 

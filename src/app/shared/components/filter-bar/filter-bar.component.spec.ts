@@ -5,6 +5,14 @@ import { signal } from '@angular/core';
 import { FilterBarComponent } from './filter-bar.component';
 import { TrainingTypeService } from '../../../core/services/training-type.service';
 import { DEFAULT_TRAINING_TYPES } from '../../../core/models/training-type.model';
+import { Sport } from '../../../core/models/sport.model';
+
+function makeSport(overrides: Partial<Sport> = {}): Sport {
+  return {
+    id: 's1', name: 'Córrer', icon: 'directions_run', color: '#43A047',
+    subtypes: [], metricDefs: [], createdAt: new Date(), ...overrides,
+  };
+}
 
 describe('FilterBarComponent', () => {
   let component: FilterBarComponent;
@@ -78,6 +86,62 @@ describe('FilterBarComponent', () => {
     it('is settable directly, e.g. from the template chips', () => {
       component.category.set('push');
       expect(component.category()).toBe('push');
+    });
+  });
+
+  // ── Tipus d'entrenament i esports: exclusius ─────────────────────────────
+
+  describe('selectCategory() / selectSport()', () => {
+    it('selectCategory() posa el tipus i el treu si es torna a prémer', () => {
+      component.selectCategory('push');
+      expect(component.category()).toBe('push');
+      component.selectCategory('push');
+      expect(component.category()).toBeNull();
+    });
+
+    it('selectSport() posa l\'esport i el treu si es torna a prémer', () => {
+      component.selectSport('s1');
+      expect(component.sport()).toBe('s1');
+      component.selectSport('s1');
+      expect(component.sport()).toBeNull();
+    });
+
+    // Cap activitat és un tipus de gimnàs *i* un esport: amb els dos posats la
+    // llista no hauria ensenyat mai res.
+    it('triar un esport treu el tipus que hi hagués', () => {
+      component.selectCategory('push');
+      component.selectSport('s1');
+      expect(component.sport()).toBe('s1');
+      expect(component.category()).toBeNull();
+    });
+
+    it('i triar un tipus treu l\'esport', () => {
+      component.selectSport('s1');
+      component.selectCategory('legs');
+      expect(component.category()).toBe('legs');
+      expect(component.sport()).toBeNull();
+    });
+  });
+
+  describe('filtres d\'esport a la fila', () => {
+    it('no en pinta cap quan no se li passa cap esport', () => {
+      expect(fixture.nativeElement.querySelectorAll('.filter-icon').length).toBe(3);
+      expect(fixture.nativeElement.querySelector('.fb-sep')).toBeNull();
+    });
+
+    it('pinta una rodona per esport, separada dels tipus', () => {
+      fixture.componentRef.setInput('sports', [
+        makeSport(),
+        makeSport({ id: 's2', name: 'Pàdel', icon: 'sports_tennis' }),
+      ]);
+      fixture.detectChanges();
+
+      // Tres tipus per defecte + dos esports.
+      expect(fixture.nativeElement.querySelectorAll('.filter-icon').length).toBe(5);
+      expect(fixture.nativeElement.querySelector('.fb-sep')).not.toBeNull();
+      const titles = [...fixture.nativeElement.querySelectorAll('.filter-icon')]
+        .map((b: HTMLElement) => b.getAttribute('title'));
+      expect(titles).toContain('Pàdel');
     });
   });
 });
