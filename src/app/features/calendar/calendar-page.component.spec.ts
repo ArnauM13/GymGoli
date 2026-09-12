@@ -316,6 +316,35 @@ describe('CalendarPageComponent', () => {
       component.filterSport.set('s1');
       expect(component.hasMore()).toBeTrue();
     });
+
+    // Sense cap coincidència als mesos carregats la llista es quedava sense
+    // sentinella i sense botó: la paginació era viva i no s'hi arribava.
+    it('sense coincidències encara deixa carregar el mes anterior', () => {
+      component.filterSport.set('s-cap');
+      // La primera càrrega ja ha passat: si no, el que es pinta és l'esquelet.
+      component.isInitialLoading.set(false);
+      fixture.detectChanges();
+
+      expect(component.feedDays()).toEqual([]);
+      expect(component.hasActiveFilter()).toBeTrue();
+      expect(component.hasMore()).toBeTrue();
+      const more: HTMLButtonElement | null =
+        fixture.nativeElement.querySelector('.load-more-btn');
+      expect(more).not.toBeNull();
+    });
+
+    it("i el botó estira la paginació un mes més", async () => {
+      const wEnsure = TestBed.inject(WorkoutService).ensureMonthLoaded as jasmine.Spy;
+      component.filterSport.set('s-cap');
+      fixture.detectChanges();
+      wEnsure.calls.reset();
+
+      await component.loadMoreMonths();
+
+      const today  = new Date(TODAY + 'T12:00:00');
+      const target = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      expect(wEnsure).toHaveBeenCalledWith(target.getFullYear(), target.getMonth());
+    });
   });
 
   // ── El període: abasts i dia, un de sol ──────────────────────────────────

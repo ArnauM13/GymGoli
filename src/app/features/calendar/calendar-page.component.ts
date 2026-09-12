@@ -231,6 +231,21 @@ function parseRangeParam(raw: string | null | undefined): number | null {
           <p>Cap activitat amb aquest filtre</p>
         </div>
 
+        <!-- Un filtre que es contesta amb el que hi ha carregat (l'esport) pot
+             no trobar res aquí i sí un mes més enrere: sense això la llista
+             quedava en un cul-de-sac, amb la paginació viva però sense cap
+             manera d'estirar-la. Cerca, tipus i període no hi entren —el
+             servidor ja els ha contestat sencers, o el tram té final— i
+             hasMore() ho diu. -->
+        @if (hasMore()) {
+          <div class="load-more-row">
+            <button class="load-more-btn" [disabled]="isLoadingMore()" (click)="loadMoreMonths()">
+              <span class="material-symbols-outlined" aria-hidden="true">history</span>
+              Carregar el mes anterior
+            </button>
+          </div>
+        }
+
       } @else {
 
         <div class="empty-state">
