@@ -166,11 +166,27 @@ hi són:
 | «Quin és el meu rècord de cada exercici?» | Baixar tota la vida amb totes les sèries i calcular-ho aquí | `exercise_records()`: una fila per exercici |
 | «On surt "dominades" a l'historial?» | Igual, i filtrar-ho aquí | `activity_feed(..., p_search)`: només les coincidències |
 | «Quantes sessions d'aquest esport porto?» | Baixar les de **tots** els esports | `loadSessionsForSport()`: les d'aquell |
+| «Ensenya'm tots els pàdels» | Rascar mes a mes el que ja hi havia carregat, fins a cansar-se | `loadSessionsForSport()`: una consulta acotada per l'esport |
 
 El patró és sempre el mateix: **agregar i filtrar és feina del servidor**. Sap
 fer-ho amb índexs i torna el resultat, no les dades per calcular-lo. El que
 viatja deixa de créixer amb l'historial: qui porta vuit anys entrenant rep el
 mateix que qui en porta dos.
+
+L'últim és el filtre d'esport de l'Historial, i el que en va caure és
+instructiu: **un filtre no es contesta paginant una altra cosa**. Filtrar per
+pàdel demanava mesos enrere a veure si en sortia cap —fins a dotze consultes
+per no trobar el de fa tres anys, i després donar l'historial per esgotat—
+quan la pregunta «tots els pàdels» ja tenia resposta d'una sola consulta,
+acotada per l'esport i paginada per dins amb `fetchAllRows()`. Entra per
+`_absorb()`, que afegeix i no poda: una resposta filtrada diu **qui
+coincideix**, no qui hi ha, i per això no cobreix cap tram ni pot deduir cap
+esborrat.
+
+Baixar-ho no és ensenyar-ho. La llista de l'Historial en pinta **una pàgina**
+(`PAGE_SIZE` activitats) i creix rascant avall, igual filtrada que sencera;
+quan s'acaba el que hi ha carregat, i només llavors, es demana el tram
+següent. Les targetes del DOM tampoc poden créixer amb la vida de l'usuari.
 
 ### El que no es guarda
 

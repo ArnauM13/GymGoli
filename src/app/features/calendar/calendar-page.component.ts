@@ -192,11 +192,13 @@ function parseRangeParam(raw: string | null | undefined): number | null {
           }
         </div>
 
-      } @else if (feedDays().length > 0) {
+      } @else if (visibleDays().length > 0) {
 
-        <!-- ── L'activitat, dia a dia: la mateixa lectura que a Inici ── -->
+        <!-- ── L'activitat, dia a dia: la mateixa lectura que a Inici ──
+             Se'n pinta una pàgina, no tot el que hi ha carregat: la llista
+             creix rascant avall, filtrada o sencera. -->
         <div class="feed-wrap">
-          @for (day of feedDays(); track day.date) {
+          @for (day of visibleDays(); track day.date) {
             <div class="feed-day">
               <div class="feed-day-header">{{ dayLabel(day.date) }}</div>
               <app-day-feed-cards [day]="day" (open)="goToWorkout($event)"
@@ -205,7 +207,7 @@ function parseRangeParam(raw: string | null | undefined): number | null {
           }
         </div>
 
-        <!-- ── Sentinel per a l'infinite scroll (un mes més cada cop) ── -->
+        <!-- ── Sentinel: una pàgina més, i si s'ha acabat, un mes més ── -->
         <div #sentinel class="scroll-sentinel"></div>
 
         @if (isLoadingMore()) {
@@ -220,31 +222,36 @@ function parseRangeParam(raw: string | null | undefined): number | null {
               </div>
             }
           </div>
-        } @else if (!hasMore()) {
+        } @else if (sportFilterLoading()) {
+          <p class="end-of-list">· Carregant-ne més ·</p>
+        } @else if (!hasMoreToShow() && !hasMore()) {
           <p class="end-of-list">· {{ loadedRangeLabel() }} ·</p>
         }
 
+      } @else if (sportFilterLoading()) {
+
+        <!-- La consulta d'aquell esport encara viatja: la llista buida
+             d'ara no vol dir que no n'hi hagi. -->
+        <div class="sk-list">
+          @for (_ of [1,2,3]; track $index) {
+            <div class="sk-card-ph">
+              <div class="sk sk-card-bar"></div>
+              <div class="sk-card-body">
+                <div class="sk sk-line sk-line--40"></div>
+                <div class="sk sk-line sk-line--60"></div>
+              </div>
+            </div>
+          }
+        </div>
+
       } @else if (hasActiveFilter()) {
 
+        <!-- Cap filtre no es contesta rascant mesos: aquí «no n'hi ha» vol dir
+             que el servidor ja ho ha dit. -->
         <div class="day-empty">
           <span class="material-symbols-outlined" aria-hidden="true">filter_list_off</span>
           <p>Cap activitat amb aquest filtre</p>
         </div>
-
-        <!-- Un filtre que es contesta amb el que hi ha carregat (l'esport) pot
-             no trobar res aquí i sí un mes més enrere: sense això la llista
-             quedava en un cul-de-sac, amb la paginació viva però sense cap
-             manera d'estirar-la. Cerca, tipus i període no hi entren —el
-             servidor ja els ha contestat sencers, o el tram té final— i
-             hasMore() ho diu. -->
-        @if (hasMore()) {
-          <div class="load-more-row">
-            <button class="load-more-btn" [disabled]="isLoadingMore()" (click)="loadMoreMonths()">
-              <span class="material-symbols-outlined" aria-hidden="true">history</span>
-              Carregar el mes anterior
-            </button>
-          </div>
-        }
 
       } @else {
 
@@ -501,6 +508,21 @@ export class CalendarPageComponent implements OnDestroy {
   readonly filterSport   = signal<string | null>(null);
   readonly searchQuery   = signal('');
 
+  // ── Quant se'n pinta ─────────────────────────────────────────────────────
+  //
+  // La llista creix de pàgina en pàgina, i és **la mateixa** filtrada o
+  // sencera: pintar de cop tot el que hi ha carregat és el que fa que una
+  // pàgina vagi bé amb dos mesos i s'arrossegui amb vuit anys.
+
+  /** Quantes activitats s'afegeixen a la llista cada cop. */
+  static readonly PAGE_SIZE = 20;
+
+  readonly visibleCount = signal(CalendarPageComponent.PAGE_SIZE);
+
+  /** Una consulta d'esport en marxa: la llista encara no és la definitiva. */
+  private readonly _sportLoading = signal(false);
+  readonly sportFilterLoading = this._sportLoading.asReadonly();
+
   // ── El període ───────────────────────────────────────────────────────────
   //
   // «Els últims X dies» i «aquell dia» són la mateixa pregunta —de quan a
@@ -619,13 +641,47 @@ export class CalendarPageComponent implements OnDestroy {
   /** Mesos seguits carregats sense trobar-hi res. */
   private _emptyStreak = 0;
 
-  /** Amb un filtre posat no hi ha res més a carregar: la resposta del servidor
-   *  ja porta totes les coincidències de tot l'historial. Amb un abast posat
-   *  tampoc: el tram té final, i és avui menys els dies que digui. */
+  /**
+   * Queden mesos per anar a buscar?
+   *
+   * Només quan la llista és la sencera. Tots els filtres tenen **resposta
+   * completa** sense rascar mesos enrere: la cerca i el tipus els contesta el
+   * servidor amb totes les coincidències de tot l'historial, un esport es
+   * demana sencer (`loadSessionsForSport`) i un abast és un tram, que té
+   * final per definició. Anar a pescar mesos amb un filtre posat era demanar
+   * dotze consultes per no trobar el pàdel de fa tres anys.
+   */
   readonly hasMore = computed(() =>
-    !this._reachedEnd() && this.rangeDays() === null
+    !this._reachedEnd() && this.rangeDays() === null && !this.filterSport()
     && !this.searchQuery().trim() && !this.filterCat()
   );
+
+  /**
+   * Els dies que es pinten: els més nous fins a omplir la pàgina.
+   *
+   * Es talla per dies sencers i no per activitats: un dia partit per la meitat
+   * entre el que es veu i el que no seria una targeta òrfena amb la data a
+   * sobre i res a sota.
+   */
+  readonly visibleDays = computed((): DayFeedEntry[] => {
+    const max  = this.visibleCount();
+    const out: DayFeedEntry[] = [];
+    let count = 0;
+    for (const day of this.feedDays()) {
+      out.push(day);
+      count += day.workouts.length + day.sports.length;
+      if (count >= max) break;
+    }
+    return out;
+  });
+
+  /** Queda activitat ja carregada que encara no es pinta. */
+  readonly hasMoreToShow = computed(() => this.visibleDays().length < this.feedDays().length);
+
+  /** Una pàgina més de la llista. No demana res: això ja ha arribat. */
+  showMore(): void {
+    this.visibleCount.update(n => n + CalendarPageComponent.PAGE_SIZE);
+  }
 
   /** El primer dia carregat: l'1 del mes més antic que s'ha demanat, o el
    *  primer dia de l'abast si n'hi ha cap de posat. */
@@ -720,10 +776,24 @@ export class CalendarPageComponent implements OnDestroy {
     return this.sortDesc() ? days : [...days].reverse();
   });
 
-  /** El rang que hi ha carregat, per tancar la llista amb alguna cosa útil. */
+  /**
+   * Com es tanca la llista: dient fins on arriba el que s'acaba de llegir.
+   *
+   * Un filtre no es tanca amb el mes més antic carregat —la seva resposta no
+   * té res a veure amb la finestra de mesos—, sinó dient que allò és tot el
+   * que hi ha.
+   */
   readonly loadedRangeLabel = computed(() => {
     const days = this.rangeDays();
     if (days !== null) return `Últims ${this.periodLabel()}`;
+
+    const sportId = this.filterSport();
+    if (sportId) {
+      const name = this.sportService.sports().find(s => s.id === sportId)?.name;
+      return name ? `Tot l'historial de ${name}` : "Tot l'historial";
+    }
+    if (this.searchQuery().trim() || this.filterCat()) return 'Totes les coincidències';
+
     const start = new Date(this.windowStart() + 'T12:00:00');
     const label = start.toLocaleDateString('ca-ES', { month: 'long', year: 'numeric' });
     return `Des de ${label}`;
@@ -826,6 +896,33 @@ export class CalendarPageComponent implements OnDestroy {
       untracked(() => { void this._runSearch(); });
     });
 
+    // ── Filtrar per un esport és una consulta d'aquell esport ──────────────
+    //
+    // Es demanen **totes** les seves sessions —una consulta, acotada per
+    // l'esport, paginada per dins (`fetchAllRows`)— i s'incorporen sense
+    // podar res: una resposta filtrada diu qui coincideix, no qui hi ha.
+    // Abans això es contestava rascant mes a mes el que ja hi havia
+    // carregat, que per a un pàdel de fa tres anys volien dir trenta-sis
+    // consultes i, si es cansava abans, cap resposta.
+    effect(() => {
+      const sportId = this.filterSport();
+      if (!sportId || !this.authService.uid()) return;
+      untracked(() => {
+        if (this.sportService.sportHistoryLoaded(sportId)) return;
+        this._sportLoading.set(true);
+        void this.sportService.loadSessionsForSport(sportId)
+          .finally(() => this._sportLoading.set(false));
+      });
+    });
+
+    // Canviar de filtre és tornar a començar la llista: si no, el que es veia
+    // amb el filtre vell decidia quant es veu del nou.
+    effect(() => {
+      this.searchQuery(); this.filterCat(); this.filterSport();
+      this.rangeDays(); this.selectedDate(); this.sortDesc();
+      untracked(() => this.visibleCount.set(CalendarPageComponent.PAGE_SIZE));
+    });
+
     // Un dia triat al calendari pot ser d'un mes que encara no s'ha carregat.
     effect(() => {
       const date = this.selectedDate();
@@ -840,8 +937,15 @@ export class CalendarPageComponent implements OnDestroy {
       const el = this.sentinelRef()?.nativeElement;
       this._observer?.disconnect();
       if (!el) return;
+      // Primer s'ensenya el que ja ha arribat i encara no es pinta; només
+      // quan s'ha acabat es va a buscar un mes més. Així rascar avall no
+      // demana res mentre hi hagi llista per ensenyar.
       this._observer = new IntersectionObserver(
-        entries => { if (entries[0].isIntersecting && this.hasMore() && !this.isLoadingMore()) this.loadMoreMonths(); },
+        entries => {
+          if (!entries[0].isIntersecting) return;
+          if (this.hasMoreToShow()) { this.showMore(); return; }
+          if (this.hasMore() && !this.isLoadingMore()) this.loadMoreMonths();
+        },
         { rootMargin: '200px' }
       );
       this._observer.observe(el);

@@ -45,12 +45,14 @@ describe('CalendarPageComponent', () => {
   let plannedByDate: Record<string, Workout[]>;
   let sportsByDate: Record<string, { sport: Sport; session: SportSession }[]>;
   let workoutsSignal: ReturnType<typeof signal<Workout[]>>;
+  let sportServiceSports: ReturnType<typeof signal<Sport[]>>;
 
   beforeEach(async () => {
     doneByDate    = {};
     plannedByDate = {};
     sportsByDate  = {};
     workoutsSignal = signal<Workout[]>([]);
+    sportServiceSports = signal<Sport[]>([]);
 
     const mockWorkoutService = {
       isLoading:            signal(false),
@@ -77,7 +79,7 @@ describe('CalendarPageComponent', () => {
     };
 
     const mockSportService = {
-      sports:                         signal<Sport[]>([]),
+      sports:                         sportServiceSports,
       sessions:                       signal<SportSession[]>([]),
       isLoaded:                       signal(true),
       getSportSessionsForDate:        jasmine.createSpy().and.callFake((d: string) => sportsByDate[d] ?? []),
@@ -87,6 +89,8 @@ describe('CalendarPageComponent', () => {
       // Amb una cerca activa el feed no va dia a dia: es munta des de les
       // coincidències, que és com arriben del servidor.
       allSportSessionPairs:           () => Object.values(sportsByDate).flat(),
+      loadSessionsForSport:           jasmine.createSpy().and.resolveTo(undefined),
+      sportHistoryLoaded:             jasmine.createSpy().and.returnValue(false),
       logSession:                     jasmine.createSpy().and.resolveTo(undefined),
       deleteSession:                  jasmine.createSpy().and.resolveTo(undefined),
       ensureLoaded:                   jasmine.createSpy().and.resolveTo(undefined),
@@ -283,6 +287,72 @@ describe('CalendarPageComponent', () => {
     });
   });
 
+  // ── Quant se'n pinta ─────────────────────────────────────────────────────
+
+  describe('paginació de la llista', () => {
+    /** `n` dies seguits amb un entrenament cadascun, del més recent enrere,
+     *  amb la finestra de mesos prou oberta perquè hi càpiguen tots. */
+    async function fillDays(n: number): Promise<void> {
+      const all: Workout[] = [];
+      for (let i = 0; i < n; i++) {
+        const date = daysAgo(i);
+        doneByDate[date] = [makeWorkout({ id: `w${i}`, date })];
+        all.push(doneByDate[date][0]);
+      }
+      workoutsSignal.set(all);
+      const months = Math.ceil(n / 28) + 1;
+      for (let i = 0; i < months; i++) await component.loadMoreMonths();
+    }
+
+    it("no pinta tot el que hi ha carregat, només la primera pàgina", async () => {
+      await fillDays(50);
+      expect(component.feedDays().length).toBe(50);
+      expect(component.visibleDays().length).toBe(CalendarPageComponent.PAGE_SIZE);
+      expect(component.hasMoreToShow()).toBeTrue();
+    });
+
+    it('showMore() n\'afegeix una pàgina, sense demanar res', async () => {
+      await fillDays(50);
+      const wEnsure = TestBed.inject(WorkoutService).ensureMonthLoaded as jasmine.Spy;
+      wEnsure.calls.reset();
+
+      component.showMore();
+
+      expect(component.visibleDays().length).toBe(CalendarPageComponent.PAGE_SIZE * 2);
+      expect(wEnsure).withContext('això ja havia arribat').not.toHaveBeenCalled();
+    });
+
+    it('deixa de créixer quan ja es veu tot', async () => {
+      await fillDays(5);
+      expect(component.visibleDays().length).toBe(5);
+      expect(component.hasMoreToShow()).toBeFalse();
+    });
+
+    // Un dia no es parteix per la meitat: la pàgina s'omple amb dies sencers.
+    it('talla per dies sencers', () => {
+      const date = daysAgo(0);
+      doneByDate[date] = Array.from({ length: 30 }, (_, i) =>
+        makeWorkout({ id: `w${i}`, date }));
+      workoutsSignal.set(doneByDate[date]);
+
+      expect(component.visibleDays().length).toBe(1);
+      expect(component.visibleDays()[0].workouts.length).toBe(30);
+    });
+
+    it('torna a la primera pàgina quan canvia el filtre', async () => {
+      await fillDays(50);
+      component.showMore();
+      expect(component.visibleDays().length).toBe(CalendarPageComponent.PAGE_SIZE * 2);
+
+      component.filterCat.set('push');
+      fixture.detectChanges();
+      component.filterCat.set(null);
+      fixture.detectChanges();
+
+      expect(component.visibleDays().length).toBe(CalendarPageComponent.PAGE_SIZE);
+    });
+  });
+
   // ── Filtre per esport ────────────────────────────────────────────────────
 
   describe('filterSport', () => {
@@ -312,40 +382,52 @@ describe('CalendarPageComponent', () => {
       expect(days[0].sports.length).toBe(1);
     });
 
-    // Els esports arriben amb els trams, no amb una cerca al servidor: rascant
-    // avall se'n poden trobar de més antics.
-    it("no tanca la paginació: hi ha mesos per anar a buscar", () => {
+    // El filtre el contesta el servidor, amb una consulta acotada per l'esport:
+    // no s'hi va rascant mesos enrere fins a trobar-ne.
+    it("demana al servidor totes les sessions d'aquell esport", () => {
+      const load = TestBed.inject(SportService).loadSessionsForSport as jasmine.Spy;
+      load.calls.reset();
+
+      component.filterSport.set('s-padel');
+      fixture.detectChanges();
+
+      expect(load).toHaveBeenCalledOnceWith('s-padel');
+    });
+
+    it('no la torna a demanar si ja la té', () => {
+      const load = TestBed.inject(SportService).loadSessionsForSport as jasmine.Spy;
+      (TestBed.inject(SportService).sportHistoryLoaded as jasmine.Spy).and.returnValue(true);
+      load.calls.reset();
+
+      component.filterSport.set('s-padel');
+      fixture.detectChanges();
+
+      expect(load).not.toHaveBeenCalled();
+    });
+
+    // La resposta d'aquell esport és sencera: no queda cap mes enrere per anar
+    // a pescar, que és el que abans es feia dotze vegades per no trobar res.
+    it('tanca la paginació per mesos: la resposta ja és tot l\'esport', () => {
       component.filterSport.set('s1');
-      expect(component.hasMore()).toBeTrue();
+      expect(component.hasMore()).toBeFalse();
     });
 
-    // Sense cap coincidència als mesos carregats la llista es quedava sense
-    // sentinella i sense botó: la paginació era viva i no s'hi arribava.
-    it('sense coincidències encara deixa carregar el mes anterior', () => {
-      component.filterSport.set('s-cap');
-      // La primera càrrega ja ha passat: si no, el que es pinta és l'esquelet.
-      component.isInitialLoading.set(false);
-      fixture.detectChanges();
+    it('mentre la consulta viatja no diu que no hi hagi res', () => {
+      let resolve = (): void => {};
+      (TestBed.inject(SportService).loadSessionsForSport as jasmine.Spy)
+        .and.returnValue(new Promise<void>(r => { resolve = r; }));
 
-      expect(component.feedDays()).toEqual([]);
-      expect(component.hasActiveFilter()).toBeTrue();
-      expect(component.hasMore()).toBeTrue();
-      const more: HTMLButtonElement | null =
-        fixture.nativeElement.querySelector('.load-more-btn');
-      expect(more).not.toBeNull();
+      component.filterSport.set('s-padel');
+      fixture.detectChanges();
+      expect(component.sportFilterLoading()).toBeTrue();
+
+      resolve();
     });
 
-    it("i el botó estira la paginació un mes més", async () => {
-      const wEnsure = TestBed.inject(WorkoutService).ensureMonthLoaded as jasmine.Spy;
-      component.filterSport.set('s-cap');
-      fixture.detectChanges();
-      wEnsure.calls.reset();
-
-      await component.loadMoreMonths();
-
-      const today  = new Date(TODAY + 'T12:00:00');
-      const target = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      expect(wEnsure).toHaveBeenCalledWith(target.getFullYear(), target.getMonth());
+    it('tanca la llista dient que allò és tot el que hi ha', () => {
+      sportServiceSports.set([makeSport({ id: 's-padel', name: 'Pàdel' })]);
+      component.filterSport.set('s-padel');
+      expect(component.loadedRangeLabel()).toBe("Tot l'historial de Pàdel");
     });
   });
 
@@ -484,9 +566,11 @@ describe('CalendarPageComponent', () => {
 
       for (let i = 0; i < 13; i++) await component.loadMoreMonths();
 
-      expect(component.hasMore()).withContext('la paginació segueix viva').toBeTrue();
+      // Amb el filtre posat la paginació per mesos està tancada a posta (la
+      // contesta la consulta de l'esport). El que no pot passar és que quedi
+      // tancada **també** en treure'l: això seria l'historial donat per mort.
       component.filterSport.set(null);
-      expect(component.hasMore()).toBeTrue();
+      expect(component.hasMore()).withContext('la paginació segueix viva').toBeTrue();
     });
 
     it('loads one more month of workouts and sports', async () => {
