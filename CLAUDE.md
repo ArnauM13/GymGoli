@@ -1,5 +1,35 @@
 # GymGoli — Notes for Claude
 
+## Escala, primer de tot
+
+**Tota funcionalitat nova s'ha de sostenir amb vuit anys d'historial a
+sobre.** No és una optimització per a més endavant: és el primer criteri de
+disseny, per davant de la comoditat d'implementar-la. El que viatja i el que
+es pinta no poden créixer amb la vida de l'usuari.
+
+Abans de donar per feta qualsevol pantalla o consulta, respon-te això:
+
+1. **Què demana, i acotat per què?** Un tram de dies, un exercici, un esport,
+   una fila o un filtre. Si la resposta és «tot», encara no està feta —
+   vegeu `SYNC.md` §«Res no baixa tot».
+2. **Qui filtra i qui agrega?** El servidor, que té índexs. Filtrar al client
+   només val per al que ja hi ha carregat i per una raó dita en veu alta; si
+   el filtre ha de trobar coses velles, és una pregunta per al servidor.
+3. **Com se'n demana més?** Tota llista que pugui créixer paginada, i amb la
+   paginació **sempre a l'abast** — també quan el que es veu ara és buit: un
+   estat buit sense manera de continuar és un cul-de-sac.
+4. **Què es pinta?** Només el que es mira. Una pàgina que arrenca amb un mes
+   de scroll a sota ja ha perdut: enllaça-hi (Inici → Historial) en comptes
+   de duplicar-hi la llista.
+5. **Quantes peticions fa un gest?** Una. Dotze mesos visibles són un tram,
+   no dotze consultes.
+
+I el manteniment va amb la mateixa etiqueta: **una sola manera de fer cada
+cosa**. Un filtre es llegeix i es treu en un sol lloc, una consulta passa per
+`ensureRange()`, una lectura d'activitat es fa amb `DayFeedEntry`. Si t'estàs
+escrivint la segona variant d'alguna cosa que ja existeix, la feina és
+ajuntar-les, no afegir-n'hi una.
+
 ## Design
 
 **When creating or restyling a page, follow `DESIGN.md`.** It captures the

@@ -61,6 +61,7 @@ describe('CalendarPageComponent', () => {
       getPlannedForDate:    jasmine.createSpy().and.callFake((d: string) => plannedByDate[d] ?? []),
       todayDateString:      jasmine.createSpy().and.returnValue(TODAY),
       ensureMonthLoaded:    jasmine.createSpy().and.resolveTo(undefined),
+      ensureRange:          jasmine.createSpy().and.resolveTo(undefined),
       searchHistory:        jasmine.createSpy().and.resolveTo(undefined),
       isSearching:          signal(false),
       createPlannedWorkout: jasmine.createSpy().and.resolveTo('w1'),
@@ -82,6 +83,7 @@ describe('CalendarPageComponent', () => {
       getSportSessionsForDate:        jasmine.createSpy().and.callFake((d: string) => sportsByDate[d] ?? []),
       getPlannedSportSessionsForDate: jasmine.createSpy().and.returnValue([]),
       ensureMonthLoaded:              jasmine.createSpy().and.resolveTo(undefined),
+      ensureRange:                    jasmine.createSpy().and.resolveTo(undefined),
       // Amb una cerca activa el feed no va dia a dia: es munta des de les
       // coincidències, que és com arriben del servidor.
       allSportSessionPairs:           () => Object.values(sportsByDate).flat(),
@@ -438,28 +440,55 @@ describe('CalendarPageComponent', () => {
       expect(component.loadedRangeLabel()).toBe('Últims 30 dies');
     });
 
-    it("demana tots els mesos que toca l'abast, no només el primer", () => {
-      const wEnsure = TestBed.inject(WorkoutService).ensureMonthLoaded as jasmine.Spy;
-      wEnsure.calls.reset();
+    // Tres mesos són un tram, no tres consultes: demanar-ho mes a mes eren
+    // quatre viatges per contestar la mateixa pregunta.
+    it("demana l'abast sencer d'una tirada, no mes a mes", () => {
+      const wRange = TestBed.inject(WorkoutService).ensureRange as jasmine.Spy;
+      const sRange = TestBed.inject(SportService).ensureRange as jasmine.Spy;
+      const wMonth = TestBed.inject(WorkoutService).ensureMonthLoaded as jasmine.Spy;
+      wRange.calls.reset(); sRange.calls.reset(); wMonth.calls.reset();
+
       component.setRange(90);
       fixture.detectChanges();
 
       const start = new Date(TODAY + 'T12:00:00');
       start.setDate(start.getDate() - 89);
-      const today = new Date(TODAY + 'T12:00:00');
-      const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
-      const wanted: [number, number][] = [];
-      while (cursor <= today) {
-        wanted.push([cursor.getFullYear(), cursor.getMonth()]);
-        cursor.setMonth(cursor.getMonth() + 1);
-      }
-      for (const [y, m] of wanted) expect(wEnsure).toHaveBeenCalledWith(y, m);
+      const from = [
+        start.getFullYear(),
+        String(start.getMonth() + 1).padStart(2, '0'),
+        String(start.getDate()).padStart(2, '0'),
+      ].join('-');
+
+      expect(wRange).toHaveBeenCalledOnceWith(from, TODAY);
+      expect(sRange).toHaveBeenCalledOnceWith(from, TODAY);
+      expect(wMonth).not.toHaveBeenCalled();
     });
   });
 
   // ── Loading ──────────────────────────────────────────────────────────────
 
   describe('loadMoreMonths()', () => {
+    // El comptador de «fi de l'historial» mira el que arriba, no el que es
+    // pinta: amb un filtre d'esport posat, dotze mesos sense aquell esport
+    // tancaven la paginació de la pàgina sencera —i quedava tancada també
+    // quan el filtre es treia.
+    it("un filtre que no troba res no dona l'historial per esgotat", async () => {
+      component.filterSport.set('s-cap');
+      // Cada mes que es demana porta activitat, encara que no sigui la
+      // d'aquell esport.
+      let n = 0;
+      (TestBed.inject(WorkoutService).ensureMonthLoaded as jasmine.Spy)
+        .and.callFake(async () => { workoutsSignal.set([
+          ...workoutsSignal(), makeWorkout({ id: `w${n++}`, date: daysAgo(60 + n * 30) }),
+        ]); });
+
+      for (let i = 0; i < 13; i++) await component.loadMoreMonths();
+
+      expect(component.hasMore()).withContext('la paginació segueix viva').toBeTrue();
+      component.filterSport.set(null);
+      expect(component.hasMore()).toBeTrue();
+    });
+
     it('loads one more month of workouts and sports', async () => {
       const wEnsure = TestBed.inject(WorkoutService).ensureMonthLoaded as jasmine.Spy;
       const sEnsure = TestBed.inject(SportService).ensureMonthLoaded as jasmine.Spy;

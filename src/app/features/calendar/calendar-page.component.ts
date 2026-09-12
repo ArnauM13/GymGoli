@@ -800,19 +800,13 @@ export class CalendarPageComponent implements OnDestroy {
       });
 
     // Un abast pot arrencar mesos enrere (tres, el més llarg) i la llista es
-    // tallaria a l'1 del mes carregat. Es demanen tots els que toca.
+    // tallaria a l'1 del mes carregat. Es demana **d'una sola tirada**: el
+    // tram és la unitat de consulta, i preguntar-ho mes a mes eren tres o
+    // quatre viatges per contestar la mateixa pregunta.
     effect(() => {
       const from = this.rangeStart();
       if (!from || !this.authService.uid()) return;
-      untracked(() => {
-        const start  = new Date(from + 'T12:00:00');
-        const today  = new Date(this.workoutService.todayDateString() + 'T12:00:00');
-        const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
-        while (cursor <= today) {
-          void this._ensureMonth(cursor.getFullYear(), cursor.getMonth());
-          cursor.setMonth(cursor.getMonth() + 1);
-        }
-      });
+      untracked(() => { void this._ensureSpan(from, this.workoutService.todayDateString()); });
     });
 
     // Càrrega inicial: l'últim mes. Tracking uid() so the first load fires
@@ -878,12 +872,17 @@ export class CalendarPageComponent implements OnDestroy {
       const next   = this.monthsBack() + 1;
       const today  = new Date(this.workoutService.todayDateString() + 'T12:00:00');
       const target = new Date(today.getFullYear(), today.getMonth() - next, 1);
-      const before = this.feedDays().length;
+      // Es mira el que ha arribat, no el que es pinta. Amb un filtre posat la
+      // llista pot no créixer perquè aquell mes no té **aquell esport**, que
+      // no vol dir que no hi hagi historial: comptant dies pintats, dotze
+      // mesos sense pàdel tancaven la paginació de la pàgina sencera, i
+      // quedava tancada també en treure el filtre.
+      const before = this._loadedCount();
       await this._ensureMonth(target.getFullYear(), target.getMonth());
       this.monthsBack.set(next);
       // Dotze mesos seguits sense res nou: donem l'historial per esgotat i
       // parem de demanar mesos buits.
-      if (this.feedDays().length === before) this._emptyStreak++;
+      if (this._loadedCount() === before) this._emptyStreak++;
       else this._emptyStreak = 0;
       if (this._emptyStreak >= 12) this._reachedEnd.set(true);
     } finally {
@@ -891,10 +890,24 @@ export class CalendarPageComponent implements OnDestroy {
     }
   }
 
+  /** Quanta activitat hi ha carregada, filtres a part: és el que diu si un
+   *  mes més enrere ha portat res o no. */
+  private _loadedCount(): number {
+    return this.workoutService.workouts().length + this.sportService.sessions().length;
+  }
+
   private async _ensureMonth(year: number, month: number): Promise<void> {
     await Promise.all([
       this.workoutService.ensureMonthLoaded(year, month),
       this.sportService.ensureMonthLoaded(year, month),
+    ]);
+  }
+
+  /** Un tram de dies, sigui quants mesos sigui: una consulta. */
+  private async _ensureSpan(from: string, to: string): Promise<void> {
+    await Promise.all([
+      this.workoutService.ensureRange(from, to),
+      this.sportService.ensureRange(from, to),
     ]);
   }
 
