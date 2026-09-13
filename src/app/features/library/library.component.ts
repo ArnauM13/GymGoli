@@ -223,7 +223,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
     </div>
   `,
   styles: [`
-    .page { padding: 0 0 88px; }
+    .page { padding: 0 0 var(--page-pad-bottom-fab); }
 
     /* ── Sports section header ── */
     .sports-section-header {

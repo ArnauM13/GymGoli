@@ -224,7 +224,7 @@ function fmtVolume(kg: number): string {
     </div>
   `,
   styles: [`
-    .page { padding: 0 0 88px; }
+    .page { padding: 0 0 var(--page-pad-bottom); }
 
     /* ── Section card ── */
     .card-section {

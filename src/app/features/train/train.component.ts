@@ -75,7 +75,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
     SessionMergeComponent,
   ],
   template: `
-    <div class="page" [style.padding-bottom]="pagePaddingBottom()">
+    <div class="page">
 
       @if (activeWorkout(); as w) {
 
@@ -554,7 +554,9 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
 
   `,
   styles: [`
-    .page { padding: 0; }
+    /* El menú flotant de l'entrenament actiu seu sobre la nav: l'últim
+       element de la pàgina no li pot quedar a sota. */
+    .page { padding: 0 0 var(--page-pad-bottom-fab); }
 
     /* ── Page header ── */
     .page-header--aw {
@@ -1348,10 +1350,6 @@ export class TrainComponent implements OnDestroy {
    *  passat i el que s'hi fa és registrar-ho. */
   readonly planning = computed(() =>
     this.isSelectedFuture() || (this.planRequested() && !this.isSelectedPast()));
-
-  readonly pagePaddingBottom = computed(() =>
-    '88px' // clear the active-workout menu FAB / the dog's suggestion card
-  );
 
   /** Searches across every already-loaded month (not just `selectedDate`),
    *  since the feed lets you open a workout from any past day the month

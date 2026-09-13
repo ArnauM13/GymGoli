@@ -388,7 +388,7 @@ import { toDateStr, todayStr } from '../../shared/utils/date.utils';
     </div>
   `,
   styles: [`
-    .page { padding: 0 0 84px; }
+    .page { padding: 0 0 var(--page-pad-bottom); }
 
     .header-add {
       width: 36px; height: 36px; border-radius: 50%; border: none;

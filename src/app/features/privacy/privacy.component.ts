@@ -92,7 +92,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
     </div>
   `,
   styles: [`
-    .page { padding: 0 16px 84px; max-width: 640px; margin: 0 auto; }
+    .page { padding: 0 16px var(--page-pad-bottom); max-width: 640px; margin: 0 auto; }
 
     /* ── Content card ── */
     .card {

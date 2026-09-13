@@ -106,7 +106,7 @@ interface InsightFamily {
     }
   `,
   styles: [`
-    .page { padding: 0 0 88px; }
+    .page { padding: 0 0 var(--page-pad-bottom); }
 
     .lede {
       margin: 0 16px; padding-top: 2px;

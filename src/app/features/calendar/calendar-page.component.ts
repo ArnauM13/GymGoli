@@ -275,7 +275,7 @@ function parseRangeParam(raw: string | null | undefined): number | null {
     </div>
   `,
   styles: [`
-    .page { padding: 0 0 16px; }
+    .page { padding: 0 0 var(--page-pad-bottom); }
 
     /* ── El xip de període (projectat a la fila de filtres) ──
        Porta text, no només icona: és l'únic filtre que no diu «de quina mena»

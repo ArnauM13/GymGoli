@@ -159,8 +159,18 @@ export interface DayFeedEntry {
   `,
   styles: [`
     /* La targeta és compartida; d'aquí només és l'aire que se'n deixa entre
-       una activitat i la següent. */
+       una activitat i la següent, i entre una sessió i la següent — que és el
+       mateix aire, el posi la caixa o la targeta.
+
+       L'últim de tot no en deixa: el marge de sota se sumava al de qui ens
+       pinta (la targeta del dia a Inici, el dia a l'Historial) i el buit de
+       baix sortia més gran que el de dalt. Dins d'una caixa de sessió,
+       l'última targeta sí que en deixa: a sota hi té el peu de «Separar
+       sessions», no la vora del bloc. */
+    .sg { margin-bottom: 10px; }
+    .sg:last-child { margin-bottom: 0; }
     app-activity-card { display: block; margin-bottom: 10px; }
+    app-activity-card:last-child { margin-bottom: 0; }
 
     /* ── Una sessió amb més d'una activitat ──
        La caixa és el que diu «això és una sola anada»: les targetes de dins no
@@ -170,8 +180,7 @@ export interface DayFeedEntry {
     .sg--grouped {
       border: 1.5px solid var(--c-border-2); border-radius: 16px;
       background: color-mix(in srgb, var(--c-text) 3%, var(--c-card));
-      padding: 8px; margin-bottom: 10px;
-      app-activity-card:last-child { margin-bottom: 0; }
+      padding: 8px;
     }
 
     .sg-head {

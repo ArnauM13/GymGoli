@@ -62,7 +62,9 @@ Rules that keep them accessible on a surface tinted by an unknown category color
 - **Section vertical gap:** `12px` (between sections)
 - **Inside section padding:** `14px 14px 16px`
 - **Inside item card padding:** `10px 10px`
-- **Bottom safe area:** `padding-bottom: 84px` on `.page` (clears tab bar + FAB)
+- **Bottom safe area:** `padding-bottom: var(--page-pad-bottom)` on `.page`
+  — `var(--page-pad-bottom-fab)` when the page has a floating button or a
+  fixed bottom bar. The shell already reserves the nav (see §2)
 
 ### Radius
 
@@ -99,11 +101,24 @@ Every page lives inside a `.page` wrapper:
 
 ```scss
 .page {
-  padding: 0 0 84px;          /* full-bleed top, leave room for tab bar */
+  padding: 0 0 var(--page-pad-bottom);   /* full-bleed top, breathing room below */
   /* OR for centered text-heavy pages: */
-  /* padding: 0 16px 84px; max-width: 540px; margin: 0 auto; */
+  /* padding: 0 16px var(--page-pad-bottom); max-width: 540px; margin: 0 auto; */
 }
 ```
+
+**The page never pays for the nav.** `.app-content` already reserves
+`var(--nav-height)` under every page, so the bottom padding is only the air
+below the last element. There are two values and no third:
+
+| Token | Value | When |
+|---|---|---|
+| `--page-pad-bottom`     | `16px` | Any page |
+| `--page-pad-bottom-fab` | `88px` | The page has a floating button (`.fab`, speed dial) or a fixed bar sitting at `bottom: calc(var(--nav-height) + 16px)` — the last element must not end up underneath it |
+
+Never write a raw `84px` / `88px` / `100px` there, and never add
+`min-height: 100vh` to a page: the shell is already the full height, so the
+page would scroll a nav's worth of nothing.
 
 ### 2a. Page header (title + action)
 
@@ -1044,7 +1059,7 @@ import { Component } from '@angular/core';
     </div>
   `,
   styles: [`
-    .page { padding: 0 0 84px; }
+    .page { padding: 0 0 var(--page-pad-bottom); }
 
     .page-header {
       display: flex; align-items: center; justify-content: space-between;

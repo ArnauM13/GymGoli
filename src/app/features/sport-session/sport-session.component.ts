@@ -198,7 +198,7 @@ import { ActivityStat, feedDayLabel, formatFeeling, sportCardStats } from '../..
     /* La nav flota per damunt del contingut: el peu de la pàgina li deixa
        l'espai perquè els botons de baix (Guardar, Eliminar) no hi quedin
        xafats a sota. */
-    .page { padding: 0 0 88px; }
+    .page { padding: 0 0 var(--page-pad-bottom); }
 
     /* ── Capçalera de la sessió ──
        La targeta és la compartida (app-activity-card), la mateixa que al feed

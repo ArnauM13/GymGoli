@@ -757,7 +757,7 @@ function asSectionId(value: string | null): SectionId | null {
   `,
   styles: [`
     .page {
-      padding: 0 16px 16px;
+      padding: 0 16px var(--page-pad-bottom);
       max-width: 540px; margin: 0 auto;
     }
 
