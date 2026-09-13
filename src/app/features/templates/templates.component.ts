@@ -233,7 +233,7 @@ const MIXED_LABEL = 'Mixt';
     }
   `,
   styles: [`
-    .page { min-height: 100vh; background: var(--c-bg); padding-bottom: 32px; }
+    .page { padding: 0 0 var(--page-pad-bottom); }
 
     .section { padding: 0 16px; margin-top: 16px; }
     .section-header { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }

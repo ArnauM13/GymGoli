@@ -23,6 +23,18 @@ html {
 // ── CSS custom properties ─────────────────────────────────────────────────
 :root {
   --nav-height:  calc(64px + env(safe-area-inset-bottom, 0px));
+
+  // ── Aire sota l'últim element d'una pàgina ──
+  // El moble (`.app-content`) ja reserva l'alçada de la nav flotant, o sigui
+  // que això només és aire: una pàgina no ha de tornar a comptar la nav —
+  // sumar-hi 84 o 88px hi deixava dos dits de buit. Dues mides i prou:
+  //   --page-pad-bottom      una pàgina qualsevol
+  //   --page-pad-bottom-fab  una pàgina amb un botó flotant o una barra fixa
+  //                          a `bottom: calc(var(--nav-height) + 16px)`:
+  //                          l'últim element no li pot quedar a sota
+  //                          (16 de sota + 56 del botó + 16 d'aire).
+  --page-pad-bottom:     16px;
+  --page-pad-bottom-fab: 88px;
   --c-bg:        #f5f5f5;
   --c-card:      #ffffff;
   --c-elevated:  #ffffff;

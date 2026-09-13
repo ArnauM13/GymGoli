@@ -273,7 +273,7 @@ const VERDICT_LABEL: Record<DiffRow['verdict'], string> = {
     </div>
   `,
   styles: [`
-    .page { padding: 0 0 84px; max-width: 720px; margin: 0 auto; }
+    .page { padding: 0 0 var(--page-pad-bottom); max-width: 720px; margin: 0 auto; }
     .lead { margin: 0 16px; font-size: 13px; color: var(--c-text-2); line-height: 1.45; }
     code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; word-break: break-all; }
 

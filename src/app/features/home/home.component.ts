@@ -177,7 +177,7 @@ import { addDays, mondayOf } from '../../shared/utils/calendar-utils';
     </div>
   `,
   styles: [`
-    .page { padding: 0 0 16px; }
+    .page { padding: 0 0 var(--page-pad-bottom); }
 
     .calendar-wrap {
       margin: 4px 16px 0;

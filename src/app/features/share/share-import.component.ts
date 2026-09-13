@@ -78,7 +78,10 @@ type Status = 'loading' | 'confirm' | 'importing' | 'success' | 'error' | 'needs
   `,
   styles: [`
     .share-page {
-      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      /* El moble ja és l'alçada de la pantalla: 100dvh aquí hi sumava el
+         retall de dalt (i la nav, quan n'hi ha) i deixava un pam de
+         scroll de no-res. */
+      min-height: 100%; display: flex; align-items: center; justify-content: center;
       padding: 24px; background: var(--c-bg);
     }
     .share-card {

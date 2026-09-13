@@ -125,7 +125,7 @@ import { NavigationHistoryService } from '../../core/services/navigation-history
     </div>
   `,
   styles: [`
-    .page { padding: 0 0 88px; }
+    .page { padding: 0 0 var(--page-pad-bottom-fab); }
 
     /* ── Bodyweight-volume legend (dismissible) ── */
     .bw-legend {

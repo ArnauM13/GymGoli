@@ -224,7 +224,7 @@ const TODAY = (): string => todayStr();
     </div>
   `,
   styles: [`
-    .page { padding: 0 0 100px; }
+    .page { padding: 0 0 var(--page-pad-bottom-fab); }
 
     .card-section {
       margin: 12px 16px 0;

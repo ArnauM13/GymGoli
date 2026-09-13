@@ -62,7 +62,9 @@ Rules that keep them accessible on a surface tinted by an unknown category color
 - **Section vertical gap:** `12px` (between sections)
 - **Inside section padding:** `14px 14px 16px`
 - **Inside item card padding:** `10px 10px`
-- **Bottom safe area:** `padding-bottom: 84px` on `.page` (clears tab bar + FAB)
+- **Bottom safe area:** `padding-bottom: var(--page-pad-bottom)` on `.page`
+  — `var(--page-pad-bottom-fab)` when the page has a floating button or a
+  fixed bottom bar. The shell already reserves the nav (see §2)
 
 ### Radius
 
@@ -99,11 +101,28 @@ Every page lives inside a `.page` wrapper:
 
 ```scss
 .page {
-  padding: 0 0 84px;          /* full-bleed top, leave room for tab bar */
+  padding: 0 0 var(--page-pad-bottom);   /* full-bleed top, breathing room below */
   /* OR for centered text-heavy pages: */
-  /* padding: 0 16px 84px; max-width: 540px; margin: 0 auto; */
+  /* padding: 0 16px var(--page-pad-bottom); max-width: 540px; margin: 0 auto; */
 }
 ```
+
+**The page never pays for the nav.** `.app-content` reserves
+`var(--nav-height)` under every page — and only while the nav is actually
+there (`.app-content--nav`; logged out there is no nav and nothing to
+reserve). So a page's bottom padding is only the air below its last element.
+There are two values and no third:
+
+| Token | Value | When |
+|---|---|---|
+| `--page-pad-bottom`     | `16px` | Any page |
+| `--page-pad-bottom-fab` | `88px` | The page has a floating button (`.fab`, speed dial) or a fixed bar sitting at `bottom: calc(var(--nav-height) + 16px)` — the last element must not end up underneath it |
+
+Never write a raw `84px` / `88px` / `100px` there, and never give a page
+`min-height: 100vh` / `100dvh`: the shell is already exactly the screen, so
+the page would scroll the top inset (and the nav) of nothing. A page that
+wants to fill the screen — a centered login card, say — uses
+`min-height: 100%`.
 
 ### 2a. Page header (title + action)
 
@@ -1089,7 +1108,7 @@ import { Component } from '@angular/core';
     </div>
   `,
   styles: [`
-    .page { padding: 0 0 84px; }
+    .page { padding: 0 0 var(--page-pad-bottom); }
 
     .page-header {
       display: flex; align-items: center; justify-content: space-between;

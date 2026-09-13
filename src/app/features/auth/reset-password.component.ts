@@ -63,7 +63,10 @@ import { AuthService } from '../../core/services/auth.service';
   `,
   styles: [`
     .reset-page {
-      min-height: 100dvh;
+      /* El moble ja és l'alçada de la pantalla: 100dvh aquí hi sumava el
+         retall de dalt (i la nav, quan n'hi ha) i deixava un pam de
+         scroll de no-res. */
+      min-height: 100%;
       display: flex; align-items: center; justify-content: center;
       background: var(--c-bg);
       padding: 24px;
