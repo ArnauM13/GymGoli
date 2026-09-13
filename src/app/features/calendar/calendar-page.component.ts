@@ -320,9 +320,12 @@ function parseRangeParam(raw: string | null | undefined): number | null {
        Van amb el calendari i no a la fila de filtres perquè són la mateixa
        pregunta que triar un dia: de quan a quan. La fila de filtres només en
        diu el resultat. */
+    /* Els abasts pengen de la barra de filtres: són el mateix calaix, i entre
+       una fila de xips i l'altra hi va l'aire que ja deixa la barra i prou
+       —quan s'hi sumava el d'aquí, obrir el calendari deixava un forat. */
     .range-row {
       display: flex; align-items: center; gap: 6px;
-      margin: 4px 0 0; padding: 8px 16px 0;
+      margin: 0; padding: 0 16px;
       overflow-x: auto; scrollbar-width: none;
       &::-webkit-scrollbar { display: none; }
     }
@@ -349,8 +352,10 @@ function parseRangeParam(raw: string | null | undefined): number | null {
     .cal-collapse--open { grid-template-rows: 1fr; }
     .cal-collapse-inner { overflow: hidden; min-height: 0; }
 
+    /* El calendari respira per totes dues bandes: no s'enganxa als xips
+       d'abast de sobre ni al que s'ha trobat, a sota. */
     .calendar-wrap {
-      margin: 4px 16px 12px;
+      margin: 12px 16px 16px;
       box-shadow: 0 2px 12px rgba(0,0,0,0.08);
       border-radius: 16px; overflow: hidden;
     }
