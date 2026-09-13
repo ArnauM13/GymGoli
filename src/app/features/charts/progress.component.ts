@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
@@ -78,7 +78,67 @@ function fmtVolume(kg: number): string {
     <div class="page">
       <app-page-header title="Progrés" />
 
-      @if (hasData()) {
+      @if (!ready()) {
+        <!-- ── La silueta del resum ──
+             Mentre no hi són les dades, la pàgina en dibuixa la forma en
+             comptes de no dibuixar res: així «Mira-t'ho de prop» neix al seu
+             lloc i no se'n va cap avall —de sota el dit de qui l'estava
+             clicant— just quan arriba la resposta. -->
+        <div class="card-section">
+          <div class="section-header">
+            <span class="sk sk-icon"></span>
+            <span class="sk sk-title"></span>
+            <span class="sk sk-count"></span>
+          </div>
+
+          <div class="stat-grid">
+            @for (t of [1, 2, 3, 4]; track t) {
+              <div class="stat-tile">
+                <span class="sk sk-icon"></span>
+                <span class="sk sk-val"></span>
+                <span class="sk sk-lbl"></span>
+                <span class="sk sk-delta"></span>
+              </div>
+            }
+          </div>
+
+          <p class="month-split"><span class="sk sk-split"></span></p>
+
+          <div class="mc">
+            <span class="sk sk-caption"></span>
+            <div class="mc-plot">
+              <div class="mc-cols">
+                @for (h of [46, 72, 58, 84]; track $index) {
+                  <div class="mc-col"><span class="sk sk-bar" [style.height.%]="h"></span></div>
+                }
+              </div>
+              <div class="mc-xrow">
+                @for (x of [1, 2, 3, 4]; track x) { <span class="sk sk-x"></span> }
+              </div>
+            </div>
+          </div>
+
+          <p class="month-total"><span class="sk sk-split"></span></p>
+        </div>
+
+        <div class="card-section">
+          <div class="section-header">
+            <span class="sk sk-icon"></span>
+            <span class="sk sk-title"></span>
+          </div>
+
+          <!-- Una barra i el seu desglossament: la forma de l'objectiu
+               combinat, que és el de sèrie. -->
+          @for (r of [1, 2, 3]; track r) {
+            <div class="goal-row" [class.goal-row--sub]="r > 1">
+              <span class="sk sk-icon"></span>
+              <span class="sk sk-name"></span>
+              <span class="goal-track"><span class="sk sk-fill"></span></span>
+              <span class="sk sk-badge"></span>
+            </div>
+          }
+        </div>
+      } @else if (hasData()) {
         <!-- ── Aquest mes ── -->
         <div class="card-section">
           <div class="section-header">
@@ -210,7 +270,7 @@ function fmtVolume(kg: number): string {
         </a>
       </div>
 
-      @if (!hasData() && !isLoading()) {
+      @if (ready() && !hasData()) {
         <div class="card-section">
           <div class="empty-state">
             <span class="material-symbols-outlined empty-icon" aria-hidden="true">monitoring</span>
@@ -416,8 +476,32 @@ function fmtVolume(kg: number): string {
       &:active { transform: scale(0.97); }
     }
 
+    /* ── La silueta ──
+       Les mides van a l'ull del que substitueixen: una silueta que fa una
+       alçada i un contingut que en fa una altra torna a moure la pàgina, que
+       és justament el que s'evita. */
+    @keyframes sk-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .sk {
+      display: block; border-radius: 6px;
+      background: var(--c-border-2); animation: sk-pulse 1.4s ease-in-out infinite;
+    }
+    .sk-icon    { width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0; }
+    .sk-title   { flex: 1; max-width: 110px; height: 14px; }
+    .sk-count   { width: 46px; height: 17px; border-radius: 10px; }
+    .sk-val     { width: 46px; height: 23px; border-radius: 7px; }
+    .sk-lbl     { width: 58px; height: 14px; }
+    .sk-delta   { width: 32px; height: 14px; margin-top: 1px; }
+    .sk-split   { width: 190px; height: 14px; margin: 2px auto 1px; }
+    .sk-caption { width: 120px; height: 13px; margin-bottom: 21px; }
+    .sk-bar     { width: 100%; border-radius: 5px 5px 2px 2px; }
+    .sk-x       { flex: 1; min-width: 0; height: 12px; }
+    .sk-name    { width: 72px; height: 15px; }
+    .sk-fill    { width: 45%; height: 100%; border-radius: 3px; }
+    .sk-badge   { margin-left: auto; width: 34px; height: 15px; }
+
     @media (prefers-reduced-motion: reduce) {
       .goal-fill, .mc-bar, .nav-card { transition: none; }
+      .sk { animation: none; }
     }
   `],
 })
@@ -441,7 +525,16 @@ export class ProgressComponent {
     { initialValue: '' },
   );
 
-  readonly isLoading = computed(() => this.stats.loading() || !this.stats.loaded());
+  /**
+   * Si ja hi ha tot el que el resum necessita per pintar-se sencer.
+   *
+   * És una sola bandera per a les tres càrregues, i no una per peça, perquè
+   * el que ha de ser estable és **l'alçada de la pàgina**: si cada tros
+   * aparegués quan arriba el seu, el que hi ha a sota —«Mira-t'ho de prop»—
+   * baixaria un cop per resposta, i un enllaç que es mou de sota el dit entre
+   * el pitjar i l'aixecar no rep el clic.
+   */
+  readonly ready = signal(false);
 
   /** De tota la vida de l'usuari: és un `count` al servidor, no baixar-se
    *  l'historial per comptar-lo. */
@@ -690,16 +783,24 @@ export class ProgressComponent {
 
   constructor() {
     this.exerciseService.ensureLoaded();
-    this.sportService.ensureLoaded();
-    // El total i els rècords: dues consultes que tornen números i que no
-    // creixen amb l'historial.
-    void this.stats.ensureLoaded();
-    // I un any de resums, sense cap sèrie: és el que necessiten la ratxa, el
-    // mes i la comparació amb el mes passat.
-    void this.workoutService.ensureRange(
-      addDays(this.workoutService.todayDateString(), -STREAK_WEEKS * 7),
-      this.workoutService.todayDateString(),
-    );
+
+    // El que es pinta aquí: el total i els rècords —dues consultes que tornen
+    // números i que no creixen amb l'historial—, els esports i un any de
+    // resums sense cap sèrie, que és el que necessiten la ratxa, el mes i la
+    // comparació amb el mes passat.
+    //
+    // Una sola espera per a totes tres: mentre no hi són, la pàgina ensenya
+    // la silueta i no va creixent a trossos. Amb el que ja hi ha en memòria
+    // es resol en un microtask —tornar-hi no fa parpellejar res— i, si alguna
+    // falla, la pàgina es dibuixa igual amb el que hi hagi.
+    void Promise.all([
+      this.stats.ensureLoaded(),
+      this.sportService.ensureLoaded(),
+      this.workoutService.ensureRange(
+        addDays(this.workoutService.todayDateString(), -STREAK_WEEKS * 7),
+        this.workoutService.todayDateString(),
+      ),
+    ]).catch(() => undefined).then(() => this.ready.set(true));
 
     effect(() => {
       const exId = this.queryExerciseId();
