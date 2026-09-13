@@ -207,6 +207,42 @@ describe('ActivityFeedService', () => {
       expect(rpc).not.toHaveBeenCalled();
     });
 
+    // «Ensenya'm tots els pàdels» és la tercera pregunta que sap contestar la
+    // consulta (migració 037), i no es contesta rascant mesos enrere.
+    it("passa l'esport al servidor", async () => {
+      await service.searchRange('2000-01-01', '2024-12-31', { sport: 'sport-padel' });
+
+      expect(rpc).toHaveBeenCalledWith('activity_feed', jasmine.objectContaining({
+        p_sport: 'sport-padel', p_search: null, p_category: null,
+      }));
+    });
+
+    it("l'esport sol ja és filtre: no cal cap cerca al costat", async () => {
+      await service.searchRange('2000-01-01', '2024-12-31', { sport: 'sport-padel' });
+
+      expect(rpc).toHaveBeenCalled();
+    });
+
+    it('dos esports diferents són dues consultes', async () => {
+      await service.searchRange('2000-01-01', '2024-12-31', { sport: 'padel' });
+      rpc.calls.reset();
+
+      await service.searchRange('2000-01-01', '2024-12-31', { sport: 'correr' });
+
+      expect(rpc).toHaveBeenCalled();
+    });
+
+    // Les coincidències d'esport surten per un canal a part: qui les llegeix
+    // les afegeix, i no pot deduir-ne cap esborrat.
+    it("les sessions que coincideixen surten a part de les d'un tram", async () => {
+      rows = [feedRow('ss-vell', '2019-04-02', { kind: 'sport', sport_id: 'padel' })];
+      await service.searchRange('2000-01-01', '2024-12-31', { sport: 'padel' });
+
+      expect(service.matchedSportSessions().map(s => s.id)).toEqual(['ss-vell']);
+      expect(service.sportSessions()).toEqual([]);
+      expect(service.covers('2000-01-01', '2024-12-31')).toBeFalse();
+    });
+
     // Una resposta filtrada diu qui coincideix, no qui hi ha d'haver: donar-la
     // per completa esborraria del dispositiu tot el que no encaixés amb la
     // cerca.

@@ -166,11 +166,41 @@ hi són:
 | «Quin és el meu rècord de cada exercici?» | Baixar tota la vida amb totes les sèries i calcular-ho aquí | `exercise_records()`: una fila per exercici |
 | «On surt "dominades" a l'historial?» | Igual, i filtrar-ho aquí | `activity_feed(..., p_search)`: només les coincidències |
 | «Quantes sessions d'aquest esport porto?» | Baixar les de **tots** els esports | `loadSessionsForSport()`: les d'aquell |
+| «Ensenya'm tots els pàdels» | Rascar mes a mes el que ja hi havia carregat, fins a cansar-se | `activity_feed(..., p_sport)`: només les seves |
 
 El patró és sempre el mateix: **agregar i filtrar és feina del servidor**. Sap
 fer-ho amb índexs i torna el resultat, no les dades per calcular-lo. El que
 viatja deixa de créixer amb l'historial: qui porta vuit anys entrenant rep el
 mateix que qui en porta dos.
+
+L'últim és el filtre d'esport de l'Historial, i el que en va caure és
+instructiu: **un filtre no es contesta paginant una altra cosa**. Filtrar per
+pàdel demanava mesos enrere a veure si en sortia cap —fins a dotze consultes
+per no trobar el de fa tres anys, i després donar l'historial per esgotat—
+quan la pregunta és exactament de la mena que `activity_feed` ja sabia
+contestar. La migració 037 li dona el tercer filtre, i els tres tenen la
+mateixa forma i la mateixa simetria:
+
+| Filtre | Va contra | Qui en queda fora |
+| --- | --- | --- |
+| `p_search` | `exercise_names` (índex trigram) | els esports |
+| `p_category` | `categories` | els esports |
+| `p_sport` | `sport_id` (índex `user_id, sport_id, date`) | el gimnàs |
+
+Cap activitat és un tipus d'entrenament **i** un esport, o sigui que els dos
+costats de la `UNION` s'exclouen sols.
+
+El que en torna **no cobreix cap tram**: una resposta filtrada diu qui
+coincideix, no qui hi ha. Per això les sessions que en surten no entren pel
+camí dels trams sinó per `matchedSportSessions()`, i d'allà a
+`SportService._absorb()`, que **afegeix i no poda**. Barrejar-ho amb el camí
+dels trams esborraria del dispositiu tot el que no fos d'aquell esport dins
+d'aquelles dates — que són vuit anys.
+
+Baixar-ho no és ensenyar-ho. La llista de l'Historial en pinta **una pàgina**
+(`PAGE_SIZE` activitats) i creix rascant avall, igual filtrada que sencera;
+quan s'acaba el que hi ha carregat, i només llavors, es demana el tram
+següent. Les targetes del DOM tampoc poden créixer amb la vida de l'usuari.
 
 ### El que no es guarda
 
@@ -333,6 +363,7 @@ Les sessions d'esport igual (`SPORT_SESSION_COLUMNS`), que a més s'enduien
 | Historial per mes i paginat | `workouts (user_id, date desc)` |
 | Cerca per nom d'exercici | `workouts` GIN trigram `(exercise_names)` |
 | Canvis de les sessions d'esport | `sport_sessions (user_id, updated_at desc)` |
+| Les sessions d'un esport (detall, i el filtre de l'Historial) | `sport_sessions (user_id, sport_id, date desc)` |
 
 Els dos primers són de la migració 029; l'últim, de la 030. La segona consulta abans anava amb
 `entries::text ilike '%"exerciseId":"…"%'`: convertir tot el blob a text obliga

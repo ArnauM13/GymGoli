@@ -813,6 +813,65 @@ Per això el botó de la targeta del dia **només surt quan el dia és avui**: u
 de futur ja té «Planifica aquest dia» a dalt, i duplicar-lo dins la targeta
 seria dir dues vegades el mateix.
 
+### Inici enllaça, l'Historial llista
+
+Inici és la pantalla del dia d'avui. L'activitat recent hi és **una drecera**
+(`.recent-link`: rodona tenyida + títol + subtítol + xebró), no una llista
+plegada: mantenir-hi el mes sencer volia dir dues lectures de la mateixa cosa,
+i l'Historial ja té cerca, filtres i calendari per fer-ne una de bona.
+
+La drecera hi entra amb l'abast posat — `/calendar?range=30d` — i l'Historial
+el llegeix **a cada arribada**, no només en muntar-se: la ruta es manté viva
+(`AppReuseStrategy`), i llegint-ho un sol cop el segon toc al botó et trobava
+la pàgina tal com l'havies deixat. Entrar-hi sense el paràmetre (la pestanya
+de baix) vol dir tot l'historial.
+
+Per pes, la drecera va **per sota** del botó del dia: tenyida i amb vora, no
+plena. L'acció de la pàgina és entrenar; això és anar a mirar.
+
+### La fila de filtres de l'Historial
+
+`app-filter-bar` porta tres menes de filtre i cadascuna es llegeix diferent:
+
+| Filtre | Forma | Per què |
+| --- | --- | --- |
+| Període | xip amb text, projectat a `[filterLead]` | És l'únic que diu «de quan» i no «de quina mena» |
+| Tipus d'entrenament | rodona amb la icona i el color del tipus | Sempre són els mateixos tres o quatre |
+| Esports configurats | rodona amb la icona i el color de l'esport | L'usuari els ha triat ell: la icona ja els identifica |
+
+Amb tots tres a la mateixa línia que la cerca, la cerca quedava feta un botó.
+`stackFilters` els baixa a una fila pròpia que **rasca de costat** (sense barra
+visible, marges negatius perquè arribi a la vora de la pantalla), i un
+`.fb-sep` separa els tipus dels esports: són dues llistes, no una.
+
+**Els dos filtres de mena s'exclouen.** Cap activitat és un tipus de gimnàs i
+un esport a la vegada, així que triar-ne un treu l'altre: tenir-los tots dos
+posats no hauria ensenyat mai res. El període, en canvi, es combina amb tot —
+talla per baix sigui quin sigui l'altre filtre, cerca inclosa.
+
+### El període: un filtre, sempre a la vista
+
+«Els últims X dies» i «aquell dia» són **la mateixa pregunta** —de quan a
+quan— feta de dues maneres. Per això:
+
+- **Viuen al mateix calaix.** Els abasts (`7 dies`, `30 dies`, `3 mesos`,
+  `Tot`) són una fila de xips dins el calendari plegable, just sobre la
+  graella. Triar un dia i triar un abast es fan al mateix lloc.
+- **S'exclouen.** `setRange()` treu el dia i `selectDate()` treu l'abast. Si
+  convisquessin, el xip diria una cosa i la llista n'ensenyaria una altra.
+- **Es llegeixen en un sol lloc.** El xip `.period-chip` de la fila de filtres
+  diu **sempre** el que hi ha posat: «Tot», «30 dies» o el dia en curt
+  (`compactDayLabel()` — «8 de set.», que el dia sencer es menjava la fila).
+  Tenyit quan filtra, neutre quan no.
+- **Es treu en un sol lloc.** Amb període posat, el xip es parteix: el cos
+  obre el calendari i la ✕ el treu. El rètol del dia que hi ha sobre la
+  llista és només un rètol, amb les fletxes de dia anterior/següent al
+  costat: dues ✕ per al mateix filtre, a dos pams l'una de l'altra, era una
+  de sobrera.
+
+L'adreça hi entra: `?range=30d` (qualsevol `<n>d`) posa l'abast, i sense
+paràmetre vol dir tot l'historial. És el contracte de la drecera d'Inici.
+
 ### Les tres pantalles de Progrés
 
 Progrés no és una pàgina, són tres, i cadascuna respon una pregunta diferent.

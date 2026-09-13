@@ -2,6 +2,8 @@ import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 
+import { provideRouter } from '@angular/router';
+
 import { CalendarPageComponent } from './calendar-page.component';
 import { WorkoutService } from '../../core/services/workout.service';
 import { ExerciseService } from '../../core/services/exercise.service';
@@ -43,12 +45,14 @@ describe('CalendarPageComponent', () => {
   let plannedByDate: Record<string, Workout[]>;
   let sportsByDate: Record<string, { sport: Sport; session: SportSession }[]>;
   let workoutsSignal: ReturnType<typeof signal<Workout[]>>;
+  let sportServiceSports: ReturnType<typeof signal<Sport[]>>;
 
   beforeEach(async () => {
     doneByDate    = {};
     plannedByDate = {};
     sportsByDate  = {};
     workoutsSignal = signal<Workout[]>([]);
+    sportServiceSports = signal<Sport[]>([]);
 
     const mockWorkoutService = {
       isLoading:            signal(false),
@@ -59,6 +63,7 @@ describe('CalendarPageComponent', () => {
       getPlannedForDate:    jasmine.createSpy().and.callFake((d: string) => plannedByDate[d] ?? []),
       todayDateString:      jasmine.createSpy().and.returnValue(TODAY),
       ensureMonthLoaded:    jasmine.createSpy().and.resolveTo(undefined),
+      ensureRange:          jasmine.createSpy().and.resolveTo(undefined),
       searchHistory:        jasmine.createSpy().and.resolveTo(undefined),
       isSearching:          signal(false),
       createPlannedWorkout: jasmine.createSpy().and.resolveTo('w1'),
@@ -74,12 +79,13 @@ describe('CalendarPageComponent', () => {
     };
 
     const mockSportService = {
-      sports:                         signal<Sport[]>([]),
+      sports:                         sportServiceSports,
       sessions:                       signal<SportSession[]>([]),
       isLoaded:                       signal(true),
       getSportSessionsForDate:        jasmine.createSpy().and.callFake((d: string) => sportsByDate[d] ?? []),
       getPlannedSportSessionsForDate: jasmine.createSpy().and.returnValue([]),
       ensureMonthLoaded:              jasmine.createSpy().and.resolveTo(undefined),
+      ensureRange:                    jasmine.createSpy().and.resolveTo(undefined),
       // Amb una cerca activa el feed no va dia a dia: es munta des de les
       // coincidències, que és com arriben del servidor.
       allSportSessionPairs:           () => Object.values(sportsByDate).flat(),
@@ -91,6 +97,7 @@ describe('CalendarPageComponent', () => {
     await TestBed.configureTestingModule({
       imports:   [CalendarPageComponent],
       providers: [
+        provideRouter([]),
         { provide: WorkoutService,      useValue: mockWorkoutService },
         { provide: ExerciseService,     useValue: mockExerciseService },
         { provide: SportService,        useValue: mockSportService },
@@ -192,6 +199,16 @@ describe('CalendarPageComponent', () => {
       expect(component.hasActiveFilter()).toBeTrue();
     });
 
+    it("és cert amb un esport filtrat", () => {
+      component.filterSport.set('s1');
+      expect(component.hasActiveFilter()).toBeTrue();
+    });
+
+    it("és cert amb un abast posat", () => {
+      component.setRange(30);
+      expect(component.hasActiveFilter()).toBeTrue();
+    });
+
     it('is false after all filters are cleared', () => {
       component.filterCat.set('push');
       component.filterCat.set(null);
@@ -268,9 +285,295 @@ describe('CalendarPageComponent', () => {
     });
   });
 
+  // ── Quant se'n pinta ─────────────────────────────────────────────────────
+
+  describe('paginació de la llista', () => {
+    /** `n` dies seguits amb un entrenament cadascun, del més recent enrere,
+     *  amb la finestra de mesos prou oberta perquè hi càpiguen tots. */
+    async function fillDays(n: number): Promise<void> {
+      const all: Workout[] = [];
+      for (let i = 0; i < n; i++) {
+        const date = daysAgo(i);
+        doneByDate[date] = [makeWorkout({ id: `w${i}`, date })];
+        all.push(doneByDate[date][0]);
+      }
+      workoutsSignal.set(all);
+      const months = Math.ceil(n / 28) + 1;
+      for (let i = 0; i < months; i++) await component.loadMoreMonths();
+    }
+
+    it("no pinta tot el que hi ha carregat, només la primera pàgina", async () => {
+      await fillDays(50);
+      expect(component.feedDays().length).toBe(50);
+      expect(component.visibleDays().length).toBe(CalendarPageComponent.PAGE_SIZE);
+      expect(component.hasMoreToShow()).toBeTrue();
+    });
+
+    it('showMore() n\'afegeix una pàgina, sense demanar res', async () => {
+      await fillDays(50);
+      const wEnsure = TestBed.inject(WorkoutService).ensureMonthLoaded as jasmine.Spy;
+      wEnsure.calls.reset();
+
+      component.showMore();
+
+      expect(component.visibleDays().length).toBe(CalendarPageComponent.PAGE_SIZE * 2);
+      expect(wEnsure).withContext('això ja havia arribat').not.toHaveBeenCalled();
+    });
+
+    it('deixa de créixer quan ja es veu tot', async () => {
+      await fillDays(5);
+      expect(component.visibleDays().length).toBe(5);
+      expect(component.hasMoreToShow()).toBeFalse();
+    });
+
+    // Un dia no es parteix per la meitat: la pàgina s'omple amb dies sencers.
+    it('talla per dies sencers', () => {
+      const date = daysAgo(0);
+      doneByDate[date] = Array.from({ length: 30 }, (_, i) =>
+        makeWorkout({ id: `w${i}`, date }));
+      workoutsSignal.set(doneByDate[date]);
+
+      expect(component.visibleDays().length).toBe(1);
+      expect(component.visibleDays()[0].workouts.length).toBe(30);
+    });
+
+    it('torna a la primera pàgina quan canvia el filtre', async () => {
+      await fillDays(50);
+      component.showMore();
+      expect(component.visibleDays().length).toBe(CalendarPageComponent.PAGE_SIZE * 2);
+
+      component.filterCat.set('push');
+      fixture.detectChanges();
+      component.filterCat.set(null);
+      fixture.detectChanges();
+
+      expect(component.visibleDays().length).toBe(CalendarPageComponent.PAGE_SIZE);
+    });
+  });
+
+  // ── Filtre per esport ────────────────────────────────────────────────────
+
+  describe('filterSport', () => {
+    it("deixa passar només les sessions d'aquell esport", () => {
+      const run  = makeSport({ id: 's-run',  name: 'Córrer' });
+      const padel = makeSport({ id: 's-padel', name: 'Pàdel', icon: 'sports_tennis', color: '#1E88E5' });
+      sportsByDate[TODAY] = [
+        { sport: run,   session: makeSession({ id: 'ss-run',   sportId: 's-run' }) },
+        { sport: padel, session: makeSession({ id: 'ss-padel', sportId: 's-padel' }) },
+      ];
+
+      component.filterSport.set('s-padel');
+      const days = component.feedDays();
+      expect(days.length).toBe(1);
+      expect(days[0].sports.map(i => i.session.id)).toEqual(['ss-padel']);
+    });
+
+    it('amaga els entrenaments: un esport no és cap tipus de gimnàs', () => {
+      doneByDate[TODAY]   = [makeWorkout({ id: 'w-today' })];
+      workoutsSignal.set(doneByDate[TODAY]);
+      sportsByDate[TODAY] = [{ sport: makeSport(), session: makeSession() }];
+
+      component.filterSport.set('s1');
+      const days = component.feedDays();
+      expect(days.length).toBe(1);
+      expect(days[0].workouts).toEqual([]);
+      expect(days[0].sports.length).toBe(1);
+    });
+
+    // El filtre el contesta el servidor, amb la mateixa consulta que la cerca
+    // i el tipus: no s'hi va rascant mesos enrere fins a trobar-ne.
+    it("va al servidor amb l'esport, no als mesos carregats", () => {
+      const search = TestBed.inject(WorkoutService).searchHistory as jasmine.Spy;
+      search.calls.reset();
+
+      component.filterSport.set('s-padel');
+      fixture.detectChanges();
+
+      expect(search).toHaveBeenCalledOnceWith(
+        jasmine.objectContaining({ sport: 's-padel' }));
+    });
+
+    it('mai no demana esports mes a mes', () => {
+      const wEnsure = TestBed.inject(WorkoutService).ensureMonthLoaded as jasmine.Spy;
+      const sEnsure = TestBed.inject(SportService).ensureMonthLoaded as jasmine.Spy;
+      wEnsure.calls.reset(); sEnsure.calls.reset();
+
+      component.filterSport.set('s-padel');
+      fixture.detectChanges();
+
+      expect(wEnsure).not.toHaveBeenCalled();
+      expect(sEnsure).not.toHaveBeenCalled();
+    });
+
+    // La resposta ja porta totes les coincidències de tot l'historial: no
+    // queda cap mes enrere per anar a pescar, que és el que abans es feia
+    // dotze vegades per no trobar res.
+    it('tanca la paginació per mesos: la resposta ja és tot l\'esport', () => {
+      component.filterSport.set('s1');
+      expect(component.hasMore()).toBeFalse();
+    });
+
+    it('mentre la consulta viatja no diu que no hi hagi res', () => {
+      let resolve = (): void => {};
+      (TestBed.inject(WorkoutService).searchHistory as jasmine.Spy)
+        .and.returnValue(new Promise<void>(r => { resolve = r; }));
+
+      component.filterSport.set('s-padel');
+      fixture.detectChanges();
+      expect(component.filterLoading()).toBeTrue();
+
+      resolve();
+    });
+
+    it('tanca la llista dient que allò és tot el que hi ha', () => {
+      sportServiceSports.set([makeSport({ id: 's-padel', name: 'Pàdel' })]);
+      component.filterSport.set('s-padel');
+      expect(component.loadedRangeLabel()).toBe("Tot l'historial de Pàdel");
+    });
+  });
+
+  // ── El període: abasts i dia, un de sol ──────────────────────────────────
+
+  describe('període', () => {
+    it("arrenca a «Tot» quan a l'adreça no hi ha cap abast", () => {
+      expect(component.rangeDays()).toBeNull();
+      expect(component.hasPeriodFilter()).toBeFalse();
+      expect(component.periodLabel()).toBe('Tot');
+    });
+
+    it('el xip diu sempre el filtre que hi ha posat', () => {
+      component.setRange(7);
+      expect(component.periodLabel()).toBe('7 dies');
+      component.setRange(90);
+      expect(component.periodLabel()).toBe('3 mesos');
+      component.selectDate(TODAY);
+      expect(component.periodLabel()).toBe('Avui');
+      component.clearPeriod();
+      expect(component.periodLabel()).toBe('Tot');
+    });
+
+    // El xip no pot dir «30 dies» mentre la llista ensenya un dia concret.
+    it('triar un dia treu l\'abast', () => {
+      component.setRange(30);
+      component.selectDate(daysAgo(3));
+      expect(component.rangeDays()).toBeNull();
+      expect(component.selectedDate()).toBe(daysAgo(3));
+    });
+
+    it("i triar un abast treu el dia", () => {
+      component.selectDate(daysAgo(3));
+      component.setRange(30);
+      expect(component.selectedDate()).toBeNull();
+      expect(component.rangeDays()).toBe(30);
+    });
+
+    it('clearPeriod() els treu tots dos', () => {
+      component.selectDate(daysAgo(3));
+      component.clearPeriod();
+      expect(component.selectedDate()).toBeNull();
+      expect(component.rangeDays()).toBeNull();
+      expect(component.hasPeriodFilter()).toBeFalse();
+    });
+
+    it("talla el que queda més enrere de l'abast", () => {
+      const within = daysAgo(29);
+      const older  = daysAgo(45);
+      doneByDate[within] = [makeWorkout({ id: 'w-within', date: within })];
+      doneByDate[older]  = [makeWorkout({ id: 'w-older',  date: older })];
+      workoutsSignal.set([...doneByDate[within], ...doneByDate[older]]);
+
+      component.setRange(30);
+      const dates = component.feedDays().map(d => d.date);
+      expect(dates).toContain(within);
+      expect(dates).not.toContain(older);
+    });
+
+    it('un abast més curt talla més amunt', () => {
+      const within = daysAgo(3);
+      const older  = daysAgo(20);
+      doneByDate[within] = [makeWorkout({ id: 'w-within', date: within })];
+      doneByDate[older]  = [makeWorkout({ id: 'w-older',  date: older })];
+      workoutsSignal.set([...doneByDate[within], ...doneByDate[older]]);
+
+      component.setRange(7);
+      const dates = component.feedDays().map(d => d.date);
+      expect(dates).toEqual([within]);
+    });
+
+    it("talla també amb una cerca posada: el tram mana", () => {
+      const older = daysAgo(45);
+      doneByDate[older] = [makeWorkout({
+        id: 'w-older', date: older,
+        entries: [{ exerciseId: 'e1', exerciseName: 'Press banca', sets: [] }],
+      })];
+      workoutsSignal.set(doneByDate[older]);
+
+      component.setRange(30);
+      component.searchQuery.set('banca');
+      expect(component.feedDays()).toEqual([]);
+    });
+
+    it("no ofereix carregar-ne més: el tram té final", () => {
+      component.setRange(30);
+      expect(component.hasMore()).toBeFalse();
+    });
+
+    it('tanca la llista dient de quin tram parla', () => {
+      component.setRange(30);
+      expect(component.loadedRangeLabel()).toBe('Últims 30 dies');
+    });
+
+    // Tres mesos són un tram, no tres consultes: demanar-ho mes a mes eren
+    // quatre viatges per contestar la mateixa pregunta.
+    it("demana l'abast sencer d'una tirada, no mes a mes", () => {
+      const wRange = TestBed.inject(WorkoutService).ensureRange as jasmine.Spy;
+      const sRange = TestBed.inject(SportService).ensureRange as jasmine.Spy;
+      const wMonth = TestBed.inject(WorkoutService).ensureMonthLoaded as jasmine.Spy;
+      wRange.calls.reset(); sRange.calls.reset(); wMonth.calls.reset();
+
+      component.setRange(90);
+      fixture.detectChanges();
+
+      const start = new Date(TODAY + 'T12:00:00');
+      start.setDate(start.getDate() - 89);
+      const from = [
+        start.getFullYear(),
+        String(start.getMonth() + 1).padStart(2, '0'),
+        String(start.getDate()).padStart(2, '0'),
+      ].join('-');
+
+      expect(wRange).toHaveBeenCalledOnceWith(from, TODAY);
+      expect(sRange).toHaveBeenCalledOnceWith(from, TODAY);
+      expect(wMonth).not.toHaveBeenCalled();
+    });
+  });
+
   // ── Loading ──────────────────────────────────────────────────────────────
 
   describe('loadMoreMonths()', () => {
+    // El comptador de «fi de l'historial» mira el que arriba, no el que es
+    // pinta: amb un filtre d'esport posat, dotze mesos sense aquell esport
+    // tancaven la paginació de la pàgina sencera —i quedava tancada també
+    // quan el filtre es treia.
+    it("un filtre que no troba res no dona l'historial per esgotat", async () => {
+      component.filterSport.set('s-cap');
+      // Cada mes que es demana porta activitat, encara que no sigui la
+      // d'aquell esport.
+      let n = 0;
+      (TestBed.inject(WorkoutService).ensureMonthLoaded as jasmine.Spy)
+        .and.callFake(async () => { workoutsSignal.set([
+          ...workoutsSignal(), makeWorkout({ id: `w${n++}`, date: daysAgo(60 + n * 30) }),
+        ]); });
+
+      for (let i = 0; i < 13; i++) await component.loadMoreMonths();
+
+      // Amb el filtre posat la paginació per mesos està tancada a posta (la
+      // contesta la consulta de l'esport). El que no pot passar és que quedi
+      // tancada **també** en treure'l: això seria l'historial donat per mort.
+      component.filterSport.set(null);
+      expect(component.hasMore()).withContext('la paginació segueix viva').toBeTrue();
+    });
+
     it('loads one more month of workouts and sports', async () => {
       const wEnsure = TestBed.inject(WorkoutService).ensureMonthLoaded as jasmine.Spy;
       const sEnsure = TestBed.inject(SportService).ensureMonthLoaded as jasmine.Spy;

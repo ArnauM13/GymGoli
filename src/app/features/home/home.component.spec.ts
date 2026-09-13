@@ -1,7 +1,7 @@
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { RouterLink, provideRouter } from '@angular/router';
 
 import { HomeComponent } from './home.component';
 import { WorkoutService } from '../../core/services/workout.service';
@@ -14,12 +14,6 @@ import { DEFAULT_USER_SETTINGS, UserSettings } from '../../core/models/user-sett
 import { EMPTY_WEEKLY_PLAN, WeeklyPlan } from '../../core/models/weekly-plan.model';
 
 const TODAY = new Date().toISOString().split('T')[0];
-
-function daysAgo(n: number): string {
-  const d = new Date(TODAY + 'T12:00:00');
-  d.setDate(d.getDate() - n);
-  return d.toISOString().split('T')[0];
-}
 
 function makeWorkout(overrides: Partial<Workout> = {}): Workout {
   return { id: '1', date: TODAY, entries: [], createdAt: new Date(), ...overrides };
@@ -86,7 +80,9 @@ describe('HomeComponent', () => {
         { provide: ConfirmDialogService, useValue: { confirm: confirmSpy } },
       ],
     })
-      .overrideComponent(HomeComponent, { set: { imports: [], schemas: [NO_ERRORS_SCHEMA] } })
+      // RouterLink hi queda: la drecera a l'Historial hi porta l'abast per query
+      // param, i és justament l'href resolt el que val la pena comprovar.
+      .overrideComponent(HomeComponent, { set: { imports: [RouterLink], schemas: [NO_ERRORS_SCHEMA] } })
       .compileComponents();
 
     fixture = TestBed.createComponent(HomeComponent);
@@ -195,61 +191,21 @@ describe('HomeComponent', () => {
     });
   });
 
-  // ── historyFeedDays() ────────────────────────────────────────────────────
+  // ── Drecera a l'Historial ────────────────────────────────────────────────
 
-  describe('historyFeedDays()', () => {
-    it('deixa fora avui: la targeta de dalt ja l\'ensenya', () => {
-      const yesterday = daysAgo(1);
-      const getDoneWorkoutsForDate = TestBed.inject(WorkoutService).getDoneWorkoutsForDate as jasmine.Spy;
-      getDoneWorkoutsForDate.and.callFake((date: string) =>
-        date === TODAY || date === yesterday ? [makeWorkout({ id: date })] : []);
-      doneWorkoutsSignal.set([makeWorkout({ id: 'today1' })]);
-
-      const dates = component.historyFeedDays().map(d => d.date);
-      expect(dates).not.toContain(TODAY);
-      expect(dates).toContain(yesterday);
+  describe("drecera a l'Historial", () => {
+    it("porta a /calendar amb l'abast de 30 dies ja filtrat", () => {
+      const link: HTMLAnchorElement | null =
+        fixture.nativeElement.querySelector('a.recent-link');
+      expect(link).withContext('el botó hi és').not.toBeNull();
+      // El routerLink resolt: l'Historial hi entra amb el filtre posat, que és
+      // el que la secció plegada ensenyava.
+      expect(link!.getAttribute('href')).toBe('/calendar?range=30d');
     });
 
-    it('deixa fora el dia seleccionat, que és el que mostra la targeta', () => {
-      const yesterday = daysAgo(1);
-      const getDoneWorkoutsForDate = TestBed.inject(WorkoutService).getDoneWorkoutsForDate as jasmine.Spy;
-      getDoneWorkoutsForDate.and.callFake((date: string) =>
-        date === TODAY || date === yesterday ? [makeWorkout({ id: date })] : []);
-      doneWorkoutsSignal.set([makeWorkout({ id: 'today1' })]);
-
-      component.selectDate(yesterday);
-
-      const dates = component.historyFeedDays().map(d => d.date);
-      expect(dates).not.toContain(yesterday);
-      expect(dates).toContain(TODAY);
-    });
-
-    it('only reaches back 30 days — the rest lives on the Historial page', () => {
-      const within = (() => { const d = new Date(TODAY + 'T12:00:00'); d.setDate(d.getDate() - 29); return d.toISOString().split('T')[0]; })();
-      const older  = (() => { const d = new Date(TODAY + 'T12:00:00'); d.setDate(d.getDate() - 45); return d.toISOString().split('T')[0]; })();
-      const getDoneWorkoutsForDate = TestBed.inject(WorkoutService).getDoneWorkoutsForDate as jasmine.Spy;
-      getDoneWorkoutsForDate.and.callFake((date: string) =>
-        date === within || date === older ? [makeWorkout({ id: date })] : []);
-      doneWorkoutsSignal.set([makeWorkout({ id: within })]);
-
-      const dates = component.historyFeedDays().map(d => d.date);
-      expect(dates).toContain(within);
-      expect(dates).not.toContain(older);
-    });
-  });
-
-  // ── "Activitat recent" plegada ───────────────────────────────────────────
-
-  describe('historyOpen()', () => {
-    it('arrenca plegada: Inici s\'obre pel dia d\'avui', () => {
-      expect(component.historyOpen()).toBeFalse();
-    });
-
-    it('toggleHistory() l\'obre i la torna a plegar', () => {
-      component.toggleHistory();
-      expect(component.historyOpen()).toBeTrue();
-      component.toggleHistory();
-      expect(component.historyOpen()).toBeFalse();
+    it("Inici ja no pinta cap llista d'activitat recent", () => {
+      expect(fixture.nativeElement.querySelector('.history-card')).toBeNull();
+      expect(fixture.nativeElement.querySelector('.feed-day')).toBeNull();
     });
   });
 

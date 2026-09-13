@@ -270,6 +270,29 @@ export function sportSessionSummary(
   return parts.join(' · ');
 }
 
+/**
+ * El mateix dia, dit curt: "Avui", "Ahir", "8 de set." — i amb l'any quan no
+ * és el d'enguany, que si no un 8 de setembre de fa tres anys no es distingeix
+ * del d'aquest.
+ *
+ * És per als llocs on el dia va dins d'una peça estreta (el xip de període de
+ * l'Historial): `feedDayLabel()` hi porta el dia de la setmana i el mes
+ * sencers, i es menjava la fila de filtres ell sol.
+ */
+export function compactDayLabel(date: string, today: string): string {
+  if (date === today) return 'Avui';
+  const yesterday = (() => {
+    const d = new Date(today + 'T12:00:00');
+    d.setDate(d.getDate() - 1);
+    return toDateStr(d);
+  })();
+  if (date === yesterday) return 'Ahir';
+  const sameYear = date.slice(0, 4) === today.slice(0, 4);
+  return new Date(date + 'T12:00:00').toLocaleDateString('ca-ES', {
+    day: 'numeric', month: 'short', ...(sameYear ? {} : { year: 'numeric' }),
+  });
+}
+
 /** "Avui" / "Ahir" / a formatted Catalan date, relative to `today`. */
 export function feedDayLabel(date: string, today: string): string {
   if (date === today) return 'Avui';

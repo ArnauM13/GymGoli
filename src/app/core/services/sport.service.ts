@@ -8,6 +8,7 @@ import { TodayService } from './today.service';
 import { SUPABASE_PAGE_SIZE, fetchAllRows } from './supabase-page.util';
 import { DEFAULT_SPORTS, Sport, SportMetricDef, SportSession, SportSessionStatus, SportSubtype } from '../models/sport.model';
 import { FeelingLevel, PlannedSource } from '../models/workout.model';
+import { toDateStr } from '../../shared/utils/date.utils';
 
 /**
  * Una escriptura que encara no ha arribat a Supabase.
@@ -195,6 +196,17 @@ export class SportService {
       const rows  = this.activityFeed.sportSessions();
       if (!scope) return;
       untracked(() => this._ingestScope(scope, rows));
+    });
+
+    // Les coincidències d'una consulta filtrada («tots els pàdels») entren per
+    // un altre camí a posta: `_absorb()` **afegeix i no poda**. Una resposta
+    // filtrada diu qui coincideix, no qui hi ha, i tractar-la com un tram
+    // esborraria del dispositiu tot el que no fos d'aquell esport.
+    effect(() => {
+      const matched = this.activityFeed.matchedSportSessions();
+      const uid     = this.auth.uid();
+      if (!uid || !matched.length) return;
+      untracked(() => this._absorb(uid, matched));
     });
 
     effect(() => {
@@ -567,14 +579,40 @@ export class SportService {
    * d'esports.
    */
   async ensureMonthLoaded(year: number, month: number, force = false): Promise<void> {
-    const key     = `${year}-${String(month + 1).padStart(2, '0')}`;
-    const lastDay = new Date(year, month + 1, 0).getDate();
-    // El que hi ha guardat al dispositiu es pot ensenyar ja, i és l'única cosa
-    // que hi haurà si ara mateix no hi ha connexió.
-    this._primeMonthFromStorage(key);
-    await this.activityFeed.ensureRange(
-      `${key}-01`, `${key}-${String(lastDay).padStart(2, '0')}`, force,
-    );
+    const start   = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    await this.ensureRange(toDateStr(start), toDateStr(lastDay), force);
+  }
+
+  /**
+   * S'assegura que hi ha les sessions d'un tram de dies.
+   *
+   * És el germà de `WorkoutService.ensureRange()` i el que ha de cridar qui
+   * pensa en dies i no en mesos —un abast de l'Historial, per exemple—: **un
+   * tram és una consulta**, per llarg que sigui, mentre que demanar-lo mes a
+   * mes eren tres o quatre viatges per contestar la mateixa pregunta.
+   *
+   * El que hi ha guardat al dispositiu es posa a la cau abans de sortir a
+   * preguntar res: és el que es veu de seguida, i l'únic que hi haurà si ara
+   * mateix no hi ha connexió.
+   */
+  async ensureRange(from: string, to: string, force = false): Promise<void> {
+    for (const key of this._monthKeysBetween(from, to)) this._primeMonthFromStorage(key);
+    await this.activityFeed.ensureRange(from, to, force);
+  }
+
+  /** Els mesos que toca un tram, en claus `YYYY-MM` — que és com el
+   *  dispositiu té guardades les sessions. */
+  private _monthKeysBetween(from: string, to: string): string[] {
+    const keys: string[] = [];
+    const end    = new Date(to + 'T12:00:00');
+    const cursor = new Date(from + 'T12:00:00');
+    cursor.setDate(1);
+    while (cursor <= end) {
+      keys.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`);
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+    return keys;
   }
 
   /** Posa a la cau el que el dispositiu ja sap d'aquest mes, sense esperar

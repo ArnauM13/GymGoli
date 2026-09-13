@@ -1,7 +1,7 @@
 import { Workout, WorkoutEntry } from '../../core/models/workout.model';
 import { METRIC_CATALOGUE, Sport } from '../../core/models/sport.model';
 import {
-  feedDayLabel, getExerciseNames, isWorkoutPlanned, sportCardStats, workoutCardColor,
+  compactDayLabel, feedDayLabel, getExerciseNames, isWorkoutPlanned, sportCardStats, workoutCardColor,
   workoutPrimaryIcon, workoutSetsCount, workoutVolumeFmt, workoutWarmupSetsCount,
 } from './workout-card.utils';
 
@@ -150,6 +150,27 @@ describe('workout-card.utils', () => {
       expect(result).not.toBe('Avui');
       expect(result).not.toBe('Ahir');
       expect(result.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('compactDayLabel()', () => {
+    it('diu "Avui" i "Ahir" igual que el llarg', () => {
+      expect(compactDayLabel('2024-03-10', '2024-03-10')).toBe('Avui');
+      expect(compactDayLabel('2024-03-09', '2024-03-10')).toBe('Ahir');
+    });
+
+    // El xip de període és estret: hi cap "8 de set.", no pas
+    // "dilluns, 8 de setembre".
+    it('escurça el dia: sense dia de la setmana i amb el mes abreujat', () => {
+      const short = compactDayLabel('2024-03-01', '2024-03-10');
+      expect(short).not.toContain('divendres');
+      expect(short).toContain('1');
+      expect(short.length).toBeLessThan(feedDayLabel('2024-03-01', '2024-03-10').length);
+    });
+
+    it("hi posa l'any quan el dia no és d'enguany", () => {
+      expect(compactDayLabel('2021-03-01', '2024-03-10')).toContain('2021');
+      expect(compactDayLabel('2024-03-01', '2024-03-10')).not.toContain('2024');
     });
   });
 
