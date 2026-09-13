@@ -1,4 +1,4 @@
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { provideRouter } from '@angular/router';
 
@@ -38,7 +38,11 @@ function sport(date: string, over: Partial<SportSession> = {}): SportSession {
 
 describe('ProgressComponent', () => {
   let component: ProgressComponent;
+  let fixture: ComponentFixture<ProgressComponent>;
   let mockEnsureRange: jasmine.Spy;
+  /** Deixa les càrregues a mitges, per mirar la pàgina mentre espera, i fa
+   *  arribar-ho tot de cop com passa de debò. */
+  let finishLoading: () => void;
 
   function setup(opts: {
     goal?: GoalConfig;
@@ -47,9 +51,15 @@ describe('ProgressComponent', () => {
     today?: string;
     insights?: unknown[];
     totalDone?: number;
+    /** No deixis arribar res: la pàgina es queda esperant. */
+    pending?: boolean;
   } = {}): void {
     TestBed.resetTestingModule();
-    mockEnsureRange = jasmine.createSpy().and.resolveTo(undefined);
+    let release = (): void => undefined;
+    const load = opts.pending
+      ? new Promise<void>(res => { release = () => res(); })
+      : Promise.resolve();
+    mockEnsureRange = jasmine.createSpy().and.returnValue(load);
     const today = opts.today ?? MONDAY;
 
     const mockWorkoutService = {
@@ -59,12 +69,21 @@ describe('ProgressComponent', () => {
       todayDateString: () => today,
     };
 
+    const totals = { totalDone: opts.totalDone ?? (opts.done ?? []).length, firstDate: null, lastDate: null };
     const mockStatsService = {
       records:      signal(new Map()),
-      totals:       signal({ totalDone: opts.totalDone ?? (opts.done ?? []).length, firstDate: null, lastDate: null }),
+      // Esperant, encara no se'n sap res: `null` és el que hi ha abans de la
+      // primera resposta, i és el que fa que no hi hagi resum per pintar.
+      totals:       signal<typeof totals | null>(opts.pending ? null : totals),
       loading:      signal(false),
-      loaded:       signal(true),
-      ensureLoaded: jasmine.createSpy().and.resolveTo(undefined),
+      loaded:       signal(!opts.pending),
+      ensureLoaded: jasmine.createSpy().and.returnValue(load),
+    };
+
+    finishLoading = () => {
+      mockStatsService.totals.set(totals);
+      mockStatsService.loaded.set(true);
+      release();
     };
 
     const goal = opts.goal ?? {};
@@ -101,7 +120,7 @@ describe('ProgressComponent', () => {
         } },
         { provide: SportService,        useValue: {
           sports: signal([]), sessions: signal<SportSession[]>(opts.sessions ?? []),
-          ensureLoaded: jasmine.createSpy().and.resolveTo(undefined),
+          ensureLoaded: jasmine.createSpy().and.returnValue(load),
         } },
         { provide: FitnessMetricsService, useValue: { insights: signal(opts.insights ?? []) } },
         { provide: UserSettingsService, useValue: mockSettingsService },
@@ -109,7 +128,7 @@ describe('ProgressComponent', () => {
       ],
     });
 
-    const fixture = TestBed.createComponent(ProgressComponent);
+    fixture = TestBed.createComponent(ProgressComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   }
@@ -327,5 +346,32 @@ describe('ProgressComponent', () => {
 
     setup({ totalDone: 4 });
     expect(component.hasData()).toBeTrue();
+  });
+
+  /**
+   * El clic que es perdia: «Mira-t'ho de prop» era l'única cosa de la pàgina
+   * mentre les dades no arribaven i, en arribar, el resum se li posava a sobre
+   * i l'enllaç marxava de sota el dit. Un enllaç que es mou entre el pitjar i
+   * l'aixecar no rep el clic: es veia baixar la pantalla i «no passava res».
+   */
+  it('mentre carrega, les portes ja neixen al seu lloc i no es mouen quan arriben les dades', async () => {
+    setup({ pending: true, done: [gym(MONDAY)], totalDone: 1 });
+
+    const sectionsOf = (): Element[] =>
+      Array.from(fixture.nativeElement.querySelectorAll('.card-section'));
+    const portesAt = (): number =>
+      sectionsOf().findIndex(sec => sec.querySelector('.nav-card'));
+
+    const whileLoading = sectionsOf().length;
+    expect(whileLoading).toBeGreaterThan(1);
+    const portesWhileLoading = portesAt();
+    expect(portesWhileLoading).toBeGreaterThan(-1);
+
+    finishLoading();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(sectionsOf().length).toBe(whileLoading);
+    expect(portesAt()).toBe(portesWhileLoading);
   });
 });

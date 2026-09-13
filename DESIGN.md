@@ -605,6 +605,46 @@ Place inside a `.card-section`:
 .empty-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 ```
 
+### 6a. Mentre carrega: la silueta, no el buit
+
+Una pàgina que espera **guarda el seu lloc**. Mentre no hi ha dades no es
+dibuixa el no-res: es dibuixa la forma del que vindrà, amb les mateixes
+targetes, les mateixes files i la mateixa alçada.
+
+```html
+<div class="card-section">
+  <div class="section-header">
+    <span class="sk sk-icon"></span><span class="sk sk-title"></span>
+  </div>
+  <div class="item-card"><span class="sk sk-line"></span></div>
+</div>
+```
+
+```scss
+@keyframes sk-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.sk {
+  display: block; border-radius: 6px;
+  background: var(--c-border-2); animation: sk-pulse 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
+```
+
+Tres regles, i totes tres són la mateixa:
+
+- **Una sola bandera per a tota la pàgina**, no una per consulta. Si cada
+  tros apareix quan arriba el seu, la pàgina creix a batzegades i el que hi
+  ha a sota baixa un cop per resposta.
+- **La silueta fa l'alçada del contingut**, no la que quedi bé. Una silueta
+  curta és el mateix salt una mica més tard.
+- **L'estat buit només quan ja se sap que és buit** (`ready() && !hasData()`).
+  «Encara no hi ha res» mentre carrega és mentida, i a més torna a saltar.
+
+No és cosmètica: un enllaç que es mou entre el pitjar i l'aixecar **no rep el
+clic**. Això és el que passava a Progrés, on «Mira-t'ho de prop» era l'única
+cosa de la pàgina mentre les dades no arribaven i el resum se li posava a
+sobre just quan algú el clicava: la pantalla baixava i el primer clic es
+perdia.
+
 ---
 
 ## 7. Material Symbols
@@ -905,6 +945,11 @@ Regles que les mantenen honestes:
   «mostrat avui» ni fites celebrades—: veure una llista no és que t'ho hagin
   dit. S'agrupen per família (`INSIGHT_LEVEL`), amb una línia que diu què hi
   busques.
+- **El resum guarda el seu lloc mentre carrega.** Les dues portes del final
+  són el que es clica més, i abans naixien a dalt de tot —soles a la
+  pàgina— per anar-se'n cap avall quan arribaven les dades, just a sota del
+  dit. Ara la pàgina n'ensenya la silueta (§6a) i totes tres consultes
+  s'esperen juntes.
 - **Al detall, exercicis i esports no es barregen**: un commutador a dalt, no
   una llista amb tot dins. Un exercici i un esport no es comparen amb res del
   mateix. Obrir un esport demana el seu historial i només el seu
