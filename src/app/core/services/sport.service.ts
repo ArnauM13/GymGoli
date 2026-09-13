@@ -198,6 +198,17 @@ export class SportService {
       untracked(() => this._ingestScope(scope, rows));
     });
 
+    // Les coincidències d'una consulta filtrada («tots els pàdels») entren per
+    // un altre camí a posta: `_absorb()` **afegeix i no poda**. Una resposta
+    // filtrada diu qui coincideix, no qui hi ha, i tractar-la com un tram
+    // esborraria del dispositiu tot el que no fos d'aquell esport.
+    effect(() => {
+      const matched = this.activityFeed.matchedSportSessions();
+      const uid     = this.auth.uid();
+      if (!uid || !matched.length) return;
+      untracked(() => this._absorb(uid, matched));
+    });
+
     effect(() => {
       const uid = this.auth.uid();
       this._sports.set([]);

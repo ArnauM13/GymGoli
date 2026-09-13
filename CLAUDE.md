@@ -69,6 +69,11 @@ tests que les subjecten són allà.
   (`activity_feed`) porta entrenaments i esports d'un rang de dies amb el
   que necessita la targeta plegada i cap sèrie. Passa per
   `WorkoutService.ensureRange()`; les sèries es demanen en obrir la sessió
+- **Els filtres els contesta la mateixa crida**: nom d'exercici (`p_search`),
+  tipus d'entrenament (`p_category`) i esport (`p_sport`), sobre tot
+  l'historial i sense sèries. Un filtre no es contesta paginant una altra
+  cosa: si la teva pregunta no hi cap, el que toca és una migració, no un
+  bucle de mesos al client
 - **Cap consulta no baixa «tot»**: tota consulta va acotada per un tram, un
   exercici, un esport, una fila o un filtre. Agregar i filtrar és feina del
   servidor — vegeu `SYNC.md` §«Res no baixa tot»

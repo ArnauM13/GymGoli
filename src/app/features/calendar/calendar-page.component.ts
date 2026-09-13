@@ -222,16 +222,16 @@ function parseRangeParam(raw: string | null | undefined): number | null {
               </div>
             }
           </div>
-        } @else if (sportFilterLoading()) {
+        } @else if (filterLoading()) {
           <p class="end-of-list">· Carregant-ne més ·</p>
         } @else if (!hasMoreToShow() && !hasMore()) {
           <p class="end-of-list">· {{ loadedRangeLabel() }} ·</p>
         }
 
-      } @else if (sportFilterLoading()) {
+      } @else if (filterLoading()) {
 
-        <!-- La consulta d'aquell esport encara viatja: la llista buida
-             d'ara no vol dir que no n'hi hagi. -->
+        <!-- La consulta filtrada encara viatja: la llista buida d'ara no vol
+             dir que no n'hi hagi. -->
         <div class="sk-list">
           @for (_ of [1,2,3]; track $index) {
             <div class="sk-card-ph">
@@ -519,9 +519,9 @@ export class CalendarPageComponent implements OnDestroy {
 
   readonly visibleCount = signal(CalendarPageComponent.PAGE_SIZE);
 
-  /** Una consulta d'esport en marxa: la llista encara no és la definitiva. */
-  private readonly _sportLoading = signal(false);
-  readonly sportFilterLoading = this._sportLoading.asReadonly();
+  /** Una consulta filtrada en marxa: el que es veu encara no és la resposta. */
+  private readonly _searching = signal(false);
+  readonly filterLoading = this._searching.asReadonly();
 
   // ── El període ───────────────────────────────────────────────────────────
   //
@@ -645,11 +645,11 @@ export class CalendarPageComponent implements OnDestroy {
    * Queden mesos per anar a buscar?
    *
    * Només quan la llista és la sencera. Tots els filtres tenen **resposta
-   * completa** sense rascar mesos enrere: la cerca i el tipus els contesta el
-   * servidor amb totes les coincidències de tot l'historial, un esport es
-   * demana sencer (`loadSessionsForSport`) i un abast és un tram, que té
-   * final per definició. Anar a pescar mesos amb un filtre posat era demanar
-   * dotze consultes per no trobar el pàdel de fa tres anys.
+   * completa** sense rascar mesos enrere: la cerca, el tipus i l'esport els
+   * contesta el servidor amb totes les coincidències de tot l'historial
+   * (`activity_feed`), i un abast és un tram, que té final per definició.
+   * Anar a pescar mesos amb un filtre posat era demanar dotze consultes per
+   * no trobar el pàdel de fa tres anys.
    */
   readonly hasMore = computed(() =>
     !this._reachedEnd() && this.rangeDays() === null && !this.filterSport()
@@ -887,31 +887,21 @@ export class CalendarPageComponent implements OnDestroy {
       this._loadInitialMonth();
     });
 
-    // Cercar o filtrar per tipus mira tot l'historial, no només els mesos que
-    // ja s'han carregat: si no, buscar un exercici antic no trobaria res.
-    effect(() => {
-      const search = this.searchQuery().trim();
-      const cat    = this.filterCat();
-      if ((!search && !cat) || !this.authService.uid()) return;
-      untracked(() => { void this._runSearch(); });
-    });
-
-    // ── Filtrar per un esport és una consulta d'aquell esport ──────────────
+    // ── Filtrar és preguntar al servidor ───────────────────────────────────
     //
-    // Es demanen **totes** les seves sessions —una consulta, acotada per
-    // l'esport, paginada per dins (`fetchAllRows`)— i s'incorporen sense
-    // podar res: una resposta filtrada diu qui coincideix, no qui hi ha.
-    // Abans això es contestava rascant mes a mes el que ja hi havia
-    // carregat, que per a un pàdel de fa tres anys volien dir trenta-sis
-    // consultes i, si es cansava abans, cap resposta.
+    // Els tres filtres hi van pel mateix camí i amb la mateixa consulta
+    // (`activity_feed`, migració 037): un nom d'exercici, un tipus
+    // d'entrenament o un esport. Miren **tot** l'historial, no els mesos que
+    // ja s'han carregat, que és l'única manera que buscar un exercici antic o
+    // el pàdel de fa tres anys trobi res.
     effect(() => {
+      const search  = this.searchQuery().trim();
+      const cat     = this.filterCat();
       const sportId = this.filterSport();
-      if (!sportId || !this.authService.uid()) return;
+      if ((!search && !cat && !sportId) || !this.authService.uid()) return;
       untracked(() => {
-        if (this.sportService.sportHistoryLoaded(sportId)) return;
-        this._sportLoading.set(true);
-        void this.sportService.loadSessionsForSport(sportId)
-          .finally(() => this._sportLoading.set(false));
+        this._searching.set(true);
+        void this._runSearch().finally(() => this._searching.set(false));
       });
     });
 
@@ -1023,14 +1013,15 @@ export class CalendarPageComponent implements OnDestroy {
    * viatja són només les coincidències —sense sèries—, encara que siguin de fa
    * vuit anys.
    *
-   * Els esports no hi entren: no tenen ni noms d'exercici ni tipus
-   * d'entrenament, o sigui que amb qualsevol dels dos filtres queden fora
-   * igualment, i sense filtre no s'arriba mai aquí.
+   * Els tres filtres hi caben perquè la consulta els sap tots tres i
+   * s'exclouen sols: un nom d'exercici i un tipus deixen els esports fora, i
+   * un esport deixa el gimnàs fora.
    */
   private async _runSearch(): Promise<void> {
     await this.workoutService.searchHistory({
       search:   this.searchQuery().trim(),
-      category: this.filterCat() ?? undefined,
+      category: this.filterCat()   ?? undefined,
+      sport:    this.filterSport() ?? undefined,
     });
   }
 

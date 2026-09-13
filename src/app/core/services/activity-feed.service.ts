@@ -18,6 +18,14 @@ export interface FeedFilters {
   search?:   string;
   /** Un tipus d'entrenament, contra `categories`. */
   category?: string;
+  /**
+   * Un esport, contra `sport_id` — «tots els pàdels».
+   *
+   * És la pregunta simètrica de les altres dues: aquelles són del gimnàs i
+   * deixen els esports fora, aquesta és d'esport i deixa el gimnàs fora. Cap
+   * activitat és les dues coses (migració 037).
+   */
+  sport?:    string;
 }
 
 /**
@@ -209,6 +217,18 @@ export class ActivityFeedService {
   /** Les sessions d'esport del que s'ha demanat. */
   readonly sportSessions    = computed((): SportSession[] => [...this._sessions().values()]);
 
+  /**
+   * Les sessions d'esport que ha tornat l'última consulta **filtrada**.
+   *
+   * Van a part de `sportSessions()` perquè no volen dir el mateix: aquelles
+   * cobreixen un tram i, amb elles, el que hi falta d'aquell tram s'ha
+   * esborrat; aquestes són coincidències escampades per anys, i de l'historial
+   * no en diuen res més. Qui les llegeix les afegeix i no poda (vegeu
+   * `SportService._absorb()`).
+   */
+  private readonly _matchedSessions = signal<SportSession[]>([]);
+  readonly matchedSportSessions = this._matchedSessions.asReadonly();
+
   /** Qui vulgui saber si un tram ja hi és sense demanar-lo (per ensenyar un
    *  esquelet o no) mira aquí. Depèn de `_version` a posta: és un senyal, i ha
    *  de tornar a mirar-s'ho quan arriba un tram nou. */
@@ -231,6 +251,7 @@ export class ActivityFeedService {
     this._searchLoads.clear();
     this.searching.set(false);
     this._summaries.set(new Map());
+    this._matchedSessions.set([]);
     this._sessions.set(new Map());
     this._version.update(v => v + 1);
     this.lastScope.set(null);
@@ -311,9 +332,9 @@ export class ActivityFeedService {
    */
   async searchRange(from: string, to: string, filters: FeedFilters): Promise<void> {
     if (!this.auth.uid() || this.offline.isOffline()) return;
-    if (!filters.search && !filters.category) return;
+    if (!filters.search && !filters.category && !filters.sport) return;
 
-    const key = `${from}|${to}|${filters.search ?? ''}|${filters.category ?? ''}`;
+    const key = `${from}|${to}|${filters.search ?? ''}|${filters.category ?? ''}|${filters.sport ?? ''}`;
     if (this._searched.has(key)) return;
 
     const inFlight = this._searchLoads.get(key);
@@ -334,6 +355,7 @@ export class ActivityFeedService {
       p_bodyweight: this.settings.bodyweightKg(),
       p_search:     filters.search   || null,
       p_category:   filters.category || null,
+      p_sport:      filters.sport    || null,
     });
     if (error) return;
     if (this.auth.uid() !== forUid) return;
@@ -342,6 +364,15 @@ export class ActivityFeedService {
     const summaries = new Map(this._summaries());
     for (const r of rows) if (r.kind === 'workout') summaries.set(r.item_id, toSummary(r));
     this._summaries.set(summaries);
+
+    // Les sessions d'esport que hi coincideixen surten per un canal a part i
+    // **no** per `_sessions`: aquell és el de les respostes de tram, i el que
+    // hi entra dona per esborrat el que hi falta del tram. Una resposta
+    // filtrada no cobreix res —diu qui coincideix, no qui hi ha—, així que el
+    // que porta només es pot **afegir**.
+    const matched = rows.filter(r => r.kind === 'sport' && r.sport_id).map(toSession);
+    if (matched.length) this._matchedSessions.set(matched);
+
     this._searched.add(key);
     this._version.update(v => v + 1);
   }

@@ -89,8 +89,6 @@ describe('CalendarPageComponent', () => {
       // Amb una cerca activa el feed no va dia a dia: es munta des de les
       // coincidències, que és com arriben del servidor.
       allSportSessionPairs:           () => Object.values(sportsByDate).flat(),
-      loadSessionsForSport:           jasmine.createSpy().and.resolveTo(undefined),
-      sportHistoryLoaded:             jasmine.createSpy().and.returnValue(false),
       logSession:                     jasmine.createSpy().and.resolveTo(undefined),
       deleteSession:                  jasmine.createSpy().and.resolveTo(undefined),
       ensureLoaded:                   jasmine.createSpy().and.resolveTo(undefined),
@@ -382,31 +380,34 @@ describe('CalendarPageComponent', () => {
       expect(days[0].sports.length).toBe(1);
     });
 
-    // El filtre el contesta el servidor, amb una consulta acotada per l'esport:
-    // no s'hi va rascant mesos enrere fins a trobar-ne.
-    it("demana al servidor totes les sessions d'aquell esport", () => {
-      const load = TestBed.inject(SportService).loadSessionsForSport as jasmine.Spy;
-      load.calls.reset();
+    // El filtre el contesta el servidor, amb la mateixa consulta que la cerca
+    // i el tipus: no s'hi va rascant mesos enrere fins a trobar-ne.
+    it("va al servidor amb l'esport, no als mesos carregats", () => {
+      const search = TestBed.inject(WorkoutService).searchHistory as jasmine.Spy;
+      search.calls.reset();
 
       component.filterSport.set('s-padel');
       fixture.detectChanges();
 
-      expect(load).toHaveBeenCalledOnceWith('s-padel');
+      expect(search).toHaveBeenCalledOnceWith(
+        jasmine.objectContaining({ sport: 's-padel' }));
     });
 
-    it('no la torna a demanar si ja la té', () => {
-      const load = TestBed.inject(SportService).loadSessionsForSport as jasmine.Spy;
-      (TestBed.inject(SportService).sportHistoryLoaded as jasmine.Spy).and.returnValue(true);
-      load.calls.reset();
+    it('mai no demana esports mes a mes', () => {
+      const wEnsure = TestBed.inject(WorkoutService).ensureMonthLoaded as jasmine.Spy;
+      const sEnsure = TestBed.inject(SportService).ensureMonthLoaded as jasmine.Spy;
+      wEnsure.calls.reset(); sEnsure.calls.reset();
 
       component.filterSport.set('s-padel');
       fixture.detectChanges();
 
-      expect(load).not.toHaveBeenCalled();
+      expect(wEnsure).not.toHaveBeenCalled();
+      expect(sEnsure).not.toHaveBeenCalled();
     });
 
-    // La resposta d'aquell esport és sencera: no queda cap mes enrere per anar
-    // a pescar, que és el que abans es feia dotze vegades per no trobar res.
+    // La resposta ja porta totes les coincidències de tot l'historial: no
+    // queda cap mes enrere per anar a pescar, que és el que abans es feia
+    // dotze vegades per no trobar res.
     it('tanca la paginació per mesos: la resposta ja és tot l\'esport', () => {
       component.filterSport.set('s1');
       expect(component.hasMore()).toBeFalse();
@@ -414,12 +415,12 @@ describe('CalendarPageComponent', () => {
 
     it('mentre la consulta viatja no diu que no hi hagi res', () => {
       let resolve = (): void => {};
-      (TestBed.inject(SportService).loadSessionsForSport as jasmine.Spy)
+      (TestBed.inject(WorkoutService).searchHistory as jasmine.Spy)
         .and.returnValue(new Promise<void>(r => { resolve = r; }));
 
       component.filterSport.set('s-padel');
       fixture.detectChanges();
-      expect(component.sportFilterLoading()).toBeTrue();
+      expect(component.filterLoading()).toBeTrue();
 
       resolve();
     });

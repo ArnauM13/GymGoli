@@ -2,6 +2,7 @@ import { TestBed, discardPeriodicTasks, fakeAsync, tick } from '@angular/core/te
 import { signal } from '@angular/core';
 
 import { SportService } from './sport.service';
+import { ActivityFeedService } from './activity-feed.service';
 import { SupabaseService } from './supabase.service';
 import { AuthService } from './auth.service';
 
@@ -363,6 +364,50 @@ describe('SportService', () => {
       tick();
 
       expect(service.sessions().some(s => s.date === '2024-02-14')).toBeTrue();
+    }));
+  });
+
+  // ── Coincidències d'una consulta filtrada ────────────────────────────────
+  //
+  // «Tots els pàdels» torna sessions escampades per anys, i **no** cobreix cap
+  // tram: si s'ingerissin com un tram, tot el que no fos pàdel dins d'aquelles
+  // dates es donaria per esborrat i marxaria del dispositiu.
+  describe('coincidències filtrades', () => {
+    it('incorpora les sessions que arriben filtrades', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+
+      sessionsData = [sessionRow('ss-vell', '2019-04-02', { sport_id: 'running' })];
+      void TestBed.inject(ActivityFeedService)
+        .searchRange('2000-01-01', '2030-12-31', { sport: 'running' });
+      tick();
+      TestBed.flushEffects();
+
+      expect(service.sessions().some(x => x.id === 'ss-vell')).toBeTrue();
+    }));
+
+    it('no treu res del que ja hi havia: no cobreix cap tram', fakeAsync(() => {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+
+      // Un mes carregat de debò, amb una sessió que no és de l'esport filtrat.
+      sessionsData = [sessionRow('ss-marc', '2024-03-06', { sport_id: 'swimming' })];
+      void service.ensureMonthLoaded(2024, 2);
+      tick();
+      TestBed.flushEffects();
+      expect(service.sessions().some(x => x.id === 'ss-marc')).toBeTrue();
+
+      // I ara la consulta filtrada, que d'aquell mes només en torna el pàdel.
+      sessionsData = [sessionRow('ss-vell', '2019-04-02', { sport_id: 'running' })];
+      void TestBed.inject(ActivityFeedService)
+        .searchRange('2000-01-01', '2030-12-31', { sport: 'running' });
+      tick();
+      TestBed.flushEffects();
+
+      expect(service.sessions().some(x => x.id === 'ss-vell')).withContext('la coincidència hi entra').toBeTrue();
+      expect(service.sessions().some(x => x.id === 'ss-marc')).withContext('i la de març es queda').toBeTrue();
     }));
   });
 

@@ -592,7 +592,7 @@ export class WorkoutService {
    * No cobreix cap tram: una resposta filtrada diu qui coincideix, no qui hi
    * ha d'haver. Vegeu `ActivityFeedService.searchRange()`.
    */
-  async searchHistory(filters: { search?: string; category?: string }): Promise<void> {
+  async searchHistory(filters: { search?: string; category?: string; sport?: string }): Promise<void> {
     await this.activityFeed.searchRange(EPOCH_START, this._todayStr, filters);
   }
 
