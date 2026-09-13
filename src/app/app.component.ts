@@ -32,7 +32,8 @@ import { OnboardingTourService } from './core/services/onboarding-tour.service';
         <app-onboarding-tour />
       }
 
-      <main class="app-content" [class.page-anim-a]="!pageAnimToggle()" [class.page-anim-b]="pageAnimToggle()">
+      <main class="app-content" [class.app-content--nav]="!!auth.user()"
+            [class.page-anim-a]="!pageAnimToggle()" [class.page-anim-b]="pageAnimToggle()">
         <router-outlet />
         @if (offlineService.isOffline() && !worksOffline()) {
           <div class="offline-page-overlay">
@@ -63,10 +64,18 @@ import { OnboardingTourService } from './core/services/onboarding-tour.service';
       overflow-y: auto;
       overflow-x: hidden;
       position: relative;
-      /* The nav floats over the content (see nav-bar.component). Reserve its
-       * footprint here — instead of the nav's old opaque flex band — so every
-       * page's resting layout is unchanged and content scrolls underneath the
-       * floating capsule. */
+    }
+
+    /* The nav floats over the content (see nav-bar.component). Reserve its
+     * footprint here — instead of the nav's old opaque flex band — so every
+     * page's resting layout is unchanged and content scrolls underneath the
+     * floating capsule. This is the ONLY place the nav is paid for: a page's
+     * own padding-bottom is just the air under its last element
+     * (--page-pad-bottom, see DESIGN.md §2).
+     *
+     * Sense sessió no hi ha nav i no hi ha res a reservar: el login i companyia
+     * arrossegaven una nav de buit que ningú no havia pintat. */
+    .app-content--nav {
       padding-bottom: var(--nav-height);
     }
 

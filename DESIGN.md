@@ -107,18 +107,22 @@ Every page lives inside a `.page` wrapper:
 }
 ```
 
-**The page never pays for the nav.** `.app-content` already reserves
-`var(--nav-height)` under every page, so the bottom padding is only the air
-below the last element. There are two values and no third:
+**The page never pays for the nav.** `.app-content` reserves
+`var(--nav-height)` under every page — and only while the nav is actually
+there (`.app-content--nav`; logged out there is no nav and nothing to
+reserve). So a page's bottom padding is only the air below its last element.
+There are two values and no third:
 
 | Token | Value | When |
 |---|---|---|
 | `--page-pad-bottom`     | `16px` | Any page |
 | `--page-pad-bottom-fab` | `88px` | The page has a floating button (`.fab`, speed dial) or a fixed bar sitting at `bottom: calc(var(--nav-height) + 16px)` — the last element must not end up underneath it |
 
-Never write a raw `84px` / `88px` / `100px` there, and never add
-`min-height: 100vh` to a page: the shell is already the full height, so the
-page would scroll a nav's worth of nothing.
+Never write a raw `84px` / `88px` / `100px` there, and never give a page
+`min-height: 100vh` / `100dvh`: the shell is already exactly the screen, so
+the page would scroll the top inset (and the nav) of nothing. A page that
+wants to fill the screen — a centered login card, say — uses
+`min-height: 100%`.
 
 ### 2a. Page header (title + action)
 

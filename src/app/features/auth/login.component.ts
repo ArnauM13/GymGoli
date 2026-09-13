@@ -158,7 +158,10 @@ function friendlyError(err: unknown): string {
   `,
   styles: [`
     .login-page {
-      min-height: 100dvh;
+      /* El moble ja és l'alçada de la pantalla: 100dvh aquí hi sumava el
+         retall de dalt (i la nav, quan n'hi ha) i deixava un pam de
+         scroll de no-res. */
+      min-height: 100%;
       display: flex; align-items: flex-start; justify-content: center;
       background: var(--c-bg);
       padding: max(10dvh, 24px) 24px 48px;
