@@ -15,7 +15,7 @@ import { UserSettingsService } from './user-settings.service';
 import { WorkoutService } from './workout.service';
 import { workoutVolume } from '../../shared/utils/workout-card.utils';
 import { countSessions } from '../../shared/utils/session-group.utils';
-import { monthStartOf, sameSpanLastMonth } from '../../shared/utils/calendar-utils';
+import { monthEndOf, monthStartOf, sameSpanLastMonth } from '../../shared/utils/calendar-utils';
 import { daysBetween, offsetDate, toDateStr } from '../../shared/utils/date.utils';
 import {
   capFirst,
@@ -125,6 +125,33 @@ function monthSpans(today: string): { now: Span; prev: Span } | null {
   if (now.days < MIN_MONTH_DAYS) return null;
   const prev = sameSpanLastMonth(today);
   return { now, prev: span(prev.from, prev.to) };
+}
+
+/** El mes sencer que conté aquesta data, de l'1 fins a l'últim dia. */
+function fullMonthSpan(dateStr: string): Span {
+  return span(monthStartOf(dateStr), monthEndOf(dateStr));
+}
+
+/**
+ * Els dos últims mesos **sencers**, quan encara són notícia.
+ *
+ * És el complement de `monthSpans()`: mentre el mes en curs és massa nou per
+ * comparar-lo amb res (`MIN_MONTH_DAYS`), el que sí que es pot dir és com va
+ * anar el que acaba de tancar-se, sencer i contra el sencer d'abans. Són les
+ * úniques xifres de l'app que no depenen del dia que les miris.
+ *
+ * Passats aquells primers dies torna a manar el mes en curs i això calla: un
+ * resum de l'agost el 25 de setembre ja no és cap novetat.
+ */
+function closedMonths(today: string): { last: Span; before: Span } | null {
+  if (Number(today.slice(8)) >= MIN_MONTH_DAYS) return null;
+  const last = fullMonthSpan(offsetDate(monthStartOf(today), -1));
+  return { last, before: fullMonthSpan(offsetDate(last.from, -1)) };
+}
+
+/** Dies que queden del mes d'aquesta data, avui inclòs. */
+function daysLeftInMonth(today: string): number {
+  return daysBetween(today, monthEndOf(today)) + 1;
 }
 
 /**
@@ -1041,6 +1068,11 @@ export class FitnessMetricsService {
       const nowRate  = now  / (nowSpan.days  / 7);
       const prevRate = prev / (prevSpan.days / 7);
 
+      // El mes passat **sencer** és l'única xifra que ja no es mourà: és
+      // contra ella que es diu què faria d'aquest un mes millor.
+      const prevFull = countIn(allDates, fullMonthSpan(prevSpan.from));
+      const left     = daysLeftInMonth(today);
+
       if (now + prev >= 8 && prev > 0) {
         const delta = (nowRate - prevRate) / prevRate;
         // Si el ritme i el recompte no van a la mateixa banda, el canvi el fa
@@ -1086,17 +1118,91 @@ export class FitnessMetricsService {
               meaning: up
                 ? 'Compara el mes en curs amb els mateixos dies del mes passat, perquè un mes a mig fer no sembli fluix. Pujar de ritme va bé mentre el descans hi càpiga.'
                 : 'Compara el mes en curs amb els mateixos dies del mes passat, perquè un mes a mig fer no sembli fluix. Un mes més tranquil no desfà res del que portes.',
+              next: now > prevFull
+                ? `${capFirst(inMonth(prevSpan.from))} sencer en van sortir ${prevFull} i ${inMonth(nowSpan.from)} ja en portes ${now}. Superat, i encara queden ${plural(left, 'dia', 'dies')}.`
+                : `${capFirst(inMonth(prevSpan.from))} sencer en van sortir ${prevFull}. Amb ${plural(prevFull + 1, 'activitat', 'activitats')} ${inMonth(nowSpan.from)} el superes, i queden ${plural(left, 'dia', 'dies')}.`,
             },
           });
         }
       }
     }
 
+    // ── El mes que acaba de tancar-se, sencer contra sencer ──────────────────
+    const closed = this._closedMonth(today, allDates, hist);
+    if (closed) out.push({ ...closed, level });
+
     // ── L'esforç puja: les últimes sessions costen més ───────────────────────
     const effort = this._effortTrend(today, workouts, sessions, sports);
     if (effort) out.push({ ...effort, level });
 
     return out;
+  }
+
+  /**
+   * Com va anar el mes que acaba de tancar-se, contra el sencer d'abans.
+   *
+   * És l'únic insight amb xifres **definitives**: dos mesos sencers, de l'1 a
+   * l'últim dia, que ja no es mouran mai més. La resta del mes mana el mes en
+   * curs (`tendencia_volum`), que és una comparació viva i canvia cada dia;
+   * aquests primers dies, en què el mes nou encara no diu res, és quan el
+   * tancament del vell és la notícia. Vegeu `closedMonths()`.
+   *
+   * Va amb `once` perquè un mes es tanca una sola vegada: repetit cada dia
+   * deixaria de ser un resum i passaria a ser un marcador.
+   */
+  private _closedMonth(today: string, allDates: string[], hist: History): FitnessInsight | null {
+    const months = closedMonths(today);
+    // Comparar amb un mes en què l'usuari encara no hi era no és comparar.
+    if (!months || !hist.first || hist.first > months.before.from) return null;
+
+    const { last, before } = months;
+    const nLast   = countIn(allDates, last);
+    const nBefore = countIn(allDates, before);
+    if (nBefore === 0 || nLast + nBefore < 8) return null;
+
+    // Per setmana, que és com es comparen dos mesos de durada diferent: el
+    // febrer no és un mes fluix pel fet de tenir tres dies menys.
+    const rateLast   = nLast   / (last.days   / 7);
+    const rateBefore = nBefore / (before.days / 7);
+    const left       = daysLeftInMonth(today);
+
+    return {
+      type: 'mes_tancat',
+      // La clau és el mes, no el tipus: el tancament següent ja serà un altre.
+      once: `mes_tancat:${last.from.slice(0, 7)}`,
+      mascot: 'both',
+      emoji: '🗓️',
+      title: `Com va anar ${inMonth(last.from)}`,
+      stat: `${plural(nLast, 'activitat', 'activitats')} ${inMonth(last.from)}`,
+      message: `${capFirst(inMonth(before.from))} en van ser ${nBefore}.`,
+      color: '#3949ab',
+      level: INSIGHT_LEVEL.tendencia,
+      strength: 40 + changeScore(nLast, nBefore),
+      cooldownDays: 0,
+      detail: {
+        headline: `${capFirst(inMonth(last.from))} vas fer ${plural(nLast, 'activitat', 'activitats')}; ${inMonth(before.from)}, ${nBefore}.`,
+        chart: {
+          caption: 'Activitats de cada mes, sencer',
+          range: dateRange(before.from, last.to),
+          // Dos mesos i prou: l'app arrenca amb tres mesos carregats
+          // (`WorkoutService.RECENT_MONTHS`) i el tercer cap enrere ja no hi
+          // seria sencer. Una barra a zero perquè el mes no ha baixat diria
+          // que aquell mes no vas fer res.
+          bars: itemBars(
+            [before, last].map(m => ({ m, n: countIn(allDates, m) })),
+            x => ({ label: monthShort(x.m.from), value: x.n }),
+            { muted: (_x, i) => i === 0, highlight: (_x, i) => i === 1 },
+          ),
+        },
+        facts: [
+          { label: monthName(last.from),   value: plural(nLast, 'activitat', 'activitats'),   note: dateRange(last.from, last.to) },
+          { label: monthName(before.from), value: plural(nBefore, 'activitat', 'activitats'), note: dateRange(before.from, before.to) },
+          { label: 'Diferència', value: weeklyChangePhrase(rateLast, rateBefore) },
+        ],
+        meaning: 'Dos mesos sencers, de l\'1 a l\'últim dia. És l\'única comparació de l\'app que no depèn del dia que la miris: aquestes dues xifres ja no es mouran.',
+        next: `${capFirst(inMonth(today))}, amb ${plural(nLast + 1, 'activitat', 'activitats')} el superes. Queden ${plural(left, 'dia', 'dies')}.`,
+      },
+    };
   }
 
   private _effortTrend(

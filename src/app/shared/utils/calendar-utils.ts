@@ -72,6 +72,12 @@ export function monthStartOf(dateStr: string): string {
   return `${dateStr.slice(0, 7)}-01`;
 }
 
+/** L'últim dia del mes d'aquesta data. Local, com tot el que és una data. */
+export function monthEndOf(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00');
+  return toDateStr(new Date(d.getFullYear(), d.getMonth() + 1, 0, 12));
+}
+
 /** «Setembre 2026», per encapçalar un resum mensual. */
 export function monthLabelOf(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');

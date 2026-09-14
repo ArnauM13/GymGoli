@@ -24,7 +24,7 @@ const TUESDAY   = '2025-04-22';
 const ALL_TYPES: InsightType[] = [
   'ratxa_assolida', 'ratxa_en_joc', 'objectiu_a_l_alca', 'objectiu_desajustat', 'compliment_objectiu',
   'sense_activitat', 'carrega_alta', 'progres', 'volum_gym',
-  'tendencia_volum', 'esforc_creixent', 'patro_setmanal', 'equilibri_gym',
+  'mes_tancat', 'tendencia_volum', 'esforc_creixent', 'patro_setmanal', 'equilibri_gym',
 ];
 
 /** Data amb N dies de diferència respecte a `MOCK_DATE` (negatiu = passat). */
@@ -604,6 +604,61 @@ describe('FitnessMetricsService', () => {
 
   // ── Nivell 4 · Tendència ─────────────────────────────────────────────────
 
+  describe('mes_tancat', () => {
+    // Principis de maig: l'abril ja s'ha tancat i les seves xifres no es
+    // mouran mai més. És l'única comparació de l'app que no depèn del dia.
+    const HISTORY = '2025-02-10';
+    const MARCH   = md('2025-03', [3, 7, 11, 15, 19, 23]);
+    const APRIL   = md('2025-04', [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]);
+
+    function atThirdOfMay(): void {
+      mockToday.set('2025-05-03');
+      mockWorkouts.set([HISTORY, ...MARCH, ...APRIL].map(dd => makeWorkout(dd)));
+    }
+
+    it('sums up the month that just closed against the whole one before', () => {
+      atThirdOfMay();
+
+      const ins = find('mes_tancat');
+      expect(ins).toBeTruthy();
+      expect(ins!.title).toBe('Com va anar a l\'abril');
+      expect(ins!.stat).toBe('10 activitats a l\'abril');
+      expect(ins!.message).toBe('Al març en van ser 6.');
+      expect(ins!.detail.facts.find(f => f.label === 'Abril')!.note).toBe('1 d\u2019abril – 30 d\u2019abril');
+      expect(ins!.detail.chart.bars.map(b => b.label)).toEqual(['mar', 'abr']);
+      expect(ins!.detail.chart.bars.map(b => b.value)).toEqual([6, 10]);
+    });
+
+    it('says what a better May would take, without making it a chore', () => {
+      atThirdOfMay();
+
+      // Onze, perquè l'abril en va fer deu; i el marge que queda per fer-les.
+      expect(find('mes_tancat')!.detail.next)
+        .toBe('Al maig, amb 11 activitats el superes. Queden 29 dies.');
+    });
+
+    it('is a milestone, not a scoreboard: one key per closed month', () => {
+      atThirdOfMay();
+
+      expect(find('mes_tancat')!.once).toBe('mes_tancat:2025-04');
+    });
+
+    it('stops being news once the new month is under way', () => {
+      // El 23 d'abril mana el mes en curs (`tendencia_volum`): un resum del
+      // març a aquestes alçades ja no és cap novetat.
+      mockWorkouts.set([HISTORY, ...MARCH, ...APRIL].map(dd => makeWorkout(dd)));
+
+      expect(types()).not.toContain('mes_tancat');
+    });
+
+    it('stays quiet without a whole month before the closed one', () => {
+      mockToday.set('2025-05-03');
+      mockWorkouts.set([...MARCH, ...APRIL].map(dd => makeWorkout(dd)));
+
+      expect(types()).not.toContain('mes_tancat');
+    });
+  });
+
   describe('tendencia_volum', () => {
     // Avui és el 23 d'abril: l'1 – 23 d'abril contra l'1 – 23 de març. Abans
     // eren dues finestres mòbils de 28 dies que es deien "aquest mes" i que
@@ -645,6 +700,27 @@ describe('FitnessMetricsService', () => {
       const ins = find('tendencia_volum');
       expect(ins!.title).toBe('Mes més tranquil');
       expect(ins!.message).toContain('Cap pressa');
+    });
+
+    it('says what would make this month beat the last whole one', () => {
+      // La comparació de la targeta és pel mateix tram; la xifra a superar,
+      // en canvi, és el març **sencer**: és l'única que ja no es mourà.
+      mockWorkouts.set([
+        PAST,
+        ...md('2025-03', [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]),
+        ...md('2025-04', [3, 8, 13, 18]),
+      ].map(dd => makeWorkout(dd)));
+
+      expect(find('tendencia_volum')!.detail.next)
+        .toBe('Al març sencer en van sortir 12. Amb 13 activitats a l\'abril el superes, i queden 8 dies.');
+    });
+
+    it('and says so plainly when the month is already past it', () => {
+      mockWorkouts.set([PAST, ...MARCH, ...APRIL].map(dd => makeWorkout(dd)));
+
+      const next = find('tendencia_volum')!.detail.next!;
+      expect(next).toContain('Superat');
+      expect(next).toContain('queden 8 dies');
     });
 
     it('stays quiet on a change under 25%', () => {
@@ -870,6 +946,18 @@ describe('FitnessMetricsService', () => {
       },
     },
     {
+      name: 'mes_tancat',
+      setup: () => {
+        // Principis de maig: l'abril ja és un mes tancat.
+        mockToday.set('2025-05-03');
+        mockWorkouts.set([
+          '2025-02-10',
+          ...md('2025-03', [3, 7, 11, 15, 19, 23]),
+          ...md('2025-04', [1, 4, 7, 10, 13, 16, 19, 22, 25, 28]),
+        ].map(dd => makeWorkout(dd)));
+      },
+    },
+    {
       name: 'tendencia_volum',
       setup: () => {
         mockWorkouts.set([
@@ -1016,7 +1104,7 @@ describe('FitnessMetricsService', () => {
     });
 
     it('data cada xifra que es compara amb una altra', () => {
-      const comparing = ['tendencia_volum', 'volum_gym', 'compliment_objectiu', 'carrega_alta'];
+      const comparing = ['mes_tancat', 'tendencia_volum', 'volum_gym', 'compliment_objectiu', 'carrega_alta'];
       for (const i of everyInsight()) {
         if (!comparing.includes(i.type)) continue;
         const dated = i.detail.facts.filter(f => f.note);

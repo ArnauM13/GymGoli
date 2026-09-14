@@ -68,6 +68,10 @@ sense problema: també sap estar quiet, si hi ha companyia.
 7. **L'explicació no és seva.** Al detall d'un insight ("per què t'ho diem")
    hi ha dades i frases planes, no gos: cap percentatge, cap paraula
    d'entrenador i cap deure. Ells posen la cara a la capçalera i callen.
+   Això inclou la línia que mira endavant (`next` a `insight.model.ts`, «amb
+   15 activitats al setembre el superes»): és una xifra i el marge que queda,
+   dita en pla. Una porta oberta, mai una llista de deures ni un «t'hi
+   falten».
 8. **Cap xifra sense el seu quan.** «2,8 per setmana» no vol dir res si no es
    diu de quan és. A la targeta, el període va dit en paraules («aquest
    mes»); al detall, amb dates. I si per dir-ho bé calen dues xifres i dos
@@ -222,7 +226,7 @@ exactament on eren. Els gossos només s'hi afegeixen al costat.
 | ------- | --- |
 | `carrega_alta`, `volum_gym`, `equilibri_gym` | Marley |
 | `progres`, `esforc_creixent` | el gos de l'àmbit: Marley si la dada és de gym, Xoco si és d'esport |
-| objectius (`ratxa_assolida`, `ratxa_en_joc`, `objectiu_a_l_alca`, `objectiu_desajustat`, `compliment_objectiu`), `sense_activitat`, `tendencia_volum`, `patro_setmanal`, resum de setmana | tots dos |
+| objectius (`ratxa_assolida`, `ratxa_en_joc`, `objectiu_a_l_alca`, `objectiu_desajustat`, `compliment_objectiu`), `sense_activitat`, `mes_tancat`, `tendencia_volum`, `patro_setmanal`, resum de setmana | tots dos |
 
 Els insights són **tendències**, no consells del dia: el «què faig avui» el diu
 el suggeriment de `train` i el «com va la setmana», les barres d'objectiu. Per
@@ -238,10 +242,11 @@ Tancar-lo el silencia **el dia d'avui i prou**, com la bafarada. L'endemà
 torna si encara és cert.
 
 L'excepció són les **fites** (`once` a `insight.model.ts`): es diuen una sola
-vegada i no tornen mai més. Avui només ho és `ratxa_assolida`, la felicitació
-del dia que la ratxa creix. Una fita és un moment, no un estat: si es quedés a
-la pantalla deixaria de ser una alegria i passaria a ser una cosa que pots
-perdre.
+vegada i no tornen mai més. Avui ho són `ratxa_assolida`, la felicitació del
+dia que la ratxa creix, i `mes_tancat`, el resum del mes que acaba d'acabar-se
+(un mes es tanca una vegada, i les seves xifres ja no es mouran). Una fita és
+un moment, no un estat: si es quedés a la pantalla deixaria de ser una alegria
+i passaria a ser una cosa que pots perdre.
 
 ---
 
@@ -256,8 +261,8 @@ recàlcul es notaria.
 En tenen els missatges on parla un gos: `carrega_alta`, `sense_activitat`,
 `esforc_creixent`, `equilibri_gym`, `progres` (gym i esport), `ratxa_assolida`
 i el final de `ratxa_en_joc`. Els que són pura dada — `compliment_objectiu`,
-`tendencia_volum`, `volum_gym`, `patro_setmanal` — no en porten: allà la xifra
-ja diu prou i una frase de gos només hi faria nosa.
+`mes_tancat`, `tendencia_volum`, `volum_gym`, `patro_setmanal` — no en porten:
+allà la xifra ja diu prou i una frase de gos només hi faria nosa.
 
 ---
 
