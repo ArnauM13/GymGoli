@@ -5,6 +5,7 @@ import { SportService } from './sport.service';
 import { ActivityFeedService } from './activity-feed.service';
 import { SupabaseService } from './supabase.service';
 import { AuthService } from './auth.service';
+import { ProjectedSport, RoutineProjectionService, routineSportId } from './routine-projection.service';
 
 const LS_PENDING_KEY = (uid: string) => `gymgoli_sport_pending_${uid}`;
 
@@ -36,6 +37,10 @@ describe('SportService', () => {
   let writeDelayMs: number;
   let service: SportService;
   let supabaseMock: ReturnType<typeof buildMock>;
+  /** El que la rutina proposa per a cada dia, per dia. Buit vol dir que no
+   *  n'hi ha cap, que és el cas de gairebé tots els tests. */
+  let routinePlan: Map<string, ProjectedSport[]>;
+  let dismissRoutine: jasmine.Spy;
 
   function buildMock() {
     const insertSpy = jasmine.createSpy('insert');
@@ -151,11 +156,20 @@ describe('SportService', () => {
     rpcShouldFail = false;
     writeDelayMs = 0;
     supabaseMock = buildMock();
+    routinePlan = new Map();
+    dismissRoutine = jasmine.createSpy('dismiss').and.resolveTo(undefined);
 
     TestBed.configureTestingModule({
       providers: [
         { provide: AuthService,     useValue: { uid } },
         { provide: SupabaseService, useValue: supabaseMock },
+        { provide: RoutineProjectionService, useValue: {
+          loaded:       () => true,
+          hasRoutine:   () => routinePlan.size > 0,
+          projectedFor: (date: string) => ({ gym: [], sport: routinePlan.get(date) ?? [] }),
+          dismiss:      dismissRoutine,
+          materialized: dismissRoutine,
+        } },
       ],
     });
     service = TestBed.inject(SportService);
@@ -756,6 +770,108 @@ describe('SportService', () => {
       expect(seen.every(v => v)).toBeTrue();
       expect(service.sportHistoryLoaded('sport-1')).toBeTrue();
       discardPeriodicTasks();
+    }));
+  });
+
+  // Un esport planificat per la rutina no és cap fila: entrar-hi per l'URL
+  // demanava una consulta d'un id que no és cap uuid, el servidor contestava
+  // error i la pàgina es quedava carregant per sempre una sessió que es podia
+  // calcular aquí mateix.
+  describe('un planificat de la rutina, per l\'id', () => {
+    const DATE = '2024-03-20';
+    const ID   = routineSportId(DATE, 'sport-1');
+
+    function withRoutine(): void {
+      routinePlan.set(DATE, [{ id: ID, date: DATE, sportId: 'sport-1', duration: 45 }]);
+    }
+
+    function boot(): void {
+      uid.set('user-1');
+      TestBed.flushEffects();
+      tick();
+      void service.ensureLoaded();
+      tick();
+    }
+
+    it('el troba sense demanar-lo al servidor', fakeAsync(() => {
+      boot();
+      withRoutine();
+
+      const session = service.getSessionById(ID);
+      expect(session?.sportId).toBe('sport-1');
+      expect(session?.status).toBe('planned');
+      expect(session?.duration).toBe(45);
+    }));
+
+    it('no en fa cap consulta: no hi ha cap fila a demanar', fakeAsync(() => {
+      boot();
+      withRoutine();
+      supabaseMock.filterCalls.length = 0;
+
+      void service.ensureSessionLoaded(ID);
+      tick();
+
+      expect(supabaseMock.filterCalls.some(([, col]) => col === 'id')).toBeFalse();
+    }));
+
+    it('dona la cerca per acabada, perquè la pàgina no es quedi carregant', fakeAsync(() => {
+      boot();
+      withRoutine();
+
+      void service.ensureSessionLoaded(ID);
+      tick();
+
+      expect(service.sessionLookupDone(ID)).toBeTrue();
+      // I si la regla ha canviat i ja no el proposa, la pàgina ha de poder dir
+      // que no hi és en comptes d'esperar-lo indefinidament.
+      routinePlan.clear();
+      expect(service.sessionLookupDone(ID)).toBeTrue();
+      expect(service.getSessionById(ID)).toBeUndefined();
+    }));
+
+    it('guardar-hi dades el converteix en una fila i retira la proposta', fakeAsync(() => {
+      boot();
+      withRoutine();
+
+      let newId = '';
+      void service.updateSession(ID, DATE, { duration: 75, notes: 'matí' })
+        .then(id => newId = id);
+      tick();
+
+      expect(newId).not.toBe(ID);
+      const created = service.plannedSessions().find(s => s.id === newId);
+      expect(created?.sportId).toBe('sport-1');
+      expect(created?.duration).toBe(75);
+      expect(created?.notes).toBe('matí');
+      // Ja no és el que diu la regla, sinó el que has decidit tu.
+      expect(created?.plannedSource).toBe('manual');
+      expect(dismissRoutine).toHaveBeenCalledWith(ID);
+    }));
+
+    it('guardar-lo com a fet el registra en comptes de deixar-lo planificat', fakeAsync(() => {
+      boot();
+      withRoutine();
+
+      let newId = '';
+      void service.updateSession(ID, DATE, { duration: 45 }, 'done').then(id => newId = id);
+      tick();
+
+      expect(service.sessions().some(s => s.id === newId)).toBeTrue();
+      expect(service.plannedSessions().some(s => s.id === newId)).toBeFalse();
+    }));
+
+    it('una edició d\'una sessió de debò continua tornant el seu mateix id', fakeAsync(() => {
+      boot();
+
+      void service.logSession('2024-03-08', 'sport-1', {}, 'done');
+      tick();
+      const id = service.sessions().find(s => s.date === '2024-03-08')!.id;
+
+      let returned = '';
+      void service.updateSession(id, '2024-03-08', { duration: 45 }).then(r => returned = r);
+      tick();
+
+      expect(returned).toBe(id);
     }));
   });
 });

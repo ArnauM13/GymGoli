@@ -1,5 +1,5 @@
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs/operators';
 
@@ -377,6 +377,7 @@ export class SportSessionComponent {
   private confirmDialog   = inject(ConfirmDialogService);
   private navHistory      = inject(NavigationHistoryService);
   private route           = inject(ActivatedRoute);
+  private router          = inject(Router);
   readonly today          = inject(TodayService).today;
 
   /** Seeded from the route snapshot so a deep-link renders on first paint. */
@@ -434,6 +435,11 @@ export class SportSessionComponent {
   readonly editMetrics  = signal<Record<string, string | number>>({});
   readonly editNotes    = signal('');
 
+  /** Cert mentre un planificat de la rutina es converteix en fila: el pla
+   *  d'abans deixa d'existir i el de debò encara no és a l'URL. És el buit
+   *  que l'efecte de «ha desaparegut» no ha de confondre amb una eliminació. */
+  private swapping = false;
+
   constructor() {
     this.sportService.ensureLoaded();
     // El formulari es carrega amb la sessió, que pot arribar més tard que la
@@ -455,17 +461,32 @@ export class SportSessionComponent {
     });
 
     // Si la sessió desapareix mentre la mires (l'has eliminada, o ho ha fet un
-    // altre dispositiu), la pàgina no es queda buida: torna d'on venies.
+    // altre dispositiu), la pàgina no es queda buida: torna d'on venies. El
+    // relleu d'una projecció per la seva fila no hi compta: allà la sessió no
+    // desapareix, canvia d'id.
     let hadSession = false;
     effect(() => {
       const has = !!this.pair();
-      if (has) hadSession = true;
-      else if (hadSession) { hadSession = false; this.navHistory.goBack('/home'); }
+      if (has) { hadSession = true; return; }
+      if (!hadSession || this.swapping) return;
+      hadSession = false;
+      this.navHistory.goBack('/home');
     });
   }
 
   emojiOf(level: FeelingLevel): string {
     return formatFeeling(level, this.settingsService.difficultyScale());
+  }
+
+  /** La pàgina segueix la sessió, no l'id amb què s'hi va entrar: un
+   *  planificat de la rutina no és cap fila, i registrar-lo o guardar-hi
+   *  dades el converteix en una de nova. Es canvia l'URL enlloc seu perquè
+   *  enrere torni d'on vas venir, no al pla que ja no hi és. */
+  private async follow(id: string): Promise<void> {
+    if (!id || id === this.sessionId()) return;
+    this.swapping = true;
+    try { await this.router.navigate(['/sport', id], { replaceUrl: true }); }
+    finally { this.swapping = false; }
   }
 
   /** Les xifres de la targeta: la durada i la mètrica que més diu d'aquest
@@ -528,7 +549,7 @@ export class SportSessionComponent {
       // quedava 'planned' la sessió no comptava enlloc (ni al calendari ni a
       // les estadístiques), igual que al registre de la pàgina d'Entrenar.
       const promote = this.isPlanned() && p.session.date <= this.today();
-      await this.sportService.updateSession(p.session.id, p.session.date, {
+      const id = await this.sportService.updateSession(p.session.id, p.session.date, {
         subtypeId: this.editSubtype() ?? undefined,
         duration:  this.editDuration() || undefined,
         feeling:   this.editFeeling() ?? undefined,
@@ -536,6 +557,7 @@ export class SportSessionComponent {
         notes:     this.editNotes().trim() || undefined,
       }, promote ? 'done' : undefined);
       this.editOpen.set(false);
+      await this.follow(id);
     } catch {
       this.feedback.error('Error en guardar', 2500);
     } finally {
@@ -546,8 +568,9 @@ export class SportSessionComponent {
   async registerPlan(p: { sport: Sport; session: SportSession }): Promise<void> {
     this.saving.set(true);
     try {
-      await this.sportService.startPlannedSession(p.session.id, p.session.date);
+      const id = await this.sportService.startPlannedSession(p.session.id, p.session.date);
       this.feedback.success(`${p.sport.name} registrat`, 2000);
+      await this.follow(id);
     } catch {
       this.feedback.error('Error en registrar', 2500);
     } finally {

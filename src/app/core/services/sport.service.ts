@@ -1,7 +1,7 @@
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 
 import { ActivityFeedService, FeedScope } from './activity-feed.service';
-import { RoutineProjectionService, isRoutineProjection } from './routine-projection.service';
+import { RoutineProjectionService, isRoutineProjection, routineProjectionDate } from './routine-projection.service';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { TodayService } from './today.service';
@@ -744,6 +744,12 @@ export class SportService {
    * fila**, que és una consulta d'una fila.
    */
   async ensureSessionLoaded(id: string): Promise<void> {
+    // Un planificat de la rutina no és cap fila: no hi ha res a demanar, i
+    // demanar-ho era pitjor que no fer res —el seu id no és cap uuid, la
+    // consulta tornava error i la pàgina es quedava esperant per sempre una
+    // sessió que ja tenia a mà (`getSessionById`).
+    if (isRoutineProjection(id)) return;
+
     const uid = this.auth.uid();
     if (!uid || this._isOffline()) return;
     if (this.getSessionById(id)) return;
@@ -779,6 +785,9 @@ export class SportService {
    *  hores d'ara no hi és, no arribarà. */
   sessionLookupDone(id: string): boolean {
     this._version();
+    // La rutina no es demana al servidor: es calcula quan arriben els
+    // ajustos. Abans d'això no saber-ne res no vol dir que no hi sigui.
+    if (isRoutineProjection(id)) return this.routine.loaded();
     return this._sessionLoadedIds.has(id) || !!this.getSessionById(id);
   }
 
@@ -912,7 +921,13 @@ export class SportService {
    *  mes no és carregat, qui hi entra fa `ensureSessionLoaded()`, que demana
    *  aquella fila i prou. */
   getSessionById(id: string): SportSession | undefined {
-    return this._sessions().find(s => s.id === id);
+    const real = this._sessions().find(s => s.id === id);
+    if (real || !isRoutineProjection(id)) return real;
+    // Un planificat de la rutina no és cap fila: no s'hi troba perquè no hi
+    // és enlloc, es calcula. El dia el porta el mateix id, així que es demana
+    // a qui el proposa en comptes de buscar-lo per tot l'historial.
+    return this.getPlannedSportSessionsForDate(routineProjectionDate(id))
+      .find(p => p.session.id === id)?.session;
   }
 
   hasSportOnDate(date: string, sportId: string): boolean {
@@ -1010,11 +1025,11 @@ export class SportService {
    */
   async startPlannedSession(id: string, date: string): Promise<string> {
     if (isRoutineProjection(id)) {
-      const proposed = this.getPlannedSportSessionsForDate(date).find(p => p.session.id === id);
+      const proposed = this._projected(id);
       const newId = await this.logSession(
         date,
-        proposed?.sport.id ?? '',
-        { subtypeId: proposed?.session.subtypeId, duration: proposed?.session.duration },
+        proposed.sportId,
+        { subtypeId: proposed.subtypeId, duration: proposed.duration },
         'done',
       );
       await this.routine.materialized(id);
@@ -1046,12 +1061,31 @@ export class SportService {
    * pàdel que tenies planificat i que ja has jugat és registrar-lo, i si
    * l'estat es quedava a 'planned' la sessió no comptava enlloc — ni al
    * calendari ni a les estadístiques — per molt que la guardessis.
+   *
+   * Torna l'id de la sessió que ha quedat amb les dades. Normalment és el
+   * mateix que se li ha passat; només canvia quan el que s'editava era una
+   * projecció de la rutina, que en guardar-la passa a ser una fila.
    */
   async updateSession(
     id: string, date: string,
     data: { subtypeId?: string; duration?: number; feeling?: FeelingLevel; metrics?: Record<string, string | number>; notes?: string },
     status?: SportSessionStatus,
-  ): Promise<void> {
+  ): Promise<string> {
+    // Un planificat de la rutina no és cap fila: guardar-hi dades és el
+    // moment en què passa a existir, igual que començar-lo
+    // (`startPlannedSession`). I com que ja no és el que diu la regla sinó el
+    // que has decidit tu, neix com a pla manual i el dia queda retirat de la
+    // proposta perquè no surti dues vegades.
+    if (isRoutineProjection(id)) {
+      const proposed = this._projected(id);
+      const newId = await this.logSession(
+        date, proposed.sportId, data, status ?? 'planned',
+        (status ?? 'planned') === 'planned' ? 'manual' : undefined,
+      );
+      await this.routine.materialized(id);
+      return newId;
+    }
+
     const uid = this._uid();
 
     // Omplir les dades d'un pla és fer-lo: el moment en què passa a estar fet
@@ -1085,6 +1119,16 @@ export class SportService {
     if (status) row['status'] = status;
     if (promoting) row['started_at'] = startedAt!.toISOString();
     await this._pushOrQueue(uid, { op: 'update', id, row });
+    return id;
+  }
+
+  /** El planificat que la rutina proposa amb aquest id. Si no hi és —la regla
+   *  ha canviat, o l'esport ja no existeix— no hi ha res a materialitzar, i
+   *  val més dir-ho que crear una sessió sense esport. */
+  private _projected(id: string): SportSession {
+    const proposed = this.getSessionById(id);
+    if (!proposed) throw new Error(`No hi ha cap planificat de la rutina amb id ${id}`);
+    return proposed;
   }
 
   async deleteSession(id: string, date: string): Promise<void> {
