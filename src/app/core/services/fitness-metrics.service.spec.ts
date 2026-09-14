@@ -13,6 +13,7 @@ import { DEFAULT_USER_SETTINGS, UserSettings } from '../models/user-settings.mod
 import { DEFAULT_TRAINING_TYPES } from '../models/training-type.model';
 import { FeelingLevel, Workout, WorkoutEntry } from '../models/workout.model';
 import { Sport, SportSession } from '../models/sport.model';
+import { MONTHS_CA } from '../../shared/utils/calendar-utils';
 
 // Dimecres fix perquè tota assercions relativa a la data sigui determinista.
 const MOCK_DATE = '2025-04-23';
@@ -48,6 +49,16 @@ function weekDates(weeksBack: number, count: number): string[] {
     day.setDate(day.getDate() + i);
     return day.toISOString().split('T')[0];
   });
+}
+
+/**
+ * Dies concrets d'un mes: `md('2025-03', [5, 12, 19])`.
+ *
+ * Els insights mensuals es comparen per mesos de calendari, i escriure'ls amb
+ * `d(-30)` obligava a comptar enrere per saber en quin mes queia cada dia.
+ */
+function md(ym: string, days: number[]): string[] {
+  return days.map(n => `${ym}-${String(n).padStart(2, '0')}`);
 }
 
 /** `perWeek` activitats per setmana, per a les setmanes `from`..`to` (enrere). */
@@ -532,56 +543,104 @@ describe('FitnessMetricsService', () => {
   });
 
   describe('volum_gym', () => {
+    // Avui és el 23 d'abril: el mes en curs és de l'1 al 23 d'abril i es
+    // compara amb l'1 – 23 de març, no amb una finestra mòbil de 28 dies.
+    const MARCH = md('2025-03', [3, 5, 10, 12, 17, 19]);
+    const APRIL = md('2025-04', [2, 4, 9, 11, 16, 18]);
+
     it('spots more tonnage moved with the same number of workouts', () => {
-      const older  = weekDates(7, 3).concat(weekDates(6, 3));
-      const recent = weekDates(3, 3).concat(weekDates(2, 3));
       mockWorkouts.set([
-        ...older.map(dd => makeWorkout(dd, { entries: [entry('Press', 50)] })),
-        ...recent.map(dd => makeWorkout(dd, { entries: [entry('Press', 70)] })),
+        ...MARCH.map(dd => makeWorkout(dd, { entries: [entry('Press', 50)] })),
+        ...APRIL.map(dd => makeWorkout(dd, { entries: [entry('Press', 70)] })),
       ]);
 
       const ins = find('volum_gym');
       expect(ins).toBeTruthy();
       expect(ins!.title).toBe('Estàs movent més pes');
       expect(ins!.message).toContain('mateixos entrenos');
+      expect(ins!.message).toContain('al març');
+      expect(ins!.stat).toContain('a l\'abril');
     });
 
-    it('stays quiet under six workouts in a window', () => {
+    it('leaves out the end of last month, which this one has not reached', () => {
+      // El 23 d'abril encara no s'ha viscut el 24 – 31 d'abril: comptar el
+      // 24 – 31 de març diria que el mes passat vas moure molt més del que
+      // toca comparar. Amb finestres de 28 dies hi queia de ple.
       mockWorkouts.set([
-        ...weekDates(6, 2).map(dd => makeWorkout(dd, { entries: [entry('Press', 50)] })),
-        ...weekDates(2, 2).map(dd => makeWorkout(dd, { entries: [entry('Press', 90)] })),
+        ...MARCH.map(dd => makeWorkout(dd, { entries: [entry('Press', 50)] })),
+        ...md('2025-03', [25, 27, 29, 31]).map(dd => makeWorkout(dd, { entries: [entry('Press', 200)] })),
+        ...APRIL.map(dd => makeWorkout(dd, { entries: [entry('Press', 70)] })),
+      ]);
+
+      const ins = find('volum_gym');
+      expect(ins).toBeTruthy();
+      expect(ins!.title).toBe('Estàs movent més pes');
+      const march = ins!.detail.facts.find(f => f.label === 'Març')!;
+      expect(march.value).toBe('2,4 t');
+      expect(ins!.detail.facts[2].value).toBe('6 contra 6');
+    });
+
+    it('stays quiet under six workouts in a month', () => {
+      mockWorkouts.set([
+        ...md('2025-03', [3, 10]).map(dd => makeWorkout(dd, { entries: [entry('Press', 50)] })),
+        ...md('2025-04', [2, 9]).map(dd => makeWorkout(dd, { entries: [entry('Press', 90)] })),
       ]);
 
       expect(types()).not.toContain('volum_gym');
+    });
+
+    it('stays quiet in the first days of a month: three days are not a month', () => {
+      mockToday.set('2025-05-05');
+      mockWorkouts.set([
+        ...MARCH.map(dd => makeWorkout(dd, { entries: [entry('Press', 50)] })),
+        ...APRIL.map(dd => makeWorkout(dd, { entries: [entry('Press', 70)] })),
+        ...md('2025-05', [1, 2, 3, 4, 5]).map(dd => makeWorkout(dd, { entries: [entry('Press', 120)] })),
+      ]);
+
+      expect(types()).not.toContain('volum_gym');
+      expect(types()).not.toContain('tendencia_volum');
     });
   });
 
   // ── Nivell 4 · Tendència ─────────────────────────────────────────────────
 
   describe('tendencia_volum', () => {
-    it('compares the last four weeks with the four before them', () => {
-      // Finestres de 28 dies comptats des d'avui, no setmanes de calendari.
-      // El de fa 80 dies queda fora de totes dues: només hi és perquè l'usuari
-      // tingui prou passat per comparar dos mesos.
-      mockWorkouts.set([
-        makeWorkout(d(-80)),
-        ...[30, 35, 40, 45].map(n => makeWorkout(d(-n))),
-        ...Array.from({ length: 12 }, (_, i) => makeWorkout(d(-(i + 1)))),
-      ]);
+    // Avui és el 23 d'abril: l'1 – 23 d'abril contra l'1 – 23 de març. Abans
+    // eren dues finestres mòbils de 28 dies que es deien "aquest mes" i que
+    // llisquaven cada dia, de manera que les xifres canviaven sense que
+    // l'usuari fes res.
+    const PAST  = '2025-02-10';
+    const MARCH = md('2025-03', [5, 12, 19]);
+    const APRIL = md('2025-04', [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+
+    it('compares this month with the same days of the one before', () => {
+      mockWorkouts.set([PAST, ...MARCH, ...APRIL].map(dd => makeWorkout(dd)));
 
       const ins = find('tendencia_volum');
       expect(ins).toBeTruthy();
       expect(ins!.title).toBe('Puges de ritme');
-      expect(ins!.stat).toBe('Aquest mes, 3,0 activitats per setmana');
-      expect(ins!.message).toBe('El mes passat en feies 1,0.');
+      expect(ins!.stat).toBe('A l\'abril, 3,7 activitats per setmana');
+      expect(ins!.message).toBe('Al març en feies 0,9.');
+    });
+
+    it('leaves out the end of last month, which this one has not reached', () => {
+      // Del 24 al 31 de març no toca comptar-hi: l'abril encara no hi ha
+      // arribat. Amb finestres de 28 dies hi entraven i el "mes passat"
+      // sortia inflat.
+      mockWorkouts.set([PAST, ...MARCH, ...md('2025-03', [25, 27, 29, 31]), ...APRIL]
+        .map(dd => makeWorkout(dd)));
+
+      const ins = find('tendencia_volum')!;
+      expect(ins.message).toBe('Al març en feies 0,9.');
+      expect(ins.detail.facts.find(f => f.label === 'Març')!.value).toBe('3 activitats');
     });
 
     it('frames a quieter month without any pressure', () => {
       mockWorkouts.set([
-        makeWorkout(d(-80)),
-        ...Array.from({ length: 12 }, (_, i) => makeWorkout(d(-(i + 29)))),
-        ...[1, 5, 9, 13].map(n => makeWorkout(d(-n))),
-      ]);
+        PAST,
+        ...md('2025-03', [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]),
+        ...md('2025-04', [3, 8, 13, 18]),
+      ].map(dd => makeWorkout(dd)));
 
       const ins = find('tendencia_volum');
       expect(ins!.title).toBe('Mes més tranquil');
@@ -590,21 +649,18 @@ describe('FitnessMetricsService', () => {
 
     it('stays quiet on a change under 25%', () => {
       mockWorkouts.set([
-        makeWorkout(d(-80)),
-        ...Array.from({ length: 12 }, (_, i) => makeWorkout(d(-(i + 29)))),
-        ...Array.from({ length: 12 }, (_, i) => makeWorkout(d(-(i + 1)))),
-      ]);
+        PAST,
+        ...md('2025-03', [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]),
+        ...APRIL,
+      ].map(dd => makeWorkout(dd)));
 
       expect(types()).not.toContain('tendencia_volum');
     });
 
     it('stays quiet for a first month: there is no month before it', () => {
-      // Mateixa forma que el primer cas, però sense passat: tot l'històric de
-      // l'usuari cap dins de la finestra "d'abans".
-      mockWorkouts.set([
-        ...[30, 35, 40].map(n => makeWorkout(d(-n))),
-        ...Array.from({ length: 12 }, (_, i) => makeWorkout(d(-(i + 1)))),
-      ]);
+      // Tot l'històric arrenca a mig març: el mes amb què compararíem és un
+      // mes en què l'usuari encara no hi era.
+      mockWorkouts.set([...md('2025-03', [15, 20]), ...APRIL].map(dd => makeWorkout(dd)));
 
       expect(types()).not.toContain('tendencia_volum');
     });
@@ -807,11 +863,9 @@ describe('FitnessMetricsService', () => {
     {
       name: 'volum_gym',
       setup: () => {
-        const older  = weekDates(7, 3).concat(weekDates(6, 3));
-        const recent = weekDates(3, 3).concat(weekDates(2, 3));
         mockWorkouts.set([
-          ...older.map(dd => makeWorkout(dd, { entries: [entry('Press', 50)] })),
-          ...recent.map(dd => makeWorkout(dd, { entries: [entry('Press', 70)] })),
+          ...md('2025-03', [3, 5, 10, 12, 17, 19]).map(dd => makeWorkout(dd, { entries: [entry('Press', 50)] })),
+          ...md('2025-04', [2, 4, 9, 11, 16, 18]).map(dd => makeWorkout(dd, { entries: [entry('Press', 70)] })),
         ]);
       },
     },
@@ -819,10 +873,10 @@ describe('FitnessMetricsService', () => {
       name: 'tendencia_volum',
       setup: () => {
         mockWorkouts.set([
-          makeWorkout(d(-80)),
-          ...[30, 35, 40, 45].map(n => makeWorkout(d(-n))),
-          ...Array.from({ length: 12 }, (_, i) => makeWorkout(d(-(i + 1)))),
-        ]);
+          '2025-02-10',
+          ...md('2025-03', [5, 12, 19]),
+          ...md('2025-04', [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]),
+        ].map(dd => makeWorkout(dd)));
       },
     },
     {
@@ -880,7 +934,10 @@ describe('FitnessMetricsService', () => {
   describe('la targeta', () => {
     it('diu sempre de quan parla', () => {
       // Cap xifra flotant: «2,8 per setmana» sense dir de quan no és res.
-      const PERIOD = /setmana|setmanes|dies|dia |mes|sessió|sessions|avui|ara/i;
+      // Un mes anomenat pel seu nom —«a l'abril»— també diu de quan es parla.
+      const PERIOD = new RegExp(
+        ['setmana', 'setmanes', 'dies', 'dia ', 'mes', 'sessió', 'sessions', 'avui', 'ara',
+         ...MONTHS_CA.map(m => m.toLowerCase())].join('|'), 'i');
       for (const i of everyInsight()) {
         expect(PERIOD.test(`${i.stat} ${i.message}`)).toBe(true, `${i.type}: ${i.stat} · ${i.message}`);
       }
@@ -970,37 +1027,40 @@ describe('FitnessMetricsService', () => {
 
     it('el «abans» de tendencia_volum té nom i dates', () => {
       // El cas que ho va motivar: «3,0 per setmana · abans 0,3» no deia mai
-      // quan era aquell abans.
+      // quan era aquell abans. Ara el "abans" és un mes amb nom propi.
       mockWorkouts.set([
-        makeWorkout(d(-80)),
-        ...[30, 35, 40, 45].map(n => makeWorkout(d(-n))),
-        ...Array.from({ length: 12 }, (_, i) => makeWorkout(d(-(i + 1)))),
-      ]);
+        '2025-02-10',
+        ...md('2025-03', [5, 12, 19]),
+        ...md('2025-04', [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]),
+      ].map(dd => makeWorkout(dd)));
 
       const ins = find('tendencia_volum')!;
       expect(ins.stat).not.toContain('abans');
-      expect(ins.stat).toContain('Aquest mes');
-      expect(ins.message).toContain('El mes passat');
+      expect(ins.stat).toContain('abril');
+      expect(ins.message).toContain('març');
 
-      const prev = ins.detail.facts.find(f => f.label === 'El mes passat')!;
-      expect(prev.note).toContain('–');
+      const prev = ins.detail.facts.find(f => f.label === 'Març')!;
+      expect(prev.note).toBe('1 de març – 23 de març');
     });
 
     it('el gràfic de tendencia_volum suma exactament el que diu el text', () => {
+      // Una barra per mes, i de cada mes el **mateix tram de dies** que les
+      // xifres del text: si el gràfic comptés mesos sencers, les barres no
+      // lligarien amb la frase.
       mockWorkouts.set([
-        makeWorkout(d(-80)),
-        ...[30, 35, 40, 45].map(n => makeWorkout(d(-n))),
-        ...Array.from({ length: 12 }, (_, i) => makeWorkout(d(-(i + 1)))),
-      ]);
+        '2025-02-10',
+        ...md('2025-03', [5, 12, 19]),
+        ...md('2025-03', [25, 27, 29, 31]),
+        ...md('2025-04', [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]),
+      ].map(dd => makeWorkout(dd)));
 
       const ins  = find('tendencia_volum')!;
       const bars = ins.detail.chart.bars;
-      expect(bars.length).toBe(8);
-      // Les quatre últimes finestres de 7 dies són "aquest mes": 12 activitats.
-      expect(bars.slice(4).reduce((sum, b) => sum + b.value, 0)).toBe(12);
-      expect(bars.slice(0, 4).reduce((sum, b) => sum + b.value, 0)).toBe(4);
-      expect(bars.slice(0, 4).every(b => b.muted)).toBe(true);
-      expect(bars[7].label).toBe('ara');
+      expect(bars.map(b => b.label)).toEqual(['feb', 'mar', 'abr']);
+      expect(bars.map(b => b.value)).toEqual([1, 3, 12]);
+      expect(bars[0].muted).toBe(true);
+      expect(bars[2].highlight).toBe(true);
+      expect(ins.detail.chart.range).toBe('1 de febrer – 23 d’abril');
     });
 
     it('explica el progrés amb una barra per sessió', () => {

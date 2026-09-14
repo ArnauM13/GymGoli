@@ -20,7 +20,7 @@ function makeInsight(chart: InsightChart, overrides: Partial<FitnessInsight> = {
       headline: 'Aquest mes portes 12 activitats; el mes passat en vas fer 4.',
       chart,
       facts: [{ label: 'Aquest mes', value: '12 activitats' }],
-      meaning: 'Compara els últims 28 dies amb els 28 d\'abans.',
+      meaning: 'Compara el mes en curs amb els mateixos dies del mes passat.',
     },
     ...overrides,
   };
@@ -182,7 +182,7 @@ describe('InsightDetailSheetComponent', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
 
     expect(text).toContain('Aquest mes portes 12 activitats');
-    expect(text).toContain('Compara els últims 28 dies');
+    expect(text).toContain('Compara el mes en curs');
     expect(text).toContain('12 activitats');
   });
 });

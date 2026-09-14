@@ -1,11 +1,15 @@
 import {
+  capFirst,
   dateRange,
   fmt1,
   fmtKg,
   fmtWeight,
+  inMonth,
   itemBars,
   livedWeeks,
   longDate,
+  monthName,
+  monthShort,
   outOfTen,
   plural,
   rollingWeekBars,
@@ -98,6 +102,37 @@ describe('insight-copy.utils', () => {
       // «del 1 d'abril» seria incorrecte i «de l'1 d'abril» obliga a saber
       // apostrofar: amb el guionet cap data pot sortir mal escrita.
       expect(dateRange('2025-02-26', '2025-04-01')).toBe('26 de febrer – 1 d\u2019abril');
+    });
+  });
+
+  // ── Mesos ────────────────────────────────────────────────────────────────
+
+  describe('inMonth()', () => {
+    it('posa l\'apòstrof als mesos que el demanen', () => {
+      expect(inMonth('2025-04-23')).toBe('a l\'abril');
+      expect(inMonth('2025-08-01')).toBe('a l\'agost');
+      expect(inMonth('2025-10-31')).toBe('a l\'octubre');
+    });
+
+    it('i l\'estalvia a la resta', () => {
+      expect(inMonth('2025-03-10')).toBe('al març');
+      expect(inMonth('2025-09-14')).toBe('al setembre');
+      expect(inMonth('2025-01-01')).toBe('al gener');
+    });
+  });
+
+  describe('monthName() i monthShort()', () => {
+    it('donen el nom sencer i el de sota una barra', () => {
+      expect(monthName('2025-09-14')).toBe('Setembre');
+      expect(monthShort('2025-09-14')).toBe('set');
+      expect(monthShort('2025-02-28')).toBe('feb');
+    });
+  });
+
+  describe('capFirst()', () => {
+    it('deixa la frase a punt per començar-hi', () => {
+      expect(capFirst('a l\'abril')).toBe('A l\'abril');
+      expect(capFirst('')).toBe('');
     });
   });
 

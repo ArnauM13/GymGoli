@@ -1,4 +1,5 @@
 import { InsightBar } from '../../core/models/insight.model';
+import { MONTHS_CA, MONTHS_SHORT } from './calendar-utils';
 import { daysBetween, offsetDate } from './date.utils';
 
 /**
@@ -76,6 +77,42 @@ export function longDate(dateStr: string): string {
  */
 export function dateRange(from: string, to: string): string {
   return `${longDate(from)} – ${longDate(to)}`;
+}
+
+// ── Mesos ────────────────────────────────────────────────────────────────────
+
+/** Els mesos que demanen apòstrof: «a l'abril», no «al abril». */
+const APOSTROPHE_MONTHS = new Set([3, 7, 9]);
+
+function monthIndex(dateStr: string): number {
+  return new Date(dateStr + 'T12:00:00').getMonth();
+}
+
+/** `Setembre` — el nom del mes tot sol, per encapçalar una xifra. */
+export function monthName(dateStr: string): string {
+  return MONTHS_CA[monthIndex(dateStr)];
+}
+
+/** `set` — per a sota d'una barra, on no hi cap el nom sencer. */
+export function monthShort(dateStr: string): string {
+  return MONTHS_SHORT[monthIndex(dateStr)];
+}
+
+/**
+ * El mes amb la preposició que li toca: `al setembre`, `a l'agost`.
+ *
+ * L'apòstrof no és cap floritura —«al abril» és incorrecte— i recordar quins
+ * mesos el demanen no pot ser feina de cada frase que n'anomeni un.
+ */
+export function inMonth(dateStr: string): string {
+  const i = monthIndex(dateStr);
+  const name = MONTHS_CA[i].toLowerCase();
+  return APOSTROPHE_MONTHS.has(i) ? `a l'${name}` : `al ${name}`;
+}
+
+/** La mateixa frase amb la primera lletra en majúscula, per començar-hi. */
+export function capFirst(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 // ── Barres ───────────────────────────────────────────────────────────────────
