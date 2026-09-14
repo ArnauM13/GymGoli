@@ -35,7 +35,7 @@ function makeWorkout(overrides: Partial<Workout> = {}): Workout {
   return { id: '1', date: TODAY, entries: [], createdAt: new Date(), ...overrides };
 }
 
-const EMPTY_CATEGORY_PROFILE = { daysSinceLast: 99, typicalGapDays: 4, overdueScore: 0 };
+const EMPTY_CATEGORY_PROFILE = { daysSinceLast: 99, typicalGapDays: 4, overdueScore: 0, everDone: false, sessions: 0 };
 
 describe('TrainComponent', () => {
   let component: TrainComponent;
@@ -46,6 +46,7 @@ describe('TrainComponent', () => {
   let settingsSignal: ReturnType<typeof signal<UserSettings>>;
   /** Com al servei de debò, un senyal: `activeProposal()` hi reacciona. */
   let hasTrainerSignal: ReturnType<typeof signal<boolean>>;
+  let profileSignal: ReturnType<typeof signal<any>>;
   let updateSettings: jasmine.Spy;
   let sportService: { [k: string]: any };
   /** Un senyal que `ensureMonthLoaded()` llegeix per dins, com el de debò:
@@ -58,6 +59,11 @@ describe('TrainComponent', () => {
     weeklyPlanSignal = signal<WeeklyPlan>(EMPTY_WEEKLY_PLAN);
     settingsSignal    = signal<UserSettings>(DEFAULT_USER_SETTINGS);
     hasTrainerSignal  = signal(false);
+    profileSignal     = signal({
+      gym: { push: EMPTY_CATEGORY_PROFILE, pull: EMPTY_CATEGORY_PROFILE, legs: EMPTY_CATEGORY_PROFILE },
+      sport: {} as Record<string, typeof EMPTY_CATEGORY_PROFILE>,
+      minRecovery: 2,
+    });
     monthLoadProbe    = signal(0);
     updateSettings    = jasmine.createSpy('update').and.callFake((patch: Partial<UserSettings>) => {
       settingsSignal.set({ ...settingsSignal(), ...patch });
@@ -122,7 +128,7 @@ describe('TrainComponent', () => {
         { provide: TrainerService,      useValue: { myTrainer: signal(null), hasTrainer: hasTrainerSignal, getProposalForDate: jasmine.createSpy().and.returnValue(null) } },
         { provide: TemplateService,     useValue: { forCategory: jasmine.createSpy().and.returnValue([]), create: jasmine.createSpy().and.resolveTo(undefined), recordUse: jasmine.createSpy().and.resolveTo(undefined) } },
         { provide: SharedWorkoutService, useValue: { share: jasmine.createSpy().and.resolveTo('share-id') } },
-        { provide: WorkoutProfileService, useValue: { profile: signal({ gym: { push: EMPTY_CATEGORY_PROFILE, pull: EMPTY_CATEGORY_PROFILE, legs: EMPTY_CATEGORY_PROFILE }, favoriteSport: null, recentSport: null, minRecovery: 2 }) } },
+        { provide: WorkoutProfileService, useValue: { profile: profileSignal } },
         { provide: MatDialog,              useValue: { open: jasmine.createSpy() } },
         { provide: FeedbackService,        useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
         { provide: ConfirmDialogService,   useValue: { confirm: jasmine.createSpy('confirm').and.resolveTo(false) } },
@@ -843,11 +849,32 @@ describe('TrainComponent', () => {
     });
   });
 
-  // El suggeriment i la bafarada són la mateixa targeta: sempre es pinta amb
-  // el gos al costat, i en tancar-la no queda res al seu lloc.
-  describe('suggestion bubble', () => {
+  // Els suggeriments i les bafarades són la mateixa targeta: sempre es pinten
+  // amb el gos al costat, com a molt un de gimnàs i un d'esport, i en tancar-ne
+  // una no queda res al seu lloc.
+  describe('suggestion bubbles', () => {
     const gym   = { type: 'gym',   category: 'legs', label: 'Cames',  color: '#81c784', icon: 'directions_run', reason: 'Fa 29 dies' } as never;
-    const sport = { type: 'sport', sport: {} as never, label: 'Futbol', color: '#1E88E5', icon: 'sports_soccer', reason: 'El teu esport habitual' } as never;
+    const sport = { type: 'sport', sport: {} as never, label: 'Futbol', color: '#1E88E5', icon: 'sports_soccer', reason: 'Hi tornem? Fa 3 setmanes' } as never;
+
+    const padel = {
+      id: 's1', name: 'Pàdel', icon: 'sports_tennis', color: '#1E88E5',
+      subtypes: [], metricDefs: [], createdAt: new Date(),
+    };
+
+    /** Un perfil que fa que aquell esport i aquell tipus siguin proposables. */
+    function withSportAndGym(): void {
+      sportService['sports'].set([padel]);
+      profileSignal.set({
+        gym: {
+          push: { daysSinceLast: 9, typicalGapDays: 3, overdueScore: 3, everDone: true, sessions: 40 },
+          pull: EMPTY_CATEGORY_PROFILE,
+          legs: EMPTY_CATEGORY_PROFILE,
+        },
+        sport: { s1: { daysSinceLast: 40, typicalGapDays: 4, overdueScore: 10, everDone: true, sessions: 30 } },
+        minRecovery: 2,
+      });
+      fixture.detectChanges();
+    }
 
     it('the Marley proposes gym', () => {
       expect(component.suggestionMascot(gym).figure).toContain('marley');
@@ -861,16 +888,74 @@ describe('TrainComponent', () => {
       expect(component.suggestionMascot(gym).figure).toContain('-full');
     });
 
-    it('starts visible so the dog shows up', () => {
-      expect(component.suggestionDismissed()).toBe(false);
+    // El Xoco surt a l'esquerra i a dalt; el Marley, a la dreta i a sota.
+    it('el Xoco va a l\'esquerra i el Marley a la dreta', () => {
+      expect(component.suggestionSide(sport)).toBe('left');
+      expect(component.suggestionSide(gym)).toBe('right');
     });
 
-    it('closing it leaves nothing behind — no card, no fallback action', () => {
-      component.dismissSuggestion();
+    it('com a molt dos: un d\'esport i un de gimnàs, i l\'esport primer', () => {
+      withSportAndGym();
+      const kinds = component.todaySuggestions().map(s => s.type);
+      expect(kinds).toEqual(['sport', 'gym']);
+      expect(fixture.nativeElement.querySelectorAll('.suggestion-float-row').length).toBe(2);
+    });
+
+    it('proposa tornar a un esport que fa temps que no fas', () => {
+      withSportAndGym();
+      const s = component.todaySuggestions().find(x => x.type === 'sport')!;
+      expect(s.source).toBe('comeback');
+      expect(s.reason).toContain('Hi tornem?');
+    });
+
+    it('tancar-ne una deixa l\'altra al seu lloc', () => {
+      withSportAndGym();
+      component.dismissSuggestion('sport');
       fixture.detectChanges();
-      expect(component.suggestionDismissed()).toBe(true);
+
+      expect(component.todaySuggestions().map(s => s.type)).toEqual(['gym']);
+      expect(fixture.nativeElement.querySelectorAll('.suggestion-float-row').length).toBe(1);
+    });
+
+    it('tancar-les totes dues no deixa res darrere', () => {
+      withSportAndGym();
+      component.dismissSuggestion('sport');
+      component.dismissSuggestion('gym');
+      fixture.detectChanges();
+
       const host: HTMLElement = fixture.nativeElement;
+      expect(component.todaySuggestions()).toEqual([]);
       expect(host.querySelector('.suggestion-float-row')).toBeNull();
+      expect(host.querySelector('.suggestion-stack')).toBeNull();
+    });
+
+    // El que ja has fet avui no es proposa: seria dir-te que facis el que
+    // acabes de fer.
+    it('no proposa el que ja s\'ha fet avui', () => {
+      sportService['getSportSessionsForDate'].and.returnValue([
+        { sport: padel, session: { id: 'x', date: TODAY, sportId: 's1', status: 'done', createdAt: new Date() } },
+      ]);
+      withSportAndGym();
+
+      expect(component.todaySuggestions().map(s => s.type)).toEqual(['gym']);
+    });
+
+    // Una cosa que has dit que faries mana sobre qualsevol estadística.
+    it('el que tens planificat per avui passa al davant, i tocar-lo el comença', async () => {
+      const session = {
+        id: 'routine:x', date: TODAY, sportId: 's1',
+        status: 'planned', plannedSource: 'routine', createdAt: new Date(),
+      };
+      sportService['getPlannedSportSessionsForDate'].and.returnValue([{ sport: padel, session }]);
+      sportService['startPlannedSession'] = jasmine.createSpy().and.resolveTo('sess-1');
+      withSportAndGym();
+
+      const s = component.todaySuggestions().find(x => x.type === 'sport')!;
+      expect(s.source).toBe('planned');
+      expect(s.reason).toBe('Toca avui, per la rutina');
+
+      await component.handleSuggestionClick(s);
+      expect(sportService['startPlannedSession']).toHaveBeenCalledWith('routine:x', TODAY);
     });
   });
 

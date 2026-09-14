@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 
 import { WorkoutProfileService } from './workout-profile.service';
+import { ActivityCadence, ActivityCadenceService, cadenceKey } from './activity-cadence.service';
 import { AuthService } from './auth.service';
 import { WorkoutService } from './workout.service';
 import { SportService } from './sport.service';
@@ -30,7 +31,13 @@ describe('WorkoutProfileService', () => {
   let sessions: ReturnType<typeof signal<SportSession[]>>;
   let sports: ReturnType<typeof signal<Sport[]>>;
   let fitnessGoal: ReturnType<typeof signal<FitnessGoal | null>>;
+  let cadence: ReturnType<typeof signal<Map<string, ActivityCadence>>>;
   let service: WorkoutProfileService;
+
+  /** El resum de tota la vida que torna el servidor (migració 038). */
+  function cadenceOf(rows: ActivityCadence[]): Map<string, ActivityCadence> {
+    return new Map(rows.map(r => [cadenceKey(r.kind, r.key), r]));
+  }
 
   beforeEach(() => {
     jasmine.clock().install();
@@ -40,6 +47,7 @@ describe('WorkoutProfileService', () => {
     sessions     = signal<SportSession[]>([]);
     sports       = signal<Sport[]>([]);
     fitnessGoal  = signal<FitnessGoal | null>(null);
+    cadence      = signal(new Map<string, ActivityCadence>());
 
     TestBed.configureTestingModule({
       providers: [
@@ -48,6 +56,7 @@ describe('WorkoutProfileService', () => {
         { provide: SportService,        useValue: { sessions, sports, loadAllSessions: jasmine.createSpy('loadAllSessions').and.resolveTo(undefined) } },
         { provide: UserSettingsService, useValue: { fitnessGoal } },
         { provide: TrainingTypeService, useValue: { types: signal(DEFAULT_TRAINING_TYPES) } },
+        { provide: ActivityCadenceService, useValue: { byKey: cadence, ensureLoaded: () => Promise.resolve() } },
       ],
     });
     service = TestBed.inject(WorkoutProfileService);
@@ -133,48 +142,82 @@ describe('WorkoutProfileService', () => {
     });
   });
 
-  describe('favoriteSport', () => {
-    it('is null when there are no sports at all', () => {
-      expect(service.profile().favoriteSport).toBeNull();
-    });
-
-    it('picks the sport with the most sessions in the last 30 days', () => {
-      sports.set([makeSport('running'), makeSport('padel')]);
+  // El mateix càlcul que el gimnàs, sobre les mateixes dades: abans l'esport
+  // només tenia «l'últim que vas fer», que no diu si et toca.
+  describe('sport profiles', () => {
+    it('computes daysSinceLast, typicalGapDays and overdueScore per sport', () => {
+      sports.set([makeSport('padel')]);
       sessions.set([
-        makeSession('2024-03-10', 'running'),
-        makeSession('2024-03-05', 'running'),
-        makeSession('2024-03-01', 'padel'),
+        makeSession('2024-03-11', 'padel'),  // 4 days before mocked "today"
+        makeSession('2024-03-07', 'padel'),  // gap 4
+        makeSession('2024-03-03', 'padel'),  // gap 4
       ]);
-      expect(service.profile().favoriteSport?.id).toBe('running');
+      const p = service.profile().sport['padel'];
+      expect(p.daysSinceLast).toBe(4);
+      expect(p.typicalGapDays).toBe(4);
+      expect(p.overdueScore).toBeCloseTo(1, 5);
+      expect(p.everDone).toBeTrue();
     });
 
-    it('ignores sessions older than 30 days', () => {
-      sports.set([makeSport('running'), makeSport('padel')]);
-      sessions.set([
-        makeSession('2024-01-01', 'running'), // > 30 days ago, ignored
-        makeSession('2024-03-10', 'padel'),
-      ]);
-      expect(service.profile().favoriteSport?.id).toBe('padel');
+    it('a sport with no history at all is not "everDone"', () => {
+      sports.set([makeSport('padel')]);
+      const p = service.profile().sport['padel'];
+      expect(p.everDone).toBeFalse();
+      expect(p.daysSinceLast).toBe(99);
     });
 
-    it('falls back to the first configured sport when nothing was logged recently', () => {
-      sports.set([makeSport('running'), makeSport('padel')]);
-      expect(service.profile().favoriteSport?.id).toBe('running');
+    it('un planificat no és una sessió feta', () => {
+      sports.set([makeSport('padel')]);
+      sessions.set([{ ...makeSession('2024-03-14', 'padel'), status: 'planned' }]);
+      expect(service.profile().sport['padel'].everDone).toBeFalse();
     });
   });
 
-  describe('recentSport', () => {
-    it('is null when there are no sessions', () => {
-      expect(service.profile().recentSport).toBeNull();
+  // La finestra recent són tres mesos. El que va quedar fora el diu el
+  // servidor, en una fila per activitat: sense això, el pàdel de fa mig any i
+  // un esport que no s'ha tocat mai es llegeixen igual.
+  describe('el que fa temps que no fas', () => {
+    it('l\'última vegada surt del resum del servidor quan no és a la finestra', () => {
+      sports.set([makeSport('padel')]);
+      cadence.set(cadenceOf([
+        { kind: 'sport', key: 'padel', sessions: 40, firstDate: '2022-01-01', lastDate: '2023-09-15' },
+      ]));
+      const p = service.profile().sport['padel'];
+      expect(p.everDone).toBeTrue();
+      expect(p.daysSinceLast).toBe(182);   // 2023-09-15 → 2024-03-15
+      expect(p.sessions).toBe(40);
     });
 
-    it('is the sport of the most recent session, regardless of the 30-day window', () => {
-      sports.set([makeSport('running'), makeSport('padel')]);
-      sessions.set([
-        makeSession('2024-01-01', 'running'),
-        makeSession('2024-02-01', 'padel'),
-      ]);
-      expect(service.profile().recentSport?.id).toBe('padel');
+    it('el mateix per a un tipus d\'entrenament: una classe que has deixat', () => {
+      cadence.set(cadenceOf([
+        { kind: 'gym', key: 'push', sessions: 22, firstDate: '2023-01-02', lastDate: '2023-12-15' },
+      ]));
+      const p = service.profile().gym['push'];
+      expect(p.everDone).toBeTrue();
+      expect(p.daysSinceLast).toBe(91);
+    });
+
+    it('la finestra recent mana sobre el resum: és la que té les dates de debò', () => {
+      doneWorkouts.set([makeWorkout('2024-03-13', 'push')]);
+      cadence.set(cadenceOf([
+        { kind: 'gym', key: 'push', sessions: 22, firstDate: '2023-01-02', lastDate: '2023-12-15' },
+      ]));
+      expect(service.profile().gym['push'].daysSinceLast).toBe(2);
+    });
+
+    it('sense sessions recents, la cadència surt del resum, retallada a 14 dies', () => {
+      sports.set([makeSport('padel')]);
+      cadence.set(cadenceOf([
+        // 4 sessions en dos anys: una cada ~240 dies. Retallat, 14.
+        { kind: 'sport', key: 'padel', sessions: 4, firstDate: '2022-01-01', lastDate: '2023-12-01' },
+      ]));
+      expect(service.profile().sport['padel'].typicalGapDays).toBe(14);
+    });
+
+    it('sense resum del servidor (migració no executada) tot continua igual', () => {
+      doneWorkouts.set([makeWorkout('2024-03-10', 'push')]);
+      expect(service.profile().gym['push'].daysSinceLast).toBe(5);
+      expect(service.profile().gym['pull'].everDone).toBeFalse();
     });
   });
 });

@@ -167,14 +167,22 @@ hi són:
 | «On surt "dominades" a l'historial?» | Igual, i filtrar-ho aquí | `activity_feed(..., p_search)`: només les coincidències |
 | «Quantes sessions d'aquest esport porto?» | Baixar les de **tots** els esports | `loadSessionsForSport()`: les d'aquell |
 | «Ensenya'm tots els pàdels» | Rascar mes a mes el que ja hi havia carregat, fins a cansar-se | `activity_feed(..., p_sport)`: només les seves |
+| «Fa temps que no fem pàdel?» | No es podia contestar: fora de la finestra recent, una activitat dorment i una que no has fet mai es llegeixen igual | `activity_cadence()`: una fila per activitat, amb quantes en portes, la primera i l'última |
 
 El patró és sempre el mateix: **agregar i filtrar és feina del servidor**. Sap
 fer-ho amb índexs i torna el resultat, no les dades per calcular-lo. El que
 viatja deixa de créixer amb l'historial: qui porta vuit anys entrenant rep el
 mateix que qui en porta dos.
 
-L'últim és el filtre d'esport de l'Historial, i el que en va caure és
-instructiu: **un filtre no es contesta paginant una altra cosa**. Filtrar per
+L'última és la que sosté el «hi tornem?» del suggeriment d'Entrenament, i
+ensenya la mateixa lliçó per l'altre costat: **la resposta no era més
+historial al dispositiu, era una pregunta més ben feta**. Saber què vas
+deixar de fer no demana baixar-s'ho, demana que el servidor ho compti — i el
+que en torna són una desena llarga de files, tant si portes dos anys entrenant
+com si en portes vuit.
+
+El filtre d'esport de l'Historial és el que en va caure abans, i és igual
+d'instructiu: **un filtre no es contesta paginant una altra cosa**. Filtrar per
 pàdel demanava mesos enrere a veure si en sortia cap —fins a dotze consultes
 per no trobar el de fa tres anys, i després donar l'historial per esgotat—
 quan la pregunta és exactament de la mena que `activity_feed` ja sabia
