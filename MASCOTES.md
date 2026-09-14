@@ -81,7 +81,7 @@ sense problema: també sap estar quiet, si hi ha companyia.
 | ---- | --- | --- |
 | Presentació de l'onboarding | tots dos, i després un de sol per diapositiva | Figura gran centrada; es presenten ells |
 | Tour guiat | segons la parada (taula de sota) | Figura a la targeta que assenyala la pantalla |
-| Suggeriment de `train` | Marley si és gym, Xoco si és esport | La targeta **és** la bafarada, amb el gos al costat |
+| Suggeriment de `train` | Marley si és gym, Xoco si és esport; poden sortir tots dos alhora | La targeta **és** la bafarada, amb el gos al costat |
 | Targetes d'insight (`home`) | segons el tipus (taula de sota) | Avatar + emoji, sense veu pròpia |
 | Detall d'un insight (full que puja des de la targeta) | el mateix que la targeta | Avatar gran a la capçalera, **sense veu**: allà s'explica la dada |
 | Feed del dia (`home`) | Marley als entrenaments, Xoco als esports | Xapa sobre la icona d'activitat |
@@ -171,23 +171,34 @@ justament el que s'ha de poder rellegir en context.
 
 ### La bafarada
 
-El gos surt a baix a la dreta amb bafarada de còmic i et diu una cosa curta.
-Ara mateix **només al suggeriment d'entrenament**: a Inici els insights es
-queden en targetes i els gossos no hi surten a parlar. Va sortir-hi un temps
-i era massa veu per a una pantalla que ja és plena de dades; es reserva per
-al moment en què tenen alguna cosa concreta a proposar.
+El gos surt a baix amb bafarada de còmic i et diu una cosa curta. Ara mateix
+**només al suggeriment d'entrenament**: a Inici els insights es queden en
+targetes i els gossos no hi surten a parlar. Va sortir-hi un temps i era massa
+veu per a una pantalla que ja és plena de dades; es reserva per al moment en
+què tenen alguna cosa concreta a proposar.
 
-Tres regles perquè no sigui invasiva:
+Regles perquè no sigui invasiva:
 
-1. **Una sola cosa a la pantalla, no tres.** Al suggeriment de `train` la
+1. **Una sola cosa per missatge, no tres.** Al suggeriment de `train` la
    targeta *és* la bafarada: mateix format, amb cua cap al gos, botó de
    tancar i el gos al costat. No hi ha una targeta a part ni un missatge
    repetit — el primer intent en tenia tres alhora (xapa, bafarada i
    targeta) i era massa.
-2. **Tancar-la no et fa perdre res.** En tancar-la queda la targeta de
-   sempre, que segueix sent clicable i portant al mateix lloc.
-3. **Es tanca i no torna en tot el dia.** L'endemà sí.
-4. **Un sol gos.** Quan la figura gran hi és, la xapa de la icona
+2. **Un gos, una proposta; dos gossos, dues.** A `train` en poden sortir dues
+   alhora, però **mai dues del mateix**: una de gimnàs (Marley) i una d'esport
+   (Xoco). Són dos àmbits i dues veus, i qui fa totes dues coses vol saber
+   què li toca de cadascuna. Tres ja serien una llista, i una llista no és
+   una proposta.
+3. **Cadascú al seu costat.** El Xoco va a dalt i a **l'esquerra**; el Marley,
+   a sota i a **la dreta**. Apilades amb el gos al mateix costat es llegien
+   com una columna de text amb el mateix gos repetit. La cua, la cantonada
+   plana i el botó de tancar segueixen el gos: sempre apunten cap a ell, i el
+   tancar va al costat contrari perquè no el tapi.
+4. **Tancar-la no et fa perdre res.** Es tanquen per separat —proposen coses
+   diferents— i en tancar-ne una queda la targeta de sempre, que segueix sent
+   clicable i portant al mateix lloc.
+5. **Es tanca i no torna en tot el dia.** L'endemà sí.
+6. **Un sol gos per targeta.** Quan la figura gran hi és, la xapa de la icona
    desapareix: no ha de sortir dos cops a la mateixa targeta.
 
 Aquí surten **grans i sense cercle**, amb el cap i el pit retallats del fons
@@ -270,6 +281,13 @@ Decidit pel camí:
   setmanes que portes i les xifres d'aquelles setmanes, i després desapareix.
   Un comptador sempre a la vista converteix una alegria en una cosa que pots
   perdre, i això seria exactament la pressió que l'onboarding promet no fer.
+
+- **Proposar no és només «què toca avui».** El suggeriment de `train` diu
+  quatre coses, i l'ordre importa: el que ja tens planificat, el que feies i
+  fa temps que no fas, el que et toca per la teva cadència, i el de sempre. La
+  segona és la que més gos porta —«Hi tornem? Fa 6 setmanes»— i segueix
+  la regla 4 de veu: un gos s'hi inclou i no et retreu res. El que no s'ha fet
+  mai no es diu com una falta («encara no l'has entrenat»), sinó com una porta.
 
 La següent, acordada i pendent de fer:
 

@@ -74,6 +74,11 @@ tests que les subjecten són allà.
   l'historial i sense sèries. Un filtre no es contesta paginant una altra
   cosa: si la teva pregunta no hi cap, el que toca és una migració, no un
   bucle de mesos al client
+- **El suggeriment d'Entrenament es tria en un sol lloc**: `pickSuggestion()`
+  (`shared/utils/train-suggestion.util.ts`) decideix igual el gimnàs i
+  l'esport, sobre el mateix `ActivityProfile`. El que fa temps que no fas el
+  diu `activity_cadence` —una fila per activitat, migració 038—, mai més
+  historial al dispositiu
 - **Cap consulta no baixa «tot»**: tota consulta va acotada per un tram, un
   exercici, un esport, una fila o un filtre. Agregar i filtrar és feina del
   servidor — vegeu `SYNC.md` §«Res no baixa tot»

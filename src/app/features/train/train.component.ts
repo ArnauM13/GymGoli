@@ -15,7 +15,7 @@ import {
   Exercise, ExerciseCategory,
 } from '../../core/models/exercise.model';
 import { MASCOTS, Mascot, MascotMeta } from '../../core/models/mascot.model';
-import { Sport } from '../../core/models/sport.model';
+import { Sport, SportSession } from '../../core/models/sport.model';
 import { WorkoutTemplate } from '../../core/models/template.model';
 import { FeelingLevel, Workout, WorkoutEntry, setMaxWeight } from '../../core/models/workout.model';
 import { TemplateService } from '../../core/services/template.service';
@@ -35,6 +35,9 @@ import { ExercisePickerDialogComponent } from './components/exercise-picker-dial
 import { ExerciseService } from '../../core/services/exercise.service';
 import { ExerciseSuggestionService } from '../../core/services/exercise-suggestion.service';
 import { ExerciseSuggestion } from '../../shared/utils/exercise-suggestion.util';
+import {
+  SuggestionCandidate, SuggestionSource, pickSuggestion,
+} from '../../shared/utils/train-suggestion.util';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { NavigationHistoryService } from '../../core/services/navigation-history.service';
 import { SessionMergeComponent } from '../../shared/components/session-merge/session-merge.component';
@@ -59,8 +62,18 @@ const STALE_SUGGESTION_MS = 2 * 60 * 60 * 1000; // 2 hours
  *  filtra res, i la configuració no és lloc per a una llista que creix. */
 const KEEP_DISMISSED_PROPOSALS = 60;
 
-type GymSuggestion   = { type: 'gym';   category: ExerciseCategory; label: string; color: string; icon: string; reason: string };
-type SportSuggestion = { type: 'sport'; sport: Sport;               label: string; color: string; icon: string; reason: string };
+/** El que comparteixen les dues propostes del dia. `plan` hi és quan la
+ *  proposta surt d'un planificat: llavors tocar-la el comença, en comptes de
+ *  crear una activitat nova al seu costat. */
+interface SuggestionBase {
+  label:  string;
+  color:  string;
+  icon:   string;
+  reason: string;
+  source: SuggestionSource;
+}
+type GymSuggestion   = SuggestionBase & { type: 'gym';   category: ExerciseCategory; plan?: Workout };
+type SportSuggestion = SuggestionBase & { type: 'sport'; sport: Sport; plan?: SportSession };
 type TodaySuggestion = GymSuggestion | SportSuggestion;
 
 interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string; color: string; }
@@ -450,39 +463,46 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
 
     </div>
 
-    <!-- ── Suggeriment ──────────────────────────────────────────────────
-         Una sola cosa, no tres: la targeta ÉS la bafarada del gos —mateix
-         format, amb cua cap a ell i botó de tancar. Si la tanques marxa tot,
-         no queda cap targeta de fons: el suggeriment torna la pròxima vegada
-         que entris a la pàgina. ── -->
-    @if (!suggestionDismissed() && !activeWorkout() && todaySuggestion(); as s) {
-      <div class="suggestion-float-row sfr--with-dog">
-        <div class="sf-card-wrap">
-          <button class="suggestion-float" [style.--sc]="s.color" (click)="handleSuggestionClick(s)"
-                  [attr.aria-label]="'Entrenament suggerit: ' + s.label + '. ' + s.reason">
-            <div class="sf-bar" aria-hidden="true"></div>
-            <app-activity-icon [icon]="s.icon" [color]="s.color" />
-            <div class="sf-info" aria-hidden="true">
-              <span class="sf-label">{{ s.label }}</span>
-              <span class="sf-reason">{{ s.reason }}</span>
+    <!-- ── Suggeriments ─────────────────────────────────────────────────
+         Com a molt dos: un d'esport i un de gimnàs, mai dos del mateix. La
+         targeta ÉS la bafarada del gos —mateix format, amb cua cap a ell i
+         botó de tancar—, i cadascuna es tanca sola: si en tanques una, marxa
+         tot el seu i l'altra es queda. El Xoco va a dalt i a l'esquerra, el
+         Marley a sota i a la dreta. ── -->
+    @if (!activeWorkout() && todaySuggestions().length) {
+      <div class="suggestion-stack">
+        @for (s of todaySuggestions(); track s.type) {
+          <div class="suggestion-float-row"
+               [class.sfr--dog-left]="suggestionSide(s) === 'left'"
+               [class.sfr--stacked]="todaySuggestions().length > 1">
+            <div class="sf-card-wrap">
+              <button class="suggestion-float" [style.--sc]="s.color" (click)="handleSuggestionClick(s)"
+                      [attr.aria-label]="'Suggeriment: ' + s.label + '. ' + s.reason">
+                <div class="sf-bar" aria-hidden="true"></div>
+                <app-activity-icon [icon]="s.icon" [color]="s.color" />
+                <div class="sf-info" aria-hidden="true">
+                  <span class="sf-label">{{ s.label }}</span>
+                  <span class="sf-reason">{{ s.reason }}</span>
+                </div>
+                <!-- El verb, dins una pastilla: amb només el chevron la targeta
+                     es llegia com una nota i no com el botó que és. -->
+                <span class="sf-go" aria-hidden="true">
+                  {{ suggestionVerb(s) }}
+                  <span class="material-symbols-outlined">arrow_forward</span>
+                </span>
+              </button>
+
+              <!-- Fora del botó: dins el retallaria l'overflow de la targeta. -->
+              <span class="sf-tail" [style.--sc]="s.color" aria-hidden="true"></span>
+              <button class="sf-close" type="button" (click)="dismissSuggestion(s.type)"
+                      [attr.aria-label]="'Tancar el suggeriment de ' + s.label">
+                <span class="material-symbols-outlined" aria-hidden="true">close</span>
+              </button>
             </div>
-            <!-- El verb, dins una pastilla: amb només el chevron la targeta
-                 es llegia com una nota i no com el botó que és. -->
-            <span class="sf-go" aria-hidden="true">
-              {{ s.type === 'gym' ? 'Començar' : 'Registrar' }}
-              <span class="material-symbols-outlined">arrow_forward</span>
-            </span>
-          </button>
 
-          <!-- Fora del botó: dins el retallaria l'overflow de la targeta. -->
-          <span class="sf-tail" [style.--sc]="s.color" aria-hidden="true"></span>
-          <button class="sf-close" type="button" (click)="dismissSuggestion()"
-                  aria-label="Tancar el suggeriment">
-            <span class="material-symbols-outlined" aria-hidden="true">close</span>
-          </button>
-        </div>
-
-        <img class="sf-figure" [src]="suggestionMascot(s).figure" alt="" aria-hidden="true">
+            <img class="sf-figure" [src]="suggestionMascot(s).figure" alt="" aria-hidden="true">
+          </div>
+        }
       </div>
     }
 
@@ -882,17 +902,25 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       .material-symbols-outlined { font-size: 32px; color: var(--c-border); }
     }
 
-    /* ── Suggestion card: full-width bar, pinned above the nav bar ── */
-    .suggestion-float-row {
+    /* ── Suggeriments: una o dues bafarades, per sobre de la nav ── */
+    .suggestion-stack {
       position: fixed; left: 16px; right: 16px; bottom: calc(var(--nav-height) + 16px); z-index: 90;
-      display: flex; align-items: flex-end; gap: 8px;
+      display: flex; flex-direction: column; align-items: stretch; gap: 10px;
+      pointer-events: none;   /* el forat entre bafarades deixa tocar el que hi ha sota */
     }
+    .suggestion-float-row {
+      display: flex; align-items: flex-end; gap: 8px;
+      pointer-events: auto;
+    }
+    /* El Xoco va a l'esquerra: el mateix marcat, girat. */
+    .suggestion-float-row.sfr--dog-left { flex-direction: row-reverse; }
 
     .sf-card-wrap { position: relative; flex: 1; min-width: 0; }
 
-    /* Amb el gos al costat, la targeta es llegeix com la seva bafarada:
-     * cantonada de baix a la dreta plana i cua apuntant-lo. */
-    .sfr--with-dog .suggestion-float { border-radius: 14px 14px 4px 14px; }
+    /* Amb el gos al costat, la targeta es llegeix com la seva bafarada: la
+     * cantonada de baix que el toca, plana, i la cua apuntant-lo. */
+    .suggestion-float { border-radius: 14px 14px 4px 14px; }
+    .sfr--dog-left .suggestion-float { border-radius: 14px 14px 14px 4px; }
 
     .sf-tail {
       position: absolute; right: -6px; bottom: 12px;
@@ -903,6 +931,9 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       transform: rotate(45deg); border-radius: 0 3px 0 0;
       pointer-events: none;
     }
+    .sfr--dog-left .sf-tail { right: auto; left: -6px; transform: rotate(-135deg); }
+
+    .sfr--dog-left .sf-close { left: auto; right: -7px; }
 
     .sf-figure {
       height: 88px; width: auto; display: block; flex-shrink: 0;
@@ -911,9 +942,12 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       mask-image: linear-gradient(to bottom, #000 84%, transparent 100%);
       -webkit-mask-image: linear-gradient(to bottom, #000 84%, transparent 100%);
     }
+    /* Amb els dos gossos a la pantalla, cadascun una mica més petit: dues
+     * figures de 88px es mengen mitja pantalla de mòbil. */
+    .sfr--stacked .sf-figure { height: 68px; }
 
-    /* A la cantonada per no robar amplada al text, i a l'esquerra perquè a la
-     * dreta hi ha el gos i el taparia. */
+    /* A la cantonada per no robar amplada al text, i al costat contrari del
+     * gos perquè si no el taparia. */
     .sf-close {
       position: absolute; top: -9px; left: -7px; z-index: 1;
       width: 26px; height: 26px; border-radius: 50%;
@@ -1246,62 +1280,101 @@ export class TrainComponent implements OnDestroy {
     feedDayLabel(this.selectedDate(), this.today()));
 
 
-  /** Shown regardless of what's already been done today — always suggests
-   *  the next overdue category / sport. */
-  readonly todaySuggestion = computed((): TodaySuggestion | null => {
+  /**
+   * El que et proposen els gossos avui: **com a molt un de gimnàs i un
+   * d'esport**, mai dos del mateix. L'esport va primer perquè es pinta a
+   * sobre (el Xoco, a l'esquerra; el Marley, a sota i a la dreta).
+   *
+   * Qui tria és `pickSuggestion()`, igual per als dos costats: el que ja tens
+   * planificat per avui mana, després el que feies i fa temps que no, després
+   * el que et toca per la teva cadència, i si res no reclama res, el de
+   * sempre. Aquí només es passen els candidats i es posa el nom, el color i
+   * la icona al que en surt.
+   */
+  readonly todaySuggestions = computed((): TodaySuggestion[] => {
     const today = this.today();
-    if (this.selectedDate() !== today) return null;
+    if (this.selectedDate() !== today) return [];
 
     const goal    = this.settingsService.fitnessGoal();
     const profile = this.profileService.profile();
+    const out: TodaySuggestion[] = [];
 
-    // Score each gym category by how "overdue" it is relative to the user's
-    // actual training cycle. Only include categories that have had enough
-    // recovery time since the last session.
-    const gymCandidates = this.typeService.types().map(t => t.id)
-      .map(cat => ({ cat, profile: profile.gym[cat] }))
-      .filter(c => !!c.profile) // guard against a momentary types/profile skew
-      .map(c => ({ cat: c.cat, ...c.profile }))
-      .filter(c => c.daysSinceLast >= profile.minRecovery)
-      .sort((a, b) => b.overdueScore - a.overdueScore);
+    // ── Esport ──────────────────────────────────────────────────────────────
+    const sports = this.sportService.sports();
+    if (sports.length) {
+      const plannedSport = new Map(
+        this.sportService.getPlannedSportSessionsForDate(today).map(p => [p.sport.id, p.session]),
+      );
+      const doneSport = new Set(
+        this.sportService.getSportSessionsForDate(today)
+          .filter(p => (p.session.status ?? 'done') !== 'planned')
+          .map(p => p.sport.id),
+      );
 
-    const nextGymCat = gymCandidates[0]?.cat ?? null;
+      const candidates: SuggestionCandidate[] = sports
+        .filter(s => !!profile.sport[s.id])
+        .map(s => ({
+          key: s.id,
+          profile: profile.sport[s.id],
+          planned: plannedSport.has(s.id),
+          fromRoutine: plannedSport.get(s.id)?.plannedSource === 'routine',
+          doneToday: doneSport.has(s.id),
+        }));
 
-    // Sport: prefer the most-recently-done sport (maintains momentum),
-    // fall back to the 30-day favourite, then first available.
-    const nextSport = profile.recentSport ?? profile.favoriteSport
-                   ?? this.sportService.sports()[0] ?? null;
-
-    const mkGym = (cat: ExerciseCategory): GymSuggestion => {
-      const p = profile.gym[cat];
-      const daysStr = p.daysSinceLast === 1 ? 'Fa 1 dia' : `Fa ${p.daysSinceLast} dies`;
-      const reason  = p.daysSinceLast >= 99 ? 'Encara no l\'has entrenat' : daysStr;
-      return {
-        type: 'gym', category: cat,
-        label: CATEGORY_LABELS[cat], color: CATEGORY_COLORS[cat], icon: CATEGORY_ICONS[cat],
-        reason,
-      };
-    };
-    const mkSport = (s: Sport): SportSuggestion => ({
-      type: 'sport', sport: s, label: s.name, color: s.color, icon: s.icon,
-      reason: profile.recentSport?.id === s.id ? 'El que vas fer l\'últim cop' : 'El teu esport habitual',
-    });
-
-    switch (goal) {
-      case 'strength':
-      case null:
-        return nextGymCat ? mkGym(nextGymCat) : null;
-      case 'fitness':
-        if (nextGymCat) return mkGym(nextGymCat);
-        if (nextSport)  return mkSport(nextSport);
-        return null;
-      case 'weight':
-        if (nextSport)  return mkSport(nextSport);
-        if (nextGymCat) return mkGym(nextGymCat);
-        return null;
-      case 'sport':
-        return nextSport ? mkSport(nextSport) : null;
+      // Un esport que no s'ha fet mai només es proposa si l'objectiu hi va:
+      // a qui entrena força, oferir-li un esport que no ha tocat mai és
+      // inventar-se una afició.
+      const pick = pickSuggestion(candidates, {
+        minRecovery: profile.minRecovery,
+        allowUntried: goal === 'sport' || goal === 'weight' || goal === 'fitness',
+      });
+      const sport = pick ? sports.find(s => s.id === pick.key) : null;
+      if (pick && sport) {
+        out.push({
+          type: 'sport', sport, plan: plannedSport.get(sport.id),
+          label: sport.name, color: sport.color, icon: sport.icon,
+          reason: pick.reason, source: pick.source,
+        });
+      }
     }
+
+    // ── Gimnàs ──────────────────────────────────────────────────────────────
+    // Els tipus d'entrenament inclouen els que s'ha fet l'usuari, o sigui que
+    // una classe del gimnàs («Body Pump», «Spinning») hi entra com qualsevol
+    // altre: si fa temps que no hi vas, el Marley t'ho proposa igual.
+    const plannedGym = new Map<string, Workout>();
+    for (const w of this.workoutService.getPlannedForDate(today)) {
+      for (const cat of workoutCategories(w)) if (!plannedGym.has(cat)) plannedGym.set(cat, w);
+    }
+    const doneGym = new Set(
+      this.workoutService.getDoneWorkoutsForDate(today).flatMap(w => workoutCategories(w)),
+    );
+
+    const gymCandidates: SuggestionCandidate[] = this.typeService.types()
+      .map(t => t.id)
+      .filter(cat => !!profile.gym[cat])   // guard against a momentary types/profile skew
+      .map(cat => ({
+        key: cat,
+        profile: profile.gym[cat],
+        planned: plannedGym.has(cat),
+        fromRoutine: plannedGym.get(cat)?.plannedSource === 'routine',
+        doneToday: doneGym.has(cat),
+      }));
+
+    const gymPick = pickSuggestion(gymCandidates, {
+      minRecovery: profile.minRecovery, allowUntried: true,
+    });
+    if (gymPick) {
+      const cat = gymPick.key as ExerciseCategory;
+      out.push({
+        type: 'gym', category: cat, plan: plannedGym.get(cat),
+        label: CATEGORY_LABELS[cat], color: CATEGORY_COLORS[cat], icon: CATEGORY_ICONS[cat],
+        reason: gymPick.source === 'untried' ? 'Encara no l\'has entrenat' : gymPick.reason,
+        source: gymPick.source,
+      });
+    }
+
+    return out.filter(s => !this.suggestionDismissed().has(s.type));
   });
 
   /**
@@ -1316,20 +1389,55 @@ export class TrainComponent implements OnDestroy {
     return MASCOTS[this.suggestionMascotId(s)];
   }
 
-  /**
-   * Tancar la bafarada retira el suggeriment sencer: no ha de quedar cap
-   * targeta de fons ni cap acció al seu lloc. Viu només a la vista —quan
-   * tornes a entrar a la pàgina, el gos torna a proposar.
-   */
-  readonly suggestionDismissed = signal(false);
-
-  dismissSuggestion(): void {
-    this.suggestionDismissed.set(true);
+  /** El Xoco surt a l'esquerra i el Marley a la dreta: dues bafarades
+   *  apilades amb el gos al mateix costat es llegirien com una sola columna
+   *  de text amb dos gossos repetits. */
+  suggestionSide(s: TodaySuggestion): 'left' | 'right' {
+    return s.type === 'sport' ? 'left' : 'right';
   }
 
-  handleSuggestionClick(s: TodaySuggestion): void {
-    if (s.type === 'gym') this.selectType(s.category);
-    else void this.startSportSession(s.sport);
+  /** El verb del botó, que és el que passarà en tocar-la: un entrenament es
+   *  comença i un esport es registra —també quan surten d'un pla, perquè
+   *  començar-lo és exactament això. */
+  suggestionVerb(s: TodaySuggestion): string {
+    return s.type === 'gym' ? 'Començar' : 'Registrar';
+  }
+
+  /**
+   * Tancar una bafarada retira aquell suggeriment sencer: no ha de quedar cap
+   * targeta de fons ni cap acció al seu lloc. Es tanquen per separat —el
+   * Marley i el Xoco proposen coses diferents— i viu només a la vista: quan
+   * tornes a entrar a la pàgina, el gos torna a proposar.
+   */
+  readonly suggestionDismissed = signal<ReadonlySet<'gym' | 'sport'>>(new Set());
+
+  dismissSuggestion(kind: 'gym' | 'sport'): void {
+    this.suggestionDismissed.update(s => new Set([...s, kind]));
+  }
+
+  async handleSuggestionClick(s: TodaySuggestion): Promise<void> {
+    if (s.type === 'gym') {
+      // Un planificat es comença, no es duplica: crear-ne un de nou al costat
+      // deixaria el dia amb el pla per fer i l'entrenament fet.
+      if (s.plan) return this.startPlan(s.plan);
+      this.selectType(s.category);
+      return;
+    }
+
+    if (s.plan) return this.startSportPlan(s.plan);
+    await this.startSportSession(s.sport);
+  }
+
+  /** El mateix que fa el feed amb un esport planificat: es registra tal com
+   *  estava previst i s'obre, per si se'n vol canviar res. Si falla, el pla
+   *  es queda on era i tocar-lo un altre cop hi torna. */
+  private async startSportPlan(session: SportSession): Promise<void> {
+    try {
+      const id = await this.sportService.startPlannedSession(session.id, session.date);
+      this._openSportSession(id);
+    } catch {
+      this.feedback.error('Error en registrar', 2500);
+    }
   }
 
   readonly isSelectedFuture = computed(() => this.selectedDate() > this.today());

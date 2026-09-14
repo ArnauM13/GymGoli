@@ -28,7 +28,7 @@ import { TrainingTypeService } from '../../core/services/training-type.service';
 import { DEFAULT_TRAINING_TYPES } from '../../core/models/training-type.model';
 
 const TODAY = new Date().toISOString().split('T')[0];
-const P = { daysSinceLast: 3, typicalGapDays: 4, overdueScore: 0.75 };
+const P = { daysSinceLast: 3, typicalGapDays: 4, overdueScore: 0.75, everDone: true, sessions: 12 };
 
 function ex(id: string, category: string, subcategory: string, extra: Partial<Exercise> = {}): Exercise {
   return { id, name: id, category, subcategory, createdAt: new Date(), ...extra } as unknown as Exercise;
@@ -90,7 +90,7 @@ describe('TrainComponent — today-only aids never crash the workout view', () =
         { provide: TrainerService, useValue: { myTrainer: signal(null), hasTrainer: () => false, getProposalForDate: () => null } },
         { provide: TemplateService, useValue: { templates: signal([]), forCategory: () => [] } },
         { provide: SharedWorkoutService, useValue: {} },
-        { provide: WorkoutProfileService, useValue: { profile: signal({ gym: { push: P, pull: P, legs: P }, favoriteSport: null, recentSport: null, minRecovery: 2 }) } },
+        { provide: WorkoutProfileService, useValue: { profile: signal({ gym: { push: P, pull: P, legs: P }, sport: {}, minRecovery: 2 }) } },
         { provide: AppHintService, useValue: { isDismissed: () => false, dismiss: () => {} } },
         { provide: MatDialog, useValue: { open: () => {}, openDialogs: [] } },
         { provide: FeedbackService, useValue: { success: () => {}, error: () => {}, info: () => {} } },

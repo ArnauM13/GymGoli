@@ -1,16 +1,22 @@
 import { Injectable, computed, effect, inject } from '@angular/core';
 
 import { ExerciseCategory } from '../models/exercise.model';
-import { Sport } from '../models/sport.model';
+import { ActivityCadence, ActivityCadenceService } from './activity-cadence.service';
 import { AuthService } from './auth.service';
 import { UserSettingsService } from './user-settings.service';
 import { SportService } from './sport.service';
 import { TrainingTypeService } from './training-type.service';
 import { WorkoutService } from './workout.service';
 import { workoutCategories } from '../../shared/utils/calendar-utils';
-import { toDateStr, todayStr } from '../../shared/utils/date.utils';
+import { todayStr } from '../../shared/utils/date.utils';
 
 const TODAY = (): string => todayStr();
+
+/** El valor de «no consta»: ni a la finestra recent ni a l'historial. */
+export const NEVER_DAYS = 99;
+
+/** Un salt més llarg que això no és la teva cadència, és una aturada. */
+const MAX_GAP_DAYS = 14;
 
 function daysBetween(a: string, b: string): number {
   return Math.round(
@@ -18,28 +24,34 @@ function daysBetween(a: string, b: string): number {
   );
 }
 
-function offsetDate(dateStr: string, days: number): string {
-  const d = new Date(dateStr + 'T12:00:00');
-  d.setDate(d.getDate() + days);
-  return toDateStr(d);
-}
-
-export interface CategoryProfile {
-  /** Days since the last session of this category. 99 if never done. */
+/**
+ * Com et portes amb una activitat: un tipus d'entrenament o un esport. La
+ * forma és la mateixa per als dos perquè la pregunta és la mateixa —«et toca?»,
+ * «fa temps que no hi tornes?»— i respondre-la de dues maneres era el que feia
+ * que l'esport anés coix: vegeu `train-suggestion.util.ts`.
+ */
+export interface ActivityProfile {
+  /** Dies des de l'última. `NEVER_DAYS` si no en consta cap. */
   daysSinceLast: number;
-  /** User's computed average gap between consecutive sessions (days). */
+  /** Cada quant la fas, en dies. */
   typicalGapDays: number;
-  /** daysSinceLast / typicalGapDays. >1 = overdue, >1.5 = significantly overdue. */
+  /** daysSinceLast / typicalGapDays. >1 = et toca, >1.5 = fa dies que et toca. */
   overdueScore: number;
+  /** L'has fet alguna vegada. Ho diu l'historial sencer (migració 038), no la
+   *  finestra recent: sense això, el pàdel de fa mig any i un esport que no has
+   *  tocat mai es llegeixen igual. */
+  everDone: boolean;
+  /** Quantes n'has fet de sempre, si el servidor ho ha pogut dir. */
+  sessions: number;
 }
 
 export interface WorkoutProfile {
-  gym:           Record<ExerciseCategory, CategoryProfile>;
-  /** Sport the user has done most in the last 30 days. */
-  favoriteSport: Sport | null;
-  /** Sport from the most recent session ever. */
-  recentSport:   Sport | null;
-  /** Minimum days that must pass before the same category is suggested again. */
+  /** Per tipus d'entrenament (inclosos els que s'ha fet l'usuari: una classe
+   *  del gimnàs és un tipus com qualsevol altre). */
+  gym:           Record<ExerciseCategory, ActivityProfile>;
+  /** Per id d'esport. */
+  sport:         Record<string, ActivityProfile>;
+  /** Minimum days that must pass before the same activity is suggested again. */
   minRecovery:   number;
 }
 
@@ -57,6 +69,7 @@ export class WorkoutProfileService {
   private sportService    = inject(SportService);
   private settingsService = inject(UserSettingsService);
   private trainingTypeService = inject(TrainingTypeService);
+  private cadenceService  = inject(ActivityCadenceService);
   private auth            = inject(AuthService);
 
   constructor() {
@@ -67,18 +80,17 @@ export class WorkoutProfileService {
     // l'arrencada, i a més deixava l'app en mode «ja ho tinc tot», cosa que
     // feia que cada tornada a l'app en tornés a baixar una còpia.
     //
-    // Amb la finestra recent n'hi ha prou, i és la que ja hi és per als altres
-    // motius: aquest perfil no distingeix entre «fa 95 dies» i «no ho has fet
-    // mai» —les dues coses es tallen a 99 i donen la mateixa suggerència— i
-    // tres mesos de sessions són de sobres per calcular la cadència d'algú que
-    // entrena. Qui entrena menys d'un cop cada tres mesos ja surt com a
-    // «encara no l'has entrenat», que és exactament el que vol dir.
+    // Amb la finestra recent n'hi ha prou per a la cadència de qui entrena
+    // ara, i el que queda fora —què vas deixar de fer, i quan— es demana
+    // agregat: una fila per activitat (`ActivityCadenceService`), no un tros
+    // més d'historial.
     //
     // Es mira `uid()` i no la llista d'entrenaments: llegint la llista, cada
     // fila que arribava tornava a disparar l'efecte.
     effect(() => {
       if (!this.auth.uid()) return;
       void this.workoutService.ensureRecentWindow();
+      void this.cadenceService.ensureLoaded();
     });
   }
 
@@ -90,8 +102,9 @@ export class WorkoutProfileService {
     const goal        = this.settingsService.fitnessGoal() ?? 'strength';
     const defaultGap  = GOAL_DEFAULT_GAP[goal] ?? 4;
     const minRecovery = GOAL_MIN_RECOVERY[goal] ?? 2;
+    const cadence     = this.cadenceService.byKey();
 
-    const gym = {} as Record<ExerciseCategory, CategoryProfile>;
+    const gym = {} as Record<ExerciseCategory, ActivityProfile>;
 
     // Reads the types signal so the profile recomputes when the user adds,
     // edits or removes a training type.
@@ -103,51 +116,87 @@ export class WorkoutProfileService {
         .map(w => w.date)
         .sort((a, b) => b.localeCompare(a));
 
-      const daysSinceLast = catDates.length > 0
-        ? daysBetween(catDates[0], today)
-        : 99;
-
-      // Derive the user's typical training gap from up to 10 consecutive sessions.
-      // Gaps > 14 days are ignored (likely training breaks, not the real cycle).
-      let typicalGapDays = defaultGap;
-      if (catDates.length >= 2) {
-        const gaps: number[] = [];
-        for (let i = 0; i < Math.min(catDates.length - 1, 10); i++) {
-          const gap = daysBetween(catDates[i + 1], catDates[i]);
-          if (gap > 0 && gap <= 14) gaps.push(gap);
-        }
-        if (gaps.length >= 1) {
-          typicalGapDays = Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length);
-        }
-      }
-
-      typicalGapDays = Math.max(typicalGapDays, minRecovery);
-      gym[cat] = {
-        daysSinceLast,
-        typicalGapDays,
-        overdueScore: daysSinceLast / Math.max(typicalGapDays, 1),
-      };
+      gym[cat] = this._activityProfile(
+        catDates, cadence.get(`gym:${cat}`), today, defaultGap, minRecovery,
+      );
     }
 
-    // Favorite sport = most sessions in the last 30 days
-    const last30 = offsetDate(today, -30);
-    const recentSessions = sessions.filter(s => s.date >= last30 && s.date <= today);
-    const sportCounts = new Map<string, number>();
-    for (const s of recentSessions) {
-      sportCounts.set(s.sportId, (sportCounts.get(s.sportId) ?? 0) + 1);
+    // El mateix per a cada esport. Abans aquí només hi havia «l'últim que vas
+    // fer» i «el que més repeteixes»: dues dades que no diuen si et toca.
+    const doneSessions  = sessions.filter(s => (s.status ?? 'done') !== 'planned');
+    const datesBySport  = new Map<string, string[]>();
+    for (const s of doneSessions) {
+      const bucket = datesBySport.get(s.sportId);
+      if (bucket) bucket.push(s.date);
+      else datesBySport.set(s.sportId, [s.date]);
     }
-    let favId = '', favCount = 0;
-    for (const [id, count] of sportCounts) {
-      if (count > favCount) { favCount = count; favId = id; }
+
+    const sport: Record<string, ActivityProfile> = {};
+    for (const s of sports) {
+      const dates = (datesBySport.get(s.id) ?? []).sort((a, b) => b.localeCompare(a));
+      sport[s.id] = this._activityProfile(
+        dates, cadence.get(`sport:${s.id}`), today, defaultGap, minRecovery,
+      );
     }
-    const favoriteSport = sports.find(s => s.id === favId) ?? sports[0] ?? null;
 
-    // Recent sport = the sport from the last session ever
-    const lastSession = [...sessions].sort((a, b) => b.date.localeCompare(a.date))[0];
-    const recentSport = lastSession
-      ? (sports.find(s => s.id === lastSession.sportId) ?? null)
-      : null;
-
-    return { gym, favoriteSport, recentSport, minRecovery };
+    // Aquí hi havia «l'esport que més fas» i «l'últim que vas fer», que era
+    // com es triava l'esport a proposar. Ja no: el perfil de cada esport diu
+    // el mateix i molt més —si et toca, si fa temps que no hi vas— i dues
+    // maneres de contestar la mateixa pregunta són una de sobrera.
+    return { gym, sport, minRecovery };
   });
+
+  /**
+   * La cadència d'una activitat, amb el que es tingui a mà.
+   *
+   * Les dates de la finestra recent manen —són les de debò— i el resum del
+   * servidor omple el que hi falta: quan va ser l'última vegada si va ser
+   * abans de la finestra, i cada quant la feies si dins de la finestra no hi
+   * ha prou sessions per dir-ho.
+   */
+  private _activityProfile(
+    recentDates: string[],
+    cadence: ActivityCadence | undefined,
+    today: string,
+    defaultGap: number,
+    minRecovery: number,
+  ): ActivityProfile {
+    const lastDate = recentDates[0]
+      ?? (cadence?.lastDate && cadence.lastDate <= today ? cadence.lastDate : null);
+
+    const daysSinceLast = lastDate ? daysBetween(lastDate, today) : NEVER_DAYS;
+
+    // Derive the user's typical training gap from up to 10 consecutive sessions.
+    // Gaps > MAX_GAP_DAYS are ignored (likely training breaks, not the real cycle).
+    let typicalGapDays = defaultGap;
+    if (recentDates.length >= 2) {
+      const gaps: number[] = [];
+      for (let i = 0; i < Math.min(recentDates.length - 1, 10); i++) {
+        const gap = daysBetween(recentDates[i + 1], recentDates[i]);
+        if (gap > 0 && gap <= MAX_GAP_DAYS) gaps.push(gap);
+      }
+      if (gaps.length >= 1) {
+        typicalGapDays = Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length);
+      }
+    } else if (cadence && cadence.sessions >= 2 && cadence.firstDate && cadence.lastDate) {
+      // Sense sessions recents, la cadència de tota la vida: l'interval mitjà
+      // entre la primera i l'última. Es reté igual que els salts —per sobre de
+      // dues setmanes ja no és una cadència— perquè si no, qui va fer quatre
+      // sessions en dos anys sortiria amb un cicle de mig any i no li tocaria
+      // mai res.
+      const span = daysBetween(cadence.firstDate, cadence.lastDate);
+      const avg  = Math.round(span / (cadence.sessions - 1));
+      if (avg > 0) typicalGapDays = Math.min(avg, MAX_GAP_DAYS);
+    }
+
+    typicalGapDays = Math.max(typicalGapDays, minRecovery);
+
+    return {
+      daysSinceLast,
+      typicalGapDays,
+      overdueScore: daysSinceLast / Math.max(typicalGapDays, 1),
+      everDone: !!lastDate,
+      sessions: cadence?.sessions ?? recentDates.length,
+    };
+  }
 }
