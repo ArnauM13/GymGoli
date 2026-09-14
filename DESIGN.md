@@ -872,6 +872,13 @@ Per això el botó de la targeta del dia **només surt quan el dia és avui**: u
 de futur ja té «Planifica aquest dia» a dalt, i duplicar-lo dins la targeta
 seria dir dues vegades el mateix.
 
+I perquè tot això s'hi pugui arribar, **el calendari va endavant**: `app-calendar`
+és el mateix a Inici i a l'Historial i cap de les dues pantalles no es planta a
+avui. Un dia de davant es pinta amb `.is-future-plan` (una mica apagat, però
+viu i seleccionable), no deshabilitat: un dia futur no és un dia prohibit, és
+un dia per omplir. Sense això, «Planifica aquest dia» i «Planificar la
+setmana» eren dos botons que no es podien prémer mai des d'Inici.
+
 ### Inici enllaça, l'Historial llista
 
 Inici és la pantalla del dia d'avui. L'activitat recent hi és **una drecera**

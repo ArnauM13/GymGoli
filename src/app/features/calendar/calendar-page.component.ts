@@ -103,7 +103,7 @@ function parseRangeParam(raw: string | null | undefined): number | null {
             </button>
           </div>
           <div class="calendar-wrap">
-            <app-calendar [selectedDate]="selectedDate()" [allowFuturePlanning]="true"
+            <app-calendar [selectedDate]="selectedDate()"
                           (dateSelected)="selectDate($event)" />
           </div>
         </div>

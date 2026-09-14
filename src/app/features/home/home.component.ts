@@ -28,6 +28,13 @@ import { addDays, mondayOf } from '../../shared/utils/calendar-utils';
 
       <app-page-header title="Inici" />
 
+      <!-- ── El calendari d'Inici també va endavant ──
+           Inici no és només el diari del que ja s'ha fet: hi ha el botó de
+           planificar la setmana i el d'un dia futur. Si el calendari es
+           plantava a avui, aquelles dues accions no s'hi podien arribar mai i
+           calia passar per l'Historial per apuntar el dimarts vinent. Ara les
+           setmanes de davant s'obren aquí igual que allà: un sol calendari,
+           una sola manera de planificar. -->
       <div class="calendar-wrap">
         <app-calendar [selectedDate]="effectiveDate()"
                       (dateSelected)="selectDate($event)"

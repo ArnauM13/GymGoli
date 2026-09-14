@@ -293,17 +293,22 @@ export function compactDayLabel(date: string, today: string): string {
   });
 }
 
-/** "Avui" / "Ahir" / a formatted Catalan date, relative to `today`. */
+/** "Avui" / "Ahir" / "Demà" / a formatted Catalan date, relative to `today`.
+ *
+ *  «Demà» hi és perquè els dies de davant ja es poden triar: el calendari va
+ *  endavant a totes dues pantalles i el dia de demà s'ha de dir com el diu
+ *  tothom, no «Dilluns, 15 de setembre». */
 export function feedDayLabel(date: string, today: string): string {
   if (date === today) return 'Avui';
-  const yesterday = (() => {
-    // Noon (not midnight) so toISOString() can't roll the date back a day in
-    // timezones ahead of UTC — otherwise "ahir" resolves to two days ago.
+  // Noon (not midnight) so toISOString() can't roll the date back a day in
+  // timezones ahead of UTC — otherwise "ahir" resolves to two days ago.
+  const shift = (n: number): string => {
     const d = new Date(today + 'T12:00:00');
-    d.setDate(d.getDate() - 1);
+    d.setDate(d.getDate() + n);
     return toDateStr(d);
-  })();
-  if (date === yesterday) return 'Ahir';
+  };
+  if (date === shift(-1)) return 'Ahir';
+  if (date === shift(1))  return 'Demà';
   const label = new Date(date + 'T12:00:00')
     .toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'long' });
   return label.charAt(0).toUpperCase() + label.slice(1);

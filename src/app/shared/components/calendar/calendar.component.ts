@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, input, output, signal, booleanAttribute } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 import { WorkoutService } from '../../../core/services/workout.service';
@@ -26,8 +26,7 @@ import {
 
         <span class="cal-period-label">{{ periodLabel() }}</span>
 
-        <button class="cal-nav-btn" (click)="navigateForward()"
-                [disabled]="!canNavForward()" aria-label="Següent">
+        <button class="cal-nav-btn" (click)="navigateForward()" aria-label="Següent">
           <span class="material-symbols-outlined">chevron_right</span>
         </button>
 
@@ -78,10 +77,8 @@ import {
               class="cal-week-day"
               [class.is-today]="cell.isToday"
               [class.is-selected]="cell.isSelected"
-              [class.is-future]="cell.isFuture && !allowFuturePlanning()"
-              [class.is-future-plan]="cell.isFuture && allowFuturePlanning()"
+              [class.is-future-plan]="cell.isFuture"
               [class.has-planned]="cell.hasPlanned && !cell.hasWorkout"
-              [disabled]="cell.isFuture && !allowFuturePlanning()"
               (click)="selectDay(cell.date)">
               <span class="week-dow">{{ getDow(cell.date) }}</span>
               <span class="week-num">{{ cell.day }}</span>
@@ -126,10 +123,8 @@ import {
                 [class.has-workout]="cell.hasWorkout"
                 [class.is-today]="cell.isToday"
                 [class.is-selected]="cell.isSelected"
-                [class.is-future]="cell.isFuture && !allowFuturePlanning()"
-                [class.is-future-plan]="cell.isFuture && allowFuturePlanning()"
+                [class.is-future-plan]="cell.isFuture"
                 [class.has-planned]="cell.hasPlanned && !cell.hasWorkout"
-                [disabled]="cell.isFuture && !allowFuturePlanning()"
                 (click)="selectDay(cell.date)"
                 [attr.aria-label]="cell.day">
                 <span class="day-num">{{ cell.day }}</span>
@@ -191,8 +186,7 @@ import {
       border-radius: 50%; cursor: pointer; color: var(--c-text-2); flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.15s;
-      &:hover:not(:disabled) { background: var(--c-hover); }
-      &:disabled { color: var(--c-border); cursor: default; }
+      &:hover { background: var(--c-hover); }
       .material-symbols-outlined { font-size: 22px; }
     }
 
@@ -253,8 +247,7 @@ import {
       background: transparent; cursor: pointer;
       transition: background 0.15s; touch-action: manipulation;
 
-      &:hover:not(:disabled):not(.is-selected) { background: rgba(var(--c-brand-rgb), 0.08); }
-      &:disabled { cursor: default; }
+      &:hover:not(.is-selected) { background: rgba(var(--c-brand-rgb), 0.08); }
 
       &.is-today:not(.is-selected) {
         outline: 2px solid var(--c-brand); outline-offset: -2px;
@@ -263,7 +256,6 @@ import {
       &.is-selected {
         background: var(--c-brand) !important; color: white;
       }
-      &.is-future { opacity: 0.35; }
       &.is-future-plan { opacity: 0.85; }
       &.is-future-plan:hover { opacity: 1; }
     }
@@ -306,8 +298,7 @@ import {
       font-size: 14px; font-weight: 500; color: var(--c-text);
       cursor: pointer; transition: background 0.15s; padding: 4px 0;
 
-      &:hover:not(:disabled):not(.is-selected) { background: rgba(var(--c-brand-rgb), 0.08); }
-      &:disabled { cursor: default; }
+      &:hover:not(.is-selected) { background: rgba(var(--c-brand-rgb), 0.08); }
 
       &.is-today:not(.is-selected) {
         outline: 2px solid var(--c-brand); outline-offset: -2px;
@@ -316,7 +307,6 @@ import {
       &.is-selected {
         background: var(--c-brand) !important; color: white; font-weight: 700;
       }
-      &.is-future { opacity: 0.35; }
       &.is-future-plan { opacity: 0.85; }
       &.is-future-plan:hover { opacity: 1; }
     }
@@ -377,7 +367,6 @@ export class CalendarComponent {
   private dialogData     = inject<{ selectedDate?: string; initialView?: 'week' | 'month' }>(MAT_DIALOG_DATA, { optional: true });
 
   readonly selectedDate          = input<string | null>(null);
-  readonly allowFuturePlanning   = input(false, { transform: booleanAttribute });
   readonly dateSelected          = output<string>();
   /** Fires whenever the Monday of the currently-viewed week changes —
    *  on init and on every navigation, regardless of week/month view. */
@@ -461,16 +450,6 @@ export class CalendarComponent {
   });
 
   // ── Navigation ────────────────────────────────────────────────────────────
-  readonly canNavForward = computed(() => {
-    if (this.allowFuturePlanning()) return true;
-    if (this.view() === 'month') {
-      const now = new Date();
-      return this.calYear() < now.getFullYear() ||
-        (this.calYear() === now.getFullYear() && this.calMonth() < now.getMonth());
-    }
-    return addDays(this.weekStart(), 6) < this.todayStr();
-  });
-
   readonly isShowingCurrent = computed(() => {
     if (this.view() === 'month') {
       const now = new Date();

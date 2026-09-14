@@ -145,10 +145,22 @@ describe('workout-card.utils', () => {
       expect(feedDayLabel('2024-03-09', '2024-03-10')).toBe('Ahir');
     });
 
+    // Els dies de davant ja es poden triar al calendari, així que demà s'ha
+    // de dir «Demà» i no «Dilluns, 11 de març».
+    it('returns "Demà" for tomorrow', () => {
+      expect(feedDayLabel('2024-03-11', '2024-03-10')).toBe('Demà');
+    });
+
     it('returns a formatted date for anything older', () => {
       const result = feedDayLabel('2024-03-01', '2024-03-10');
       expect(result).not.toBe('Avui');
       expect(result).not.toBe('Ahir');
+      expect(result.length).toBeGreaterThan(0);
+    });
+
+    it('escriu el dia quan el futur ja no és demà', () => {
+      const result = feedDayLabel('2024-03-20', '2024-03-10');
+      expect(result).not.toBe('Demà');
       expect(result.length).toBeGreaterThan(0);
     });
   });

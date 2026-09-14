@@ -45,7 +45,6 @@ import {
   feedDayLabel, formatFeeling, workoutCardColor, workoutCardStats,
   workoutPrimaryColor, workoutPrimaryIcon, workoutTypeLabel,
 } from '../../shared/utils/workout-card.utils';
-import { toDateStr } from '../../shared/utils/date.utils';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 /** Accept a `?date=` deep-link only when it's a well-formed ISO date, so a
@@ -1240,21 +1239,11 @@ export class TrainComponent implements OnDestroy {
    *  "Registrant" rather than "Planificant". */
   readonly isSelectedPast = computed(() => this.selectedDate() < this.today());
 
-  /** Human date for the "not today" context banner: Ahir / Demà, otherwise
-   *  the capitalised weekday + day + month. */
-  readonly selectedDateLabel = computed(() => {
-    const sel = this.selectedDate();
-    const shift = (n: number) => {
-      const d = new Date(this.today() + 'T12:00:00');
-      d.setDate(d.getDate() + n);
-      return toDateStr(d);
-    };
-    if (sel === shift(-1)) return 'Ahir';
-    if (sel === shift(1))  return 'Demà';
-    const label = new Date(sel + 'T12:00:00')
-      .toLocaleDateString('ca-ES', { weekday: 'long', day: 'numeric', month: 'long' });
-    return label.charAt(0).toUpperCase() + label.slice(1);
-  });
+  /** Human date for the "not today" context banner: Avui / Ahir / Demà, o el
+   *  dia escrit. Ho diu `feedDayLabel()`, com el feed i la pàgina de la
+   *  sessió: el mateix dia no es pot dir de dues maneres segons la pantalla. */
+  readonly selectedDateLabel = computed(() =>
+    feedDayLabel(this.selectedDate(), this.today()));
 
 
   /** Shown regardless of what's already been done today — always suggests
