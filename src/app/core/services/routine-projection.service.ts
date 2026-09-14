@@ -23,6 +23,13 @@ export function isRoutineProjection(id: string): boolean {
   return id.startsWith(ROUTINE_ID_PREFIX);
 }
 
+/** La data que porta l'id d'una projecció (`routine:<data>:…`). És l'única
+ *  manera de saber de quin dia és un planificat que no és cap fila: l'id el
+ *  diu tot. */
+export function routineProjectionDate(id: string): string {
+  return id.slice(ROUTINE_ID_PREFIX.length, ROUTINE_ID_PREFIX.length + 10);
+}
+
 export function routineGymId(date: string, category: string): string {
   return `${ROUTINE_ID_PREFIX}${date}:gym:${category}`;
 }
@@ -98,6 +105,11 @@ export class RoutineProjectionService {
     return plan?.recurring ? plan : null;
   });
 
+  /** Cert quan els ajustos ja han arribat: fins llavors no se sap si hi ha
+   *  rutina, i una projecció que encara no s'ha calculat no vol dir que no
+   *  existeixi. Qui espera una sessió per l'id ho ha de distingir. */
+  readonly loaded = this.settings.loaded;
+
   /** Cert si la rutina proposa alguna cosa. */
   readonly hasRoutine = computed(() => {
     const plan = this._plan();
@@ -148,7 +160,7 @@ export class RoutineProjectionService {
     // Es talla per quantitat i es netegen els que ja han passat: un dia tret
     // fa mig any no filtra res, i la llista viu dins `user_settings`.
     const today = this.today.today();
-    const kept  = current.filter(key => this._dateOf(key) >= today);
+    const kept  = current.filter(key => routineProjectionDate(key) >= today);
     await this.settings.update({ dismissedRoutinePlans: [...kept, id].slice(-200) });
   }
 
@@ -161,11 +173,6 @@ export class RoutineProjectionService {
     const monday = mondayOf(date);
     for (let i = 0; i < 7; i++) if (addDays(monday, i) === date) return i;
     return 0;
-  }
-
-  /** La data que porta l'id d'una projecció (`routine:<data>:…`). */
-  private _dateOf(id: string): string {
-    return id.slice(ROUTINE_ID_PREFIX.length, ROUTINE_ID_PREFIX.length + 10);
   }
 
   /** Una llista d'exercicis feta a mà al planificador mana sobre la plantilla,
