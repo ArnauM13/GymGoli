@@ -20,6 +20,7 @@ export type InsightType =
   | 'progres'
   | 'volum_gym'
   // Tendència — cap on va el ritme
+  | 'mes_tancat'
   | 'tendencia_volum'
   | 'esforc_creixent'
   // Patró — com és realment la teva rutina
@@ -101,6 +102,17 @@ export interface InsightDetail {
   facts: InsightFact[];
   /** Què vol dir i què en pots fer. Sense deures ni retrets. */
   meaning: string;
+  /**
+   * Què faria d'aquest mes un mes millor, dit en xifres: «a l'agost sencer en
+   * van sortir 14; amb 15 al setembre el superes».
+   *
+   * És una **porta oberta, no una tasca pendent**: diu quina xifra seria i
+   * quant de marge queda, i para. Res de «t'hi falten», res d'imperatius —
+   * vegeu `MASCOTES.md` §regla 7, que deixa el detall sense deures.
+   *
+   * Opcional: la majoria d'insights miren enrere i no tenen res a oferir-hi.
+   */
+  next?: string;
 }
 
 /**

@@ -105,6 +105,17 @@ import { MASCOTS, MascotMeta } from '../../../core/models/mascot.model';
         <span class="material-symbols-outlined" aria-hidden="true">lightbulb</span>
         <p>{{ detail().meaning }}</p>
       </div>
+
+      <!-- ── Què en faria un mes millor ──
+           Va l'últim i amb més tinta: és l'única línia que mira endavant, i
+           la que l'usuari busca quan obre el full d'un insight de mes. Només
+           hi és quan hi ha una xifra a oferir. -->
+      @if (detail().next; as next) {
+        <div class="ids-next">
+          <span class="material-symbols-outlined" aria-hidden="true">flag</span>
+          <p>{{ next }}</p>
+        </div>
+      }
     </div>
   `,
   styles: [`
@@ -254,6 +265,21 @@ import { MASCOTS, MascotMeta } from '../../../core/models/mascot.model';
         font-variation-settings: 'FILL' 0, 'wght' 300;
       }
       p { margin: 0; font-size: 12.5px; font-weight: 500; color: var(--c-text-2); line-height: 1.5; }
+    }
+
+    /* ── Què en faria un mes millor ── */
+    /* Mateixa forma que «què vol dir», amb més color i el text ple: és el
+       que s'ofereix, no el que s'explica. */
+    .ids-next {
+      display: flex; align-items: flex-start; gap: 9px;
+      margin-top: 10px; padding: 11px 12px; border-radius: 14px;
+      background: color-mix(in srgb, var(--ic) 16%, var(--c-card));
+      .material-symbols-outlined {
+        font-size: 17px; flex-shrink: 0; margin-top: 1px;
+        color: color-mix(in srgb, var(--ic) 75%, var(--c-text));
+        font-variation-settings: 'FILL' 0, 'wght' 400;
+      }
+      p { margin: 0; font-size: 12.5px; font-weight: 600; color: var(--c-text); line-height: 1.5; }
     }
   `],
 })

@@ -20,7 +20,7 @@ function makeInsight(chart: InsightChart, overrides: Partial<FitnessInsight> = {
       headline: 'Aquest mes portes 12 activitats; el mes passat en vas fer 4.',
       chart,
       facts: [{ label: 'Aquest mes', value: '12 activitats' }],
-      meaning: 'Compara els últims 28 dies amb els 28 d\'abans.',
+      meaning: 'Compara el mes en curs amb els mateixos dies del mes passat.',
     },
     ...overrides,
   };
@@ -45,7 +45,10 @@ describe('InsightDetailSheetComponent', () => {
   let component: InsightDetailSheetComponent;
 
   /** Munta el full amb un gràfic concret; el període, si no es diu, ja hi és. */
-  function build(partial: Omit<InsightChart, 'range'> & { range?: string }): void {
+  function build(
+    partial: Omit<InsightChart, 'range'> & { range?: string },
+    overrides: Partial<FitnessInsight> = {},
+  ): void {
     const chart: InsightChart = { range: '3 de març – 23 d\'abril', ...partial };
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
@@ -54,7 +57,7 @@ describe('InsightDetailSheetComponent', () => {
     });
     fixture = TestBed.createComponent(InsightDetailSheetComponent);
     component = fixture.componentInstance;
-    fixture.componentRef.setInput('insight', makeInsight(chart));
+    fixture.componentRef.setInput('insight', makeInsight(chart, overrides));
     fixture.detectChanges();
   }
 
@@ -182,7 +185,31 @@ describe('InsightDetailSheetComponent', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
 
     expect(text).toContain('Aquest mes portes 12 activitats');
-    expect(text).toContain('Compara els últims 28 dies');
+    expect(text).toContain('Compara el mes en curs');
     expect(text).toContain('12 activitats');
+  });
+
+  // ── Què en faria un mes millor ───────────────────────────────────────────
+
+  it('pinta el que faria d\'aquest un mes millor quan hi ha xifra a oferir', () => {
+    build({ caption: 'Activitats per setmana', bars: bars(1, 2) }, {
+      detail: {
+        headline: 'Aquest mes portes 12 activitats.',
+        chart: { caption: 'Activitats per setmana', range: '1 – 23 d\'abril', bars: bars(1, 2) },
+        facts: [{ label: 'Abril', value: '12 activitats' }],
+        meaning: 'Dos mesos sencers.',
+        next: 'Al març sencer en van sortir 14. Amb 15 a l\'abril el superes, i queden 8 dies.',
+      },
+    });
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelector('.ids-next')).toBeTruthy();
+    expect(el.textContent).toContain('Amb 15 a l\'abril el superes');
+  });
+
+  it('i no deixa el bloc buit quan l\'insight no té res a oferir-hi', () => {
+    build({ caption: 'Activitats per setmana', bars: bars(1, 2) });
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('.ids-next')).toBeNull();
   });
 });

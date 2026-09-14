@@ -15,14 +15,19 @@ import { UserSettingsService } from './user-settings.service';
 import { WorkoutService } from './workout.service';
 import { workoutVolume } from '../../shared/utils/workout-card.utils';
 import { countSessions } from '../../shared/utils/session-group.utils';
+import { monthEndOf, monthStartOf, sameSpanLastMonth } from '../../shared/utils/calendar-utils';
 import { daysBetween, offsetDate, toDateStr } from '../../shared/utils/date.utils';
 import {
+  capFirst,
   dateRange,
   fmt1,
   fmtKg,
   fmtWeight,
+  inMonth,
   itemBars,
   longDate,
+  monthName,
+  monthShort,
   outOfTen,
   plural,
   rollingWeekBars,
@@ -72,6 +77,99 @@ const DAY_LABEL: Record<ExerciseCategory, string> = {
 
 function dayLabel(cat: ExerciseCategory): string {
   return DAY_LABEL[cat] ?? `Dia de ${CATEGORY_LABELS[cat]}?`;
+}
+
+// ── Mesos ────────────────────────────────────────────────────────────────────
+
+/**
+ * Un tram de calendari amb els dies que fa. La durada hi va perquè comparar
+ * dos trams sense saber quant dura cadascun és el que feia que un febrer
+ * semblés un mes fluix.
+ */
+interface Span {
+  from: string;
+  to:   string;
+  days: number;
+}
+
+function span(from: string, to: string): Span {
+  return { from, to, days: daysBetween(from, to) + 1 };
+}
+
+function countIn(dates: string[], s: Span): number {
+  return dates.filter(d => d >= s.from && d <= s.to).length;
+}
+
+/**
+ * Els primers dies d'un mes no són un mes: tres dies contra tres dies no és
+ * cap tendència, és soroll. Fins aquí, els insights mensuals callen.
+ */
+const MIN_MONTH_DAYS = 10;
+
+/**
+ * El mes en curs contra l'anterior, per **mesos de calendari**.
+ *
+ * Abans això eren dues finestres mòbils de 28 dies que es deien «aquest mes»:
+ * el tram lliscava cada dia, no coincidia amb cap mes real i les xifres
+ * canviaven encara que l'usuari no toqués res. Un mes és un mes.
+ *
+ * El mes en curs va del dia 1 fins avui i el passat, **els mateixos dies**
+ * (`sameSpanLastMonth()`, el mateix tall que el resum del mes de Progrés):
+ * deu dies d'aquest mes contra els trenta del passat dirien que has baixat
+ * sempre, i no seria veritat.
+ *
+ * `null` mentre el mes és massa nou — vegeu `MIN_MONTH_DAYS`.
+ */
+function monthSpans(today: string): { now: Span; prev: Span } | null {
+  const now = span(monthStartOf(today), today);
+  if (now.days < MIN_MONTH_DAYS) return null;
+  const prev = sameSpanLastMonth(today);
+  return { now, prev: span(prev.from, prev.to) };
+}
+
+/** El mes sencer que conté aquesta data, de l'1 fins a l'últim dia. */
+function fullMonthSpan(dateStr: string): Span {
+  return span(monthStartOf(dateStr), monthEndOf(dateStr));
+}
+
+/**
+ * Els dos últims mesos **sencers**, quan encara són notícia.
+ *
+ * És el complement de `monthSpans()`: mentre el mes en curs és massa nou per
+ * comparar-lo amb res (`MIN_MONTH_DAYS`), el que sí que es pot dir és com va
+ * anar el que acaba de tancar-se, sencer i contra el sencer d'abans. Són les
+ * úniques xifres de l'app que no depenen del dia que les miris.
+ *
+ * Passats aquells primers dies torna a manar el mes en curs i això calla: un
+ * resum de l'agost el 25 de setembre ja no és cap novetat.
+ */
+function closedMonths(today: string): { last: Span; before: Span } | null {
+  if (Number(today.slice(8)) >= MIN_MONTH_DAYS) return null;
+  const last = fullMonthSpan(offsetDate(monthStartOf(today), -1));
+  return { last, before: fullMonthSpan(offsetDate(last.from, -1)) };
+}
+
+/** Dies que queden del mes d'aquesta data, avui inclòs. */
+function daysLeftInMonth(today: string): number {
+  return daysBetween(today, monthEndOf(today)) + 1;
+}
+
+/**
+ * El mateix tram dels últims `n` mesos, del més vell al més nou: les barres
+ * dels gràfics mensuals. Es va enrere amb `sameSpanLastMonth()` perquè el
+ * tall de les barres sigui el mateix que el de les xifres del text.
+ *
+ * `n` no passa de tres: és el que l'app té carregat en entrar
+ * (`WorkoutService.RECENT_MONTHS`), i una barra a zero perquè el mes no ha
+ * baixat diria que aquell mes no vas fer res.
+ */
+function monthSpansBack(today: string, n: number): Span[] {
+  const out: Span[] = [span(monthStartOf(today), today)];
+  for (let i = 1; i < n; i++) {
+    const prev = sameSpanLastMonth(out[out.length - 1].to);
+    out.push(span(prev.from, prev.to));
+  }
+  return out.reverse();
 }
 
 // ── Setmanes ─────────────────────────────────────────────────────────────────
@@ -865,9 +963,13 @@ export class FitnessMetricsService {
   }
 
   /**
-   * Tonatge mogut aquest mes contra l'anterior. El creuament amb el nombre
-   * d'entrenos és el que ho fa útil: mateixos entrenos i més quilos vol dir
-   * que has pujat intensitat, i això no es veu des de cap targeta.
+   * Tonatge mogut aquest mes contra **el mateix tram del passat**. El
+   * creuament amb el nombre d'entrenos és el que ho fa útil: mateixos
+   * entrenos i més quilos vol dir que has pujat intensitat, i això no es veu
+   * des de cap targeta.
+   *
+   * Els dos mesos són mesos de calendari, no finestres de 28 dies: vegeu
+   * `monthSpans()`.
    */
   private _volumeTrend(today: string, workouts: Workout[]): FitnessInsight | null {
     const ctx = {
@@ -875,72 +977,68 @@ export class FitnessMetricsService {
       loadTypeOf: this.exerciseService.loadTypeOf,
       bodyweightFactorOf: this.exerciseService.bodyweightFactorOf,
     };
-    const from28 = offsetDate(today, -28);
-    const from56 = offsetDate(today, -56);
+    const spans = monthSpans(today);
+    if (!spans) return null;
+    const { now: nowSpan, prev: prevSpan } = spans;
 
-    const now  = workouts.filter(w => w.date > from28 && w.date <= today);
-    const prev = workouts.filter(w => w.date > from56 && w.date <= from28);
+    const inSpan   = (s: Span) => workouts.filter(w => w.date >= s.from && w.date <= s.to);
+    const volumeOf = (ws: Workout[]) => ws.reduce((sum, w) => sum + workoutVolume(w, ctx), 0);
+
+    const now  = inSpan(nowSpan);
+    const prev = inSpan(prevSpan);
     if (now.length < 6 || prev.length < 6) return null;
 
-    const vNow  = now.reduce((sum, w) => sum + workoutVolume(w, ctx), 0);
-    const vPrev = prev.reduce((sum, w) => sum + workoutVolume(w, ctx), 0);
+    const vNow  = volumeOf(now);
+    const vPrev = volumeOf(prev);
     if (vPrev <= 0) return null;
 
-    const delta = (vNow - vPrev) / vPrev;
+    // El canvi es mesura per dia perquè els dos trams poden no ser igual de
+    // llargs: `sameSpanLastMonth()` retalla el mes passat quan és més curt (el
+    // 31 de març contra el febrer). I si el total i el ritme diuen coses
+    // diferents, el canvi no és prou clar per obrir-hi la boca.
+    const ratePrev = vPrev / prevSpan.days;
+    const delta    = (vNow / nowSpan.days - ratePrev) / ratePrev;
     if (Math.abs(delta) < 0.15) return null;
+    if (Math.sign(vNow - vPrev) !== Math.sign(delta)) return null;
 
     const score     = changeScore(vNow, vPrev);
     const sameCount = Math.abs(now.length - prev.length) <= Math.max(1, prev.length * 0.15);
     const up        = delta > 0;
 
-    // Vuit finestres de 7 dies acabades avui: les quatre últimes són "aquest
-    // mes" i les altres quatre, "el passat". Així el gràfic suma exactament
-    // les xifres del text.
-    const weekly = [7, 6, 5, 4, 3, 2, 1, 0].map(i => ({
-      i,
-      start: offsetDate(today, -(7 * (i + 1))),
-      end:   offsetDate(today, -(7 * i)),
-    })).map(w => ({
-      ...w,
-      kg: workouts
-        .filter(x => x.date > w.start && x.date <= w.end)
-        .reduce((sum, x) => sum + workoutVolume(x, ctx), 0),
-    }));
+    // Una barra per mes, comptant de cada un **el mateix tram de dies** que
+    // les xifres del text: així el gràfic no diu una cosa i la frase una altra.
+    const months = monthSpansBack(today, 3).map(s => ({ s, kg: volumeOf(inSpan(s)) }));
 
     return {
       type: 'volum_gym',
       mascot: 'marley',
       emoji: up ? '🏋️' : '🍃',
       title: up ? 'Estàs movent més pes' : 'Mes més suau al gym',
-      stat: `${fmtKg(vNow)} aquest mes`,
+      stat: `${fmtKg(vNow)} ${inMonth(nowSpan.from)}`,
       message: sameCount
-        ? `Amb els mateixos entrenos que el mes passat. ${up ? 'Has pujat intensitat.' : 'Menys càrrega, més recuperació.'}`
-        : `${now.length} entrenos, contra ${prev.length} el mes passat.`,
+        ? `Amb els mateixos entrenos que ${inMonth(prevSpan.from)}. ${up ? 'Has pujat intensitat.' : 'Menys càrrega, més recuperació.'}`
+        : `${now.length} entrenos, contra ${prev.length} ${inMonth(prevSpan.from)}.`,
       color: '#00695c',
       level: INSIGHT_LEVEL.progres,
       strength: 30 + score,
       cooldownDays: 7,
       detail: {
-        headline: `Aquest mes has mogut ${fmtKg(vNow)} en total; el mes passat, ${fmtKg(vPrev)}.`,
+        headline: `${capFirst(inMonth(nowSpan.from))} portes ${fmtKg(vNow)}; ${inMonth(prevSpan.from)}, pels mateixos dies, ${fmtKg(vPrev)}.`,
         chart: {
-          caption: 'Pes mogut cada 7 dies',
-          range: dateRange(offsetDate(from56, 1), today),
+          caption: 'Pes mogut, el mateix tram de cada mes',
+          range: dateRange(months[0].s.from, nowSpan.to),
           bars: itemBars(
-            weekly,
-            w => ({
-              label: w.i === 0 ? 'ara' : shortDate(offsetDate(w.start, 1)),
-              value: w.kg,
-              display: fmtKg(w.kg),
-            }),
-            { muted: w => w.i >= 4, highlight: (_w, i, n) => i === n - 1 },
+            months,
+            m => ({ label: monthShort(m.s.from), value: m.kg, display: fmtKg(m.kg) }),
+            { muted: (_m, i, n) => i < n - 2, highlight: (_m, i, n) => i === n - 1 },
           ),
         },
         facts: [
-          { label: 'Aquest mes',    value: fmtKg(vNow), note: dateRange(offsetDate(from28, 1), today) },
-          { label: 'El mes passat', value: fmtKg(vPrev), note: dateRange(offsetDate(from56, 1), from28) },
-          { label: 'Entrenos',      value: `${now.length} contra ${prev.length}` },
+          { label: monthName(nowSpan.from),  value: fmtKg(vNow),  note: dateRange(nowSpan.from, nowSpan.to) },
+          { label: monthName(prevSpan.from), value: fmtKg(vPrev), note: dateRange(prevSpan.from, prevSpan.to) },
+          { label: 'Entrenos', value: `${now.length} contra ${prev.length}` },
         ],
-        meaning: 'El pes mogut és la suma de totes les sèries: el pes de cada una multiplicat per les repeticions. Serveix per veure la feina total, que el nombre d\'entrenos sol no diu.',
+        meaning: 'El pes mogut és la suma de totes les sèries: el pes de cada una multiplicat per les repeticions. Es compara el mes en curs amb els mateixos dies del mes passat, perquè un mes a mig fer no sembli fluix.',
       },
     };
   }
@@ -953,66 +1051,158 @@ export class FitnessMetricsService {
     const out: FitnessInsight[] = [];
     const level = INSIGHT_LEVEL.tendencia;
 
-    // ── Ritme d'activitat: 4 setmanes contra les 4 anteriors ─────────────────
+    // ── Ritme d'activitat: aquest mes contra el passat ───────────────────────
+    // Mesos de calendari, no finestres mòbils de 28 dies: vegeu `monthSpans()`.
     const allDates = [...workouts.map(w => w.date), ...sessions.map(s => s.date)];
-    const from28 = offsetDate(today, -28);
-    const from56 = offsetDate(today, -56);
-    const now    = allDates.filter(d => d > from28 && d <= today).length;
-    const prev   = allDates.filter(d => d > from56 && d <= from28).length;
+    const spans    = monthSpans(today);
 
     // "Un 300% més que el mes passat" quan el mes passat encara no hi eres no
-    // és una tendència: cal haver viscut els dos mesos que es comparen.
-    if (hist.days >= 56 && now + prev >= 8 && prev > 0) {
-      const delta = (now - prev) / prev;
-      if (Math.abs(delta) >= 0.25) {
-        const up  = delta > 0;
-        out.push({
-          type: 'tendencia_volum',
-          mascot: 'both',
-          emoji: up ? '📈' : '🌙',
-          title: up ? 'Puges de ritme' : 'Mes més tranquil',
-          stat: `Aquest mes, ${fmt1(now / 4)} activitats per setmana`,
-          message: up
-            ? `El mes passat en feies ${fmt1(prev / 4)}.`
-            : `El mes passat en feies ${fmt1(prev / 4)}. Cap pressa.`,
-          color: up ? '#0288d1' : '#78909c',
-          level,
-          strength: 30 + changeScore(now, prev),
-          cooldownDays: 7,
-          detail: {
-            headline: `Aquest mes portes ${plural(now, 'activitat', 'activitats')}; el mes passat en vas fer ${prev}.`,
-            chart: {
-              caption: 'Activitats cada 7 dies',
-              range: dateRange(offsetDate(from56, 1), today),
-              bars: rollingWeekBars(today, allDates, 8, {
-                muted: (_x, i) => i < 4,
-                highlight: (_x, i, n) => i === n - 1,
-              }),
+    // és una tendència: cal haver viscut sencer el mes amb què es compara.
+    if (spans && hist.first && hist.first <= spans.prev.from) {
+      const { now: nowSpan, prev: prevSpan } = spans;
+      const now  = countIn(allDates, nowSpan);
+      const prev = countIn(allDates, prevSpan);
+
+      // Per setmana i no en brut: els dos trams poden no ser igual de llargs
+      // (el 31 de març contra el febrer), i és el ritme el que es compara.
+      const nowRate  = now  / (nowSpan.days  / 7);
+      const prevRate = prev / (prevSpan.days / 7);
+
+      // El mes passat **sencer** és l'única xifra que ja no es mourà: és
+      // contra ella que es diu què faria d'aquest un mes millor.
+      const prevFull = countIn(allDates, fullMonthSpan(prevSpan.from));
+      const left     = daysLeftInMonth(today);
+
+      if (now + prev >= 8 && prev > 0) {
+        const delta = (nowRate - prevRate) / prevRate;
+        // Si el ritme i el recompte no van a la mateixa banda, el canvi el fa
+        // la durada del tram i no l'usuari: millor no dir-ne res.
+        if (Math.abs(delta) >= 0.25 && Math.sign(now - prev) === Math.sign(delta)) {
+          const up     = delta > 0;
+          const months = monthSpansBack(today, 3).map(s => ({ s, n: countIn(allDates, s) }));
+          out.push({
+            type: 'tendencia_volum',
+            mascot: 'both',
+            emoji: up ? '📈' : '🌙',
+            title: up ? 'Puges de ritme' : 'Mes més tranquil',
+            stat: `${capFirst(inMonth(nowSpan.from))}, ${fmt1(nowRate)} activitats per setmana`,
+            message: up
+              ? `${capFirst(inMonth(prevSpan.from))} en feies ${fmt1(prevRate)}.`
+              : `${capFirst(inMonth(prevSpan.from))} en feies ${fmt1(prevRate)}. Cap pressa.`,
+            color: up ? '#0288d1' : '#78909c',
+            level,
+            strength: 30 + changeScore(now, prev),
+            cooldownDays: 7,
+            detail: {
+              headline: `${capFirst(inMonth(nowSpan.from))} portes ${plural(now, 'activitat', 'activitats')}; ${inMonth(prevSpan.from)}, pels mateixos dies, en vas fer ${prev}.`,
+              chart: {
+                caption: 'Activitats, el mateix tram de cada mes',
+                range: dateRange(months[0].s.from, nowSpan.to),
+                bars: itemBars(
+                  months,
+                  m => ({ label: monthShort(m.s.from), value: m.n }),
+                  { muted: (_m, i, n) => i < n - 2, highlight: (_m, i, n) => i === n - 1 },
+                ),
+              },
+              facts: [
+                {
+                  label: monthName(nowSpan.from), value: plural(now, 'activitat', 'activitats'),
+                  note: dateRange(nowSpan.from, nowSpan.to),
+                },
+                {
+                  label: monthName(prevSpan.from), value: plural(prev, 'activitat', 'activitats'),
+                  note: dateRange(prevSpan.from, prevSpan.to),
+                },
+                { label: 'Diferència', value: weeklyChangePhrase(nowRate, prevRate) },
+              ],
+              meaning: up
+                ? 'Compara el mes en curs amb els mateixos dies del mes passat, perquè un mes a mig fer no sembli fluix. Pujar de ritme va bé mentre el descans hi càpiga.'
+                : 'Compara el mes en curs amb els mateixos dies del mes passat, perquè un mes a mig fer no sembli fluix. Un mes més tranquil no desfà res del que portes.',
+              next: now > prevFull
+                ? `${capFirst(inMonth(prevSpan.from))} sencer en van sortir ${prevFull} i ${inMonth(nowSpan.from)} ja en portes ${now}. Superat, i encara queden ${plural(left, 'dia', 'dies')}.`
+                : `${capFirst(inMonth(prevSpan.from))} sencer en van sortir ${prevFull}. Amb ${plural(prevFull + 1, 'activitat', 'activitats')} ${inMonth(nowSpan.from)} el superes, i queden ${plural(left, 'dia', 'dies')}.`,
             },
-            facts: [
-              {
-                label: 'Aquest mes', value: plural(now, 'activitat', 'activitats'),
-                note: dateRange(offsetDate(from28, 1), today),
-              },
-              {
-                label: 'El mes passat', value: plural(prev, 'activitat', 'activitats'),
-                note: dateRange(offsetDate(from56, 1), from28),
-              },
-              { label: 'Diferència', value: weeklyChangePhrase(now / 4, prev / 4) },
-            ],
-            meaning: up
-              ? 'Compara els últims 28 dies amb els 28 d\'abans. Pujar de ritme va bé mentre el descans hi càpiga.'
-              : 'Compara els últims 28 dies amb els 28 d\'abans. Un mes més tranquil no desfà res del que portes.',
-          },
-        });
+          });
+        }
       }
     }
+
+    // ── El mes que acaba de tancar-se, sencer contra sencer ──────────────────
+    const closed = this._closedMonth(today, allDates, hist);
+    if (closed) out.push({ ...closed, level });
 
     // ── L'esforç puja: les últimes sessions costen més ───────────────────────
     const effort = this._effortTrend(today, workouts, sessions, sports);
     if (effort) out.push({ ...effort, level });
 
     return out;
+  }
+
+  /**
+   * Com va anar el mes que acaba de tancar-se, contra el sencer d'abans.
+   *
+   * És l'únic insight amb xifres **definitives**: dos mesos sencers, de l'1 a
+   * l'últim dia, que ja no es mouran mai més. La resta del mes mana el mes en
+   * curs (`tendencia_volum`), que és una comparació viva i canvia cada dia;
+   * aquests primers dies, en què el mes nou encara no diu res, és quan el
+   * tancament del vell és la notícia. Vegeu `closedMonths()`.
+   *
+   * Va amb `once` perquè un mes es tanca una sola vegada: repetit cada dia
+   * deixaria de ser un resum i passaria a ser un marcador.
+   */
+  private _closedMonth(today: string, allDates: string[], hist: History): FitnessInsight | null {
+    const months = closedMonths(today);
+    // Comparar amb un mes en què l'usuari encara no hi era no és comparar.
+    if (!months || !hist.first || hist.first > months.before.from) return null;
+
+    const { last, before } = months;
+    const nLast   = countIn(allDates, last);
+    const nBefore = countIn(allDates, before);
+    if (nBefore === 0 || nLast + nBefore < 8) return null;
+
+    // Per setmana, que és com es comparen dos mesos de durada diferent: el
+    // febrer no és un mes fluix pel fet de tenir tres dies menys.
+    const rateLast   = nLast   / (last.days   / 7);
+    const rateBefore = nBefore / (before.days / 7);
+    const left       = daysLeftInMonth(today);
+
+    return {
+      type: 'mes_tancat',
+      // La clau és el mes, no el tipus: el tancament següent ja serà un altre.
+      once: `mes_tancat:${last.from.slice(0, 7)}`,
+      mascot: 'both',
+      emoji: '🗓️',
+      title: `Com va anar ${inMonth(last.from)}`,
+      stat: `${plural(nLast, 'activitat', 'activitats')} ${inMonth(last.from)}`,
+      message: `${capFirst(inMonth(before.from))} en van ser ${nBefore}.`,
+      color: '#3949ab',
+      level: INSIGHT_LEVEL.tendencia,
+      strength: 40 + changeScore(nLast, nBefore),
+      cooldownDays: 0,
+      detail: {
+        headline: `${capFirst(inMonth(last.from))} vas fer ${plural(nLast, 'activitat', 'activitats')}; ${inMonth(before.from)}, ${nBefore}.`,
+        chart: {
+          caption: 'Activitats de cada mes, sencer',
+          range: dateRange(before.from, last.to),
+          // Dos mesos i prou: l'app arrenca amb tres mesos carregats
+          // (`WorkoutService.RECENT_MONTHS`) i el tercer cap enrere ja no hi
+          // seria sencer. Una barra a zero perquè el mes no ha baixat diria
+          // que aquell mes no vas fer res.
+          bars: itemBars(
+            [before, last].map(m => ({ m, n: countIn(allDates, m) })),
+            x => ({ label: monthShort(x.m.from), value: x.n }),
+            { muted: (_x, i) => i === 0, highlight: (_x, i) => i === 1 },
+          ),
+        },
+        facts: [
+          { label: monthName(last.from),   value: plural(nLast, 'activitat', 'activitats'),   note: dateRange(last.from, last.to) },
+          { label: monthName(before.from), value: plural(nBefore, 'activitat', 'activitats'), note: dateRange(before.from, before.to) },
+          { label: 'Diferència', value: weeklyChangePhrase(rateLast, rateBefore) },
+        ],
+        meaning: 'Dos mesos sencers, de l\'1 a l\'últim dia. És l\'única comparació de l\'app que no depèn del dia que la miris: aquestes dues xifres ja no es mouran.',
+        next: `${capFirst(inMonth(today))}, amb ${plural(nLast + 1, 'activitat', 'activitats')} el superes. Queden ${plural(left, 'dia', 'dies')}.`,
+      },
+    };
   }
 
   private _effortTrend(
