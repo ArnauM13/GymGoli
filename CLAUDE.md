@@ -93,4 +93,9 @@ tests que les subjecten són allà.
   `weeklyActivityGoal` i companyia, que són l'objectiu d'ara. Canviar-lo val
   des de la setmana en curs; les tancades conserven el seu
 - Tests use `jasmine.clock().mockDate(...)` for date-dependent logic
-- Develop on a feature branch, never push to `main` directly without a PR
+- **Branques**: per defecte, es desenvolupa en una branca de feina i `main` es
+  toca per PR, mai a pols. Ara bé, és el camí per defecte, no un veto: **si
+  l'usuari demana explícitament el contrari** («fes merge directe a main»,
+  «puja-ho a main»), es fa i ja està — no cal insistir-hi ni obrir un PR de
+  compromís. El que no es negocia és el que hi arriba: tests i build verds
+  abans de tocar `main`, hi arribi com hi arribi
