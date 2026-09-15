@@ -92,17 +92,24 @@ export interface DayFeedEntry {
               @if (expandedWorkoutId() === item.workout.id) {
                 <app-workout-detail [workout]="item.workout" [planned]="isPlanned(item.workout)" />
                 @if (isPlanned(item.workout)) {
-                  <!-- Desplegar un pla és llegir-lo; començar-lo és un pas a
-                       part, i es diu amb totes les lletres. Un pla de demà
-                       només es llegeix: el desplegable es queda sense peu. -->
-                  @if (canStart(item.workout.date)) {
-                    <div class="ac-detail-actions">
+                  <!-- Desplegar un pla és llegir-lo. Obrir-lo és tocar-lo —hi
+                       pots afegir o treure exercicis i es queda pla— i
+                       començar-lo és donar-lo per fet: dos passos diferents,
+                       dos botons. El de començar només surt quan el dia ja ha
+                       arribat; el d'obrir, sempre: un pla de dimecres es
+                       prepara des d'avui. -->
+                  <div class="ac-detail-actions">
+                    <button class="ac-open-btn" (click)="openPlan(item.workout)">
+                      <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>
+                      Obrir
+                    </button>
+                    @if (canStart(item.workout.date)) {
                       <button class="ac-open-btn ac-open-btn--start" (click)="startPlan(item.workout)">
                         <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
                         Començar
                       </button>
-                    </div>
-                  }
+                    }
+                  </div>
                 } @else {
                   <div class="ac-detail-actions">
                     <button class="ac-open-btn" (click)="open.emit(item.workout.id)">
@@ -423,6 +430,22 @@ export class DayFeedCardsComponent {
    */
   handleWorkoutClick(w: Workout): void {
     this.expandedWorkoutId.update(id => id === w.id ? null : w.id);
+  }
+
+  /**
+   * Obre el pla per tocar-lo: s'hi afegeixen o se'n treuen exercicis i es
+   * queda pla, per començar-lo un altre dia.
+   *
+   * Un planificat de la rutina no és cap fila fins que el toques, així que
+   * el que s'obre pot ser un id nou —el pla de debò que s'acaba de crear—,
+   * no el projectat.
+   */
+  async openPlan(w: Workout): Promise<void> {
+    try {
+      this.open.emit(await this.workoutService.editPlannedWorkout(w.id));
+    } catch {
+      this.feedback.error('Error en obrir el pla', 2500);
+    }
   }
 
   async startPlan(w: Workout): Promise<void> {

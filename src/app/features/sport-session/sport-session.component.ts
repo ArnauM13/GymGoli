@@ -545,17 +545,18 @@ export class SportSessionComponent {
     this.saving.set(true);
     try {
       const metrics = this.editMetrics();
-      // Omplir les dades d'un pla d'avui o d'abans és registrar-lo: si es
-      // quedava 'planned' la sessió no comptava enlloc (ni al calendari ni a
-      // les estadístiques), igual que al registre de la pàgina d'Entrenar.
-      const promote = this.isPlanned() && p.session.date <= this.today();
+      // Editar un pla és afinar-lo, no fer-lo: es queda planificat fins que el
+      // registres des del seu botó, que és el de «Registrar la sessió» d'aquí
+      // sobre. Abans, guardar-hi qualsevol canvi el donava per fet, o sigui
+      // que apuntar quants minuts pensaves córrer avui ja et comptava la
+      // cursa — i el pla que volies deixar preparat ja no existia.
       const id = await this.sportService.updateSession(p.session.id, p.session.date, {
         subtypeId: this.editSubtype() ?? undefined,
         duration:  this.editDuration() || undefined,
         feeling:   this.editFeeling() ?? undefined,
         metrics:   Object.keys(metrics).length ? metrics : undefined,
         notes:     this.editNotes().trim() || undefined,
-      }, promote ? 'done' : undefined);
+      });
       this.editOpen.set(false);
       await this.follow(id);
     } catch {

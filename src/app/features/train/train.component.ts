@@ -151,6 +151,19 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
 
         } @else {
 
+        <!-- ── Començar el pla ──
+             Un pla obert es toca: s'hi afegeixen exercicis, se'n treuen, i es
+             queda pla. Donar-lo per començat és un pas a part i té el seu
+             botó, com «Registrar la sessió» a la pàgina d'un esport
+             planificat. Només quan el dia ja ha arribat: un pla de dimecres
+             es prepara des d'avui, però no es comença. -->
+        @if (canStartActivePlan(w)) {
+          <button class="start-plan-btn" [disabled]="startingPlan()" (click)="startPlan(w)">
+            <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
+            Començar l'entrenament
+          </button>
+        }
+
         <app-workout-editor
           #editor
           [workout]="w"
@@ -696,6 +709,21 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       &:hover { background: var(--c-brand-dk); }
       &:active { transform: scale(0.96); }
     }
+    /* ── Començar el pla ──
+       El mateix botó que «Registrar la sessió» a la pàgina d'un esport
+       planificat: un pla es comença igual sigui del gimnàs o de fora. */
+    .start-plan-btn {
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+      width: calc(100% - 32px); box-sizing: border-box;
+      margin: 12px 16px 0; padding: 13px; border: none; border-radius: 14px;
+      background: var(--c-brand); color: white; font-size: 14px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation; transition: background 0.15s, transform 0.1s;
+      .material-symbols-outlined { font-size: 20px; }
+      &:hover:not(:disabled) { background: var(--c-brand-dk); }
+      &:active:not(:disabled) { transform: scale(0.99); }
+      &:disabled { opacity: 0.6; cursor: default; }
+    }
+
     /* ── Contextual "save as template" nudge ── */
     .aw-nudge {
       position: relative;
@@ -1888,7 +1916,20 @@ export class TrainComponent implements OnDestroy {
     this.navHistory.goBack('/home');
   }
 
+  /** Cert mentre el pla es converteix en entrenament, perquè el botó no
+   *  s'accioni dos cops. */
+  readonly startingPlan = signal(false);
+
+  /** Un pla obert es pot començar des d'aquí, i només quan el dia ja ha
+   *  arribat — la mateixa regla que el botó de play del feed i que
+   *  «Registrar la sessió» d'un esport planificat. */
+  canStartActivePlan(w: Workout): boolean {
+    return this.isPlannedWorkout(w) && w.date <= this.today();
+  }
+
   async startPlan(w: Workout): Promise<void> {
+    if (this.startingPlan()) return;
+    this.startingPlan.set(true);
     try {
       // Un planificat de la rutina no és cap fila fins que el comences: el
       // que s'obre és l'entrenament que s'acaba de crear, no el projectat.
@@ -1896,6 +1937,8 @@ export class TrainComponent implements OnDestroy {
       this.openWorkout(id, { edit: true });
     } catch {
       this.feedback.error('Error en iniciar el pla', 2500);
+    } finally {
+      this.startingPlan.set(false);
     }
   }
 

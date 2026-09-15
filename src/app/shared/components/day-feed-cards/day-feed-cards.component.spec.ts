@@ -18,6 +18,7 @@ describe('DayFeedCardsComponent', () => {
   let component: DayFeedCardsComponent;
   let fixture: ReturnType<typeof TestBed.createComponent<DayFeedCardsComponent>>;
   let startPlannedWorkout: jasmine.Spy;
+  let editPlannedWorkout: jasmine.Spy;
   let setWorkoutGroup: jasmine.Spy;
   let setSportGroup: jasmine.Spy;
   let deleteWorkout: jasmine.Spy;
@@ -30,6 +31,9 @@ describe('DayFeedCardsComponent', () => {
     // Torna l'id de l'entrenament que s'ha d'obrir: un planificat de la
     // rutina no és cap fila fins que es comença, i llavors n'és una de nova.
     startPlannedWorkout = jasmine.createSpy().and.callFake((id: string) => Promise.resolve(id));
+    // Igual que començar-lo: torna l'id del pla que s'ha d'obrir, que d'una
+    // projecció de la rutina és el de la fila que s'acaba de crear.
+    editPlannedWorkout = jasmine.createSpy().and.callFake((id: string) => Promise.resolve(id));
     deleteWorkout = jasmine.createSpy().and.resolveTo(undefined);
     updateSession = jasmine.createSpy().and.resolveTo(undefined);
     deleteSession = jasmine.createSpy().and.resolveTo(undefined);
@@ -41,7 +45,9 @@ describe('DayFeedCardsComponent', () => {
     await TestBed.configureTestingModule({
       imports: [DayFeedCardsComponent],
       providers: [
-        { provide: WorkoutService, useValue: { startPlannedWorkout, deleteWorkout, setSessionGroup: setWorkoutGroup } },
+        { provide: WorkoutService, useValue: {
+          startPlannedWorkout, editPlannedWorkout, deleteWorkout, setSessionGroup: setWorkoutGroup,
+        } },
         { provide: SportService, useValue: {
           updateSession, deleteSession, startPlannedSession, setSessionGroup: setSportGroup,
           sessions: signal([]),
@@ -302,6 +308,45 @@ describe('DayFeedCardsComponent', () => {
       // Ni per la porta del darrere.
       await component.startPlan(makeWorkout({ id: 'plan1', date: '2999-01-01', status: 'planned' }));
       expect(startPlannedWorkout).not.toHaveBeenCalled();
+    });
+
+    // Obrir un pla és tocar-lo —afegir-hi o treure'n exercicis— i es queda
+    // pla. Val sempre, també per a un dia que encara ha de venir: preparar el
+    // de dimecres no s'ha d'esperar a dimecres.
+    it('obre un planificat per tocar-lo, arribi el dia o no', async () => {
+      const openSpy = spyOn(component.open, 'emit');
+      for (const date of ['2024-03-05', '2999-01-01']) {
+        fixture.componentRef.setInput('day', {
+          ...day, date,
+          workouts: [makeWorkout({ id: 'plan1', date, categories: ['push'], status: 'planned' })],
+        });
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+
+        (el.querySelector('.ac-main') as HTMLElement).click();
+        fixture.detectChanges();
+        (el.querySelector('.ac-open-btn:not(.ac-open-btn--start)') as HTMLElement).click();
+        await fixture.whenStable();
+
+        expect(editPlannedWorkout).toHaveBeenCalledWith('plan1');
+        expect(openSpy).toHaveBeenCalledWith('plan1');
+        // Obrir-lo no el comença: continua sent un pla.
+        expect(startPlannedWorkout).not.toHaveBeenCalled();
+        editPlannedWorkout.calls.reset();
+        component.handleWorkoutClick(makeWorkout({ id: 'plan1' }));   // plega
+      }
+    });
+
+    it('obre el pla de debò quan el que es toca és una projecció de la rutina', async () => {
+      const openSpy = spyOn(component.open, 'emit');
+      editPlannedWorkout.and.resolveTo('fila-nova');
+
+      await component.openPlan(makeWorkout({
+        id: 'routine:2024-03-05:gym:push', date: '2024-03-05', status: 'planned',
+      }));
+
+      expect(editPlannedWorkout).toHaveBeenCalledWith('routine:2024-03-05:gym:push');
+      expect(openSpy).toHaveBeenCalledWith('fila-nova');
     });
   });
 

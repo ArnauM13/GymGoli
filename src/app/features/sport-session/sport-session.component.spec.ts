@@ -217,11 +217,13 @@ describe('SportSessionComponent', () => {
       await component.save({ sport: SPORT, session });
 
       expect(updateSession).toHaveBeenCalledWith(
-        'sess1', '2024-03-05', jasmine.objectContaining({ duration: 45 }), undefined);
+        'sess1', '2024-03-05', jasmine.objectContaining({ duration: 45 }));
       expect(component.editOpen()).toBeFalse();
     });
 
-    it("guardar un pla d'un dia que ja ha arribat el registra", async () => {
+    // Editar un pla és afinar-lo, no fer-lo: el registra el seu botó, i tant
+    // se val que el dia ja hagi arribat.
+    it("guardar un pla d'un dia que ja ha arribat el deixa pla", async () => {
       const session = makeSession({ date: '2024-03-05', status: 'planned', duration: 60 });
       allSessions.set([session]);
       build();
@@ -231,7 +233,8 @@ describe('SportSessionComponent', () => {
       await component.save({ sport: SPORT, session });
 
       expect(updateSession).toHaveBeenCalledWith(
-        'sess1', '2024-03-05', jasmine.objectContaining({ duration: 90 }), 'done');
+        'sess1', '2024-03-05', jasmine.objectContaining({ duration: 90 }));
+      expect(startPlannedSession).not.toHaveBeenCalled();
     });
 
     it('un pla del futur es guarda i segueix sent un pla', async () => {
@@ -243,7 +246,8 @@ describe('SportSessionComponent', () => {
       await component.save({ sport: SPORT, session });
 
       expect(updateSession).toHaveBeenCalledWith(
-        'sess1', '2999-01-01', jasmine.any(Object), undefined);
+        'sess1', '2999-01-01', jasmine.any(Object));
+      expect(startPlannedSession).not.toHaveBeenCalled();
     });
   });
 

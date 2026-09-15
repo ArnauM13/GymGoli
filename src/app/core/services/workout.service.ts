@@ -678,6 +678,9 @@ export class WorkoutService {
    * com qualsevol altra i ja es pot editar.
    */
   async ensureWorkoutEntries(id: string): Promise<void> {
+    // Un planificat de la rutina no és cap fila: no se'n poden demanar les
+    // sèries perquè no n'hi ha cap a demanar. Ja porta a sobre tot el que és.
+    if (isRoutineProjection(id)) return;
     if (this.store.has(id) || this.store.isDeleted(id)) return;
     const inFlight = this._entryLoads.get(id);
     if (inFlight) return inFlight;
@@ -931,6 +934,40 @@ export class WorkoutService {
 
     const proposed = this._find(workoutId) ?? this._findPlanned(workoutId);
     const id = await this.createWorkoutForDate(proposed?.date ?? this._todayStr, proposed?.category);
+    if (proposed?.entries.length) {
+      this._updateWorkout(id, {
+        entries:    proposed.entries.map(e => ({ ...e, sets: [...e.sets] })),
+        categories: proposed.categories ?? (proposed.category ? [proposed.category] : []),
+      });
+    }
+    await this.routine.materialized(workoutId);
+    return id;
+  }
+
+  /**
+   * Prepara un planificat per obrir-lo i tocar-lo, i torna l'id que s'ha
+   * d'obrir — que no sempre és el que se li ha passat.
+   *
+   * És el germà de `startPlannedWorkout()`, amb la diferència que compta:
+   * començar un pla el dona per fet, i obrir-lo el deixa **pla**. Un
+   * planificat de la rutina no és cap fila, i tocar-lo és el moment en què
+   * passa a existir; però neix amb `status: 'planned'`, no com un
+   * entrenament fet. I com que a partir d'aquí ja no és el que diu la regla
+   * sinó el que has decidit tu, neix manual i el dia queda retirat de la
+   * proposta perquè no surti dues vegades.
+   *
+   * La mateixa regla que `SportService.updateSession()` aplica a una sessió
+   * projectada: guardar-hi res la materialitza, i es queda planificada.
+   */
+  async editPlannedWorkout(workoutId: string): Promise<string> {
+    if (!isRoutineProjection(workoutId)) return workoutId;
+
+    const proposed = this._findPlanned(workoutId);
+    const id = await this.createPlannedWorkout(proposed?.date ?? this._todayStr, proposed?.category);
+    // Els exercicis es copien sencers, sèries incloses: la pauta que deia la
+    // plantilla («4×10 · 80 kg») és el pla, i materialitzar-lo no l'ha de
+    // buidar. `createPlannedWorkout()` en treu les sèries a posta —un pla fet
+    // des del selector no en porta—, així que es tornen a posar aquí.
     if (proposed?.entries.length) {
       this._updateWorkout(id, {
         entries:    proposed.entries.map(e => ({ ...e, sets: [...e.sets] })),

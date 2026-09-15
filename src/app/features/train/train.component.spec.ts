@@ -804,6 +804,25 @@ describe('TrainComponent', () => {
     });
   });
 
+  // ── canStartActivePlan() ─────────────────────────────────────────────────
+  //
+  // La mateixa regla que el botó de play del feed i que «Registrar la sessió»
+  // d'un esport planificat: un pla es comença quan el seu dia ha arribat.
+
+  describe('canStartActivePlan()', () => {
+    it('ofereix començar el pla d\'avui', () => {
+      expect(component.canStartActivePlan(makeWorkout({ date: TODAY, status: 'planned' }))).toBe(true);
+    });
+
+    it('no ofereix començar un pla que encara ha de venir', () => {
+      expect(component.canStartActivePlan(makeWorkout({ date: '2999-01-01', status: 'planned' }))).toBe(false);
+    });
+
+    it('un entrenament ja fet no es comença: ja s\'ha començat', () => {
+      expect(component.canStartActivePlan(makeWorkout({ date: TODAY }))).toBe(false);
+    });
+  });
+
   // ── shareWorkout() ───────────────────────────────────────────────────────
 
   describe('shareWorkout()', () => {

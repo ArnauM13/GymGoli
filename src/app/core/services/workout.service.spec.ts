@@ -1028,6 +1028,55 @@ describe('WorkoutService', () => {
       expect(dismissRoutine).toHaveBeenCalledWith(projected.id);
     });
 
+    // El germà de començar-lo: obrir-lo també el converteix en fila —no n'hi
+    // ha cap fins que el toques—, però es queda **pla**, per començar-lo un
+    // altre dia.
+    it('obrir-lo el converteix en un pla de debò, sense donar-lo per fet', async () => {
+      const date = future();
+      routineOn(date, 'push');
+      const projected = service.getPlannedForDate(date)[0];
+
+      const id = await service.editPlannedWorkout(projected.id);
+
+      expect(id).not.toBe(projected.id);
+      const store = TestBed.inject(WorkoutStoreService);
+      expect(store.get(id)!.status).toBe('planned');
+      // Ja no és el que diu la regla, sinó el que has decidit tu.
+      expect(store.get(id)!.plannedSource).toBe('manual');
+      expect(store.get(id)!.date).toBe(date);
+      expect(store.get(id)!.entries.map(e => e.exerciseId)).toEqual(['ex1']);
+      expect(dismissRoutine).toHaveBeenCalledWith(projected.id);
+    });
+
+    // La pauta que deia la plantilla és el pla: materialitzar-lo no l'ha de
+    // buidar.
+    it('obrir-lo es queda la pauta que portava', async () => {
+      const date = future();
+      routinePlan.set(date, [{
+        id: routineGymId(date, 'push'), date, category: 'push',
+        entries: [{
+          exerciseId: 'ex1', exerciseName: 'Press banca',
+          sets: [{ reps: 10, weight: 80 }, { reps: 10, weight: 80 }],
+        }],
+      }]);
+      const projected = service.getPlannedForDate(date)[0];
+
+      const id = await service.editPlannedWorkout(projected.id);
+
+      const store = TestBed.inject(WorkoutStoreService);
+      expect(store.get(id)!.entries[0].sets.length).toBe(2);
+      expect(store.get(id)!.entries[0].sets[0].weight).toBe(80);
+    });
+
+    // Un pla fet a mà ja és una fila: obrir-lo no n'ha de crear cap altra.
+    it('un pla manual s\'obre tal com és, sense duplicar-se', async () => {
+      const date = future();
+      const planId = await service.createPlannedWorkout(date, 'push');
+
+      expect(await service.editPlannedWorkout(planId)).toBe(planId);
+      expect(service.getPlannedForDate(date).length).toBe(1);
+    });
+
     it('esborrar-lo és treure el dia de la rutina, no esborrar cap fila', async () => {
       const date = future();
       routineOn(date, 'push');
