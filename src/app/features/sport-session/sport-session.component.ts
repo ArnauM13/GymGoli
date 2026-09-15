@@ -10,6 +10,7 @@ import { TodayService } from '../../core/services/today.service';
 import { UserSettingsService } from '../../core/services/user-settings.service';
 import { ActivityCardComponent } from '../../shared/components/activity-card/activity-card.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { FabMenuComponent } from '../../shared/components/fab-menu/fab-menu.component';
 import { SportDetailComponent } from '../../shared/components/sport-detail/sport-detail.component';
 import { SessionMergeComponent } from '../../shared/components/session-merge/session-merge.component';
 import { ActivityItem } from '../../shared/utils/session-group.utils';
@@ -30,42 +31,36 @@ import { ActivityStat, feedDayLabel, formatFeeling, sportCardStats } from '../..
 @Component({
   selector: 'app-sport-session',
   standalone: true,
-  imports: [ActivityCardComponent, PageHeaderComponent, SportDetailComponent, SessionMergeComponent],
+  imports: [
+    ActivityCardComponent, PageHeaderComponent, SportDetailComponent, SessionMergeComponent,
+    FabMenuComponent,
+  ],
   template: `
     <div class="page">
 
       @if (pair(); as p) {
 
         <app-page-header [title]="p.sport.name" [subtitle]="dateLabel()"
-                         [showBack]="true" [fromSession]="true">
-          <!-- ── El menú de la sessió ──
-               El que no es fa cada dia viu aquí dins: unir-la amb una altra
-               activitat del dia i esborrar-la. Abans unir era una targeta
-               plantada al final de la pàgina —ocupava com una acció principal
-               una cosa que es fa un cop de cada deu— i esborrar només sortia
-               amb el formulari obert, que és un lloc estrany per anar-hi a
-               buscar. -->
-          <button class="ss-menu-btn" [class.ss-menu-btn--on]="menuOpen()"
-                  (click)="menuOpen.set(!menuOpen())"
-                  aria-label="Opcions de la sessió" [attr.aria-expanded]="menuOpen()">
-            <span class="material-symbols-outlined">more_vert</span>
-          </button>
-        </app-page-header>
+                         [showBack]="true" [fromSession]="true" />
 
-        @if (menuOpen()) {
-          <div class="bottom-sheet-backdrop" (click)="menuOpen.set(false)" aria-hidden="true"></div>
-          <div class="ss-sheet bottom-sheet" role="dialog" aria-modal="true" aria-label="Opcions de la sessió">
-            <span class="bottom-sheet-handle" aria-hidden="true"></span>
-            <button class="ss-menu-item" (click)="openMerge()">
-              <span class="material-symbols-outlined">add_link</span>
-              Unir amb una altra sessió
-            </button>
-            <button class="ss-menu-item ss-menu-item--danger" (click)="menuOpen.set(false); deleteSession(p)">
-              <span class="material-symbols-outlined">delete</span>
-              Eliminar la sessió
-            </button>
-          </div>
-        }
+        <!-- ── El menú de la sessió ──
+             El que no es fa cada dia viu aquí dins: unir-la amb una altra
+             activitat del dia i esborrar-la. Abans unir era una targeta
+             plantada al final de la pàgina —ocupava com una acció principal
+             una cosa que es fa un cop de cada deu— i esborrar només sortia
+             amb el formulari obert, que és un lloc estrany per anar-hi a
+             buscar. És el mateix menú que a l'entrenament, al mateix lloc:
+             el botó rodó de baix a la dreta, a l'abast del polze. -->
+        <app-fab-menu [(open)]="menuOpen" label="Opcions de la sessió">
+          <button class="fab-menu-item" (click)="openMerge()">
+            <span class="material-symbols-outlined">add_link</span>
+            Unir amb una altra sessió
+          </button>
+          <button class="fab-menu-item fab-menu-item--danger" (click)="menuOpen.set(false); deleteSession(p)">
+            <span class="material-symbols-outlined">delete</span>
+            Eliminar la sessió
+          </button>
+        </app-fab-menu>
 
         <!-- ── Amb quina? ──
              La llista de sessions del dia, la mateixa que a Entrenar. Tocar-ne
@@ -240,46 +235,25 @@ import { ActivityStat, feedDayLabel, formatFeeling, sportCardStats } from '../..
     </div>
   `,
   styles: [`
-    /* La nav flota per damunt del contingut: el peu de la pàgina li deixa
-       l'espai perquè els botons de baix (Guardar, Eliminar) no hi quedin
-       xafats a sota. */
-    .page { padding: 0 0 var(--page-pad-bottom); }
+    /* La nav flota per damunt del contingut i el menú de tres punts hi és a
+       sobre: el peu de la pàgina els deixa l'espai perquè l'últim botó
+       (Guardar, Editar) no hi quedi a sota. */
+    .page { padding: 0 0 var(--page-pad-bottom-fab); }
 
     /* ── Capçalera de la sessió ──
        La targeta és la compartida (app-activity-card), la mateixa que al feed
        i la que corona un entrenament. D'aquí només és on es posa. */
     .ss-hero { display: block; margin: 4px 16px 0; }
 
-    /* ── El menú de la capçalera ── */
-    .ss-menu-btn {
-      display: flex; align-items: center; justify-content: center;
-      width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
-      border: none; background: var(--c-subtle); color: var(--c-text-2);
-      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 20px; }
-      &:hover { background: var(--c-hover); }
-      &.ss-menu-btn--on { background: var(--c-brand); color: white; }
-    }
+    /* El menú de la sessió és el compartit (app-fab-menu, styles.scss):
+       el mateix botó i les mateixes opcions que a un entrenament. */
+
     /* La fulla de baix és la de tota l'app (styles.scss); d'aquí només surt
        el seu farciment. */
     .ss-sheet { padding: 14px 14px 22px; }
     .ss-sheet-head { display: flex; flex-direction: column; gap: 3px; margin-bottom: 12px; }
     .ss-sheet-title { font-size: 15px; font-weight: 800; color: var(--c-text); }
     .ss-sheet-sub   { font-size: 12px; font-weight: 500; color: var(--c-text-3); line-height: 1.35; }
-    .ss-menu-item {
-      display: flex; align-items: center; gap: 11px; width: 100%; box-sizing: border-box;
-      padding: 13px 12px; border: none; border-radius: 13px;
-      background: transparent; color: var(--c-text); font-size: 14px; font-weight: 700;
-      text-align: left; cursor: pointer; touch-action: manipulation; transition: background 0.15s;
-      .material-symbols-outlined { font-size: 20px; color: var(--c-text-3); }
-      &:hover { background: var(--c-subtle); }
-      &.ss-menu-item--danger {
-        color: #ef5350;
-        .material-symbols-outlined { color: #ef5350; }
-        &:hover { background: rgba(239,83,80,0.10); }
-      }
-    }
-
     /* ── Registrar un pla que ja toca ── */
     .register-btn {
       display: flex; align-items: center; justify-content: center; gap: 7px;

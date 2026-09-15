@@ -296,7 +296,7 @@ describe('SportSessionComponent', () => {
       const host = fixture.nativeElement as HTMLElement;
       expect(host.querySelector('app-session-merge')).toBeNull();
 
-      host.querySelector<HTMLElement>('.ss-menu-btn')!.click();
+      host.querySelector<HTMLElement>('.fab-menu-btn')!.click();
       fixture.detectChanges();
       expect(component.menuOpen()).toBeTrue();
 

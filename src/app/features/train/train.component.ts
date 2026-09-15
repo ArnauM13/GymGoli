@@ -42,6 +42,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { NavigationHistoryService } from '../../core/services/navigation-history.service';
 import { SessionMergeComponent } from '../../shared/components/session-merge/session-merge.component';
 import { SessionPickerComponent } from '../../shared/components/session-picker/session-picker.component';
+import { FabMenuComponent } from '../../shared/components/fab-menu/fab-menu.component';
 import {
   ActivityItem, SessionGroup, groupTitle, sessionKey,
 } from '../../shared/utils/session-group.utils';
@@ -88,7 +89,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
   imports: [
     FormsModule, A11yModule, WorkoutEditorComponent,
     PageHeaderComponent, ActivityCardComponent, ActivityIconComponent,
-    SessionMergeComponent, SessionPickerComponent,
+    SessionMergeComponent, SessionPickerComponent, FabMenuComponent,
   ],
   template: `
     <div class="page">
@@ -251,77 +252,66 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
                fa a cada sèrie (canviar de mode, ordenar, agrupar, plantilla,
                compartir, eliminar) hi viu dins, que un segon botó flotant
                menja pantalla justament on hi ha els exercicis. -->
-          <div class="aw-fab-row">
-            <!-- ── Three-dots action menu ── -->
-            @if (workoutMenuOpen()) {
-              <div class="aw-menu-backdrop" (click)="workoutMenuOpen.set(false)"></div>
-              <div class="aw-menu-dropdown">
-                <!-- ── Canviar de mode, primer de tot ──
-                     Passar de llegir a tocar-hi (i tornar) és el que més s'hi
-                     busca: obre el menú i ja hi és, a dalt, sense haver de
-                     llegir-se les altres opcions. Tornar a la consulta només
-                     hi és si has entrat a editar des de la consulta —mentre
-                     entrenes no hi ha cap consulta on tornar—, i mentre
-                     s'agrupa tampoc, que allò té la seva pròpia sortida. -->
-                @if (!editing()) {
-                  <button class="aw-menu-item edit-btn" (click)="workoutMenuOpen.set(false); startEditing()">
-                    <span class="material-symbols-outlined">edit</span>
-                    Editar l'entrenament
-                  </button>
-                } @else if (canStopEditing() && !groupingMode()) {
-                  <button class="aw-menu-item read-btn" (click)="stopEditing()">
-                    <span class="material-symbols-outlined">visibility</span>
-                    Tornar a la consulta
-                  </button>
-                }
-                <!-- Ordenar i agrupar canvien l'entrenament: en consulta no
-                     s'ofereixen, que allà no s'hi toca res. -->
-                @if (editing() && !groupingMode() && w.entries.length > 1) {
-                  <button class="aw-menu-item" (click)="workoutMenuOpen.set(false); startReordering()">
-                    <span class="material-symbols-outlined">swap_vert</span>
-                    Ordenar exercicis
-                  </button>
-                }
-                @if (editing() && (settingsService.supersetsEnabled() || groupingMode())) {
-                  <button class="aw-menu-item" (click)="workoutMenuOpen.set(false); startGrouping()">
-                    <span class="material-symbols-outlined">{{ groupingMode() ? 'check' : 'link' }}</span>
-                    {{ groupingMode() ? 'Finalitzar agrupació' : 'Agrupar en superset' }}
-                  </button>
-                }
-                <!-- ── Ha estat la mateixa anada? ──
-                     Si el dia ja té una altra activitat apuntada —el pàdel
-                     d'abans, la cinta de després—, aquí s'uneixen. Al menú i
-                     no al cos de la pàgina: és una cosa que es fa un cop de
-                     cada deu i abans ocupava una targeta sencera al final de
-                     tot, sortís o no sortís a compte. -->
-                @if (canMergeActive()) {
-                  <button class="aw-menu-item" (click)="openActiveMerge()">
-                    <span class="material-symbols-outlined">add_link</span>
-                    Unir amb una altra sessió
-                  </button>
-                }
-                @if (!offlineService.isOffline()) {
-                  <button class="aw-menu-item" (click)="openSaveAsTemplate(w)">
-                    <span class="material-symbols-outlined">bookmark_add</span>
-                    Guardar com a plantilla
-                  </button>
-                  <button class="aw-menu-item" (click)="shareWorkout(w)">
-                    <span class="material-symbols-outlined">share</span>
-                    Compartir entrenament
-                  </button>
-                }
-                <button class="aw-menu-item aw-menu-item--danger" (click)="workoutMenuOpen.set(false); deleteActiveWorkout()">
-                  <span class="material-symbols-outlined">delete</span>
-                  Eliminar entrenament
-                </button>
-              </div>
+          <app-fab-menu [(open)]="workoutMenuOpen" label="Opcions de l'entrenament">
+            <!-- ── Canviar de mode, primer de tot ──
+                 Passar de llegir a tocar-hi (i tornar) és el que més s'hi
+                 busca: obre el menú i ja hi és, a dalt, sense haver de
+                 llegir-se les altres opcions. Tornar a la consulta només
+                 hi és si has entrat a editar des de la consulta —mentre
+                 entrenes no hi ha cap consulta on tornar—, i mentre
+                 s'agrupa tampoc, que allò té la seva pròpia sortida. -->
+            @if (!editing()) {
+              <button class="fab-menu-item edit-btn" (click)="workoutMenuOpen.set(false); startEditing()">
+                <span class="material-symbols-outlined">edit</span>
+                Editar l'entrenament
+              </button>
+            } @else if (canStopEditing() && !groupingMode()) {
+              <button class="fab-menu-item read-btn" (click)="stopEditing()">
+                <span class="material-symbols-outlined">visibility</span>
+                Tornar a la consulta
+              </button>
             }
-            <button class="aw-menu-fab" [class.aw-menu-fab--open]="workoutMenuOpen()"
-                    (click)="workoutMenuOpen.set(!workoutMenuOpen())"
-                    aria-label="Opcions de l'entrenament" [attr.aria-expanded]="workoutMenuOpen()">
-              <span class="material-symbols-outlined">more_vert</span>
+            <!-- Ordenar i agrupar canvien l'entrenament: en consulta no
+                 s'ofereixen, que allà no s'hi toca res. -->
+            @if (editing() && !groupingMode() && w.entries.length > 1) {
+              <button class="fab-menu-item" (click)="workoutMenuOpen.set(false); startReordering()">
+                <span class="material-symbols-outlined">swap_vert</span>
+                Ordenar exercicis
+              </button>
+            }
+            @if (editing() && (settingsService.supersetsEnabled() || groupingMode())) {
+              <button class="fab-menu-item" (click)="workoutMenuOpen.set(false); startGrouping()">
+                <span class="material-symbols-outlined">{{ groupingMode() ? 'check' : 'link' }}</span>
+                {{ groupingMode() ? 'Finalitzar agrupació' : 'Agrupar en superset' }}
+              </button>
+            }
+            <!-- ── Ha estat la mateixa anada? ──
+                 Si el dia ja té una altra activitat apuntada —el pàdel
+                 d'abans, la cinta de després—, aquí s'uneixen. Al menú i
+                 no al cos de la pàgina: és una cosa que es fa un cop de
+                 cada deu i abans ocupava una targeta sencera al final de
+                 tot, sortís o no sortís a compte. -->
+            @if (canMergeActive()) {
+              <button class="fab-menu-item" (click)="openActiveMerge()">
+                <span class="material-symbols-outlined">add_link</span>
+                Unir amb una altra sessió
+              </button>
+            }
+            @if (!offlineService.isOffline()) {
+              <button class="fab-menu-item" (click)="openSaveAsTemplate(w)">
+                <span class="material-symbols-outlined">bookmark_add</span>
+                Guardar com a plantilla
+              </button>
+              <button class="fab-menu-item" (click)="shareWorkout(w)">
+                <span class="material-symbols-outlined">share</span>
+                Compartir entrenament
+              </button>
+            }
+            <button class="fab-menu-item fab-menu-item--danger" (click)="workoutMenuOpen.set(false); deleteActiveWorkout()">
+              <span class="material-symbols-outlined">delete</span>
+              Eliminar entrenament
             </button>
-          </div>
+          </app-fab-menu>
         }
 
         <!-- ── Amb quina sessió? ──
@@ -723,34 +713,8 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       &:hover { color: #ef5350; border-color: rgba(239,83,80,0.3); background: rgba(239,83,80,0.06); }
     }
 
-    /* ── Fila de botons flotants de l'entrenament actiu ──
-       Ordenar, acabar i el menú de tres punts hi viuen junts, mateixa forma
-       (rodó, 56px) i mateixa alçada — la fila és qui es posiciona, no cada
-       botó per separat. */
-    .aw-fab-row {
-      position: fixed; right: 20px;
-      bottom: calc(var(--nav-height) + 16px);
-      z-index: 89;
-      display: flex; align-items: center; gap: 12px;
-    }
-    .aw-menu-fab {
-      width: 56px; height: 56px; border-radius: 50%; flex-shrink: 0;
-      border: 1.5px solid var(--c-border); background: var(--c-card); color: var(--c-text-2);
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; touch-action: manipulation;
-      box-shadow: 0 4px 16px var(--c-shadow-md);
-      transition: background 0.15s, transform 0.15s;
-      .material-symbols-outlined { font-size: 24px; }
-      &:active { transform: scale(0.94); }
-      &.aw-menu-fab--open { background: var(--c-subtle); border-color: var(--c-brand); color: var(--c-brand); }
-    }
-    /* Hover només amb ratolí real: en tàctil, el toc que obre el detall deixa
-       l':hover "enganxat" al FAB —queda seleccionat i més gran sense que
-       ningú l'hagi tocat. */
-    @media (hover: hover) {
-      .aw-menu-fab:hover { background: var(--c-subtle); transform: scale(1.06); }
-    }
-    .aw-menu-backdrop { position: fixed; inset: 0; z-index: 88; }
+    /* El menú de tres punts és el compartit (app-fab-menu, styles.scss):
+       el mateix botó i les mateixes opcions que a la pàgina d'un esport. */
     /* ── Guardar l'ordre, mentre s'ordena ──
        Un botó primari de la casa (10px de radi, 13px de lletra), no un FAB:
        mentre mous exercicis el que has de veure són els exercicis, i una
@@ -845,34 +809,6 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
     }
     .aw-suggest-name { font-size: 14px; font-weight: 700; color: var(--c-text); }
     .aw-suggest-reason { font-size: 11px; color: var(--c-text-3); padding-left: 29px; line-height: 1.3; }
-
-    .aw-menu-dropdown {
-      position: fixed; right: 16px;
-      bottom: calc(var(--nav-height) + 16px + 56px + 10px);
-      z-index: 90; min-width: 230px;
-      background: var(--c-card); border-radius: 14px;
-      box-shadow: 0 4px 24px var(--c-shadow-md), 0 0 0 1px var(--c-border);
-      padding: 6px;
-      transform-origin: bottom right;
-      animation: menu-in 0.18s cubic-bezier(0.34, 1.2, 0.64, 1) both;
-    }
-    @keyframes menu-in {
-      from { opacity: 0; transform: scale(0.85); }
-      to   { opacity: 1; transform: scale(1); }
-    }
-    .aw-menu-item {
-      display: flex; align-items: center; gap: 12px;
-      width: 100%; padding: 13px 14px; border-radius: 10px;
-      border: none; background: transparent;
-      color: var(--c-text); font-size: 14px; font-weight: 600;
-      cursor: pointer; touch-action: manipulation; text-align: left;
-      transition: background 0.12s;
-      .material-symbols-outlined { font-size: 20px; color: var(--c-text-3); }
-      &:hover { background: var(--c-subtle); }
-      &.aw-menu-item--danger { color: #ef5350; }
-      &.aw-menu-item--danger .material-symbols-outlined { color: #ef5350; }
-      &.aw-menu-item--danger:hover { background: rgba(239,83,80,0.07); }
-    }
 
     /* ── Save as template sheet (floating bottom sheet — see global .bottom-sheet) ── */
     .aw-tpl-sheet { padding: 8px 20px 0; }
