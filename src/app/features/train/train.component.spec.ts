@@ -8,6 +8,7 @@ import { MatDialog } from '@angular/material/dialog';
 
 import { TrainComponent } from './train.component';
 import { ActivityCardComponent } from '../../shared/components/activity-card/activity-card.component';
+import { FabMenuComponent } from '../../shared/components/fab-menu/fab-menu.component';
 import { WorkoutService } from '../../core/services/workout.service';
 import { SportService } from '../../core/services/sport.service';
 import { ExerciseService } from '../../core/services/exercise.service';
@@ -134,13 +135,13 @@ describe('TrainComponent', () => {
         { provide: MatDialog,              useValue: { open: jasmine.createSpy() } },
         { provide: FeedbackService,        useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
         { provide: ConfirmDialogService,   useValue: { confirm: jasmine.createSpy('confirm').and.resolveTo(false) } },
-        { provide: NavigationHistoryService, useValue: { goBack: jasmine.createSpy('goBack') } },
+        { provide: NavigationHistoryService, useValue: { goBack: jasmine.createSpy('goBack'), goBackFromSession: jasmine.createSpy('goBackFromSession') } },
       ],
     })
       .overrideComponent(TrainComponent, {
         // La targeta de dalt és la compartida i és el que aquests tests
         // miren, així que es queda de debò; la resta de fills, esquemàtics.
-        set: { imports: [LowerCasePipe, ActivityCardComponent], schemas: [NO_ERRORS_SCHEMA] },
+        set: { imports: [LowerCasePipe, ActivityCardComponent, FabMenuComponent], schemas: [NO_ERRORS_SCHEMA] },
       })
       .compileComponents();
 
@@ -149,9 +150,9 @@ describe('TrainComponent', () => {
     fixture.detectChanges();
     navigateSpy = spyOn(component.router, 'navigate').and.resolveTo(true);
     const navHistory = TestBed.inject(NavigationHistoryService);
-    goBackSpy = (jasmine.isSpy(navHistory.goBack)
-      ? navHistory.goBack
-      : spyOn(navHistory, 'goBack')) as jasmine.Spy;
+    goBackSpy = (jasmine.isSpy(navHistory.goBackFromSession)
+      ? navHistory.goBackFromSession
+      : spyOn(navHistory, 'goBackFromSession')) as jasmine.Spy;
     goBackSpy.calls.reset();
   });
 
@@ -229,10 +230,10 @@ describe('TrainComponent', () => {
       expect(component.activeWorkoutId()).toBeNull();
     });
 
-    it('returns to the origin on closeWorkout (home, or the calendar when registering a past day)', () => {
+    it('returns to the origin on closeWorkout (home, or the calendar when registering a past day), never the train dashboard', () => {
       component.openWorkout('abc');
       component.closeWorkout();
-      expect(goBackSpy).toHaveBeenCalledWith('/home');
+      expect(goBackSpy).toHaveBeenCalled();
     });
   });
 
@@ -309,7 +310,7 @@ describe('TrainComponent', () => {
       expect(el.querySelector('app-workout-editor')).toBeTruthy();
 
       openMenu();
-      const items = el.querySelectorAll('.aw-menu-dropdown .aw-menu-item');
+      const items = el.querySelectorAll('.fab-menu-dropdown .fab-menu-item');
       expect(items[0].classList).toContain('edit-btn');
     });
 
@@ -343,7 +344,7 @@ describe('TrainComponent', () => {
       fixture.detectChanges();
 
       expect(component.canStopEditing()).toBeTrue();
-      const items = openMenu().querySelectorAll<HTMLButtonElement>('.aw-menu-dropdown .aw-menu-item');
+      const items = openMenu().querySelectorAll<HTMLButtonElement>('.fab-menu-dropdown .fab-menu-item');
       expect(items[0].classList).toContain('read-btn');
       items[0].click();
       fixture.detectChanges();
@@ -416,11 +417,11 @@ describe('TrainComponent', () => {
         ],
       }));
 
-      expect(el.querySelectorAll('.aw-fab-row button').length).toBe(1);
+      expect(el.querySelectorAll('app-fab-menu button').length).toBe(1);
 
       component.workoutMenuOpen.set(true);
       fixture.detectChanges();
-      const menu = Array.from(el.querySelectorAll('.aw-menu-item')).map(b => b.textContent?.trim());
+      const menu = Array.from(el.querySelectorAll('.fab-menu-item')).map(b => b.textContent?.trim());
       expect(menu.join(' ')).toContain('Ordenar exercicis');
     });
 
@@ -439,7 +440,7 @@ describe('TrainComponent', () => {
       component.workoutMenuOpen.set(true);
       fixture.detectChanges();
 
-      const menu = Array.from(el.querySelectorAll('.aw-menu-item')).map(b => b.textContent?.trim());
+      const menu = Array.from(el.querySelectorAll('.fab-menu-item')).map(b => b.textContent?.trim());
       expect(menu.join(' ')).not.toContain('Ordenar');
     });
 
@@ -624,7 +625,7 @@ describe('TrainComponent', () => {
 
       expect(workoutService.deleteWorkout).toHaveBeenCalledWith('abc');
       expect(component.activeWorkoutId()).toBeNull();
-      expect(goBackSpy).toHaveBeenCalledWith('/home');
+      expect(goBackSpy).toHaveBeenCalled();
     });
   });
 

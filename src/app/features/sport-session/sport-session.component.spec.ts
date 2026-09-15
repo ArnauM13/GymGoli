@@ -37,6 +37,7 @@ describe('SportSessionComponent', () => {
   let startPlannedSession: jasmine.Spy;
   let confirm: jasmine.Spy;
   let goBack: jasmine.Spy;
+  let goBackFromSession: jasmine.Spy;
 
   function build(sessionId = 'sess1', query: Record<string, string> = {}): void {
     TestBed.overrideProvider(ActivatedRoute, {
@@ -62,6 +63,7 @@ describe('SportSessionComponent', () => {
     startPlannedSession = jasmine.createSpy().and.resolveTo(undefined);
     confirm             = jasmine.createSpy().and.resolveTo(true);
     goBack              = jasmine.createSpy();
+    goBackFromSession   = jasmine.createSpy();
 
     await TestBed.configureTestingModule({
       imports: [SportSessionComponent],
@@ -97,7 +99,7 @@ describe('SportSessionComponent', () => {
         { provide: UserSettingsService, useValue: { difficultyScale: signal('emoji') } },
         { provide: FeedbackService, useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
         { provide: ConfirmDialogService, useValue: { confirm } },
-        { provide: NavigationHistoryService, useValue: { goBack } },
+        { provide: NavigationHistoryService, useValue: { goBack, goBackFromSession } },
         // La pàgina ofereix unir la sessió amb una altra del dia; qui diu amb
         // quines és el servei, i aquí el dia no en té cap més.
         {
@@ -294,7 +296,7 @@ describe('SportSessionComponent', () => {
       const host = fixture.nativeElement as HTMLElement;
       expect(host.querySelector('app-session-merge')).toBeNull();
 
-      host.querySelector<HTMLElement>('.ss-menu-btn')!.click();
+      host.querySelector<HTMLElement>('.fab-menu-btn')!.click();
       fixture.detectChanges();
       expect(component.menuOpen()).toBeTrue();
 
@@ -338,13 +340,13 @@ describe('SportSessionComponent', () => {
       const session = makeSession();
       allSessions.set([session]);
       build();
-      expect(goBack).not.toHaveBeenCalled();
+      expect(goBackFromSession).not.toHaveBeenCalled();
 
       // Com quan el servei confirma l'esborrat (o ho fa un altre dispositiu).
       allSessions.set([]);
       fixture.detectChanges();
 
-      expect(goBack).toHaveBeenCalledWith('/home');
+      expect(goBackFromSession).toHaveBeenCalled();
     });
   });
 });

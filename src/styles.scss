@@ -269,3 +269,63 @@ html.dark {
   .bottom-sheet-backdrop { animation-duration: 0.2s; }
 }
 
+// ── Menú flotant de tres punts ──────────────────────────────────────────────
+// El menú d'una pàgina de sessió (`<app-fab-menu>`): un botó rodó a baix a la
+// dreta i, obert, les opcions just al damunt. Viu aquí per la mateixa raó que
+// la fulla de sobre: les opcions arriben projectades des de la pàgina que el
+// fa servir —l'entrenament, la sessió d'esport— i l'estil d'un fill projectat
+// el diu qui l'escriu, no el component que l'encabeix.
+.fab-menu {
+  position: fixed; right: 20px; bottom: calc(var(--nav-height) + 16px);
+  z-index: 89;
+  display: flex; align-items: center; gap: 12px;
+}
+.fab-menu-btn {
+  width: 56px; height: 56px; border-radius: 50%; flex-shrink: 0;
+  border: 1.5px solid var(--c-border); background: var(--c-card); color: var(--c-text-2);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; touch-action: manipulation;
+  box-shadow: 0 4px 16px var(--c-shadow-md);
+  transition: background 0.15s, transform 0.15s;
+  .material-symbols-outlined { font-size: 24px; }
+  &:active { transform: scale(0.94); }
+  &.fab-menu-btn--open { background: var(--c-subtle); border-color: var(--c-brand); color: var(--c-brand); }
+}
+// Hover només amb ratolí real: en tàctil, el toc que obre el detall deixa
+// l':hover "enganxat" al botó —queda seleccionat i més gran sense que ningú
+// l'hagi tocat.
+@media (hover: hover) {
+  .fab-menu-btn:hover { background: var(--c-subtle); transform: scale(1.06); }
+}
+.fab-menu-backdrop { position: fixed; inset: 0; z-index: 88; }
+.fab-menu-dropdown {
+  position: fixed; right: 16px;
+  bottom: calc(var(--nav-height) + 16px + 56px + 10px);
+  z-index: 90; min-width: 230px;
+  background: var(--c-card); border-radius: 14px;
+  box-shadow: 0 4px 24px var(--c-shadow-md), 0 0 0 1px var(--c-border);
+  padding: 6px;
+  transform-origin: bottom right;
+  animation: fab-menu-in 0.18s cubic-bezier(0.34, 1.2, 0.64, 1) both;
+}
+.fab-menu-item {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; box-sizing: border-box; padding: 13px 14px; border-radius: 10px;
+  border: none; background: transparent;
+  color: var(--c-text); font-size: 14px; font-weight: 600;
+  cursor: pointer; touch-action: manipulation; text-align: left;
+  transition: background 0.12s;
+  .material-symbols-outlined { font-size: 20px; color: var(--c-text-3); }
+  &:hover { background: var(--c-subtle); }
+  &.fab-menu-item--danger { color: #ef5350; }
+  &.fab-menu-item--danger .material-symbols-outlined { color: #ef5350; }
+  &.fab-menu-item--danger:hover { background: rgba(239, 83, 80, 0.07); }
+}
+@keyframes fab-menu-in {
+  from { opacity: 0; transform: scale(0.85); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fab-menu-dropdown { animation-duration: 0.01ms; }
+}
+

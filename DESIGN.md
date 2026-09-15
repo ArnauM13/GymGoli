@@ -798,6 +798,41 @@ nav pill (inset side margins, all four corners rounded) and slide up from below.
   is no finger. Sheets that carry unsaved input (editors, forms) stay out of
   it — a stray swipe must not throw away what was typed.
 
+### El menú d'una sessió (`app-fab-menu`)
+
+Una pàgina de sessió —un entrenament obert a `train`, una sessió d'esport a
+`sport-session`— porta **un sol botó flotant a baix a la dreta**: el menú de
+tres punts. Tot el que no es fa cada dia hi viu dins (canviar de mode, ordenar,
+agrupar, unir amb una altra activitat del dia, plantilla, compartir, esborrar).
+És el mateix component a totes dues pàgines, i és allà on el polze arriba sense
+canviar la mà de lloc — no a la capçalera.
+
+```html
+<app-fab-menu [(open)]="menuOpen" label="Opcions de la sessió">
+  <button class="fab-menu-item" (click)="openMerge()">
+    <span class="material-symbols-outlined">add_link</span>
+    Unir amb una altra sessió
+  </button>
+  <button class="fab-menu-item fab-menu-item--danger" (click)="menuOpen.set(false); deleteSession()">
+    <span class="material-symbols-outlined">delete</span>
+    Eliminar la sessió
+  </button>
+</app-fab-menu>
+```
+
+- El component posa el botó (56px, rodó), el fons que tanca en tocar fora i el
+  desplegable que puja des de la cantonada. La pàgina només escriu les opcions,
+  amb `.fab-menu-item` (i `.fab-menu-item--danger` per esborrar). Com que hi
+  arriben projectades, el seu estil és global (`styles.scss`, al costat de la
+  fulla de baix) — no el repeteixis a la pàgina.
+- `open` és un `model()`: la pàgina també el tanca, en triar una opció, en
+  obrir una fulla o en sortir de la sessió.
+- La pàgina reserva l'aire de sota amb `--page-pad-bottom-fab` (§2), que
+  l'últim botó no quedi sota el menú.
+- Un segon botó flotant no hi cap: menja pantalla justament on hi ha el que
+  estàs mirant. Si un mode necessita la seva pròpia sortida —ordenar—, el menú
+  se'n va i en surt un sol botó petit al seu lloc.
+
 ### Activity hero
 
 The card that crowns an activity's own page — a workout (`train`, with a
