@@ -104,19 +104,22 @@ import { addDays, mondayOf } from '../../shared/utils/calendar-utils';
             </div>
           }
 
-          <!-- ── Planificar just aquest dia ──
+          <!-- ── Planificar aquest dia ──
                El botó gran de dalt comença l'entrenament ara mateix, i el de
-               la setmana planifica els set dies. Faltava el mig: deixar
-               apuntat el d'avui per a més tard. Va aquí, dins el dia, perquè
-               és del dia que parla — i només hi surt quan el dia és avui i
-               encara no hi ha res: un de futur ja té «Planifica aquest dia» a
-               dalt, un de passat no es pot planificar, i si avui ja té
-               alguna cosa (planificat o fet) tornar-lo a oferir seria dir
-               dues vegades el mateix. -->
-          @if (canPlanToday()) {
+               la setmana planifica els set dies. Aquest és el del mig: deixar
+               apuntat **aquest** dia per a més tard, i va aquí, dins el dia,
+               perquè és del dia que parla.
+
+               Hi surt sempre que el dia es pugui planificar —avui o
+               endavant; un de passat ja ha passat—, tingui res o no. Abans
+               només sortia amb el dia buit, i això deixava sense sortida el
+               cas més normal de tots: ja tens una cosa apuntada i en vols
+               afegir una altra. El que canvia amb el dia ple és el que hi
+               diu, no si hi és. -->
+          @if (canPlanDay()) {
             <button class="today-plan-btn" (click)="planSelectedDay()">
               <span class="material-symbols-outlined" aria-hidden="true">event_upcoming</span>
-              Planificar avui
+              {{ planDayLabel() }}
             </button>
           }
         </div>
@@ -486,9 +489,15 @@ export class HomeComponent {
 
   readonly isToday = computed(() => this.effectiveDate() === this.today());
 
-  /** El botó «Planificar avui» només té sentit si avui encara no té res —
-   *  ni planificat ni fet. */
-  readonly canPlanToday = computed(() => this.isToday() && !this.previewFeedEntry());
+  /** Un dia es pot planificar mentre no hagi passat: el d'avui i els que
+   *  vénen. El que ja té alguna cosa també — s'hi afegeix. */
+  readonly canPlanDay = computed(() => !this.isPast());
+
+  /** Planificar un dia buit és estrenar-lo; fer-ho en un que ja té alguna
+   *  cosa és afegir-hi, i el botó ho ha de dir: qui ja té el pàdel apuntat i
+   *  hi vol posar el gimnàs no està «planificant el dia», hi està sumant. */
+  readonly planDayLabel = computed(() =>
+    this.previewFeedEntry() ? 'Afegeix a la planificació' : 'Planificar el dia');
 
   /** A day that has already passed — the "Comença un entrenament" primary
    *  action is swapped for "Registra un entrenament", which opens the train

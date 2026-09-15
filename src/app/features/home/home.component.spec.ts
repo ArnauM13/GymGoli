@@ -242,31 +242,40 @@ describe('HomeComponent', () => {
       return d.toISOString().split('T')[0];
     };
 
+    const planBtn = (): HTMLElement | null =>
+      (fixture.nativeElement as HTMLElement).querySelector('.today-plan-btn');
+
     it("hi és quan el dia és avui", () => {
       fixture.detectChanges();
-      expect((fixture.nativeElement as HTMLElement).querySelector('.today-plan-btn')).toBeTruthy();
+      expect(planBtn()).toBeTruthy();
+      expect(planBtn()!.textContent).toContain('Planificar el dia');
     });
 
-    it('no hi és els altres dies: ja tenen la seva acció a dalt', () => {
+    // Preparar dijous no s'ha d'esperar a dijous.
+    it("hi és també els dies que han de venir", () => {
       component.selectedDate.set(shift(3));
       fixture.detectChanges();
-      expect((fixture.nativeElement as HTMLElement).querySelector('.today-plan-btn')).toBeNull();
-
-      component.selectedDate.set(shift(-3));
-      fixture.detectChanges();
-      expect((fixture.nativeElement as HTMLElement).querySelector('.today-plan-btn')).toBeNull();
+      expect(planBtn()).toBeTruthy();
     });
 
-    // Oferir-lo quan avui ja té alguna cosa —planificada o feta— diria dues
-    // vegades el mateix: la targeta del dia ja ho ensenya.
-    it("no hi és si avui ja té alguna activitat", () => {
+    it('no hi és en un dia que ja ha passat: allò ja no es planifica', () => {
+      component.selectedDate.set(shift(-3));
+      fixture.detectChanges();
+      expect(planBtn()).toBeNull();
+    });
+
+    // El cas més normal de tots: ja tens una cosa apuntada i en vols afegir
+    // una altra. El botó hi és igual, i el que canvia és el que hi diu.
+    it("segueix sent-hi si el dia ja té alguna activitat, dient que s'hi afegeix", () => {
       const workoutService = TestBed.inject(WorkoutService) as unknown as {
         getDoneWorkoutsForDate: jasmine.Spy;
       };
       workoutService.getDoneWorkoutsForDate.and.returnValue([makeWorkout({ id: 'w1', date: TODAY })]);
       doneWorkoutsSignal.set([makeWorkout({ id: 'w1', date: TODAY })]);
       fixture.detectChanges();
-      expect((fixture.nativeElement as HTMLElement).querySelector('.today-plan-btn')).toBeNull();
+
+      expect(planBtn()).toBeTruthy();
+      expect(planBtn()!.textContent).toContain('Afegeix a la planificació');
     });
   });
 

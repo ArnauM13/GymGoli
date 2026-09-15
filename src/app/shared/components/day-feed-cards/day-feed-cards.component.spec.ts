@@ -263,9 +263,9 @@ describe('DayFeedCardsComponent', () => {
     });
 
     // Un planificat es llegeix igual que un esport planificat: es desplega en
-    // mode consulta i, del desplegable, se'n pot començar.
-    it('desplega un planificat en mode consulta, amb el botó de començar', async () => {
-      const openSpy = spyOn(component.open, 'emit');
+    // mode consulta, i el peu porta «Obrir» i res més. Començar-lo és el
+    // botó de play del costat de la targeta, no un segon botó aquí sota.
+    it('desplega un planificat en mode consulta, sense repetir-hi el començar', () => {
       fixture.componentRef.setInput('day', {
         ...day,
         workouts: [makeWorkout({ id: 'plan1', categories: ['push'], status: 'planned' })],
@@ -281,10 +281,12 @@ describe('DayFeedCardsComponent', () => {
       expect(el.querySelector('app-workout-detail')).toBeTruthy();
       expect(startPlannedWorkout).not.toHaveBeenCalled();
 
-      (el.querySelector('.ac-open-btn--start') as HTMLElement).click();
-      await fixture.whenStable();
-      expect(startPlannedWorkout).toHaveBeenCalledWith('plan1');
-      expect(openSpy).toHaveBeenCalledWith('plan1');
+      // Un sol botó al peu, el mateix que el d'un esport.
+      const footer = el.querySelectorAll('.ac-detail-actions .ac-open-btn');
+      expect(footer.length).toBe(1);
+      expect(footer[0].textContent?.trim()).toContain('Obrir');
+      // I el play continua al costat de la targeta.
+      expect(el.querySelector('.ac-act--start')).toBeTruthy();
     });
 
     // La mateixa regla que un esport planificat: un entrenament de demà es
@@ -303,7 +305,6 @@ describe('DayFeedCardsComponent', () => {
       fixture.detectChanges();
       expect(component.expandedWorkoutId()).toBe('plan1');
       expect(el.querySelector('app-workout-detail')).toBeTruthy();
-      expect(el.querySelector('.ac-open-btn--start')).toBeNull();
 
       // Ni per la porta del darrere.
       await component.startPlan(makeWorkout({ id: 'plan1', date: '2999-01-01', status: 'planned' }));
@@ -325,7 +326,7 @@ describe('DayFeedCardsComponent', () => {
 
         (el.querySelector('.ac-main') as HTMLElement).click();
         fixture.detectChanges();
-        (el.querySelector('.ac-open-btn:not(.ac-open-btn--start)') as HTMLElement).click();
+        (el.querySelector('.ac-detail-actions .ac-open-btn') as HTMLElement).click();
         await fixture.whenStable();
 
         expect(editPlannedWorkout).toHaveBeenCalledWith('plan1');

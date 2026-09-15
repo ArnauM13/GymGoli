@@ -417,7 +417,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
               <span class="material-symbols-outlined">tune</span>
             </button>
           </div>
-          <p class="section-hint">Tria un tipus per començar</p>
+          <p class="section-hint">{{ planning() ? 'Tria un tipus per afegir-lo al pla' : 'Tria un tipus per començar' }}</p>
           <div class="type-grid" [style.grid-template-columns]="gridCols(workoutTypes().length)">
             @for (cat of workoutTypes(); track cat.value) {
               <button class="type-btn"
@@ -443,7 +443,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
             <h2 class="section-title">Esport</h2>
           </div>
           @if (sportService.sports().length > 0) {
-            <p class="section-hint">Tria un esport per registrar-lo</p>
+            <p class="section-hint">{{ planning() ? 'Tria un esport per afegir-lo al pla' : 'Tria un esport per registrar-lo' }}</p>
             <div class="type-grid" [style.grid-template-columns]="gridCols(sportService.sports().length)">
               @for (sport of sportService.sports(); track sport.id) {
                 <button class="type-btn"

@@ -91,33 +91,18 @@ export interface DayFeedEntry {
 
               @if (expandedWorkoutId() === item.workout.id) {
                 <app-workout-detail [workout]="item.workout" [planned]="isPlanned(item.workout)" />
-                @if (isPlanned(item.workout)) {
-                  <!-- Desplegar un pla és llegir-lo. Obrir-lo és tocar-lo —hi
-                       pots afegir o treure exercicis i es queda pla— i
-                       començar-lo és donar-lo per fet: dos passos diferents,
-                       dos botons. El de començar només surt quan el dia ja ha
-                       arribat; el d'obrir, sempre: un pla de dimecres es
-                       prepara des d'avui. -->
-                  <div class="ac-detail-actions">
-                    <button class="ac-open-btn" (click)="openPlan(item.workout)">
-                      <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>
-                      Obrir
-                    </button>
-                    @if (canStart(item.workout.date)) {
-                      <button class="ac-open-btn ac-open-btn--start" (click)="startPlan(item.workout)">
-                        <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
-                        Començar
-                      </button>
-                    }
-                  </div>
-                } @else {
-                  <div class="ac-detail-actions">
-                    <button class="ac-open-btn" (click)="open.emit(item.workout.id)">
-                      <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>
-                      Obrir
-                    </button>
-                  </div>
-                }
+                <!-- El peu del desplegable porta una sola cosa, i és la
+                     mateixa per a un entrenament i per a un esport: obrir
+                     l'activitat. Començar un pla ja és el botó de play del
+                     costat de la targeta —dir-ho dues vegades al mateix
+                     desplegable era només l'entrenament, i sobrava. -->
+                <div class="ac-detail-actions">
+                  <button class="ac-open-btn"
+                          (click)="isPlanned(item.workout) ? openPlan(item.workout) : open.emit(item.workout.id)">
+                    <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>
+                    Obrir
+                  </button>
+                </div>
               }
             </app-activity-card>
 
@@ -251,13 +236,6 @@ export interface DayFeedEntry {
       .material-symbols-outlined { font-size: 17px; }
       &:hover { background: color-mix(in srgb, var(--ac, var(--c-card)) 15%, var(--c-card)); color: var(--c-text); }
     }
-    /* Començar el pla és l'acció que s'espera del desplegable d'un
-       planificat: va plena, com el botó de play del costat de la targeta. */
-    .ac-open-btn--start {
-      border-color: transparent; background: var(--c-brand); color: white;
-      &:hover { background: var(--c-brand-dk); color: white; }
-    }
-
     /* ── Separar la sessió, al peu de la caixa ──
        Separar és de segon terme: sense fons ni vora, a baix a la dreta i en
        el to apagat del text de suport. Qui hi arriba hi va a posta. */
