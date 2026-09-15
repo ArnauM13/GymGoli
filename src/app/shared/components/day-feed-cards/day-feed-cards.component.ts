@@ -447,8 +447,8 @@ export class DayFeedCardsComponent {
   async registerSportPlan(item: { sport: Sport; session: SportSession }): Promise<void> {
     if (!this.canStart(item.session.date)) return;
     try {
+      // Sense avís: la targeta deixa de ser un pla allà mateix i això ja ho diu.
       await this.sportService.startPlannedSession(item.session.id, item.session.date);
-      this.feedback.success(`${item.sport.name} registrat`, 2000, 'xoco');
     } catch {
       this.feedback.error('Error en registrar', 2500);
     }
