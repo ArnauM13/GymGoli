@@ -329,3 +329,32 @@ html.dark {
   .fab-menu-dropdown { animation-duration: 0.01ms; }
 }
 
+
+// ── Number input ────────────────────────────────────────────────────────────
+// El control per tocar una xifra a tota l'app: −, el número escrivible, +.
+// Va aquí perquè el gimnàs i l'esport hi toquen igual — abans era el
+// `.we-number-input` de `workout-editor` i una sessió d'esport no el podia
+// fer servir, així que se'n va inventar un altre (un stepper sense input, que
+// només sumava d'un en un: 20 km eren 40 tocs). Una sola manera de fer-ho.
+//
+// `--sm` és la mida per a una fila de detall, on el control comparteix línia
+// amb l'etiqueta; sense modificador és la del formulari de sèries.
+.num-input {
+  display: flex; align-items: center;
+  border: 1.5px solid var(--c-border); border-radius: 8px; overflow: hidden; background: var(--c-card);
+  button {
+    width: 30px; height: 38px; border: none; background: var(--c-subtle);
+    font-size: 18px; cursor: pointer; color: var(--c-text); touch-action: manipulation;
+    &:hover  { background: var(--c-hover); }
+    &:active { background: var(--c-border-2); }
+  }
+  input {
+    flex: 1; border: none; text-align: center;
+    font-size: 16px; font-weight: 600; outline: none;
+    width: 0; min-width: 0; padding: 8px 0; background: var(--c-card); color: var(--c-text);
+  }
+}
+.num-input--sm {
+  button { width: 26px; height: 30px; font-size: 15px; }
+  input  { font-size: 16px; font-weight: 600; padding: 4px 0; min-width: 48px; }
+}
