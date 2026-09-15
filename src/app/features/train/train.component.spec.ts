@@ -484,6 +484,45 @@ describe('TrainComponent', () => {
     });
   });
 
+  // ── El pla del dia, en entrar ────────────────────────────────────────────
+
+  describe('plannedDay()', () => {
+    const sport = { id: 's1', name: 'Padel', icon: 'sports_tennis', color: '#000', subtypes: [], metricDefs: [] } as any;
+
+    it('no diu res quan el dia no té res apuntat', () => {
+      expect(component.plannedDay()).toBeNull();
+    });
+
+    it("ensenya el que tens planificat per al dia que es mira", () => {
+      const plan = makeWorkout({ id: 'p1', date: '2999-01-02', status: 'planned', categories: ['push'] });
+      (TestBed.inject(WorkoutService).getPlannedForDate as jasmine.Spy).and.returnValue([plan]);
+      component.selectedDate.set('2999-01-02');
+
+      const day = component.plannedDay();
+      expect(day?.date).toBe('2999-01-02');
+      expect(day?.workouts).toEqual([plan]);
+    });
+
+    it("també els esports apuntats", () => {
+      const session = { id: 'sess1', date: '2999-01-03', sportId: 's1', status: 'planned' } as any;
+      sportService['getPlannedSportSessionsForDate'].and.returnValue([{ sport, session }]);
+      component.selectedDate.set('2999-01-03');
+
+      expect(component.plannedDay()?.sports.length).toBe(1);
+    });
+
+    it("hi véns a començar-lo, o a veure què hi tens si el planifiques", () => {
+      expect(component.plannedHint()).toBe('Comença el que tenies previst');
+      component.planRequested.set(true);
+      expect(component.plannedHint()).toBe('Això ja ho tens apuntat per a aquest dia');
+    });
+
+    it("un esport del pla s'obre a la seva pàgina", () => {
+      component.openPlannedSport({ session: { id: 'sess1' } as any });
+      expect(navigateSpy).toHaveBeenCalledWith(['/sport', 'sess1'], {});
+    });
+  });
+
   // ── deleteActiveWorkout() ────────────────────────────────────────────────
 
   describe('deleteActiveWorkout()', () => {
@@ -975,6 +1014,51 @@ describe('TrainComponent', () => {
 
       await component.handleSuggestionClick(s);
       expect(sportService['startPlannedSession']).toHaveBeenCalledWith('routine:x', TODAY);
+    });
+
+    // Qui ve a deixar el dia apuntat no el vol començar: el gos proposa
+    // planificar, i si el dia ja té pla, calla.
+    describe('planificant el dia', () => {
+      beforeEach(() => component.planRequested.set(true));
+
+      it('el verb passa a ser planificar, per als dos gossos', () => {
+        withSportAndGym();
+        const kinds = component.todaySuggestions();
+
+        expect(kinds.map(x => component.suggestionVerb(x))).toEqual(['Planificar', 'Planificar']);
+      });
+
+      it('i el que es proposa es deixa apuntat, no es comença', async () => {
+        withSportAndGym();
+        const s = component.todaySuggestions().find(x => x.type === 'sport')!;
+
+        await component.handleSuggestionClick(s);
+
+        expect(sportService['logSession']).toHaveBeenCalledWith(
+          TODAY, 's1', jasmine.any(Object), 'planned', 'manual');
+      });
+
+      it('un de gimnàs obre el full per triar amb què omplir el pla', () => {
+        withSportAndGym();
+        const s = component.todaySuggestions().find(x => x.type === 'gym')!;
+
+        void component.handleSuggestionClick(s);
+
+        expect(component.pickerCat()).toBe(s.type === 'gym' ? s.category : null);
+      });
+
+      it('i si el dia ja té alguna cosa apuntada, aquell gos calla', () => {
+        const session = {
+          id: 'sess-p', date: TODAY, sportId: 's1',
+          status: 'planned', plannedSource: 'manual', createdAt: new Date(),
+        };
+        sportService['getPlannedSportSessionsForDate'].and.returnValue([{ sport: padel, session }]);
+        withSportAndGym();
+
+        // L'esport ja és al pla —i surt a la secció «Planificat»—, o sigui que
+        // el Xoco no el repeteix; el gimnàs, que no en té, sí que es proposa.
+        expect(component.todaySuggestions().map(x => x.type)).toEqual(['gym']);
+      });
     });
   });
 

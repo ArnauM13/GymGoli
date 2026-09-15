@@ -27,6 +27,7 @@ import { FeedbackService } from '../../shared/services/feedback.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { OfflineService } from '../../core/services/offline.service';
 import { ActivityCardComponent } from '../../shared/components/activity-card/activity-card.component';
+import { DayFeedCardsComponent, DayFeedEntry } from '../../shared/components/day-feed-cards/day-feed-cards.component';
 import { ActivityIconComponent } from '../../shared/components/activity-icon/activity-icon.component';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
@@ -84,7 +85,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
   imports: [
     FormsModule, A11yModule, WorkoutEditorComponent,
     PageHeaderComponent, ActivityCardComponent, ActivityIconComponent,
-    SessionMergeComponent,
+    SessionMergeComponent, DayFeedCardsComponent,
   ],
   template: `
     <div class="page">
@@ -358,6 +359,29 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
               <span class="dc-eyebrow">{{ isSelectedPast() ? 'Registrant' : 'Planificant' }}</span>
               <span class="dc-date">{{ selectedDateLabel() }}</span>
             </div>
+          </div>
+        }
+
+        <!-- ── El que ja tens apuntat per a aquest dia ──
+             Primer de tot, i abans de qualsevol mosaic: qui entra a Entrenar
+             amb el dia planificat hi ve a començar allò, no a tornar-ho a
+             triar de zero. Sense això, l'únic lloc on sortia el pla era la
+             bafarada del gos —una de sola, i que es pot tancar—, o sigui que
+             un dia amb dues coses apuntades en deixava una d'amagada.
+
+             La targeta és la del feed, la mateixa d'Inici: una activitat
+             es llegeix igual la miris on la miris, i el botó de play, el
+             d'esborrar i el desplegable ja hi són. -->
+        @if (plannedDay(); as day) {
+          <div class="card-section">
+            <div class="section-header">
+              <span class="material-symbols-outlined section-icon">event_upcoming</span>
+              <h2 class="section-title">Planificat</h2>
+            </div>
+            <p class="section-hint">{{ plannedHint() }}</p>
+            <app-day-feed-cards [day]="day"
+                                (open)="openWorkout($event, { edit: true })"
+                                (openSport)="openPlannedSport($event)" />
           </div>
         }
 
@@ -1036,6 +1060,10 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       color: color-mix(in srgb, var(--sc) 65%, var(--c-text-3));
     }
 
+    /* La llista del pla és la targeta compartida: d'aquí només és que ocupi
+       la seva línia dins la secció. */
+    app-day-feed-cards { display: block; }
+
     /* ── "Nou entrenament" section card ── */
     .card-section {
       margin: 16px 16px 0;
@@ -1313,6 +1341,29 @@ export class TrainComponent implements OnDestroy {
   readonly selectedDateLabel = computed(() =>
     feedDayLabel(this.selectedDate(), this.today()));
 
+  /**
+   * El que ja tens apuntat per al dia que es mira, per ensenyar-ho en entrar.
+   *
+   * Només el que encara està per fer: el que ja s'ha fet no és cap pla, i el
+   * dia sencer es llegeix a Inici i a l'Historial. Va acotat al dia —una fila
+   * de dates, no cap historial— i es llegeix amb `DayFeedEntry`, com tota la
+   * resta d'activitat de la casa.
+   */
+  readonly plannedDay = computed((): DayFeedEntry | null => {
+    const date     = this.selectedDate();
+    const workouts = this.workoutService.getPlannedForDate(date);
+    const sports   = this.sportService.getPlannedSportSessionsForDate(date);
+    if (!workouts.length && !sports.length) return null;
+    return { date, workouts, sports };
+  });
+
+  /** Què se'n fa, del que ja hi ha al pla: si hi véns a planificar és el que
+   *  ja hi tens; si no, és el que has vingut a començar. */
+  readonly plannedHint = computed(() =>
+    this.planning()
+      ? 'Això ja ho tens apuntat per a aquest dia'
+      : 'Comença el que tenies previst');
+
 
   /**
    * El que et proposen els gossos avui: **com a molt un de gimnàs i un
@@ -1324,13 +1375,21 @@ export class TrainComponent implements OnDestroy {
    * el que et toca per la teva cadència, i si res no reclama res, el de
    * sempre. Aquí només es passen els candidats i es posa el nom, el color i
    * la icona al que en surt.
+   *
+   * Planificant, el mateix càlcul contesta una altra pregunta: què hi
+   * posaries, en comptes de què comences. El que ja tens al pla no es
+   * proposa —ja hi és—, i el verb del botó passa a ser «Planificar».
    */
   readonly todaySuggestions = computed((): TodaySuggestion[] => {
     const today = this.today();
     if (this.selectedDate() !== today) return [];
 
-    const goal    = this.settingsService.fitnessGoal();
-    const profile = this.profileService.profile();
+    const goal     = this.settingsService.fitnessGoal();
+    const profile  = this.profileService.profile();
+    // Qui ve a deixar el dia apuntat no el vol començar: el que es proposa
+    // canvia de verb, i el que ja és al pla fa callar el gos (vegeu
+    // `pickSuggestion`).
+    const planning = this.planning();
     const out: TodaySuggestion[] = [];
 
     // ── Esport ──────────────────────────────────────────────────────────────
@@ -1361,6 +1420,7 @@ export class TrainComponent implements OnDestroy {
       const pick = pickSuggestion(candidates, {
         minRecovery: profile.minRecovery,
         allowUntried: goal === 'sport' || goal === 'weight' || goal === 'fitness',
+        forPlanning: planning,
       });
       const sport = pick ? sports.find(s => s.id === pick.key) : null;
       if (pick && sport) {
@@ -1396,7 +1456,7 @@ export class TrainComponent implements OnDestroy {
       }));
 
     const gymPick = pickSuggestion(gymCandidates, {
-      minRecovery: profile.minRecovery, allowUntried: true,
+      minRecovery: profile.minRecovery, allowUntried: true, forPlanning: planning,
     });
     if (gymPick) {
       const cat = gymPick.key as ExerciseCategory;
@@ -1432,8 +1492,10 @@ export class TrainComponent implements OnDestroy {
 
   /** El verb del botó, que és el que passarà en tocar-la: un entrenament es
    *  comença i un esport es registra —també quan surten d'un pla, perquè
-   *  començar-lo és exactament això. */
+   *  començar-lo és exactament això—, i planificant, totes dues coses es
+   *  deixen apuntades. */
   suggestionVerb(s: TodaySuggestion): string {
+    if (this.planning()) return 'Planificar';
     return s.type === 'gym' ? 'Començar' : 'Registrar';
   }
 
@@ -1450,15 +1512,20 @@ export class TrainComponent implements OnDestroy {
   }
 
   async handleSuggestionClick(s: TodaySuggestion): Promise<void> {
+    // Planificant no es comença res: el que es proposa s'afegeix al pla del
+    // dia, i per això passa pel camí de sempre —el full de plantilles i
+    // `startSportSession()`, que ja saben que el que creïn serà un pla.
+    const planning = this.planning();
+
     if (s.type === 'gym') {
       // Un planificat es comença, no es duplica: crear-ne un de nou al costat
       // deixaria el dia amb el pla per fer i l'entrenament fet.
-      if (s.plan) return this.startPlan(s.plan);
+      if (s.plan && !planning) return this.startPlan(s.plan);
       this.selectType(s.category);
       return;
     }
 
-    if (s.plan) return this.startSportPlan(s.plan);
+    if (s.plan && !planning) return this.startSportPlan(s.plan);
     await this.startSportSession(s.sport);
   }
 
@@ -1472,6 +1539,13 @@ export class TrainComponent implements OnDestroy {
     } catch {
       this.feedback.error('Error en registrar', 2500);
     }
+  }
+
+  /** Un esport del pla s'obre a la seva pàgina, com des del feed d'Inici: la
+   *  sessió és seva i no d'aquesta pantalla. Començar-lo, en canvi, es fa
+   *  sense marxar d'aquí —és el botó de play de la targeta. */
+  openPlannedSport(item: { session: SportSession }): void {
+    this._openSportSession(item.session.id);
   }
 
   readonly isSelectedFuture = computed(() => this.selectedDate() > this.today());

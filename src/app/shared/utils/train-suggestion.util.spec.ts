@@ -141,6 +141,30 @@ describe('pickSuggestion', () => {
       expect(pick?.key).toBe('push');
     });
   });
+
+  // Planificant es contesta una altra pregunta: què hi posaries, no què
+  // comences. I a qui ja ho té apuntat no se li pregunta.
+  describe('planificant', () => {
+    const PLAN_OPTS = { ...OPTS, forPlanning: true };
+
+    it('no proposa res quan el dia ja té alguna cosa al pla', () => {
+      const pick = pickSuggestion([
+        candidate('push', { daysSinceLast: 1 }, { planned: true }),
+        candidate('legs', { daysSinceLast: 12, typicalGapDays: 3 }),
+      ], PLAN_OPTS);
+
+      expect(pick).toBeNull();
+    });
+
+    it("i en proposa una quan el dia encara és buit", () => {
+      const pick = pickSuggestion([
+        candidate('legs', { daysSinceLast: 12, typicalGapDays: 3 }),
+      ], PLAN_OPTS);
+
+      expect(pick?.key).toBe('legs');
+      expect(pick?.source).toBe('due');
+    });
+  });
 });
 
 describe('sinceLabel', () => {

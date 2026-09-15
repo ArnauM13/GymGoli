@@ -24,6 +24,13 @@ import { ActivityProfile } from '../../core/services/workout-profile.service';
  * ── El que no es proposa mai ────────────────────────────────────────────────
  * El que ja has fet avui, i el que encara està descansant (per sota de
  * `minRecovery`). Proposar-te el que acabes de fer no és un suggeriment.
+ *
+ * ── Planificant es proposa una altra cosa ───────────────────────────────────
+ * Qui ve a deixar el dia apuntat no el vol començar ara, o sigui que el verb
+ * canvia: no «comença això», sinó «deixa-ho apuntat». I llavors el pla deixa
+ * de manar i passa a fer callar (`forPlanning`): a qui ja té el dia planificat
+ * no se li proposa res —ja ho ha fet—, i a qui no, se li proposa què hi
+ * posaria.
  */
 export type SuggestionKind   = 'gym' | 'sport';
 export type SuggestionSource = 'planned' | 'comeback' | 'due' | 'untried' | 'habit';
@@ -57,6 +64,8 @@ export interface PickOptions {
    *  d'entrenament sense estrenar és justament el que s'ha de proposar—; un
    *  esport només si l'objectiu de l'usuari hi va. */
   allowUntried: boolean;
+  /** El que es proposa és **deixar-ho apuntat**, no començar-ho ara. */
+  forPlanning?: boolean;
 }
 
 /** Fa tant que no la fas que ja no és «et toca», és «hi tornem?». */
@@ -80,6 +89,12 @@ export function pickSuggestion(
   candidates: SuggestionCandidate[],
   opts: PickOptions,
 ): RankedSuggestion | null {
+  // Planificant, el que ja hi ha al pla fa callar tota la banda: proposar-te
+  // que planifiquis el dia que acabes de planificar no és cap proposta, i
+  // proposar-te'n una segona cosa és decidir per tu que el dia se't queda
+  // curt. Es proposa quan no tens res apuntat, i llavors una de sola.
+  if (opts.forPlanning && candidates.some(c => c.planned)) return null;
+
   const ranked = candidates
     .map(c => rank(c, opts))
     .filter((r): r is RankedSuggestion => r !== null)
