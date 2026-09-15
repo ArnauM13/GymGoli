@@ -119,7 +119,7 @@ import { MASCOTS, MascotMeta } from '../../../core/models/mascot.model';
     </div>
   `,
   styles: [`
-    .ids-sheet { padding: 8px 18px 22px; }
+    .ids-sheet { padding: 8px 18px 0; }
     /* La nansa és el que es veu agafable: amb el ratolí, que ho digui el cursor. */
     .ids-sheet .bottom-sheet-handle { cursor: grab; }
 

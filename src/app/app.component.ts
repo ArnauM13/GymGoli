@@ -32,9 +32,16 @@ import { OnboardingTourService } from './core/services/onboarding-tour.service';
         <app-onboarding-tour />
       }
 
-      <main class="app-content" [class.app-content--nav]="!!auth.user()"
+      <main class="app-content"
             [class.page-anim-a]="!pageAnimToggle()" [class.page-anim-b]="pageAnimToggle()">
         <router-outlet />
+
+        <!-- La reserva de la nav flotant: una peça de veritat al final del
+             scroll, no el padding de sota del moble (vegeu els estils). -->
+        @if (auth.user()) {
+          <div class="nav-reserve" aria-hidden="true"></div>
+        }
+
         @if (offlineService.isOffline() && !worksOffline()) {
           <div class="offline-page-overlay">
             <span class="material-symbols-outlined">wifi_off</span>
@@ -73,10 +80,18 @@ import { OnboardingTourService } from './core/services/onboarding-tour.service';
      * own padding-bottom is just the air under its last element
      * (--page-pad-bottom, see DESIGN.md §2).
      *
+     * I la reserva és una peça, no un padding-bottom del moble: WebKit no
+     * compta el padding de sota d'un contenidor amb scroll dins del que es pot
+     * recórrer, o sigui que a l'iPhone la reserva desapareixia justament quan
+     * hi havia prou contingut per fer scroll — la nav tapava l'últim element i
+     * se'n menjava el toc. Un bloc buit al final del scroll el compten tots els
+     * navegadors.
+     *
      * Sense sessió no hi ha nav i no hi ha res a reservar: el login i companyia
      * arrossegaven una nav de buit que ningú no havia pintat. */
-    .app-content--nav {
-      padding-bottom: var(--nav-height);
+    .nav-reserve {
+      height: var(--nav-height);
+      pointer-events: none;
     }
 
     /* ── Offline page overlay ── */

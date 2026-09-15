@@ -109,9 +109,9 @@ Every page lives inside a `.page` wrapper:
 
 **The page never pays for the nav.** `.app-content` reserves
 `var(--nav-height)` under every page — and only while the nav is actually
-there (`.app-content--nav`; logged out there is no nav and nothing to
-reserve). So a page's bottom padding is only the air below its last element.
-There are two values and no third:
+there (`.nav-reserve`, el bloc buit que tanca el scroll; sense sessió no hi
+ha nav i no s'hi pinta). So a page's bottom padding is only the air below its
+last element. There are two values and no third:
 
 | Token | Value | When |
 |---|---|---|
@@ -123,6 +123,15 @@ Never write a raw `84px` / `88px` / `100px` there, and never give a page
 the page would scroll the top inset (and the nav) of nothing. A page that
 wants to fill the screen — a centered login card, say — uses
 `min-height: 100%`.
+
+**La reserva és una peça, no un `padding-bottom`.** WebKit no compta el
+padding de sota d'un contenidor amb scroll dins del que es pot recórrer: amb
+`padding-bottom` al moble, la reserva desapareixia a l'iPhone justament quan
+hi havia prou contingut per fer scroll —la nav tapava l'últim element i li
+robava el toc— i es veia bé a l'escriptori. Qualsevol altre lloc que hagi de
+deixar aire sota l'últim element d'una llista amb scroll (un `bottom-sheet`,
+posem per cas) té el mateix problema i la mateixa solució: un bloc al final,
+no padding al contenidor.
 
 ### 2a. Page header (title + action)
 
@@ -760,6 +769,11 @@ nav pill (inset side margins, all four corners rounded) and slide up from below.
   **only** its own `padding` and inner content styles (the shell owns position,
   size, rounding, shadow, slide-up + backdrop-fade animation, `max-height`
   with internal scroll, and `prefers-reduced-motion`).
+- **L'aire de sota el posa la closca, no el teu `padding-bottom`.** La fulla és
+  qui fa el scroll i WebKit no compta el padding de sota d'un contenidor amb
+  scroll (vegeu §2): escriu `padding: 8px 20px 0` i prou. Són 22px; si en vols
+  uns altres, `--sheet-air`. En una fulla en columna amb `gap`, el `gap` ja hi
+  posa la seva part i `--sheet-air` només diu la resta.
 - **Accessibility (always):** `role="dialog"`, `aria-modal="true"`,
   `aria-labelledby` pointing at the title, `cdkTrapFocus cdkTrapFocusAutoCapture`
   (import `A11yModule`), and Escape-to-close via a

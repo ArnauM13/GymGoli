@@ -786,7 +786,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
     }
 
     /* ── Save as template sheet (floating bottom sheet — see global .bottom-sheet) ── */
-    .aw-tpl-sheet { padding: 8px 20px 22px; }
+    .aw-tpl-sheet { padding: 8px 20px 0; }
     .aw-tpl-header {
       display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;
     }
@@ -1034,7 +1034,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
     }
 
     /* ── Template picker bottom sheet ── */
-    .tp-sheet { padding: 8px 16px 20px; }
+    .tp-sheet { --sheet-air: 20px; padding: 8px 16px 0; }
     .tp-header {
       display: flex; align-items: center; justify-content: space-between;
       margin-bottom: 16px;
