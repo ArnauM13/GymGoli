@@ -280,6 +280,29 @@ describe('DayFeedCardsComponent', () => {
       expect(startPlannedWorkout).toHaveBeenCalledWith('plan1');
       expect(openSpy).toHaveBeenCalledWith('plan1');
     });
+
+    // La mateixa regla que un esport planificat: un entrenament de demà es
+    // llegeix, però encara no es pot haver fet.
+    it('no deixa començar un planificat que encara no ha arribat', async () => {
+      fixture.componentRef.setInput('day', {
+        ...day, date: '2999-01-01',
+        workouts: [makeWorkout({ id: 'plan1', date: '2999-01-01', categories: ['push'], status: 'planned' })],
+      });
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+
+      expect(el.querySelector('.ac-act--start')).toBeNull();
+      // I es continua podent desplegar: llegir el pla no depèn del dia.
+      (el.querySelector('.ac-main') as HTMLElement).click();
+      fixture.detectChanges();
+      expect(component.expandedWorkoutId()).toBe('plan1');
+      expect(el.querySelector('app-workout-detail')).toBeTruthy();
+      expect(el.querySelector('.ac-open-btn--start')).toBeNull();
+
+      // Ni per la porta del darrere.
+      await component.startPlan(makeWorkout({ id: 'plan1', date: '2999-01-01', status: 'planned' }));
+      expect(startPlannedWorkout).not.toHaveBeenCalled();
+    });
   });
 
   describe('sport row', () => {
@@ -432,6 +455,11 @@ describe('DayFeedCardsComponent', () => {
     it('registerSportPlan() promou la sessió a feta', async () => {
       await component.registerSportPlan(plannedDay('2024-03-05').sports[0]);
       expect(startPlannedSession).toHaveBeenCalledWith('sess1', '2024-03-05');
+    });
+
+    it('no registra un pla que encara no ha arribat', async () => {
+      await component.registerSportPlan(plannedDay('2999-01-01').sports[0]);
+      expect(startPlannedSession).not.toHaveBeenCalled();
     });
 
     it('deleteSportPlan() elimina el pla després de confirmar-ho', async () => {

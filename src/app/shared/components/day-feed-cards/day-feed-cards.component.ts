@@ -81,29 +81,36 @@ export interface DayFeedEntry {
                           aria-label="Eliminar planificació">
                     <span class="material-symbols-outlined" aria-hidden="true">delete</span>
                   </button>
-                  <button class="ac-act ac-act--start" (click)="startPlan(item.workout)" aria-label="Comença">
-                    <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
-                  </button>
+                  @if (canStart(item.workout.date)) {
+                    <button class="ac-act ac-act--start" (click)="startPlan(item.workout)" aria-label="Comença">
+                      <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
+                    </button>
+                  }
                 </div>
               }
 
               @if (expandedWorkoutId() === item.workout.id) {
                 <app-workout-detail [workout]="item.workout" [planned]="isPlanned(item.workout)" />
-                <div class="ac-detail-actions">
-                  @if (isPlanned(item.workout)) {
-                    <!-- Desplegar un pla és llegir-lo; començar-lo és un pas
-                         a part, i es diu amb totes les lletres. -->
-                    <button class="ac-open-btn ac-open-btn--start" (click)="startPlan(item.workout)">
-                      <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
-                      Començar
-                    </button>
-                  } @else {
+                @if (isPlanned(item.workout)) {
+                  <!-- Desplegar un pla és llegir-lo; començar-lo és un pas a
+                       part, i es diu amb totes les lletres. Un pla de demà
+                       només es llegeix: el desplegable es queda sense peu. -->
+                  @if (canStart(item.workout.date)) {
+                    <div class="ac-detail-actions">
+                      <button class="ac-open-btn ac-open-btn--start" (click)="startPlan(item.workout)">
+                        <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
+                        Començar
+                      </button>
+                    </div>
+                  }
+                } @else {
+                  <div class="ac-detail-actions">
                     <button class="ac-open-btn" (click)="open.emit(item.workout.id)">
                       <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>
                       Obrir
                     </button>
-                  }
-                </div>
+                  </div>
+                }
               }
             </app-activity-card>
 
@@ -123,9 +130,7 @@ export interface DayFeedEntry {
                           aria-label="Eliminar planificació">
                     <span class="material-symbols-outlined" aria-hidden="true">delete</span>
                   </button>
-                  <!-- Un pla de demà encara no es pot haver fet: el botó de
-                       registrar només surt quan el dia ja ha arribat. -->
-                  @if (item.session.date <= today()) {
+                  @if (canStart(item.session.date)) {
                     <button class="ac-act ac-act--start" (click)="registerSportPlan(item)"
                             aria-label="Registrar">
                       <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
@@ -374,6 +379,7 @@ export class DayFeedCardsComponent {
    *  portava passen a comptar com a fets. Per canviar-ne res, la sessió
    *  s'obre des del seu detall. */
   async registerSportPlan(item: { sport: Sport; session: SportSession }): Promise<void> {
+    if (!this.canStart(item.session.date)) return;
     try {
       await this.sportService.startPlannedSession(item.session.id, item.session.date);
       this.feedback.success(`${item.sport.name} registrat`, 2000);
@@ -396,6 +402,18 @@ export class DayFeedCardsComponent {
   }
 
   /**
+   * Un pla de demà encara no es pot haver fet: començar-lo o registrar-lo
+   * només val quan el dia ja ha arribat.
+   *
+   * La regla és la mateixa per a un entrenament i per a un esport —un pla és
+   * un pla—, i per això es llegeix d'aquí i no de dos `date <= today()`
+   * escampats pel marcatge.
+   */
+  canStart(date: string): boolean {
+    return date <= this.today();
+  }
+
+  /**
    * Tocar la targeta la desplega, i prou —també la d'un pla.
    *
    * Un planificat es llegeix abans de fer-se: quins exercicis porta i amb
@@ -408,6 +426,7 @@ export class DayFeedCardsComponent {
   }
 
   async startPlan(w: Workout): Promise<void> {
+    if (!this.canStart(w.date)) return;
     try {
       // Un planificat de la rutina no és cap fila fins que el comences: el
       // que s'obre és l'entrenament que s'acaba de crear, no el projectat.
