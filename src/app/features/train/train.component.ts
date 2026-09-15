@@ -931,7 +931,13 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       transform: rotate(45deg); border-radius: 0 3px 0 0;
       pointer-events: none;
     }
-    .sfr--dog-left .sf-tail { right: auto; left: -6px; transform: rotate(-135deg); }
+    /* A l'esquerra la cua surt de la barra d'accent, no de la vora clara: hi
+     * va del mateix color intens perquè es llegeixi com una punta de la barra
+     * i no com un tall. */
+    .sfr--dog-left .sf-tail {
+      right: auto; left: -6px; transform: rotate(-135deg);
+      background: var(--sc); border-top-color: var(--sc); border-right-color: var(--sc);
+    }
 
     .sfr--dog-left .sf-close { left: auto; right: -7px; }
 
