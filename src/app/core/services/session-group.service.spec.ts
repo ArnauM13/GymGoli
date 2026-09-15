@@ -26,6 +26,8 @@ describe('SessionGroupService', () => {
   let service: SessionGroupService;
   let setWorkoutGroup: jasmine.Spy;
   let setSportGroup: jasmine.Spy;
+  let setWorkoutStartedAt: jasmine.Spy;
+  let setSportStartedAt: jasmine.Spy;
 
   /** El que el dia té apuntat, repartit tal com ho serveixen els dos
    *  magatzems: fet i planificat, per separat. */
@@ -37,17 +39,21 @@ describe('SessionGroupService', () => {
   beforeEach(() => {
     setWorkoutGroup = jasmine.createSpy().and.resolveTo(undefined);
     setSportGroup   = jasmine.createSpy().and.resolveTo(undefined);
+    setWorkoutStartedAt = jasmine.createSpy().and.resolveTo(undefined);
+    setSportStartedAt   = jasmine.createSpy().and.resolveTo(undefined);
     plannedWorkouts = []; doneWorkouts = []; plannedSports = []; doneSports = [];
 
     TestBed.configureTestingModule({
       providers: [
         { provide: WorkoutService, useValue: {
           setSessionGroup: setWorkoutGroup,
+          setStartedAt: setWorkoutStartedAt,
           getPlannedForDate: () => plannedWorkouts,
           getDoneWorkoutsForDate: () => doneWorkouts,
         } },
         { provide: SportService,   useValue: {
           setSessionGroup: setSportGroup,
+          setStartedAt: setSportStartedAt,
           getPlannedSportSessionsForDate: () => plannedSports,
           getSportSessionsForDate: () => doneSports,
         } },
@@ -148,6 +154,60 @@ describe('SessionGroupService', () => {
 
       expect(setWorkoutGroup).not.toHaveBeenCalled();
       expect(setSportGroup).toHaveBeenCalledWith('s1', '2025-04-21', null);
+    });
+  });
+
+  // ── L'ordre de dins d'una anada ──
+  // El que es desa és l'hora, que és el que ordena el dia a tot arreu: no hi
+  // ha cap segona llista d'ordres que s'hagi de mantenir d'acord amb aquesta.
+  describe('reorder()', () => {
+    /** Dues activitats del mateix dia, amb l'hora d'alta a una hora de
+     *  distància. */
+    function pair(): ActivityItem[] {
+      const w = workout('w1');
+      const s = sport('s1');
+      (w as { workout: Workout }).workout.createdAt      = new Date('2025-04-21T10:00:00');
+      (s as { session: SportSession }).session.createdAt = new Date('2025-04-21T11:00:00');
+      return [w, s];
+    }
+
+    it("escriu l'hora de cadascuna en l'ordre demanat", async () => {
+      const [w, sp] = pair();
+      await service.reorder([sp, w]);
+
+      const sportAt   = setSportStartedAt.calls.mostRecent().args[2] as Date;
+      const workoutAt = setWorkoutStartedAt.calls.mostRecent().args[1] as Date;
+      // La primera es queda l'hora de base —la més matinera de la sessió— i la
+      // segona va just després.
+      expect(sportAt.getTime()).toBe(new Date('2025-04-21T10:00:00').getTime());
+      expect(workoutAt.getTime()).toBeGreaterThan(sportAt.getTime());
+    });
+
+    it('no torna a escriure el que ja és al seu lloc', async () => {
+      const [w, sp] = pair();
+      await service.reorder([sp, w]);
+      setSportStartedAt.calls.reset();
+      setWorkoutStartedAt.calls.reset();
+
+      // La segona vegada, les hores ja hi són: no hi ha res a dir.
+      const moved = [
+        { kind: 'sport', sport: SPORT, session: { ...(sp as { session: SportSession }).session, startedAt: new Date('2025-04-21T10:00:00') } },
+        { kind: 'workout', workout: { ...(w as { workout: Workout }).workout, startedAt: new Date('2025-04-21T10:01:00') } },
+      ] as ActivityItem[];
+      await service.reorder(moved);
+
+      expect(setSportStartedAt).not.toHaveBeenCalled();
+      expect(setWorkoutStartedAt).not.toHaveBeenCalled();
+    });
+
+    it("una sola activitat ja està ordenada", async () => {
+      await service.reorder([workout('w1')]);
+      expect(setWorkoutStartedAt).not.toHaveBeenCalled();
+    });
+
+    it('i una sessió no surt mai d\'un dia', async () => {
+      await expectAsync(service.reorder([workout('w1'), workout('w2', undefined, '2025-04-22')]))
+        .toBeRejected();
     });
   });
 });

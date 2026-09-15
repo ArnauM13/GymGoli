@@ -345,7 +345,7 @@ export class ExerciseProgressInlineComponent implements AfterViewInit, OnDestroy
         this.feedback.info('No s\'ha eliminat cap sessió');
       } else {
         const label = sessions === 1 ? 'sessió' : 'sessions';
-        this.feedback.success(`Dades eliminades · ${sessions} ${label} de ${name}`);
+        this.feedback.success(`Dades eliminades · ${sessions} ${label} de ${name}`, 2200, 'marley');
       }
     } catch {
       this.feedback.error('No s\'han pogut eliminar les dades');

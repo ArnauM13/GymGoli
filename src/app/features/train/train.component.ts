@@ -27,7 +27,6 @@ import { FeedbackService } from '../../shared/services/feedback.service';
 import { WorkoutService } from '../../core/services/workout.service';
 import { OfflineService } from '../../core/services/offline.service';
 import { ActivityCardComponent } from '../../shared/components/activity-card/activity-card.component';
-import { DayFeedCardsComponent, DayFeedEntry } from '../../shared/components/day-feed-cards/day-feed-cards.component';
 import { ActivityIconComponent } from '../../shared/components/activity-icon/activity-icon.component';
 import { WorkoutEditorComponent } from '../../shared/components/workout-editor/workout-editor.component';
 import { WorkoutProfileService } from '../../core/services/workout-profile.service';
@@ -42,8 +41,9 @@ import {
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { NavigationHistoryService } from '../../core/services/navigation-history.service';
 import { SessionMergeComponent } from '../../shared/components/session-merge/session-merge.component';
+import { SessionPickerComponent } from '../../shared/components/session-picker/session-picker.component';
 import {
-  ActivityItem, SessionGroup, groupIcons, groupTitle,
+  ActivityItem, SessionGroup, groupTitle, sessionKey,
 } from '../../shared/utils/session-group.utils';
 import { SessionGroupService } from '../../core/services/session-group.service';
 import { TodayService } from '../../core/services/today.service';
@@ -88,7 +88,7 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
   imports: [
     FormsModule, A11yModule, WorkoutEditorComponent,
     PageHeaderComponent, ActivityCardComponent, ActivityIconComponent,
-    SessionMergeComponent, DayFeedCardsComponent,
+    SessionMergeComponent, SessionPickerComponent,
   ],
   template: `
     <div class="page">
@@ -236,18 +236,6 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
 
         }
 
-        <!-- ── Ha estat la mateixa anada? ──
-             Si aquest dia ja hi ha una altra sessió apuntada —el pàdel d'abans,
-             la cinta de després—, aquí s'ofereix unir-les: és el moment en què
-             es té al cap, just havent registrat. Unir-se és sempre des de
-             l'activitat; desfer-ho, des d'on es llegeix. Mentre s'ordena o
-             s'agrupa no hi surt: allà s'està tocant una altra cosa. -->
-        @if (activeMergeItem(); as item) {
-          @if (!reorderMode() && !groupingMode()) {
-            <app-session-merge [item]="item" />
-          }
-        }
-
         <!-- Mentre s'ordena, la fila es reemplaça per un sol botó de guardar
              —l'ordre es desa a cada moviment, així que això només surt del
              mode. Petit, com qualsevol altre botó de la casa: no ha de tapar
@@ -300,6 +288,18 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
                     {{ groupingMode() ? 'Finalitzar agrupació' : 'Agrupar en superset' }}
                   </button>
                 }
+                <!-- ── Ha estat la mateixa anada? ──
+                     Si el dia ja té una altra activitat apuntada —el pàdel
+                     d'abans, la cinta de després—, aquí s'uneixen. Al menú i
+                     no al cos de la pàgina: és una cosa que es fa un cop de
+                     cada deu i abans ocupava una targeta sencera al final de
+                     tot, sortís o no sortís a compte. -->
+                @if (canMergeActive()) {
+                  <button class="aw-menu-item" (click)="openActiveMerge()">
+                    <span class="material-symbols-outlined">add_link</span>
+                    Unir amb una altra sessió
+                  </button>
+                }
                 @if (!offlineService.isOffline()) {
                   <button class="aw-menu-item" (click)="openSaveAsTemplate(w)">
                     <span class="material-symbols-outlined">bookmark_add</span>
@@ -321,6 +321,22 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
                     aria-label="Opcions de l'entrenament" [attr.aria-expanded]="workoutMenuOpen()">
               <span class="material-symbols-outlined">more_vert</span>
             </button>
+          </div>
+        }
+
+        <!-- ── Amb quina sessió? ──
+             La mateixa llista que al taulell d'Entrenar i a la pàgina d'un
+             esport: les sessions del dia, i tocar-ne una les uneix. -->
+        @if (mergeOpen() && activeMergeItem()) {
+          <div class="bottom-sheet-backdrop" (click)="mergeOpen.set(false)" aria-hidden="true"></div>
+          <div class="aw-merge-sheet bottom-sheet" role="dialog" aria-modal="true"
+               aria-labelledby="aw-merge-title">
+            <span class="bottom-sheet-handle" aria-hidden="true"></span>
+            <div class="aw-sheet-head">
+              <span class="aw-sheet-title" id="aw-merge-title">Ha estat la mateixa sessió?</span>
+              <span class="aw-sheet-sub">Uneix-lo amb una altra activitat del dia i comptaran com una sola anada.</span>
+            </div>
+            <app-session-merge [item]="activeMergeItem()!" (merged)="mergeOpen.set(false)" />
           </div>
         }
 
@@ -362,29 +378,6 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
               <span class="dc-eyebrow">{{ isSelectedPast() ? 'Registrant' : 'Planificant' }}</span>
               <span class="dc-date">{{ selectedDateLabel() }}</span>
             </div>
-          </div>
-        }
-
-        <!-- ── El que ja tens apuntat per a aquest dia ──
-             Primer de tot, i abans de qualsevol mosaic: qui entra a Entrenar
-             amb el dia planificat hi ve a començar allò, no a tornar-ho a
-             triar de zero. Sense això, l'únic lloc on sortia el pla era la
-             bafarada del gos —una de sola, i que es pot tancar—, o sigui que
-             un dia amb dues coses apuntades en deixava una d'amagada.
-
-             La targeta és la del feed, la mateixa d'Inici: una activitat
-             es llegeix igual la miris on la miris, i el botó de play, el
-             d'esborrar i el desplegable ja hi són. -->
-        @if (plannedDay(); as day) {
-          <div class="card-section">
-            <div class="section-header">
-              <span class="material-symbols-outlined section-icon">event_upcoming</span>
-              <h2 class="section-title">Planificat</h2>
-            </div>
-            <p class="section-hint">{{ plannedHint() }}</p>
-            <app-day-feed-cards [day]="day"
-                                (open)="openWorkout($event, { edit: true })"
-                                (openSport)="openPlannedSport($event)" />
           </div>
         }
 
@@ -435,40 +428,44 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
           </div>
         }
 
-        <!-- ── A quina sessió va el que creïs ──
+        <!-- ── Afegir-ho a una sessió que ja hi és ──
              Una sessió és una anada: al gimnàs i, en acabar, vint minuts de
-             cinta. Fins ara això només es podia dir després —registraves les
-             dues coses per separat i les unies—, i el moment en què es té al
-             cap és aquest: quan en vas a apuntar la segona.
+             cinta. Quan es té al cap és justament aquí, anant a apuntar la
+             segona cosa del dia.
 
-             Surt només quan el dia ja té alguna cosa apuntada, i mana sobre
-             tot el que es creï a sota, sigui de gimnàs o d'esport: un sol
-             comandament per a les dues bandes, que la pregunta és la mateixa.
-             Els plans hi compten com les sessions fetes: una anada es prepara
-             igual que es viu. -->
+             Plegat: una pregunta d'una línia, i la llista només si dius que
+             sí. Abans eren totes les sessions del dia desplegades en xapes,
+             sempre obertes, i la pàgina quedava plena d'una tria que gairebé
+             mai es fa. Val per al gimnàs i per a l'esport alhora —la pregunta
+             és la mateixa— i el que es triï mana sobre el que es creï a
+             sota. -->
         @if (daySessions().length) {
-          <div class="card-section">
-            <div class="section-header">
-              <span class="material-symbols-outlined section-icon">merge</span>
-              <h2 class="section-title">A quina sessió?</h2>
-            </div>
-            <p class="section-hint">El que afegeixis a sota anirà aquí.</p>
-            <div class="js-chips">
-              <button class="js-chip" [class.active]="!joinTarget()" (click)="chooseSession(null)">
-                <span class="material-symbols-outlined" aria-hidden="true">add_circle</span>
-                Sessió nova
-              </button>
-              @for (g of daySessions(); track g.key) {
-                <button class="js-chip" [class.active]="joinTarget()?.key === g.key" (click)="chooseSession(g.key)">
-                  <span class="js-chip-icons" aria-hidden="true">
-                    @for (ic of groupIcons(g); track $index) {
-                      <span class="material-symbols-outlined" [style.color]="joinTarget()?.key === g.key ? 'inherit' : ic.color">{{ ic.icon }}</span>
-                    }
-                  </span>
-                  {{ groupTitle(g) }}
-                </button>
-              }
-            </div>
+          <div class="join-ask" [class.join-ask--on]="joinTarget()">
+            <button class="ja-head" (click)="toggleSessionPicker()"
+                    [attr.aria-expanded]="sessionPickerOpen()">
+              <span class="material-symbols-outlined ja-icon" aria-hidden="true">
+                {{ joinTarget() ? 'link' : 'add_link' }}
+              </span>
+              <span class="ja-text">
+                @if (joinTarget(); as t) {
+                  <span class="ja-title">Va amb {{ groupTitle(t) }}</span>
+                  <span class="ja-sub">El que afegeixis serà la mateixa sessió</span>
+                } @else {
+                  <span class="ja-title">Afegir-ho a una sessió del dia?</span>
+                  <span class="ja-sub">Si no, serà una sessió a part</span>
+                }
+              </span>
+              <span class="material-symbols-outlined ja-chevron" aria-hidden="true">
+                {{ sessionPickerOpen() ? 'expand_less' : 'expand_more' }}
+              </span>
+            </button>
+
+            @if (sessionPickerOpen()) {
+              <div class="ja-list">
+                <app-session-picker [sessions]="daySessions()" [selectedKey]="joinTargetKey()"
+                                    allowNew goIcon="add_circle" (pick)="chooseSession($event)" />
+              </div>
+            }
           </div>
         }
 
@@ -1100,27 +1097,42 @@ interface WorkoutTypeItem { value: ExerciseCategory; label: string; icon: string
       color: color-mix(in srgb, var(--sc) 65%, var(--c-text-3));
     }
 
-    /* La llista del pla és la targeta compartida: d'aquí només és que ocupi
-       la seva línia dins la secció. */
-    app-day-feed-cards { display: block; }
-
-    /* ── Triar la sessió ──
-       Xapes de filtre de la casa: una tria d'entre poques i totes a la vista.
-       Amb el nom de la sessió al damunt no caben en una línia, o sigui que
-       emboliquen en comptes de fer barra. */
-    .js-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-    .js-chip {
-      display: flex; align-items: center; gap: 5px; max-width: 100%;
-      padding: 7px 12px; border-radius: 20px;
+    /* ── Afegir-ho a una sessió que ja hi és ──
+       Una fila, no una secció: la pregunta es contesta que no gairebé sempre i
+       no ha de pesar com el mosaic de sota. Quan sí que hi ha resposta es
+       tenyeix de marca, que és el que fa veure que el que creïs no anirà sol. */
+    .join-ask {
+      margin: 12px 16px 0; border-radius: 16px; overflow: hidden;
       border: 1.5px solid var(--c-border-2); background: var(--c-card);
-      font-size: 12px; font-weight: 700; color: var(--c-text-2);
-      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      .material-symbols-outlined { font-size: 16px; }
-      &:hover:not(.active) { border-color: var(--c-brand); color: var(--c-brand); }
-      &.active { background: var(--c-brand); border-color: var(--c-brand); color: #fff; }
+      box-shadow: 0 2px 10px var(--c-shadow);
+      &.join-ask--on {
+        border-color: color-mix(in srgb, var(--c-brand) 55%, var(--c-border-2));
+        background: color-mix(in srgb, var(--c-brand) 7%, var(--c-card));
+      }
     }
-    .js-chip-icons { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+    .ja-head {
+      display: flex; align-items: center; gap: 11px; width: 100%; box-sizing: border-box;
+      padding: 12px 12px 12px 14px; border: none; background: transparent;
+      text-align: left; cursor: pointer; touch-action: manipulation; transition: background 0.15s;
+      &:hover { background: color-mix(in srgb, var(--c-text) 4%, transparent); }
+    }
+    .ja-icon    { font-size: 21px; color: var(--c-brand); flex-shrink: 0; }
+    .ja-text    { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .ja-title   { font-size: 13.5px; font-weight: 800; color: var(--c-text); }
+    .ja-sub {
+      font-size: 11.5px; font-weight: 600; color: var(--c-text-3); line-height: 1.3;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .ja-chevron { font-size: 20px; color: var(--c-text-3); flex-shrink: 0; }
+    .ja-list    { padding: 0 12px 12px; }
+
+    /* ── La fulla d'unir, des del menú ──
+       La caixa és la de tota l'app (styles.scss); d'aquí surt el farciment
+       i la pregunta de dalt. */
+    .aw-merge-sheet { padding: 14px 14px 22px; }
+    .aw-sheet-head { display: flex; flex-direction: column; gap: 3px; margin-bottom: 12px; }
+    .aw-sheet-title { font-size: 15px; font-weight: 800; color: var(--c-text); }
+    .aw-sheet-sub   { font-size: 12px; font-weight: 500; color: var(--c-text-3); line-height: 1.35; }
 
     /* ── "Nou entrenament" section card ── */
     .card-section {
@@ -1400,29 +1412,6 @@ export class TrainComponent implements OnDestroy {
   readonly selectedDateLabel = computed(() =>
     feedDayLabel(this.selectedDate(), this.today()));
 
-  /**
-   * El que ja tens apuntat per al dia que es mira, per ensenyar-ho en entrar.
-   *
-   * Només el que encara està per fer: el que ja s'ha fet no és cap pla, i el
-   * dia sencer es llegeix a Inici i a l'Historial. Va acotat al dia —una fila
-   * de dates, no cap historial— i es llegeix amb `DayFeedEntry`, com tota la
-   * resta d'activitat de la casa.
-   */
-  readonly plannedDay = computed((): DayFeedEntry | null => {
-    const date     = this.selectedDate();
-    const workouts = this.workoutService.getPlannedForDate(date);
-    const sports   = this.sportService.getPlannedSportSessionsForDate(date);
-    if (!workouts.length && !sports.length) return null;
-    return { date, workouts, sports };
-  });
-
-  /** Què se'n fa, del que ja hi ha al pla: si hi véns a planificar és el que
-   *  ja hi tens; si no, és el que has vingut a començar. */
-  readonly plannedHint = computed(() =>
-    this.planning()
-      ? 'Això ja ho tens apuntat per a aquest dia'
-      : 'Comença el que tenies previst');
-
   /** Les sessions que el dia ja té, fetes o planificades: les candidates a
    *  rebre el que es creï a continuació. */
   readonly daySessions = computed((): SessionGroup[] =>
@@ -1430,7 +1419,12 @@ export class TrainComponent implements OnDestroy {
 
   /** La sessió triada per a la propera activitat, per la seva clau. Sense
    *  res, el que es creï és una anada nova —que és el cas de sempre. */
-  private readonly joinTargetKey = signal<string | null>(null);
+  readonly joinTargetKey = signal<string | null>(null);
+
+  /** La llista de sessions, desplegada. Plegada de sèrie: la pregunta es
+   *  contesta que no gairebé sempre, i una llista oberta per res és el que
+   *  feia llarga aquesta pàgina. */
+  readonly sessionPickerOpen = signal(false);
 
   /**
    * La sessió a la qual s'afegirà el que es creï, si se n'ha triat cap.
@@ -1446,11 +1440,17 @@ export class TrainComponent implements OnDestroy {
     return this.daySessions().find(g => g.key === key) ?? null;
   });
 
-  readonly groupIcons = groupIcons;
   readonly groupTitle = groupTitle;
 
-  chooseSession(key: string | null): void {
-    this.joinTargetKey.set(key);
+  toggleSessionPicker(): void {
+    this.sessionPickerOpen.update(open => !open);
+  }
+
+  /** Triada la sessió, la llista es plega: la pregunta ja té resposta i es
+   *  llegeix a la mateixa fila que la feia. */
+  chooseSession(group: SessionGroup | null): void {
+    this.joinTargetKey.set(group?.key ?? null);
+    this.sessionPickerOpen.set(false);
   }
 
 
@@ -1630,12 +1630,6 @@ export class TrainComponent implements OnDestroy {
     }
   }
 
-  /** Un esport del pla s'obre a la seva pàgina, com des del feed d'Inici: la
-   *  sessió és seva i no d'aquesta pantalla. Començar-lo, en canvi, es fa
-   *  sense marxar d'aquí —és el botó de play de la targeta. */
-  openPlannedSport(item: { session: SportSession }): void {
-    this._openSportSession(item.session.id);
-  }
 
   readonly isSelectedFuture = computed(() => this.selectedDate() > this.today());
 
@@ -1668,6 +1662,23 @@ export class TrainComponent implements OnDestroy {
     if (!w) return null;
     return { kind: 'workout', workout: w };
   });
+
+  /** La llista de sessions del dia, oberta des del menú. */
+  readonly mergeOpen = signal(false);
+
+  /** L'opció d'unir només surt si el dia té alguna altra sessió: un menú amb
+   *  una porta que no va enlloc és pitjor que no tenir-la. Ho contesta el
+   *  servei, que és qui sap què és una fila i què és una projecció. */
+  readonly canMergeActive = computed((): boolean => {
+    const w = this.activeWorkout();
+    if (!w) return false;
+    return this.sessionGroups.groupsForDay(w.date).some(g => g.key !== sessionKey(w));
+  });
+
+  openActiveMerge(): void {
+    this.workoutMenuOpen.set(false);
+    this.mergeOpen.set(true);
+  }
 
   /**
    * Si la pàgina és per entrenar o per llegir.
@@ -1958,6 +1969,7 @@ export class TrainComponent implements OnDestroy {
         // La sessió triada és d'aquell dia: un altre dia són unes altres
         // sessions, i la clau d'ahir no vol dir res avui.
         this.joinTargetKey.set(null);
+        this.sessionPickerOpen.set(false);
       });
     });
 
@@ -2103,6 +2115,7 @@ export class TrainComponent implements OnDestroy {
       // Un planificat de la rutina no és cap fila fins que el comences: el
       // que s'obre és l'entrenament que s'acaba de crear, no el projectat.
       const id = await this.workoutService.startPlannedWorkout(w.id);
+      this.feedback.success('Entrenament començat', 1800, 'marley');
       this.openWorkout(id, { edit: true });
     } catch {
       this.feedback.error('Error en iniciar el pla', 2500);
@@ -2191,7 +2204,7 @@ export class TrainComponent implements OnDestroy {
       await this.templateService.create(name, cat, entries);
       this.saveTemplateOpen.set(false);
       this.saveTemplateName = '';
-      this.feedback.success('Plantilla guardada', 2000);
+      this.feedback.success('Plantilla guardada', 2000, 'marley');
     } catch {
       this.feedback.error('Error en guardar la plantilla', 3000);
     }
@@ -2223,6 +2236,7 @@ export class TrainComponent implements OnDestroy {
     try {
       await this.workoutService.deleteWorkout(w.id);
       this.closeWorkout();
+      this.feedback.success('Entrenament eliminat', 2000, 'marley');
     } catch {
       this.feedback.error('Error en eliminar', 2000);
     }
@@ -2232,6 +2246,7 @@ export class TrainComponent implements OnDestroy {
     if (!await this.confirmDialog.confirm(`Eliminar "${this.workoutLabel(w)}"?`, { variant: 'danger', confirmLabel: 'Eliminar' })) return;
     try {
       await this.workoutService.deleteWorkout(w.id);
+      this.feedback.success('Entrenament eliminat', 2000, 'marley');
     } catch {
       this.feedback.error('Error en eliminar', 2000);
     }
@@ -2256,6 +2271,7 @@ export class TrainComponent implements OnDestroy {
   @HostListener('document:keydown.escape')
   onEscape(): void {
     if (this.dialog.openDialogs.length) return;
+    if (this.mergeOpen())        { this.mergeOpen.set(false); return; }
     if (this.saveTemplateOpen()) { this.saveTemplateOpen.set(false); return; }
     if (this.pickerCat())        { this.closePicker(); return; }
     if (this.workoutMenuOpen())  { this.workoutMenuOpen.set(false); }
@@ -2271,6 +2287,10 @@ export class TrainComponent implements OnDestroy {
     const id = await this._create(cat, entries);
     const workout = this.workoutService.workouts().find(w => w.id === id);
     if (workout) await this._joinChosenSession({ kind: 'workout', workout });
+    // Res del que s'escriu passa en silenci: el que s'acaba de crear es diu,
+    // encara que tot seguit se n'obri la pàgina.
+    this.feedback.success(
+      this.planning() ? 'Entrenament planificat' : 'Entrenament creat', 1800, 'marley');
     return id;
   }
 
@@ -2412,6 +2432,7 @@ export class TrainComponent implements OnDestroy {
       await this.workoutService.addExerciseToWorkout(workoutId, {
         exerciseId, exerciseName, sets: [],
       });
+      this.feedback.success(`${exerciseName} afegit`, 1500, 'marley');
 
       setTimeout(() => {
         this.editor?.startAddSet({ exerciseId, exerciseName, sets: [] });
@@ -2481,13 +2502,13 @@ export class TrainComponent implements OnDestroy {
       const session = this.sportService.getSessionById(id);
       if (session) await this._joinChosenSession({ kind: 'sport', sport, session });
 
-      // Planificar-lo és deixar-lo apuntat i res més: el pla surt tot seguit a
-      // «Planificat», aquí mateix, i el dia se segueix planificant sense
-      // marxar. Registrar-lo sí que porta a la sessió: allà s'omple.
-      if (planning) {
-        this.feedback.success(`${sport.name} planificat`, 2000, 'xoco');
-        return;
-      }
+      // Tant si es planifica com si es registra, s'acaba a la sessió: neix
+      // buida i el que li falta —els minuts, el subtipus, les mètriques— es
+      // diu allà, que és l'única banda on una sessió es toca. I allà mateix
+      // hi ha el menú per unir-la amb una altra del dia, si va ser la mateixa
+      // anada. Abans un pla es quedava aquí i s'havia d'anar a buscar.
+      this.feedback.success(
+        planning ? `${sport.name} planificat` : `${sport.name} registrat`, 2000, 'xoco');
       this._openSportSession(id, true);
     } catch {
       this.feedback.error('Error en registrar', 2500);

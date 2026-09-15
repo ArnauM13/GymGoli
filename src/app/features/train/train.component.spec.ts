@@ -486,45 +486,6 @@ describe('TrainComponent', () => {
     });
   });
 
-  // ── El pla del dia, en entrar ────────────────────────────────────────────
-
-  describe('plannedDay()', () => {
-    const sport = { id: 's1', name: 'Padel', icon: 'sports_tennis', color: '#000', subtypes: [], metricDefs: [] } as any;
-
-    it('no diu res quan el dia no té res apuntat', () => {
-      expect(component.plannedDay()).toBeNull();
-    });
-
-    it("ensenya el que tens planificat per al dia que es mira", () => {
-      const plan = makeWorkout({ id: 'p1', date: '2999-01-02', status: 'planned', categories: ['push'] });
-      (TestBed.inject(WorkoutService).getPlannedForDate as jasmine.Spy).and.returnValue([plan]);
-      component.selectedDate.set('2999-01-02');
-
-      const day = component.plannedDay();
-      expect(day?.date).toBe('2999-01-02');
-      expect(day?.workouts).toEqual([plan]);
-    });
-
-    it("també els esports apuntats", () => {
-      const session = { id: 'sess1', date: '2999-01-03', sportId: 's1', status: 'planned' } as any;
-      sportService['getPlannedSportSessionsForDate'].and.returnValue([{ sport, session }]);
-      component.selectedDate.set('2999-01-03');
-
-      expect(component.plannedDay()?.sports.length).toBe(1);
-    });
-
-    it("hi véns a començar-lo, o a veure què hi tens si el planifiques", () => {
-      expect(component.plannedHint()).toBe('Comença el que tenies previst');
-      component.planRequested.set(true);
-      expect(component.plannedHint()).toBe('Això ja ho tens apuntat per a aquest dia');
-    });
-
-    it("un esport del pla s'obre a la seva pàgina", () => {
-      component.openPlannedSport({ session: { id: 'sess1' } as any });
-      expect(navigateSpy).toHaveBeenCalledWith(['/sport', 'sess1'], {});
-    });
-  });
-
   // ── A quina sessió va el que es crea ─────────────────────────────────────
 
   // Una sessió és una anada: al gimnàs i, en acabar, vint minuts de cinta. El
@@ -544,6 +505,23 @@ describe('TrainComponent', () => {
     it('no es pregunta res quan el dia encara és buit', () => {
       component.selectedDate.set('2999-01-04');
       expect(component.daySessions()).toEqual([]);
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).querySelector('.join-ask')).toBeNull();
+    });
+
+    // La pregunta va plegada: es contesta que no gairebé sempre, i una llista
+    // sempre oberta és el que feia llarga aquesta pàgina.
+    it('la pregunta surt plegada, i la llista només si la demanes', () => {
+      dayWithOneSession();
+      fixture.detectChanges();
+
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector('.ja-title')?.textContent).toContain("Afegir-ho a una sessió");
+      expect(host.querySelector('app-session-picker')).toBeNull();
+
+      host.querySelector<HTMLElement>('.ja-head')!.click();
+      fixture.detectChanges();
+      expect(host.querySelector('app-session-picker')).toBeTruthy();
     });
 
     it('i es pregunta quan el dia ja té alguna cosa apuntada', () => {
@@ -557,7 +535,7 @@ describe('TrainComponent', () => {
       dayWithOneSession();
       (TestBed.inject(WorkoutService) as unknown as { workouts: ReturnType<typeof signal<Workout[]>> })
         .workouts.set([makeWorkout({ id: 'plan-id', date: '2999-01-05' })]);
-      component.chooseSession('w1');
+      component.chooseSession(component.daySessions()[0]);
 
       component.selectType('push');
       await component.pickerStartEmpty();
@@ -570,7 +548,7 @@ describe('TrainComponent', () => {
     it("i l'esport també, que la pregunta és la mateixa", async () => {
       dayWithOneSession();
       sportService['getSessionById'].and.returnValue({ id: 'new-sess', date: '2999-01-05', sportId: 's1' });
-      component.chooseSession('w1');
+      component.chooseSession(component.daySessions()[0]);
 
       await component.startSportSession(sport);
 
@@ -579,10 +557,56 @@ describe('TrainComponent', () => {
       expect(target[0].workout.id).toBe('w1');
     });
 
-    it('una clau que ja no existeix no apunta enlloc', () => {
+    it('deixar-ho sol torna a ser la resposta per defecte', () => {
       dayWithOneSession();
-      component.chooseSession('fantasma');
+      component.chooseSession(component.daySessions()[0]);
+      expect(component.joinTarget()).not.toBeNull();
+
+      component.chooseSession(null);
       expect(component.joinTarget()).toBeNull();
+    });
+
+    it('triada una sessió, la llista es plega', () => {
+      dayWithOneSession();
+      component.toggleSessionPicker();
+      expect(component.sessionPickerOpen()).toBeTrue();
+
+      component.chooseSession(component.daySessions()[0]);
+      expect(component.sessionPickerOpen()).toBeFalse();
+    });
+  });
+
+  // ── Unir l'entrenament obert amb una altra sessió ────────────────────────
+
+  // Al menú i no al cos de la pàgina: es fa un cop de cada deu i abans
+  // ocupava una targeta sencera al final de tot, sortís o no sortís a compte.
+  describe('unir des del menú', () => {
+    function openWorkoutOnDayWith(others: Workout[]): void {
+      const w = makeWorkout({ id: 'open', date: '2999-01-06' });
+      (TestBed.inject(WorkoutService) as unknown as { workouts: ReturnType<typeof signal<Workout[]>> })
+        .workouts.set([w]);
+      (TestBed.inject(WorkoutService).getDoneWorkoutsForDate as jasmine.Spy)
+        .and.returnValue([w, ...others]);
+      component.openWorkout('open');
+    }
+
+    it("s'ofereix quan el dia té una altra sessió", () => {
+      openWorkoutOnDayWith([makeWorkout({ id: 'altra', date: '2999-01-06' })]);
+      expect(component.canMergeActive()).toBeTrue();
+    });
+
+    it('i no quan aquesta és l\'única del dia', () => {
+      openWorkoutOnDayWith([]);
+      expect(component.canMergeActive()).toBeFalse();
+    });
+
+    it('obrir-lo tanca el menú i desplega la llista', () => {
+      openWorkoutOnDayWith([makeWorkout({ id: 'altra', date: '2999-01-06' })]);
+      component.workoutMenuOpen.set(true);
+
+      component.openActiveMerge();
+      expect(component.workoutMenuOpen()).toBeFalse();
+      expect(component.mergeOpen()).toBeTrue();
     });
   });
 
@@ -658,11 +682,11 @@ describe('TrainComponent', () => {
         '2999-01-01', 's1', {}, 'planned', 'manual');
     });
 
-    it("i planificar-lo no et treu d'Entrenament: el dia se segueix planificant", async () => {
+    it("i planificar-lo també porta a la seva pàgina, a acabar-lo de definir", async () => {
       component.selectedDate.set('2999-01-01');
       await component.startSportSession(sport);
 
-      expect(navigateSpy).not.toHaveBeenCalled();
+      expect(navigateSpy).toHaveBeenCalledWith(['/sport', 'new-sess'], { queryParams: { nova: 1 } });
     });
 
     it("no en crea una altra si el dia ja en té: hi va", async () => {

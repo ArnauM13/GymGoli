@@ -10,16 +10,26 @@ const DEFAULT_DURATION: Record<FeedbackVariant, number> = {
   error: 3500,
 };
 
-/** Single entry point for on-screen feedback across the app — a small,
- *  color-coded toast (success/error/info) instead of raw MatSnackBar
- *  messages, so every screen looks and behaves the same way. */
+/**
+ * L'única manera de dir-li res a l'usuari a la pantalla.
+ *
+ * Tot el que canvia les seves dades es confirma —crear, editar, unir,
+ * esborrar—, perquè d'una escriptura que no diu res no se'n sap mai si ha
+ * passat. La forma la posa `FeedbackToastComponent`; d'aquí surt qui ho diu i
+ * quanta estona.
+ *
+ * ── Sempre amb gos ──
+ * Una confirmació la diu el Marley si va de gimnàs, el Xoco si va d'esport i
+ * tots dos si no és de cap dels dos mons (vegeu `MASCOTES.md`). Qui truca no
+ * ho ha de recordar: **sense mascota, hi van tots dos**. Així no hi ha cap
+ * camí que acabi en un tic de sistema, que era el que passava a la majoria.
+ */
 @Injectable({ providedIn: 'root' })
 export class FeedbackService {
   private readonly snackBar = inject(MatSnackBar);
 
-  /** `mascot` fa que ho digui un gos: la seva cara al lloc del glif i la
-   *  frase en la seva veu (`MASCOTES.md`). Sense gos, el toast de sempre. */
-  success(message: string, duration = DEFAULT_DURATION.success, mascot?: Mascot): void {
+  /** `mascot` diu qui ho celebra. Si no se'n diu cap, tots dos. */
+  success(message: string, duration = DEFAULT_DURATION.success, mascot: Mascot = 'both'): void {
     this.show(message, 'success', duration, mascot);
   }
 
@@ -28,7 +38,7 @@ export class FeedbackService {
     this.show(message, 'error', duration);
   }
 
-  info(message: string, duration = DEFAULT_DURATION.info, mascot?: Mascot): void {
+  info(message: string, duration = DEFAULT_DURATION.info, mascot: Mascot = 'both'): void {
     this.show(message, 'info', duration, mascot);
   }
 

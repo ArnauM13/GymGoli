@@ -163,14 +163,23 @@ html, body {
   --mdc-snackbar-supporting-text-color: #fff;
 }
 
-// FeedbackService's toasts fully control their own look (rounded card,
-// colored accent bar) — strip the default Material surface around them.
+// ── El toast del FeedbackService ──
+// La targeta se la pinta ell sencera (vora, ombra, barra de color): d'aquí
+// només surt on va i quant ocupa. Ample com una fulla de baix i amb els
+// mateixos marges, perquè es llegeixi com una cosa de l'app i no com un
+// rètol del sistema, i sempre per sobre de la barra de navegació — a sota
+// hi quedava mig tapat pels botons.
+.feedback-toast-panel {
+  width: 100%;
+  max-width: 460px !important;
+  margin-bottom: calc(var(--nav-height) + 8px) !important;
+}
 .feedback-toast-panel .mat-mdc-snackbar-surface {
   background: transparent !important;
   box-shadow: none !important;
   padding: 0 !important;
   min-width: 0 !important;
-  max-width: 92vw !important;
+  width: 100%;
 }
 .feedback-toast-panel .mat-mdc-snack-bar-label {
   padding: 0 !important;

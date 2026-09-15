@@ -177,10 +177,10 @@ export class SportsConfigComponent {
       try {
         if (sport) {
           await this.sportService.updateSport(sport.id, result);
-          this.feedback.success('Esport actualitzat', 2000);
+          this.feedback.success('Esport actualitzat', 2000, 'xoco');
         } else {
           await this.sportService.createSport(result);
-          this.feedback.success('Esport creat', 2000);
+          this.feedback.success('Esport creat', 2000, 'xoco');
         }
       } catch (err) {
         this.feedback.error(`Error: ${(err as { message?: string }).message ?? 'desconegut'}`, 5000);
@@ -192,7 +192,7 @@ export class SportsConfigComponent {
     if (!await this.confirmDialog.confirm(`Eliminar "${sport.name}"?`, { variant: 'danger', confirmLabel: 'Eliminar' })) return;
     try {
       await this.sportService.deleteSport(sport.id);
-      this.feedback.success('Esport eliminat', 2000);
+      this.feedback.success('Esport eliminat', 2000, 'xoco');
     } catch {
       this.feedback.error('Error en eliminar', 3000);
     }

@@ -90,20 +90,33 @@ sense problema: també sap estar quiet, si hi ha companyia.
 | Detall d'un insight (full que puja des de la targeta) | el mateix que la targeta | Avatar gran a la capçalera, **sense veu**: allà s'explica la dada |
 | Feed del dia (`home`) | Marley als entrenaments, Xoco als esports | Xapa sobre la icona d'activitat |
 | Barres d'objectiu setmanal | Marley al gym, Xoco a l'esport, tots dos si l'objectiu és combinat | Avatar a l'esquerra |
-| Confirmació d'una acció (toast) | el gos del que s'ha tocat; tots dos si la sessió barreja gimnàs i esport | Cara al lloc del glif, amb la frase seva |
+| Confirmació d'una acció (toast) | el gos del que s'ha tocat; tots dos per defecte | Cara gran amb anella de color, a l'esquerra del missatge |
 
 ### El toast
 
-Les confirmacions que porten gos són les que parlen del que acabes de fer amb
-les teves activitats: unir dues sessions, separar-ne una. La cara ocupa el
-lloc del glif —la barra de color ja diu que ha anat bé— i la frase és curta,
-d'una línia: «Tot en una sessió.», «Aquesta ja va sola!».
+**Tota confirmació la diu un gos.** El Marley quan el que s'ha tocat és del
+gimnàs (un exercici, una plantilla, un tipus d'entrenament), el Xoco quan és
+d'esport, i tots dos quan no és de cap dels dos mons o quan l'anada els
+barreja. Qui truca no ho ha de recordar: `FeedbackService.success()` i
+`.info()` hi posen `both` si no se'ls diu res, o sigui que no hi ha cap camí
+que acabi en un tic de sistema — que és com anaven gairebé tots.
+
+La cara va gran, amb anella del color que toca, a l'esquerra del missatge; la
+frase és curta i d'una línia: «Tot en una sessió.», «Aquesta ja va sola!»,
+«Entrenament creat». Quan la frase és una dada («Exercici eliminat») el gos hi
+posa la cara i prou: la regla 6 val igual aquí, i no tot ha de sonar a gos
+perquè un gos ho signi.
+
+**Res del que s'escriu passa en silenci.** Crear, editar, unir, ordenar i
+esborrar es confirmen, perquè d'una escriptura muda no se'n sap mai si ha
+passat. L'excepció és el que ja es veu sol i es repeteix desenes de vegades
+seguides —apuntar una sèrie mentre entrenes, moure un interruptor de
+Configuració—: allà la pantalla ja respon, i un toast per cop taparia
+justament el que estàs mirant.
 
 **Cap error no el diu un gos.** `FeedbackService.error()` no accepta mascota a
 posta: cap dels dos dona males notícies, i posar-hi una cara contenta davant
-d'un «no s'ha pogut» és exactament el que la regla 3 vol evitar. La resta de
-toasts (guardat, esborrat, coses de configuració) es queden com estan: no tot
-ha de portar gos, o la broma es gasta.
+d'un «no s'ha pogut» és exactament el que la regla 3 vol evitar.
 
 ### La icona d'activitat
 

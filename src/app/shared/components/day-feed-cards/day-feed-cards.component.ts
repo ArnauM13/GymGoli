@@ -1,7 +1,7 @@
 import { Component, booleanAttribute, computed, inject, input, output, signal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 
 import { ActivityCardComponent } from '../activity-card/activity-card.component';
-import { SessionMergeComponent } from '../session-merge/session-merge.component';
 import { SportDetailComponent } from '../sport-detail/sport-detail.component';
 import { WorkoutDetailComponent } from '../workout-detail/workout-detail.component';
 import { Sport, SportSession } from '../../../core/models/sport.model';
@@ -20,7 +20,8 @@ import {
   workoutCardColor, workoutCardStats, workoutPrimaryColor, workoutPrimaryIcon, workoutTypeLabel,
 } from '../../utils/workout-card.utils';
 import {
-  ActivityItem, SessionGroup, activityOf, groupDayFeed, groupIcons, groupTitle, splitLine,
+  ActivityItem, SessionGroup, activityOf, groupDayFeed, groupIcons, groupTitle,
+  sessionMascot, splitLine,
 } from '../../utils/session-group.utils';
 
 export interface DayFeedEntry {
@@ -40,7 +41,7 @@ export interface DayFeedEntry {
 @Component({
   selector: 'app-day-feed-cards',
   standalone: true,
-  imports: [ActivityCardComponent, SportDetailComponent, WorkoutDetailComponent, SessionMergeComponent],
+  imports: [ActivityCardComponent, SportDetailComponent, WorkoutDetailComponent, NgTemplateOutlet],
   template: `
     @for (group of groups(); track group.key) {
       <div class="sg" [class.sg--grouped]="group.grouped">
@@ -76,8 +77,11 @@ export interface DayFeedEntry {
                 expandable [expanded]="expandedWorkoutId() === item.workout.id"
                 (cardClick)="handleWorkoutClick(item.workout)">
 
-              @if (isPlanned(item.workout)) {
-                <div class="ac-actions" cardActions>
+              @if (group.grouped || isPlanned(item.workout)) {
+              <div class="ac-actions" cardActions>
+                <ng-container [ngTemplateOutlet]="moveBtns"
+                              [ngTemplateOutletContext]="{ group: group, i: $index }" />
+                @if (isPlanned(item.workout)) {
                   <button class="ac-act ac-act--del" (click)="deletePlan(item.workout)"
                           aria-label="Eliminar planificació">
                     <span class="material-symbols-outlined" aria-hidden="true">delete</span>
@@ -87,7 +91,8 @@ export interface DayFeedEntry {
                       <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
                     </button>
                   }
-                </div>
+                }
+              </div>
               }
 
               @if (expandedWorkoutId() === item.workout.id) {
@@ -117,8 +122,11 @@ export interface DayFeedEntry {
                 expandable [expanded]="expandedSportId() === item.session.id"
                 (cardClick)="toggleSportExpand(item)">
 
-              @if (isSportPlanned(item)) {
-                <div class="ac-actions" cardActions>
+              @if (group.grouped || isSportPlanned(item)) {
+              <div class="ac-actions" cardActions>
+                <ng-container [ngTemplateOutlet]="moveBtns"
+                              [ngTemplateOutletContext]="{ group: group, i: $index }" />
+                @if (isSportPlanned(item)) {
                   <button class="ac-act ac-act--del" (click)="deleteSportPlan(item)"
                           aria-label="Eliminar planificació">
                     <span class="material-symbols-outlined" aria-hidden="true">delete</span>
@@ -129,7 +137,8 @@ export interface DayFeedEntry {
                       <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
                     </button>
                   }
-                </div>
+                }
+              </div>
               }
 
               @if (expandedSportId() === item.session.id) {
@@ -146,44 +155,48 @@ export interface DayFeedEntry {
           }
         }
 
-        <!-- ── Ajuntar i separar ──
-             Les dues cares de la mateixa cosa, i totes dues al peu del bloc:
-             el dia amb què s'uneix o del que se separa és la sessió sencera,
-             no cap targeta de dins. «Unir» només quan el dia té alguna altra
-             sessió amb què fer-ho —fet o planificat, tant li fa— i «Separar»
-             només quan ja n'hi ha dues de juntes. A baix a la dreta i sense
-             pes: no és el pas que s'espera de ningú.
+        <!-- ── Separar ──
+             Al peu del bloc, perquè el que se separa és la sessió sencera i no
+             cap targeta de dins. A baix a la dreta i sense pes: no és el pas
+             que s'espera de ningú.
 
-             Unir des d'aquí és el camí de després: el de mentre encara hi ets
-             és la targeta que surt sota l'activitat acabada de registrar. Un i
-             altre fan la mateixa pregunta al mateix lloc. -->
-        @if (canMerge(group) || group.grouped) {
+             Unir no és d'aquí. Des del feed, la pregunta «amb quina?» obria
+             una llista dins d'una targeta que ja n'és una de plena, i ocupava
+             a totes les sessions del dia per a una cosa que es fa un cop de
+             cada deu. Ara viu al menú de l'activitat oberta, que és on es va
+             a fer-hi coses. -->
+        @if (group.grouped) {
           <div class="sg-foot">
-            @if (canMerge(group)) {
-              <button class="sg-split" [class.sg-split--on]="mergeOpen() === group.key"
-                      (click)="toggleMerge(group)"
-                      [attr.aria-expanded]="mergeOpen() === group.key">
-                <span class="material-symbols-outlined" aria-hidden="true">add_link</span>
-                Unir amb una altra
-              </button>
-            }
-            @if (group.grouped) {
-              <button class="sg-split" (click)="split(group)" [disabled]="splitting() === group.key">
-                <span class="material-symbols-outlined" aria-hidden="true">link_off</span>
-                Separar sessions
-              </button>
-            }
-          </div>
-        }
-
-        @if (mergeOpen() === group.key) {
-          <div class="sg-merge">
-            <app-session-merge [item]="group.items[0]" compact />
+            <button class="sg-split" (click)="split(group)" [disabled]="splitting() === group.key">
+              <span class="material-symbols-outlined" aria-hidden="true">link_off</span>
+              Separar sessions
+            </button>
           </div>
         }
 
       </div>
     }
+
+    <!-- ── Moure una activitat dins de la seva sessió ──
+         L'ordre de dins d'una anada és el de com va anar, i qui ho sap és qui
+         hi era: l'hora de la fila diu quan es va apuntar, no quan es va fer.
+         Les fletxes només surten si la sessió en té més d'una —una de sola ja
+         està ordenada— i el que escriuen és l'hora, que és el que l'app fa
+         servir per ordenar el dia (ho fa el servei de sessions). -->
+    <ng-template #moveBtns let-group="group" let-i="i">
+      @if (group.grouped) {
+        <span class="ac-move">
+          <button class="ac-mv" [disabled]="i === 0 || moving() === group.key"
+                  (click)="move(group, i, -1)" aria-label="Moure amunt">
+            <span class="material-symbols-outlined" aria-hidden="true">keyboard_arrow_up</span>
+          </button>
+          <button class="ac-mv" [disabled]="i === group.items.length - 1 || moving() === group.key"
+                  (click)="move(group, i, 1)" aria-label="Moure avall">
+            <span class="material-symbols-outlined" aria-hidden="true">keyboard_arrow_down</span>
+          </button>
+        </span>
+      }
+    </ng-template>
   `,
   styles: [`
     /* La targeta és compartida; d'aquí només és l'aire que se'n deixa entre
@@ -226,8 +239,22 @@ export interface DayFeedEntry {
       font-size: 11.5px; font-weight: 700; color: var(--c-text-3);
     }
 
-    /* ── Botons d'un pla, al costat de la targeta ── */
+    /* ── Botons al costat de la targeta ── */
     .ac-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding-right: 9px; }
+
+    /* ── Moure dins de la sessió ──
+       Dues fletxes apilades, estretes i en to apagat: van al costat de cada
+       targeta d'una sessió unida i no han de competir amb res del que hi diu. */
+    .ac-move { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+    .ac-mv {
+      display: flex; align-items: center; justify-content: center;
+      width: 28px; height: 22px; border-radius: 7px;
+      border: 1.5px solid var(--c-border-2); background: var(--c-card); color: var(--c-text-3);
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 16px; }
+      &:hover:not(:disabled) { color: var(--c-brand); border-color: var(--c-brand); }
+      &:disabled { opacity: 0.35; cursor: default; }
+    }
     .ac-act {
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
       width: 36px; height: 36px; border-radius: 10px;
@@ -263,8 +290,6 @@ export interface DayFeedEntry {
        Separar és de segon terme: sense fons ni vora, a baix a la dreta i en
        el to apagat del text de suport. Qui hi arriba hi va a posta. */
     .sg-foot { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 2px; padding: 2px 2px 0; }
-    /* La llista de sessions amb què unir-se, desplegada des del peu. */
-    .sg-merge { padding: 8px 2px 2px; }
     .sg-split {
       display: inline-flex; align-items: center; gap: 5px;
       height: 30px; padding: 0 9px; border-radius: 9px;
@@ -274,7 +299,6 @@ export interface DayFeedEntry {
       .material-symbols-outlined { font-size: 16px; }
       &:hover:not(:disabled) { color: var(--c-text-2); background: color-mix(in srgb, var(--c-text) 6%, transparent); }
       &:disabled { opacity: 0.5; cursor: default; }
-      &.sg-split--on { color: var(--c-brand); background: color-mix(in srgb, var(--c-brand) 10%, transparent); }
     }
   `],
 })
@@ -347,33 +371,35 @@ export class DayFeedCardsComponent {
   /** La sessió que s'està separant, perquè el botó no s'accioni dos cops. */
   readonly splitting = signal<string | null>(null);
 
-  /** La sessió que té la llista d'unir desplegada, si n'hi ha cap. Una de
-   *  sola: dues llistes obertes alhora demanarien triar entre dues preguntes
-   *  que són la mateixa. */
-  readonly mergeOpen = signal<string | null>(null);
-
-  /** Quantes sessions té el dia amb què es pugui unir res: les files, sense
-   *  el que la rutina només projecta. Es calcula un cop per dia i no per
-   *  targeta —la plantilla ho pregunta a cada sessió. */
-  private readonly mergeableCount = computed(() => {
-    const date = this.day()?.date;
-    return date ? this.sessionGroups.groupsForDay(date).length : 0;
-  });
+  /** La sessió que s'està reordenant, perquè les fletxes no s'accionin dues
+   *  vegades mentre s'escriu. */
+  readonly moving = signal<string | null>(null);
 
   /**
-   * Si aquesta sessió es pot unir amb una altra del dia.
+   * Puja o baixa una activitat dins de la seva sessió.
    *
-   * Cal que n'hi hagi una altra i que aquesta sigui de files: el que la rutina
-   * només proposa encara no existeix enlloc, i no s'hi pot posar res a dins.
-   * Fet i planificat compten igual —una anada es prepara com es viu—, i qui
-   * ho contesta és el servei, un sol cop per a tothom.
+   * Qui hi era sap en quin ordre va anar, i l'hora de la fila no ho sap: diu
+   * quan es va apuntar. El que es desa és aquesta hora —és el que ordena el
+   * dia a tot arreu—, o sigui que l'ordre nou val igual aquí, a Inici i a
+   * l'Historial, i no hi ha cap segona llista d'ordres a mantenir.
    */
-  canMerge(group: SessionGroup): boolean {
-    return this.mergeableCount() > 1 && this.sessionGroups.canMerge(group);
-  }
+  async move(group: SessionGroup, index: number, delta: number): Promise<void> {
+    const to = index + delta;
+    if (this.moving() || to < 0 || to >= group.items.length) return;
 
-  toggleMerge(group: SessionGroup): void {
-    this.mergeOpen.update(key => key === group.key ? null : group.key);
+    const items = [...group.items];
+    const [moved] = items.splice(index, 1);
+    items.splice(to, 0, moved);
+
+    this.moving.set(group.key);
+    try {
+      await this.sessionGroups.reorder(items);
+      this.feedback.success('Ordre desat', 1600, sessionMascot(group));
+    } catch {
+      this.feedback.error('Error en ordenar la sessió', 2500);
+    } finally {
+      this.moving.set(null);
+    }
   }
 
   /**
@@ -422,7 +448,7 @@ export class DayFeedCardsComponent {
     if (!this.canStart(item.session.date)) return;
     try {
       await this.sportService.startPlannedSession(item.session.id, item.session.date);
-      this.feedback.success(`${item.sport.name} registrat`, 2000);
+      this.feedback.success(`${item.sport.name} registrat`, 2000, 'xoco');
     } catch {
       this.feedback.error('Error en registrar', 2500);
     }
@@ -435,7 +461,7 @@ export class DayFeedCardsComponent {
     if (!ok) return;
     try {
       await this.sportService.deleteSession(item.session.id, item.session.date);
-      this.feedback.success('Planificació eliminada', 2000);
+      this.feedback.success('Planificació eliminada', 2000, 'xoco');
     } catch {
       this.feedback.error('Error en eliminar', 2500);
     }
@@ -487,6 +513,7 @@ export class DayFeedCardsComponent {
       // Un planificat de la rutina no és cap fila fins que el comences: el
       // que s'obre és l'entrenament que s'acaba de crear, no el projectat.
       const id = await this.workoutService.startPlannedWorkout(w.id);
+      this.feedback.success('Entrenament començat', 1800, 'marley');
       this.open.emit(id);
     } catch {
       this.feedback.error('Error en iniciar el pla', 2500);
@@ -502,7 +529,7 @@ export class DayFeedCardsComponent {
     if (!ok) return;
     try {
       await this.workoutService.deleteWorkout(w.id);
-      this.feedback.success('Planificació eliminada', 2000);
+      this.feedback.success('Planificació eliminada', 2000, 'marley');
     } catch {
       this.feedback.error('Error en eliminar', 2500);
     }

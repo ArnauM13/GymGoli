@@ -1878,6 +1878,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     const notes = this.notesText().trim();
     try {
       await this.workoutService.updateEntryNotes(w.id, exerciseId, notes || undefined);
+      this.feedback.success(notes ? 'Nota guardada' : 'Nota eliminada', 1500, 'marley');
     } catch {
       this.feedback.error('Error en desar la nota', 2000);
     }
@@ -1928,6 +1929,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     moveItemInArray(entries, fromFlat, toFlat);
     try {
       await this.workoutService.reorderEntries(w.id, entries);
+      this.feedback.success('Ordre desat', 1500, 'marley');
     } catch {
       this.feedback.error('Error en reordenar', 2000);
     }
@@ -2069,7 +2071,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     try {
       await this.workoutService.updateEntryFeeling(w.id, entry.exerciseId, newFeeling);
       if (!hadWorkoutFeeling && this.workout()?.feeling != null) {
-        this.feedback.info('Sensació general calculada automàticament', 2500);
+        this.feedback.info('Sensació general calculada automàticament', 2500, 'marley');
       }
     } catch {
       this.feedback.error('Error en actualitzar la fatiga', 2000);
@@ -2324,7 +2326,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     if (!w) return;
     try {
       await this.workoutService.addSetsToEntry(w.id, entry.exerciseId, [this._cloneSet(set)]);
-      this.feedback.info('Sèrie copiada', 1800);
+      this.feedback.info('Sèrie copiada', 1800, 'marley');
     } catch {
       this.feedback.error('Error en copiar la sèrie', 3000);
     }
@@ -2335,6 +2337,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     if (!w) return;
     try {
       await this.workoutService.removeSetFromEntry(w.id, exerciseId, index);
+      this.feedback.success('Sèrie eliminada', 1500, 'marley');
     } catch {
       this.feedback.error('Error en eliminar', 2000);
     }
@@ -2356,6 +2359,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     if (this._timerForExercise === exerciseId) this.cancelTimer();
     try {
       await this.workoutService.removeEntryFromWorkout(w.id, exerciseId);
+      this.feedback.success(`${entry?.exerciseName ?? 'Exercici'} eliminat`, 1800, 'marley');
     } catch {
       this.feedback.error('Error en eliminar', 2000);
     }
@@ -2375,6 +2379,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     try {
       await this.workoutService.groupIntoSuperset(w.id, ids);
       this.selectedForGroup.set(new Set());
+      this.feedback.success('Superset creat', 1800, 'marley');
     } catch {
       this.feedback.error('Error en agrupar', 2000);
     }
@@ -2385,6 +2390,7 @@ export class WorkoutEditorComponent implements OnDestroy {
     if (!w) return;
     try {
       await this.workoutService.removeFromSuperset(w.id, exerciseId);
+      this.feedback.success('Superset desfet', 1800, 'marley');
     } catch {
       this.feedback.error('Error en desfer el superset', 2000);
     }

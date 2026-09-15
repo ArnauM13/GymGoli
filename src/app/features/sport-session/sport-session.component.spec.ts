@@ -281,6 +281,38 @@ describe('SportSessionComponent', () => {
     });
   });
 
+  // ── El menú de la capçalera ──
+  // El que no es fa cada dia hi viu dins: unir la sessió amb una altra del
+  // dia i esborrar-la. Al cos de la pàgina no hi ha cap de les dues coses.
+  describe('menú de la sessió', () => {
+    beforeEach(() => {
+      allSessions.set([makeSession()]);
+      build();
+    });
+
+    it("unir no ocupa la pàgina: s'obre des del menú", () => {
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector('app-session-merge')).toBeNull();
+
+      host.querySelector<HTMLElement>('.ss-menu-btn')!.click();
+      fixture.detectChanges();
+      expect(component.menuOpen()).toBeTrue();
+
+      component.openMerge();
+      fixture.detectChanges();
+      expect(component.menuOpen()).toBeFalse();
+      expect(component.mergeOpen()).toBeTrue();
+      expect(host.querySelector('app-session-merge')).toBeTruthy();
+    });
+
+    it("i esborrar tampoc viu dins del formulari", () => {
+      const host = fixture.nativeElement as HTMLElement;
+      component.openEdit({ sport: SPORT, session: makeSession() });
+      fixture.detectChanges();
+      expect(host.querySelector('.sl-delete-btn')).toBeNull();
+    });
+  });
+
   describe('eliminar', () => {
     it('demana confirmació abans de fer-ho', async () => {
       const session = makeSession();

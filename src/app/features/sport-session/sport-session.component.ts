@@ -37,7 +37,50 @@ import { ActivityStat, feedDayLabel, formatFeeling, sportCardStats } from '../..
       @if (pair(); as p) {
 
         <app-page-header [title]="p.sport.name" [subtitle]="dateLabel()"
-                         [showBack]="true" backFallback="/home" />
+                         [showBack]="true" backFallback="/home">
+          <!-- ── El menú de la sessió ──
+               El que no es fa cada dia viu aquí dins: unir-la amb una altra
+               activitat del dia i esborrar-la. Abans unir era una targeta
+               plantada al final de la pàgina —ocupava com una acció principal
+               una cosa que es fa un cop de cada deu— i esborrar només sortia
+               amb el formulari obert, que és un lloc estrany per anar-hi a
+               buscar. -->
+          <button class="ss-menu-btn" [class.ss-menu-btn--on]="menuOpen()"
+                  (click)="menuOpen.set(!menuOpen())"
+                  aria-label="Opcions de la sessió" [attr.aria-expanded]="menuOpen()">
+            <span class="material-symbols-outlined">more_vert</span>
+          </button>
+        </app-page-header>
+
+        @if (menuOpen()) {
+          <div class="bottom-sheet-backdrop" (click)="menuOpen.set(false)" aria-hidden="true"></div>
+          <div class="ss-sheet bottom-sheet" role="dialog" aria-modal="true" aria-label="Opcions de la sessió">
+            <span class="bottom-sheet-handle" aria-hidden="true"></span>
+            <button class="ss-menu-item" (click)="openMerge()">
+              <span class="material-symbols-outlined">add_link</span>
+              Unir amb una altra sessió
+            </button>
+            <button class="ss-menu-item ss-menu-item--danger" (click)="menuOpen.set(false); deleteSession(p)">
+              <span class="material-symbols-outlined">delete</span>
+              Eliminar la sessió
+            </button>
+          </div>
+        }
+
+        <!-- ── Amb quina? ──
+             La llista de sessions del dia, la mateixa que a Entrenar. Tocar-ne
+             una les uneix i tanca. -->
+        @if (mergeOpen()) {
+          <div class="bottom-sheet-backdrop" (click)="mergeOpen.set(false)" aria-hidden="true"></div>
+          <div class="ss-sheet bottom-sheet" role="dialog" aria-modal="true" aria-labelledby="ss-merge-title">
+            <span class="bottom-sheet-handle" aria-hidden="true"></span>
+            <div class="ss-sheet-head">
+              <span class="ss-sheet-title" id="ss-merge-title">Ha estat la mateixa sessió?</span>
+              <span class="ss-sheet-sub">Uneix-la amb una altra activitat del dia i comptaran com una sola anada.</span>
+            </div>
+            <app-session-merge [item]="mergeItem(p)" (merged)="mergeOpen.set(false)" />
+          </div>
+        }
 
         <!-- ── Què és i com ha anat ──
              La targeta compartida, la mateixa que al feed: qui, les xifres
@@ -73,12 +116,6 @@ import { ActivityStat, feedDayLabel, formatFeeling, sportCardStats } from '../..
             <span class="material-symbols-outlined" aria-hidden="true">edit</span>
             Editar la sessió
           </button>
-
-          <!-- ── Ha estat la mateixa anada? ──
-               El mateix oferiment que a la pàgina d'un entrenament: si el dia
-               té una altra sessió —feta o apuntada—, aquí s'uneixen. Mentre
-               s'edita no: allà s'està tocant una altra cosa. -->
-          <app-session-merge [item]="mergeItem(p)" />
 
         } @else {
 
@@ -168,11 +205,9 @@ import { ActivityStat, feedDayLabel, formatFeeling, sportCardStats } from '../..
                           rows="2"></textarea>
               </div>
 
+              <!-- Esborrar no és d'aquí: és una acció sobre la sessió, no
+                   sobre el formulari, i viu al menú de la capçalera. -->
               <div class="sl-actions">
-                <button class="sl-delete-btn" [disabled]="saving()" (click)="deleteSession(p)">
-                  <span class="material-symbols-outlined" aria-hidden="true">delete</span>
-                  Eliminar
-                </button>
                 <div class="sl-main-actions">
                   <button class="sl-cancel" (click)="editOpen.set(false)">Cancel·lar</button>
                   <button class="sl-save" [disabled]="saving()" (click)="save(p)">Guardar</button>
@@ -214,6 +249,36 @@ import { ActivityStat, feedDayLabel, formatFeeling, sportCardStats } from '../..
        La targeta és la compartida (app-activity-card), la mateixa que al feed
        i la que corona un entrenament. D'aquí només és on es posa. */
     .ss-hero { display: block; margin: 4px 16px 0; }
+
+    /* ── El menú de la capçalera ── */
+    .ss-menu-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+      border: none; background: var(--c-subtle); color: var(--c-text-2);
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+      .material-symbols-outlined { font-size: 20px; }
+      &:hover { background: var(--c-hover); }
+      &.ss-menu-btn--on { background: var(--c-brand); color: white; }
+    }
+    /* La fulla de baix és la de tota l'app (styles.scss); d'aquí només surt
+       el seu farciment. */
+    .ss-sheet { padding: 14px 14px 22px; }
+    .ss-sheet-head { display: flex; flex-direction: column; gap: 3px; margin-bottom: 12px; }
+    .ss-sheet-title { font-size: 15px; font-weight: 800; color: var(--c-text); }
+    .ss-sheet-sub   { font-size: 12px; font-weight: 500; color: var(--c-text-3); line-height: 1.35; }
+    .ss-menu-item {
+      display: flex; align-items: center; gap: 11px; width: 100%; box-sizing: border-box;
+      padding: 13px 12px; border: none; border-radius: 13px;
+      background: transparent; color: var(--c-text); font-size: 14px; font-weight: 700;
+      text-align: left; cursor: pointer; touch-action: manipulation; transition: background 0.15s;
+      .material-symbols-outlined { font-size: 20px; color: var(--c-text-3); }
+      &:hover { background: var(--c-subtle); }
+      &.ss-menu-item--danger {
+        color: #ef5350;
+        .material-symbols-outlined { color: #ef5350; }
+        &:hover { background: rgba(239,83,80,0.10); }
+      }
+    }
 
     /* ── Registrar un pla que ja toca ── */
     .register-btn {
@@ -330,16 +395,6 @@ import { ActivityStat, feedDayLabel, formatFeeling, sportCardStats } from '../..
       display: flex; align-items: center; gap: 8px;
       margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--c-border-2);
     }
-    .sl-delete-btn {
-      display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
-      height: 38px; padding: 0 13px; border-radius: 10px;
-      border: 1.5px solid rgba(239,83,80,0.3); background: rgba(239,83,80,0.06); color: #ef5350;
-      font-size: 13px; font-weight: 600;
-      cursor: pointer; transition: all 0.15s; touch-action: manipulation;
-      .material-symbols-outlined { font-size: 18px; }
-      &:hover { background: rgba(239,83,80,0.12); border-color: #ef5350; }
-      &:disabled { opacity: 0.6; cursor: default; }
-    }
     .sl-main-actions { display: flex; gap: 8px; flex: 1; justify-content: flex-end; }
     .sl-cancel {
       height: 38px; padding: 0 16px; border-radius: 10px;
@@ -437,6 +492,11 @@ export class SportSessionComponent {
   readonly durationPresets: number[] = [30, 45, 60, 90];
   readonly feelingLevels: FeelingLevel[] = [1, 2, 3, 4, 5];
 
+  /** El menú de la capçalera, i la llista d'unir que en surt. Un de sol
+   *  obert a la vegada: la llista reemplaça el menú, no s'hi apila. */
+  readonly menuOpen  = signal(false);
+  readonly mergeOpen = signal(false);
+
   readonly editOpen     = signal(false);
   readonly saving       = signal(false);
   readonly editDuration = signal(60);
@@ -492,6 +552,13 @@ export class SportSessionComponent {
    *  dia. Un pla també: una anada es prepara igual que es viu. */
   mergeItem(p: { sport: Sport; session: SportSession }): ActivityItem {
     return { kind: 'sport', sport: p.sport, session: p.session };
+  }
+
+  /** Del menú a la llista de sessions del dia: una fulla tanca i l'altra
+   *  s'obre, que són la mateixa conversa. */
+  openMerge(): void {
+    this.menuOpen.set(false);
+    this.mergeOpen.set(true);
   }
 
   /** La pàgina segueix la sessió, no l'id amb què s'hi va entrar: un
@@ -578,6 +645,7 @@ export class SportSessionComponent {
         notes:     this.editNotes().trim() || undefined,
       });
       this.editOpen.set(false);
+      this.feedback.success('Sessió guardada', 2000, 'xoco');
       await this.follow(id);
     } catch {
       this.feedback.error('Error en guardar', 2500);
@@ -590,7 +658,7 @@ export class SportSessionComponent {
     this.saving.set(true);
     try {
       const id = await this.sportService.startPlannedSession(p.session.id, p.session.date);
-      this.feedback.success(`${p.sport.name} registrat`, 2000);
+      this.feedback.success(`${p.sport.name} registrat`, 2000, 'xoco');
       await this.follow(id);
     } catch {
       this.feedback.error('Error en registrar', 2500);
@@ -607,7 +675,7 @@ export class SportSessionComponent {
     this.saving.set(true);
     try {
       await this.sportService.deleteSession(p.session.id, p.session.date);
-      this.feedback.success('Sessió eliminada', 2000);
+      this.feedback.success('Sessió eliminada', 2000, 'xoco');
       // Sortir d'aquí ho fa l'efecte que vigila que la sessió existeixi: si ho
       // féssim també des d'aquí, la pila de navegació es desapilaria dos cops.
     } catch {

@@ -188,10 +188,10 @@ export class TrainingTypesComponent {
       try {
         if (type) {
           await this.typeService.updateType(type.id, result);
-          this.feedback.success('Tipus actualitzat', 2000);
+          this.feedback.success('Tipus actualitzat', 2000, 'marley');
         } else {
           await this.typeService.createType(result);
-          this.feedback.success('Tipus creat', 2000);
+          this.feedback.success('Tipus creat', 2000, 'marley');
         }
       } catch (err) {
         this.feedback.error(`Error: ${(err as { message?: string }).message ?? 'desconegut'}`, 5000);
@@ -215,7 +215,7 @@ export class TrainingTypesComponent {
     if (!await this.confirmDialog.confirm(`Eliminar "${type.name}"?${extra}`, { variant: 'danger', confirmLabel: 'Eliminar' })) return;
     try {
       await this.typeService.deleteType(type.id);
-      this.feedback.success('Tipus eliminat', 2000);
+      this.feedback.success('Tipus eliminat', 2000, 'marley');
     } catch {
       this.feedback.error('Error en eliminar', 3000);
     }

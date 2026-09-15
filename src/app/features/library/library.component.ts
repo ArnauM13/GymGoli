@@ -534,10 +534,10 @@ export class LibraryComponent {
       try {
         if (exercise) {
           await this.exerciseService.update(exercise.id, result);
-          this.feedback.success('Exercici actualitzat', 2000);
+          this.feedback.success('Exercici actualitzat', 2000, 'marley');
         } else {
           await this.exerciseService.create(result);
-          this.feedback.success('Exercici creat', 2000);
+          this.feedback.success('Exercici creat', 2000, 'marley');
         }
       } catch (err) {
         const msg = (err as { message?: string }).message ?? 'Error desconegut';
@@ -550,7 +550,7 @@ export class LibraryComponent {
     if (!await this.confirmDialog.confirm(`Eliminar "${exercise.name}"?`, { variant: 'danger', confirmLabel: 'Eliminar' })) return;
     try {
       await this.exerciseService.delete(exercise.id);
-      this.feedback.success('Exercici eliminat', 2000);
+      this.feedback.success('Exercici eliminat', 2000, 'marley');
     } catch {
       this.feedback.error('Error en eliminar', 3000);
     }
@@ -558,7 +558,7 @@ export class LibraryComponent {
 
   async seed(): Promise<void> {
     await this.exerciseService.ensureLoaded();
-    this.feedback.success('Exercicis carregats', 2000);
+    this.feedback.success('Exercicis carregats', 2000, 'marley');
   }
 
   openSportForm(sport?: Sport): void {
@@ -573,10 +573,10 @@ export class LibraryComponent {
       try {
         if (sport) {
           await this.sportService.updateSport(sport.id, result);
-          this.feedback.success('Esport actualitzat', 2000);
+          this.feedback.success('Esport actualitzat', 2000, 'xoco');
         } else {
           await this.sportService.createSport(result);
-          this.feedback.success('Esport creat', 2000);
+          this.feedback.success('Esport creat', 2000, 'xoco');
         }
       } catch (err) {
         const msg = (err as { message?: string }).message ?? 'Error desconegut';
@@ -589,7 +589,7 @@ export class LibraryComponent {
     if (!await this.confirmDialog.confirm(`Eliminar "${sport.name}"?`, { variant: 'danger', confirmLabel: 'Eliminar' })) return;
     try {
       await this.sportService.deleteSport(sport.id);
-      this.feedback.success('Esport eliminat', 2000);
+      this.feedback.success('Esport eliminat', 2000, 'xoco');
     } catch {
       this.feedback.error('Error en eliminar', 3000);
     }

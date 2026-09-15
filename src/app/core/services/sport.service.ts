@@ -1017,6 +1017,28 @@ export class SportService {
   }
 
   /**
+   * Quan va passar la sessió dins del dia.
+   *
+   * `startedAt` és l'ordre del dia (migració 035), i és el que s'escriu quan
+   * algú ordena a mà les activitats d'una mateixa anada: dir que la cinta va
+   * anar després del gimnàs és dir a quina hora va anar. Com
+   * `sessionGroupId`, un camp escalar que puja pel camí de sempre.
+   */
+  async setStartedAt(sessionId: string, date: string, startedAt: Date): Promise<void> {
+    const uid = this._uid();
+
+    const key    = date.substring(0, 7);
+    const bucket = this._monthCache.get(key) ?? [];
+    this._monthCache.set(key, bucket.map(s => s.id === sessionId ? { ...s, startedAt } : s));
+    this._rebuild();
+    this._writeSessionsToStorage(uid, key, this._monthCache.get(key)!);
+
+    await this._pushOrQueue(uid, {
+      op: 'update', id: sessionId, row: { started_at: startedAt.toISOString() },
+    });
+  }
+
+  /**
    * Converteix una sessió planificada en una de feta.
    *
    * Una sessió projectada de la rutina no és cap fila: començar-la és el

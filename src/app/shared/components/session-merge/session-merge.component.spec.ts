@@ -1,4 +1,3 @@
-import { NO_ERRORS_SCHEMA, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { SessionMergeComponent } from './session-merge.component';
@@ -27,7 +26,8 @@ function sportPair(id: string, sessionGroupId?: string): { sport: Sport; session
  * Unir aquesta activitat amb una altra del dia.
  *
  * El cas de sempre és que les dues ja estiguin apuntades —el gimnàs i la cinta
- * de després—, o sigui que l'oferiment surt de l'activitat, no del feed.
+ * de després—, o sigui que l'oferiment surt de l'activitat: del seu menú, que
+ * és on viuen les coses que es fan un cop de cada deu.
  */
 describe('SessionMergeComponent', () => {
   let merge: jasmine.Spy;
@@ -54,7 +54,7 @@ describe('SessionMergeComponent', () => {
         },
         { provide: FeedbackService, useValue: { success, error: jasmine.createSpy() } },
       ],
-    }).overrideComponent(SessionMergeComponent, { set: { schemas: [NO_ERRORS_SCHEMA] } });
+    });
 
     const fixture = TestBed.createComponent(SessionMergeComponent);
     fixture.componentRef.setInput('item', opts.item);
@@ -72,7 +72,7 @@ describe('SessionMergeComponent', () => {
 
     // La que s'està mirant no és candidata d'ella mateixa.
     expect(component.targets().map(g => g.key)).toEqual(['w2', 's1']);
-    expect((fixture.nativeElement as HTMLElement).querySelectorAll('.sm-btn').length).toBe(2);
+    expect((fixture.nativeElement as HTMLElement).querySelectorAll('.sp-btn').length).toBe(2);
   });
 
   it('les de la mateixa sessió tampoc: ja hi són', () => {
@@ -103,26 +103,27 @@ describe('SessionMergeComponent', () => {
     expect(success).toHaveBeenCalledWith('Una sola sessió.', jasmine.any(Number), 'both');
   });
 
-  it('sense cap altra sessió al dia no hi ha res a oferir', () => {
+  it('sense cap altra sessió al dia ho diu, i no hi ha res a tocar', () => {
     const w = workout('w1');
     const { fixture, component } = setup({ item: { kind: 'workout', workout: w }, workouts: [w] });
 
     expect(component.targets()).toEqual([]);
-    expect((fixture.nativeElement as HTMLElement).querySelector('.sm-card')).toBeNull();
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('.sp-btn')).toBeNull();
+    expect(host.querySelector('.sm-none')?.textContent).toContain('cap altra sessió');
   });
 
-  it('«ara no» l\'aparta i no torna a sortir', () => {
+  it('unida, avisa qui l\'ha obert perquè es tanqui', async () => {
     const w = workout('w1');
-    const { fixture, component } = setup({
+    const { component } = setup({
       item: { kind: 'workout', workout: w },
       workouts: [w], sports: [sportPair('s1')],
     });
+    const done = jasmine.createSpy('merged');
+    component.merged.subscribe(done);
 
-    component.dismiss();
-    fixture.detectChanges();
-
-    expect(component.targets()).toEqual([]);
-    expect((fixture.nativeElement as HTMLElement).querySelector('.sm-card')).toBeNull();
+    await component.unify(component.targets()[0]);
+    expect(done).toHaveBeenCalled();
   });
 
   // Una anada es prepara igual que es viu: el pàdel i la cinta que penses fer
@@ -138,19 +139,16 @@ describe('SessionMergeComponent', () => {
     expect(component.targets().map(g => g.key)).toEqual(['w1']);
   });
 
-  // La targeta sencera surt sota l'activitat acabada de registrar; desplegada
-  // des del peu d'una del feed, la pregunta ja l'ha feta el botó que l'obre.
-  it('compacta, només la llista', () => {
+  // La pregunta la fa la fulla que l'obre; d'aquí només en surt la llista.
+  it('només la llista: cap capçalera pròpia', () => {
     const w = workout('w1');
     const { fixture } = setup({
       item: { kind: 'workout', workout: w },
       workouts: [w], sports: [sportPair('s1')],
     });
-    fixture.componentRef.setInput('compact', true);
-    fixture.detectChanges();
 
     const host = fixture.nativeElement as HTMLElement;
     expect(host.querySelector('.sm-head')).toBeNull();
-    expect(host.querySelectorAll('.sm-btn').length).toBe(1);
+    expect(host.querySelectorAll('.sp-btn').length).toBe(1);
   });
 });

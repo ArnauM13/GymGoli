@@ -32,6 +32,8 @@ describe('DayFeedCardsComponent', () => {
   let editPlannedWorkout: jasmine.Spy;
   let setWorkoutGroup: jasmine.Spy;
   let setSportGroup: jasmine.Spy;
+  let setWorkoutStartedAt: jasmine.Spy;
+  let setSportStartedAt: jasmine.Spy;
   let deleteWorkout: jasmine.Spy;
   let updateSession: jasmine.Spy;
   let deleteSession: jasmine.Spy;
@@ -56,6 +58,8 @@ describe('DayFeedCardsComponent', () => {
     confirm = jasmine.createSpy().and.resolveTo(true);
     setWorkoutGroup = jasmine.createSpy().and.resolveTo(undefined);
     setSportGroup   = jasmine.createSpy().and.resolveTo(undefined);
+    setWorkoutStartedAt = jasmine.createSpy().and.resolveTo(undefined);
+    setSportStartedAt   = jasmine.createSpy().and.resolveTo(undefined);
     // El que el dia té apuntat, tal com ho llegiria `SessionGroupService`:
     // és el que decideix si aquesta sessió es pot unir amb cap altra.
     dayWorkouts = [];
@@ -66,11 +70,13 @@ describe('DayFeedCardsComponent', () => {
       providers: [
         { provide: WorkoutService, useValue: {
           startPlannedWorkout, editPlannedWorkout, deleteWorkout, setSessionGroup: setWorkoutGroup,
+          setStartedAt: setWorkoutStartedAt,
           getPlannedForDate: () => dayWorkouts.filter(w => w.status === 'planned'),
           getDoneWorkoutsForDate: () => dayWorkouts.filter(w => (w.status ?? 'done') !== 'planned'),
         } },
         { provide: SportService, useValue: {
           updateSession, deleteSession, startPlannedSession, setSessionGroup: setSportGroup,
+          setStartedAt: setSportStartedAt,
           getPlannedSportSessionsForDate: () => daySports.filter(p => p.session.status === 'planned'),
           getSportSessionsForDate: () => daySports.filter(p => (p.session.status ?? 'done') !== 'planned'),
           sessions: signal([]),
@@ -483,49 +489,61 @@ describe('DayFeedCardsComponent', () => {
       expect(setSportGroup).toHaveBeenCalledWith('sess1', '2024-03-05', null);
     });
 
-    // Unir i separar són les dues cares de la mateixa cosa i viuen al mateix
-    // peu: el de després, quan les dues activitats ja estan apuntades.
-    describe('unir des de la targeta', () => {
-      /** El dia, tal com el llegiria el servei: dues sessions soltes. */
-      function twoLooseSessions(): void {
-        const d = day();
-        dayWorkouts = d.workouts;
-        daySports   = d.sports;
+    // Unir ja no és d'aquí: viu al menú de l'activitat oberta. Del peu de la
+    // targeta només en queda separar.
+    it("unir no s'ofereix des del feed", () => {
+      const d = day();
+      dayWorkouts = d.workouts;
+      daySports   = d.sports;
+      fixture.componentRef.setInput('day', d);
+      fixture.detectChanges();
+
+      expect(footLabels(fixture.nativeElement)).not.toContain('Unir amb una altra');
+    });
+
+    // ── L'ordre de dins d'una anada ──
+    // Qui hi era sap què va anar primer; l'hora de la fila diu quan es va
+    // apuntar, que no és el mateix.
+    describe('ordenar les activitats de la sessió', () => {
+      /** Una sessió unida, amb el gimnàs apuntat abans que l'esport. */
+      function groupedDay() {
+        const d = day('g1', 'g1');
+        d.workouts[0].createdAt    = new Date('2024-03-05T10:00:00');
+        d.sports[0].session.createdAt = new Date('2024-03-05T11:00:00');
         fixture.componentRef.setInput('day', d);
         fixture.detectChanges();
+        return d;
       }
 
-      it('s\'ofereix quan el dia té una altra sessió', () => {
-        twoLooseSessions();
-        expect(footLabels(fixture.nativeElement).filter(t => t === 'Unir amb una altra').length).toBe(2);
+      it('les fletxes surten a cada targeta d\'una sessió unida', () => {
+        groupedDay();
+        expect((fixture.nativeElement as HTMLElement).querySelectorAll('.ac-move').length).toBe(2);
       });
 
-      it('i no quan no n\'hi ha cap més', () => {
+      it('i no quan cada activitat ja va sola: no hi ha res a ordenar', () => {
         fixture.componentRef.setInput('day', day());
         fixture.detectChanges();
-        expect(footLabels(fixture.nativeElement)).not.toContain('Unir amb una altra');
+        expect((fixture.nativeElement as HTMLElement).querySelector('.ac-move')).toBeNull();
       });
 
-      it('tocar-lo desplega les altres sessions del dia, i només una alhora', () => {
-        twoLooseSessions();
-        const [first, second] = component.groups();
+      it('baixar-ne una escriu l\'hora de totes dues, en l\'ordre nou', async () => {
+        groupedDay();
+        await component.move(component.groups()[0], 0, 1);
 
-        component.toggleMerge(first);
-        fixture.detectChanges();
-        expect((fixture.nativeElement as HTMLElement).querySelectorAll('.sg-merge').length).toBe(1);
-
-        component.toggleMerge(second);
-        expect(component.mergeOpen()).toBe(second.key);
-
-        component.toggleMerge(second);
-        expect(component.mergeOpen()).toBeNull();
+        // L'esport passa al davant i es queda l'hora de base; el gimnàs, la
+        // de després. Les dues escriptures són les mínimes.
+        const sportAt   = setSportStartedAt.calls.mostRecent().args[2] as Date;
+        const workoutAt = setWorkoutStartedAt.calls.mostRecent().args[1] as Date;
+        expect(sportAt.getTime()).toBeLessThan(workoutAt.getTime());
       });
 
-      // Un planificat de la rutina no és cap fila: no s'hi pot posar res dins.
-      it('una sessió que la rutina només proposa no s\'ofereix', () => {
-        const projected = makeWorkout({ id: 'routine:2024-03-05:gym:push', date: '2024-03-05', status: 'planned' });
-        expect(component.canMerge({ key: projected.id, grouped: false, items: [{ kind: 'workout', workout: projected }] }))
-          .toBeFalse();
+      it('la primera no puja i l\'última no baixa', async () => {
+        groupedDay();
+        await component.move(component.groups()[0], 0, -1);
+        await component.move(component.groups()[0], 1, 1);
+
+        expect(setWorkoutStartedAt).not.toHaveBeenCalled();
+        expect(setSportStartedAt).not.toHaveBeenCalled();
       });
     });
   });

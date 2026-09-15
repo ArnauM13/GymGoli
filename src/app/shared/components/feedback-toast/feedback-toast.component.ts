@@ -9,11 +9,14 @@ export interface FeedbackToastData {
   message: string;
   variant: FeedbackVariant;
   /**
-   * Qui ho diu, quan ho diu un gos.
+   * Qui ho diu.
    *
-   * La cara substitueix el glif del toast: el color de la barra ja diu si ha
-   * anat bé, i qui parla és el que li dona la veu. Sense gos, el toast és el
-   * de sempre — i els errors no en porten mai (vegeu `MASCOTES.md`).
+   * Tot el que ha anat bé ho diu un gos: el que toca gimnàs és del Marley, el
+   * que toca esport és del Xoco i la resta és de tots dos (vegeu
+   * `MASCOTES.md`). Qui truca no ho ha de recordar —`FeedbackService` hi posa
+   * `both` si no se'n diu cap—, i per això aquí sempre n'hi ha un.
+   *
+   * Els errors no en porten: cap dels dos dona males notícies.
    */
   mascot?: Mascot;
 }
@@ -24,16 +27,29 @@ const VARIANT_ICON: Record<FeedbackVariant, string> = {
   info: 'info',
 };
 
+/**
+ * La confirmació del que acabes de fer.
+ *
+ * És una targeta de la casa, no un rètol de sistema: mides, vores i ombra de
+ * `DESIGN.md`, la barra de color de 5px a l'esquerra com qualsevol targeta
+ * d'activitat, i la cara de qui ho diu en gran. Va ample —fins on hi cap la
+ * pàgina— perquè una frase hi càpiga d'una línia i es llegeixi de passada,
+ * que és tot el temps que té.
+ */
 @Component({
   selector: 'app-feedback-toast',
   standalone: true,
   template: `
     <div class="fb-toast" [class]="'fb-toast--' + data.variant">
-      <div class="fb-bar"></div>
+      <div class="fb-bar" aria-hidden="true"></div>
       @if (dog; as d) {
-        <img class="fb-dog" [src]="d.avatar" [alt]="d.alt">
+        <span class="fb-dog-ring" aria-hidden="true">
+          <img class="fb-dog" [src]="d.avatar" [alt]="d.alt">
+        </span>
       } @else {
-        <span class="material-symbols-outlined fb-icon">{{ icon }}</span>
+        <span class="fb-icon-wrap" aria-hidden="true">
+          <span class="material-symbols-outlined fb-icon">{{ icon }}</span>
+        </span>
       }
       <span class="fb-msg">{{ data.message }}</span>
       <button type="button" class="fb-close" (click)="dismiss()" aria-label="Tancar">
@@ -42,43 +58,59 @@ const VARIANT_ICON: Record<FeedbackVariant, string> = {
     </div>
   `,
   styles: [`
+    /* L'ample el mana el panell (styles.scss): aquí dins s'omple sempre, que
+       una confirmació estreta enmig de la pantalla es llegia com un avís del
+       navegador i no com una cosa de l'app. */
     .fb-toast {
-      display: flex; align-items: center; gap: 10px;
-      min-width: 220px; max-width: 100%;
-      padding: 12px 8px 12px 0;
-      border-radius: 14px; overflow: hidden;
+      display: flex; align-items: center; gap: 11px;
+      width: 100%; box-sizing: border-box;
+      padding: 12px 10px 12px 0;
+      border-radius: 18px; overflow: hidden;
       background: var(--c-card); color: var(--c-text);
-      box-shadow: 0 6px 24px var(--c-shadow-md), 0 2px 8px var(--c-shadow);
-      animation: fb-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+      border: 1.5px solid var(--fb-c, var(--c-border-2));
+      box-shadow: 0 10px 30px var(--c-shadow-md), 0 3px 10px var(--c-shadow);
+      animation: fb-in 0.26s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
-    .fb-bar { width: 5px; align-self: stretch; flex-shrink: 0; border-radius: 0 4px 4px 0; }
-    .fb-toast--success .fb-bar { background: #43a047; }
-    .fb-toast--error   .fb-bar { background: #ef5350; }
-    .fb-toast--info    .fb-bar { background: var(--c-brand); }
+    /* La barra de color, com a qualsevol targeta d'activitat. */
+    .fb-bar { width: 5px; align-self: stretch; flex-shrink: 0; background: var(--fb-c); }
+    .fb-toast--success { --fb-c: #43a047; }
+    .fb-toast--error   { --fb-c: #ef5350; }
+    .fb-toast--info    { --fb-c: var(--c-brand); }
+
+    /* ── Qui ho diu ──
+       El gos va gran i amb anella del color que toca: és la cara de l'app
+       dient-te que allò ha quedat guardat. */
+    .fb-dog-ring {
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      width: 42px; height: 42px; border-radius: 50%;
+      background: color-mix(in srgb, var(--fb-c) 14%, var(--c-card));
+      border: 1.5px solid color-mix(in srgb, var(--fb-c) 45%, transparent);
+    }
+    .fb-dog { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; display: block; }
+
+    .fb-icon-wrap {
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      width: 42px; height: 42px; border-radius: 13px;
+      background: color-mix(in srgb, var(--fb-c) 12%, var(--c-card));
+    }
     .fb-icon {
-      font-size: 20px; flex-shrink: 0;
+      font-size: 24px; color: var(--fb-c);
       font-variation-settings: 'FILL' 1, 'wght' 400;
     }
-    .fb-toast--success .fb-icon { color: #43a047; }
-    .fb-toast--error   .fb-icon { color: #ef5350; }
-    .fb-toast--info    .fb-icon { color: var(--c-brand); }
-    .fb-dog {
-      width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%;
-      object-fit: cover; display: block;
-    }
-    .fb-msg { flex: 1; font-size: 13.5px; font-weight: 600; line-height: 1.4; }
+
+    .fb-msg { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 700; line-height: 1.35; }
     .fb-close {
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-      width: 26px; height: 26px; border-radius: 50%; border: none;
+      width: 30px; height: 30px; border-radius: 50%; border: none;
       background: transparent; color: var(--c-text-3);
       cursor: pointer; touch-action: manipulation;
       transition: background 0.15s, color 0.15s;
-      .material-symbols-outlined { font-size: 16px; }
+      .material-symbols-outlined { font-size: 18px; }
       &:hover { background: var(--c-hover); color: var(--c-text); }
     }
     @keyframes fb-in {
-      from { transform: translateY(14px); opacity: 0; }
-      to   { transform: translateY(0);    opacity: 1; }
+      from { transform: translateY(16px) scale(0.97); opacity: 0; }
+      to   { transform: translateY(0)    scale(1);    opacity: 1; }
     }
   `],
 })
@@ -86,7 +118,7 @@ export class FeedbackToastComponent {
   readonly data = inject<FeedbackToastData>(MAT_SNACK_BAR_DATA);
   private readonly ref = inject(MatSnackBarRef<FeedbackToastComponent>);
   readonly icon = VARIANT_ICON[this.data.variant];
-  /** La cara de qui ho diu, quan el missatge té veu. */
+  /** La cara de qui ho diu. Només falta als errors. */
   readonly dog = this.data.mascot ? MASCOTS[this.data.mascot] : null;
 
   dismiss(): void {

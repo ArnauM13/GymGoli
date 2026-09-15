@@ -569,10 +569,10 @@ export class TemplatesComponent {
           category: this.editorCat,
           entries: this.editorEntries,
         });
-        this.feedback.success('Plantilla actualitzada', 2000);
+        this.feedback.success('Plantilla actualitzada', 2000, 'marley');
       } else {
         await this.templateService.create(this.editorName.trim(), this.editorCat, this.editorEntries);
-        this.feedback.success('Plantilla creada', 2000);
+        this.feedback.success('Plantilla creada', 2000, 'marley');
       }
       this.closeEditor();
     } catch {
@@ -583,7 +583,7 @@ export class TemplatesComponent {
   async deleteTemplate(id: string): Promise<void> {
     try {
       await this.templateService.delete(id);
-      this.feedback.success('Plantilla eliminada', 2000);
+      this.feedback.success('Plantilla eliminada', 2000, 'marley');
     } catch {
       this.feedback.error('Error en eliminar', 3000);
     }
@@ -601,7 +601,7 @@ export class TemplatesComponent {
         .filter((e): e is Exercise => e !== undefined)
         .map(e => ({ exerciseId: e.id, exerciseName: e.name }));
       await this.templateService.create(t.name, t.category, entries);
-      this.feedback.success('Plantilla afegida', 2000);
+      this.feedback.success('Plantilla afegida', 2000, 'marley');
     } catch {
       this.feedback.error('Error en afegir la plantilla', 3000);
     }

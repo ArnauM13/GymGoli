@@ -1007,6 +1007,20 @@ export class WorkoutService {
     await this._updateWorkout(workoutId, { sessionGroupId });
   }
 
+  /**
+   * Quan va passar l'entrenament dins del dia.
+   *
+   * `startedAt` és l'ordre del dia (migració 035), i per això és el que
+   * s'escriu quan algú ordena a mà les activitats d'una mateixa sessió: dir
+   * que la cinta va anar després del gimnàs és dir a quina hora va anar. Com
+   * `sessionGroupId`, és un camp escalar que puja pel camí de sempre.
+   */
+  async setStartedAt(workoutId: string, startedAt: Date): Promise<void> {
+    const workout = this._find(workoutId);
+    if (!workout || workout.startedAt?.getTime() === startedAt.getTime()) return;
+    await this._updateWorkout(workoutId, { startedAt });
+  }
+
   // ── Mutations ─────────────────────────────────────────────────────────────
   async addExerciseToWorkout(workoutId: string, entry: WorkoutEntry): Promise<void> {
     const workout = this._find(workoutId);

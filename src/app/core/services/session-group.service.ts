@@ -4,8 +4,13 @@ import { SportService } from './sport.service';
 import { WorkoutService } from './workout.service';
 import { isRoutineProjection } from './routine-projection.service';
 import {
-  ActivityItem, SessionGroup, activityOf, dateOf, groupDayFeed,
+  ActivityItem, SessionGroup, activityOf, activityTime, dateOf, groupDayFeed, hasExplicitTime,
 } from '../../shared/utils/session-group.utils';
+
+/** L'aire que es deixa entre dues activitats en ordenar-les a mà. Un minut:
+ *  prou perquè l'ordre sigui estricte i prou poc perquè l'hora resultant
+ *  continuï dient el que deia —això va passar cap aquí. */
+const ORDER_STEP_MS = 60_000;
 
 /**
  * Ajuntar i separar activitats d'una mateixa sessió.
@@ -59,6 +64,49 @@ export class SessionGroupService {
    *  només proposa, no: encara no existeix enlloc. */
   canMerge(group: SessionGroup): boolean {
     return group.items.every(i => !isRoutineProjection(activityOf(i).id));
+  }
+
+  /**
+   * Deixa les activitats d'una sessió en aquest ordre.
+   *
+   * L'ordre de dins d'una anada és el de com va anar —primer la cinta, després
+   * les sèries—, i qui ho sap és qui hi era. Fins ara sortia de l'hora de la
+   * fila i no es podia contradir: una activitat apuntada després però feta
+   * abans es quedava on l'hora la deixava.
+   *
+   * El que s'escriu és `startedAt`, que és **l'ordre del dia** des de la
+   * migració 035: dir que la cinta va anar primer és dir a quina hora va anar.
+   * Per això no cal cap columna nova ni cap camp que s'hagi de mantenir
+   * d'acord amb un altre — hi ha una sola manera de saber quan va passar una
+   * activitat, i ordenar-les l'escriu.
+   *
+   * S'escriuen les mínimes files: qui ja és a la seva hora no es torna a
+   * tocar, o sigui que moure'n una en una sessió de tres en toca dues.
+   */
+  async reorder(items: ActivityItem[]): Promise<void> {
+    if (items.length < 2) return;
+
+    const day = dateOf(items[0]);
+    if (items.some(i => dateOf(i) !== day)) {
+      throw new Error('Una sessió no surt mai d\'un dia');
+    }
+
+    const base = Math.min(...items.map(activityTime));
+    for (const [i, item] of items.entries()) {
+      const when = base + i * ORDER_STEP_MS;
+      if (hasExplicitTime(item) && activityTime(item) === when) continue;
+      await this.setStartedAt(item, new Date(when));
+    }
+  }
+
+  /** Quan va passar l'activitat dins del dia. Cada servei se n'escriu la
+   *  seva; d'aquí només surt a quina banda va. */
+  async setStartedAt(item: ActivityItem, startedAt: Date): Promise<void> {
+    if (item.kind === 'workout') {
+      await this.workoutService.setStartedAt(item.workout.id, startedAt);
+      return;
+    }
+    await this.sportService.setStartedAt(item.session.id, item.session.date, startedAt);
   }
 
   /**

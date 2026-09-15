@@ -116,6 +116,27 @@ describe('session-group.utils', () => {
     });
   });
 
+  // Ordenar una sessió a mà és dir a quina hora va anar cada cosa, i llavors
+  // aquella hora mana per sobre de qualsevol regla —també de la de posar els
+  // plans al davant. Si no, moure un pla dins d'una anada no serviria de res.
+  describe('ordenar a mà dins d\'una sessió', () => {
+    it('un pla amb hora dita es queda on l\'han posat', () => {
+      const groups = groupDayFeed(
+        [w('pla', 'g1', { status: 'planned', createdAt: at('23:00'), startedAt: at('19:00') })],
+        [s('run', 'g1', { createdAt: at('18:00') })],
+      );
+      expect(groups[0].items.map(i => i.kind)).toEqual(['sport', 'workout']);
+    });
+
+    it('i sense hora dita continua anant al davant', () => {
+      const groups = groupDayFeed(
+        [w('pla', 'g1', { status: 'planned', createdAt: at('23:00') })],
+        [s('run', 'g1', { createdAt: at('18:00') })],
+      );
+      expect(groups[0].items.map(i => i.kind)).toEqual(['workout', 'sport']);
+    });
+  });
+
   describe('activityTime()', () => {
     it('sense hora de començament, l\'alta de la fila ja és l\'hora bona', () => {
       expect(activityTime({ kind: 'workout', workout: w('a') })).toBe(at('12:00').getTime());

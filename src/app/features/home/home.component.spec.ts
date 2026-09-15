@@ -237,9 +237,11 @@ describe('HomeComponent', () => {
       return d.toISOString().split('T')[0];
     };
 
-    it('offers to start a workout on today', () => {
+    // Un sol verb al botó gran, i el mateix tots els dies que ja han
+    // arribat: registrar. Planificar avui viu dins la targeta del dia.
+    it('offers to log a workout on today', () => {
       expect(component.dayAction().kind).toBe('today');
-      expect(component.dayAction().label).toBe('Comença un entrenament');
+      expect(component.dayAction().label).toBe('Registra un entrenament');
     });
 
     it('offers to log one on a past day', () => {
@@ -298,25 +300,23 @@ describe('HomeComponent', () => {
     //
     // Avui es pot fer ara o deixar apuntat, i els altres dies no: un de
     // passat ja ha passat i un de futur només es pot planificar, cosa que el
-    // botó sencer ja fa. Per això només avui es parteix.
-    describe('planificar avui, partint el botó', () => {
+    // botó gran ja fa. El d'avui va dins la targeta del dia, sota el que el
+    // dia ja té: el botó gran no es parteix per res.
+    describe('planificar avui, des de la targeta del dia', () => {
       const planBtn = (): HTMLElement | null =>
-        (fixture.nativeElement as HTMLElement).querySelector('.swb-plan');
-      const mainBtn = (): HTMLElement =>
-        (fixture.nativeElement as HTMLElement).querySelector('.start-workout-btn')!;
+        (fixture.nativeElement as HTMLElement).querySelector('.today-plan-btn');
 
-      it("hi és quan el dia triat és avui", () => {
+      it("hi és quan el dia triat és avui, i el botó gran va sencer", () => {
         fixture.detectChanges();
         expect(planBtn()).toBeTruthy();
-        expect((fixture.nativeElement as HTMLElement).querySelector('.swb-row--split')).toBeTruthy();
+        expect((fixture.nativeElement as HTMLElement).querySelector('.swb-plan')).toBeNull();
       });
 
-      it('no hi és cap altre dia: el botó va sencer', () => {
+      it('no hi és cap altre dia', () => {
         for (const days of [3, -3]) {
           component.selectedDate.set(shift(days));
           fixture.detectChanges();
           expect(planBtn()).toBeNull();
-          expect((fixture.nativeElement as HTMLElement).querySelector('.swb-row--split')).toBeNull();
         }
       });
 
@@ -328,11 +328,23 @@ describe('HomeComponent', () => {
         expect(navigateSpy).toHaveBeenCalledWith(['/train'], { queryParams: { date: TODAY, plan: 1 } });
       });
 
-      // El botó gros del costat no s'ha de moure de lloc: són dos verbs, no
-      // un que en canvia.
-      it("no toca el que fa la meitat gran", () => {
+      // Planificar la primera cosa del dia i afegir-ne una segona no són el
+      // mateix gest: el botó ho diu.
+      it('el que hi diu depèn de si el dia ja té pla', () => {
+        expect(component.planLabel()).toBe('Planificar avui');
+
+        // El pla arriba amb les dades; el senyal cru és el que desperta la
+        // targeta del dia (els ajudants per data són índexs memoritzats).
+        (TestBed.inject(WorkoutService).getPlannedForDate as jasmine.Spy)
+          .and.returnValue([makeWorkout({ id: 'p1', date: TODAY, status: 'planned' })]);
+        doneWorkoutsSignal.set([...doneWorkoutsSignal()]);
+
+        expect(component.planLabel()).toBe('Afegir al pla d\'avui');
+      });
+
+      it("no toca el que fa el botó gran", () => {
         fixture.detectChanges();
-        mainBtn().click();
+        (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('.start-workout-btn')!.click();
         expect(navigateSpy).toHaveBeenCalledWith(['/train']);
       });
     });

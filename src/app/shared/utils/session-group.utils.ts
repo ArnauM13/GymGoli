@@ -103,6 +103,19 @@ export function isPlannedItem(item: ActivityItem): boolean {
   return (a.status ?? 'done') === 'planned';
 }
 
+/**
+ * Té una hora dita expressament, i no la de l'alta de la fila.
+ *
+ * `startedAt` vol dir «això va passar aquí»: l'escriu qui comença un pla i
+ * l'escriu qui ordena una sessió a mà. En tots dos casos és una hora que algú
+ * ha decidit, o sigui que mana per sobre de qualsevol regla d'ordre — també
+ * per sobre de la de posar els plans al davant.
+ */
+export function hasExplicitTime(item: ActivityItem): boolean {
+  const a = item.kind === 'workout' ? item.workout : item.session;
+  return !!a.startedAt;
+}
+
 /** Les icones de les activitats de la sessió, amb el seu color: és el que fa
  *  reconèixer d'un cop d'ull de què està feta l'anada. */
 export function groupIcons(group: SessionGroup): { icon: string; color: string }[] {
@@ -165,8 +178,20 @@ export function groupDayFeed(
 /** L'ordre de dins d'una sessió, i el de les sessions entre elles: el que ha
  *  passat abans va abans, i el que encara no ha passat, al davant. */
 function byWhenItHappened(a: ActivityItem, b: ActivityItem): number {
-  return Number(!isPlannedItem(a)) - Number(!isPlannedItem(b))
+  return Number(!floatsToTop(a)) - Number(!floatsToTop(b))
     || activityTime(a) - activityTime(b);
+}
+
+/**
+ * Va al davant perquè encara no ha passat.
+ *
+ * Un pla no té hora: surt primer i baixa al seu lloc el dia que es fa. Ara
+ * bé, si algú li ha posat hora ordenant la sessió a mà (`hasExplicitTime`),
+ * aquella hora és la resposta i la regla calla — o moure un pla dins d'una
+ * anada no serviria de res, que tornaria a pujar de cop.
+ */
+function floatsToTop(item: ActivityItem): boolean {
+  return isPlannedItem(item) && !hasExplicitTime(item);
 }
 
 /** Una sessió és un pla mentre no se n'hagi fet res. */
