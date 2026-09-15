@@ -11,6 +11,8 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
 import { ActivityCardComponent } from '../../shared/components/activity-card/activity-card.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { SportDetailComponent } from '../../shared/components/sport-detail/sport-detail.component';
+import { SessionMergeComponent } from '../../shared/components/session-merge/session-merge.component';
+import { ActivityItem } from '../../shared/utils/session-group.utils';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { NavigationHistoryService } from '../../core/services/navigation-history.service';
@@ -28,7 +30,7 @@ import { ActivityStat, feedDayLabel, formatFeeling, sportCardStats } from '../..
 @Component({
   selector: 'app-sport-session',
   standalone: true,
-  imports: [ActivityCardComponent, PageHeaderComponent, SportDetailComponent],
+  imports: [ActivityCardComponent, PageHeaderComponent, SportDetailComponent, SessionMergeComponent],
   template: `
     <div class="page">
 
@@ -72,6 +74,12 @@ import { ActivityStat, feedDayLabel, formatFeeling, sportCardStats } from '../..
             Editar la sessió
           </button>
 
+          <!-- ── Ha estat la mateixa anada? ──
+               El mateix oferiment que a la pàgina d'un entrenament: si el dia
+               té una altra sessió —feta o apuntada—, aquí s'uneixen. Mentre
+               s'edita no: allà s'està tocant una altra cosa. -->
+          <app-session-merge [item]="mergeItem(p)" />
+
         } @else {
 
           <!-- ── Editar ──
@@ -95,7 +103,9 @@ import { ActivityStat, feedDayLabel, formatFeeling, sportCardStats } from '../..
                   </div>
                   <div class="sl-stepper">
                     <button class="sl-step-btn" (click)="adjustDuration(-5)" aria-label="Menys 5 minuts">−5</button>
-                    <span class="sl-step-val">{{ editDuration() }}<small>min</small></span>
+                    <span class="sl-step-val">
+                      @if (editDuration()) { {{ editDuration() }}<small>min</small> } @else { <small>Sense durada</small> }
+                    </span>
                     <button class="sl-step-btn" (click)="adjustDuration(5)" aria-label="Més 5 minuts">+5</button>
                   </div>
                 </div>
@@ -478,6 +488,12 @@ export class SportSessionComponent {
     return formatFeeling(level, this.settingsService.difficultyScale());
   }
 
+  /** Aquesta sessió com a activitat, per oferir d'unir-la amb una altra del
+   *  dia. Un pla també: una anada es prepara igual que es viu. */
+  mergeItem(p: { sport: Sport; session: SportSession }): ActivityItem {
+    return { kind: 'sport', sport: p.sport, session: p.session };
+  }
+
   /** La pàgina segueix la sessió, no l'id amb què s'hi va entrar: un
    *  planificat de la rutina no és cap fila, i registrar-lo o guardar-hi
    *  dades el converteix en una de nova. Es canvia l'URL enlloc seu perquè
@@ -498,7 +514,9 @@ export class SportSessionComponent {
   /** Obrir el formulari el carrega amb el que la sessió ja porta; tancar-lo
    *  (Cancel·lar) llença els canvis sense guardar. */
   openEdit(p: { sport: Sport; session: SportSession }): void {
-    this.editDuration.set(p.session.duration ?? 60);
+    // Sense durada es queda sense: un esport es pot deixar apuntat buit, i
+    // obrir-ne el formulari no li ha d'inventar una hora que no has dit.
+    this.editDuration.set(p.session.duration ?? 0);
     this.editSubtype.set(p.session.subtypeId ?? null);
     this.editFeeling.set(p.session.feeling ?? null);
     this.editMetrics.set({ ...(p.session.metrics ?? {}) });
@@ -533,8 +551,10 @@ export class SportSessionComponent {
     this.editSubtype.update(v => v === id ? null : id);
   }
 
+  /** Fins a zero, que vol dir «sense durada»: guardar-la la treu (vegeu
+   *  `save()`), i és l'única manera de desdir-se'n un cop posada. */
   adjustDuration(delta: number): void {
-    this.editDuration.update(v => Math.max(5, v + delta));
+    this.editDuration.update(v => Math.max(0, v + delta));
   }
 
   toggleFeeling(level: FeelingLevel): void {

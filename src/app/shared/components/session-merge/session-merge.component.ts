@@ -1,11 +1,9 @@
-import { Component, computed, inject, input, signal } from '@angular/core';
+import { Component, booleanAttribute, computed, inject, input, signal } from '@angular/core';
 
 import { SessionGroupService } from '../../../core/services/session-group.service';
-import { SportService } from '../../../core/services/sport.service';
-import { WorkoutService } from '../../../core/services/workout.service';
 import { FeedbackService } from '../../services/feedback.service';
 import {
-  ActivityItem, SessionGroup, activityOf, dateOf, groupDayFeed, groupIcons, groupTitle,
+  ActivityItem, SessionGroup, activityOf, dateOf, groupIcons, groupTitle,
   sessionKey, unifiedLine,
 } from '../../utils/session-group.utils';
 
@@ -18,10 +16,19 @@ import {
  * o sigui que unir-les s'ofereix **des de l'activitat**, just on acabes en
  * registrar-ne una: si el dia ja en té una altra, aquí hi surt.
  *
+ * Amb què es pot unir ho diu `SessionGroupService.groupsForDay()`, i vol dir
+ * **tot el que el dia té apuntat**: fet i planificat, gimnàs i esport. Una
+ * anada es prepara igual que es viu.
+ *
  * No es toca res del contingut: cada activitat es queda amb les seves sèries,
  * les seves mètriques i els seus rècords. L'única cosa que canvia és de quina
  * sessió són, i és el que fa que es comptin com una (vegeu
  * `shared/utils/session-group.utils`).
+ *
+ * ── Dues cares, un sol component ────────────────────────────────────────────
+ * Tal qual és la targeta que surt sota l'activitat que acabes de registrar.
+ * Amb `compact`, només la llista: és el que es desplega des del peu d'una
+ * targeta del feed, on la pregunta ja l'ha feta el botó que l'ha obert.
  *
  * Desfer-ho no és d'aquí: la sessió unida es separa des d'on es llegeix, al
  * peu de la caixa que l'engloba a Inici i a l'Historial.
@@ -31,17 +38,19 @@ import {
   standalone: true,
   template: `
     @if (targets().length) {
-      <div class="sm-card">
-        <div class="sm-head">
-          <span class="material-symbols-outlined sm-icon" aria-hidden="true">merge</span>
-          <div class="sm-head-text">
-            <span class="sm-title">Ha estat la mateixa sessió?</span>
-            <span class="sm-sub">Uneix-la amb una altra activitat d'avui i comptaran com una sola anada.</span>
+      <div class="sm-card" [class.sm-card--compact]="compact()">
+        @if (!compact()) {
+          <div class="sm-head">
+            <span class="material-symbols-outlined sm-icon" aria-hidden="true">merge</span>
+            <div class="sm-head-text">
+              <span class="sm-title">Ha estat la mateixa sessió?</span>
+              <span class="sm-sub">Uneix-la amb una altra activitat del dia i comptaran com una sola anada.</span>
+            </div>
+            <button class="sm-x" (click)="dismiss()" aria-label="Ara no">
+              <span class="material-symbols-outlined" aria-hidden="true">close</span>
+            </button>
           </div>
-          <button class="sm-x" (click)="dismiss()" aria-label="Ara no">
-            <span class="material-symbols-outlined" aria-hidden="true">close</span>
-          </button>
-        </div>
+        }
 
         <!-- Una fila per sessió, amb les icones de què està feta: la llista és
              curta —les altres sessions del dia— i s'ha de reconèixer d'un cop
@@ -68,6 +77,12 @@ import {
       background: var(--c-card); border-radius: 18px;
       border: 1.5px solid color-mix(in srgb, var(--c-brand) 30%, var(--c-border-2));
       box-shadow: 0 2px 10px var(--c-shadow);
+    }
+    /* Desplegada des del peu d'una targeta: la caixa i la pregunta ja són les
+       de fora, aquí només hi ha la llista. */
+    .sm-card--compact {
+      margin: 0; padding: 0;
+      background: none; border: none; box-shadow: none; border-radius: 0;
     }
     .sm-head { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 11px; }
     .sm-icon {
@@ -103,32 +118,28 @@ import {
   `],
 })
 export class SessionMergeComponent {
-  private workoutService = inject(WorkoutService);
-  private sportService   = inject(SportService);
   private sessionGroups  = inject(SessionGroupService);
   private feedback       = inject(FeedbackService);
 
   /** L'activitat que s'està mirant: la que s'unirà amb la que es triï. */
   readonly item = input.required<ActivityItem>();
+  /** Només la llista, sense caixa ni pregunta: per desplegar-la des del peu
+   *  d'una targeta, que ja les posa. */
+  readonly compact = input(false, { transform: booleanAttribute });
 
   readonly merging = signal(false);
   /** L'activitat per a la qual s'ha dit «ara no»: l'oferiment no ha de
    *  seguir-te la resta de l'entrenament si ja l'has apartat. */
   private readonly dismissed = signal<string | null>(null);
 
-  /**
-   * Les sessions fetes del dia. Un pla no hi entra: encara no és cap anada, i
-   * el grup diu com s'ha fet una cosa, no com es farà.
-   */
-  private readonly dayGroups = computed((): SessionGroup[] => {
-    const date = dateOf(this.item());
-    return groupDayFeed(
-      this.workoutService.getDoneWorkoutsForDate(date),
-      this.sportService.getSportSessionsForDate(date),
-    );
-  });
+  /** Les sessions del dia amb què es pot unir: les diu el servei, que és qui
+   *  sap què és una fila i què és només una projecció de la rutina. */
+  private readonly dayGroups = computed((): SessionGroup[] =>
+    this.sessionGroups.groupsForDay(dateOf(this.item()))
+  );
 
-  /** La sessió d'aquesta activitat, si el dia és carregat i és una de feta. */
+  /** La sessió d'aquesta activitat, si el dia és carregat i és de les que es
+   *  poden unir. */
   readonly mine = computed((): SessionGroup | null =>
     this.dayGroups().find(g => g.key === sessionKey(activityOf(this.item()))) ?? null
   );

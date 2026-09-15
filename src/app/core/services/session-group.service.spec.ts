@@ -27,17 +27,63 @@ describe('SessionGroupService', () => {
   let setWorkoutGroup: jasmine.Spy;
   let setSportGroup: jasmine.Spy;
 
+  /** El que el dia té apuntat, repartit tal com ho serveixen els dos
+   *  magatzems: fet i planificat, per separat. */
+  let plannedWorkouts: Workout[];
+  let doneWorkouts: Workout[];
+  let plannedSports: { sport: Sport; session: SportSession }[];
+  let doneSports: { sport: Sport; session: SportSession }[];
+
   beforeEach(() => {
     setWorkoutGroup = jasmine.createSpy().and.resolveTo(undefined);
     setSportGroup   = jasmine.createSpy().and.resolveTo(undefined);
+    plannedWorkouts = []; doneWorkouts = []; plannedSports = []; doneSports = [];
 
     TestBed.configureTestingModule({
       providers: [
-        { provide: WorkoutService, useValue: { setSessionGroup: setWorkoutGroup } },
-        { provide: SportService,   useValue: { setSessionGroup: setSportGroup } },
+        { provide: WorkoutService, useValue: {
+          setSessionGroup: setWorkoutGroup,
+          getPlannedForDate: () => plannedWorkouts,
+          getDoneWorkoutsForDate: () => doneWorkouts,
+        } },
+        { provide: SportService,   useValue: {
+          setSessionGroup: setSportGroup,
+          getPlannedSportSessionsForDate: () => plannedSports,
+          getSportSessionsForDate: () => doneSports,
+        } },
       ],
     });
     service = TestBed.inject(SessionGroupService);
+  });
+
+  // Amb què es pot unir una activitat es contesta aquí i enlloc més: la
+  // targeta, l'activitat oberta i Entrenament han de rebre la mateixa llista.
+  describe('groupsForDay()', () => {
+    it('hi entra tot el que el dia té apuntat, fet i planificat', () => {
+      doneWorkouts  = [{ id: 'w1', date: '2025-04-21', entries: [], createdAt: new Date() }];
+      plannedSports = [{
+        sport: SPORT,
+        session: { id: 's1', date: '2025-04-21', sportId: 'sp1', status: 'planned', createdAt: new Date() },
+      }];
+
+      // Els plans van al davant: encara no han passat i no tenen hora amb què
+      // ordenar-se entre el que ja s'ha fet.
+      expect(service.groupsForDay('2025-04-21').map(g => g.key)).toEqual(['s1', 'w1']);
+    });
+
+    it('el que la rutina només projecta queda fora: no és cap fila', () => {
+      plannedWorkouts = [{ id: 'routine:2025-04-21:gym:push', date: '2025-04-21', entries: [], createdAt: new Date(), status: 'planned' }];
+      plannedSports   = [{ sport: SPORT, session: { id: 'routine:2025-04-21:sport:sp1', date: '2025-04-21', sportId: 'sp1', status: 'planned', createdAt: new Date() } }];
+
+      expect(service.groupsForDay('2025-04-21')).toEqual([]);
+    });
+
+    it('i una sessió projectada no es pot unir a res', () => {
+      const projected = workout('routine:2025-04-21:gym:push');
+
+      expect(service.canMerge({ key: 'x', grouped: false, items: [projected] })).toBeFalse();
+      expect(service.canMerge({ key: 'x', grouped: false, items: [workout('w1')] })).toBeTrue();
+    });
   });
 
   describe('merge()', () => {

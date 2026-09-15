@@ -11,6 +11,7 @@ import { UserSettingsService } from '../../core/services/user-settings.service';
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { NavigationHistoryService } from '../../core/services/navigation-history.service';
+import { SessionGroupService } from '../../core/services/session-group.service';
 
 const TODAY = '2024-03-10';
 
@@ -97,6 +98,12 @@ describe('SportSessionComponent', () => {
         { provide: FeedbackService, useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
         { provide: ConfirmDialogService, useValue: { confirm } },
         { provide: NavigationHistoryService, useValue: { goBack } },
+        // La pàgina ofereix unir la sessió amb una altra del dia; qui diu amb
+        // quines és el servei, i aquí el dia no en té cap més.
+        {
+          provide: SessionGroupService,
+          useValue: { groupsForDay: () => [], merge: jasmine.createSpy().and.resolveTo('g1') },
+        },
       ],
     })
       .overrideComponent(SportSessionComponent, { set: { schemas: [NO_ERRORS_SCHEMA] } })

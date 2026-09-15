@@ -27,6 +27,7 @@ import { UserSettings, DEFAULT_USER_SETTINGS } from '../../core/models/user-sett
 import { ConfirmDialogService } from '../../shared/services/confirm-dialog.service';
 import { FeedbackService } from '../../shared/services/feedback.service';
 import { TrainingTypeService } from '../../core/services/training-type.service';
+import { SessionGroupService } from '../../core/services/session-group.service';
 import { DEFAULT_TRAINING_TYPES } from '../../core/models/training-type.model';
 
 const TODAY = new Date().toISOString().split('T')[0];
@@ -92,6 +93,7 @@ describe('TrainComponent', () => {
       sportsLoaded:            signal(true),
       hasSportOnDate:          jasmine.createSpy().and.returnValue(false),
       getSessionForDate:       jasmine.createSpy().and.returnValue(null),
+      getSessionById:          jasmine.createSpy().and.returnValue(null),
       getSportSessionsForDate:        jasmine.createSpy().and.returnValue([]),
       getPlannedSportSessionsForDate: jasmine.createSpy().and.returnValue([]),
       ensureMonthLoaded:       jasmine.createSpy().and.callFake(() => { monthLoadProbe(); }),
@@ -523,6 +525,67 @@ describe('TrainComponent', () => {
     });
   });
 
+  // ── A quina sessió va el que es crea ─────────────────────────────────────
+
+  // Una sessió és una anada: al gimnàs i, en acabar, vint minuts de cinta. El
+  // moment de dir-ho és quan vas a apuntar la segona activitat.
+  describe('triar la sessió del que es crea', () => {
+    const sport = { id: 's1', name: 'Padel', icon: 'sports_tennis', color: '#000', subtypes: [], metricDefs: [] } as any;
+    let mergeSpy: jasmine.Spy;
+
+    /** El dia ja té una activitat feta, o sigui que hi ha sessió on afegir. */
+    function dayWithOneSession(): void {
+      (TestBed.inject(WorkoutService).getDoneWorkoutsForDate as jasmine.Spy)
+        .and.returnValue([makeWorkout({ id: 'w1', date: '2999-01-05', categories: ['push'] })]);
+      component.selectedDate.set('2999-01-05');
+      mergeSpy = spyOn(TestBed.inject(SessionGroupService), 'merge').and.resolveTo('g1');
+    }
+
+    it('no es pregunta res quan el dia encara és buit', () => {
+      component.selectedDate.set('2999-01-04');
+      expect(component.daySessions()).toEqual([]);
+    });
+
+    it('i es pregunta quan el dia ja té alguna cosa apuntada', () => {
+      dayWithOneSession();
+      expect(component.daySessions().map(g => g.key)).toEqual(['w1']);
+      // Per defecte, el que es creï és una anada nova: el cas de sempre.
+      expect(component.joinTarget()).toBeNull();
+    });
+
+    it("l'entrenament que es crea entra a la sessió triada", async () => {
+      dayWithOneSession();
+      (TestBed.inject(WorkoutService) as unknown as { workouts: ReturnType<typeof signal<Workout[]>> })
+        .workouts.set([makeWorkout({ id: 'plan-id', date: '2999-01-05' })]);
+      component.chooseSession('w1');
+
+      component.selectType('push');
+      await component.pickerStartEmpty();
+
+      const [mine, target] = mergeSpy.calls.mostRecent().args as [any[], any[]];
+      expect(mine[0].workout.id).toBe('plan-id');
+      expect(target[0].workout.id).toBe('w1');
+    });
+
+    it("i l'esport també, que la pregunta és la mateixa", async () => {
+      dayWithOneSession();
+      sportService['getSessionById'].and.returnValue({ id: 'new-sess', date: '2999-01-05', sportId: 's1' });
+      component.chooseSession('w1');
+
+      await component.startSportSession(sport);
+
+      const [mine, target] = mergeSpy.calls.mostRecent().args as [any[], any[]];
+      expect(mine[0].session.id).toBe('new-sess');
+      expect(target[0].workout.id).toBe('w1');
+    });
+
+    it('una clau que ja no existeix no apunta enlloc', () => {
+      dayWithOneSession();
+      component.chooseSession('fantasma');
+      expect(component.joinTarget()).toBeNull();
+    });
+  });
+
   // ── deleteActiveWorkout() ────────────────────────────────────────────────
 
   describe('deleteActiveWorkout()', () => {
@@ -590,8 +653,16 @@ describe('TrainComponent', () => {
       component.selectedDate.set('2999-01-01');
       await component.startSportSession(sport);
 
+      // Un pla neix buit: quants minuts penses jugar és per a quan ho sàpigues.
       expect(sportService['logSession']).toHaveBeenCalledWith(
-        '2999-01-01', 's1', jasmine.any(Object), 'planned', 'manual');
+        '2999-01-01', 's1', {}, 'planned', 'manual');
+    });
+
+    it("i planificar-lo no et treu d'Entrenament: el dia se segueix planificant", async () => {
+      component.selectedDate.set('2999-01-01');
+      await component.startSportSession(sport);
+
+      expect(navigateSpy).not.toHaveBeenCalled();
     });
 
     it("no en crea una altra si el dia ja en té: hi va", async () => {

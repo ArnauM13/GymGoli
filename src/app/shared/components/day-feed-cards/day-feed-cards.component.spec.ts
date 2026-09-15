@@ -9,9 +9,20 @@ import { ExerciseService } from '../../../core/services/exercise.service';
 import { FeedbackService } from '../../services/feedback.service';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import { Workout } from '../../../core/models/workout.model';
+import { Sport, SportSession } from '../../../core/models/sport.model';
 
 function makeWorkout(overrides: Partial<Workout> = {}): Workout {
   return { id: '1', date: '2024-01-01', entries: [], createdAt: new Date(), ...overrides };
+}
+
+/** Què ofereix el peu de cada sessió: unir, separar, o res. Sense la icona,
+ *  que amb la font de símbols també és text. */
+function footLabels(host: HTMLElement): string[] {
+  return Array.from(host.querySelectorAll('.sg-foot .sg-split'), btn => {
+    const copy = btn.cloneNode(true) as HTMLElement;
+    copy.querySelectorAll('.material-symbols-outlined').forEach(icon => icon.remove());
+    return copy.textContent?.trim() ?? '';
+  });
 }
 
 describe('DayFeedCardsComponent', () => {
@@ -26,6 +37,10 @@ describe('DayFeedCardsComponent', () => {
   let deleteSession: jasmine.Spy;
   let startPlannedSession: jasmine.Spy;
   let confirm: jasmine.Spy;
+  /** El que el dia té apuntat, que és el que el servei llegeix per dir amb
+   *  què es pot unir cada sessió. */
+  let dayWorkouts: Workout[];
+  let daySports: { sport: Sport; session: SportSession }[];
 
   beforeEach(async () => {
     // Torna l'id de l'entrenament que s'ha d'obrir: un planificat de la
@@ -41,15 +56,23 @@ describe('DayFeedCardsComponent', () => {
     confirm = jasmine.createSpy().and.resolveTo(true);
     setWorkoutGroup = jasmine.createSpy().and.resolveTo(undefined);
     setSportGroup   = jasmine.createSpy().and.resolveTo(undefined);
+    // El que el dia té apuntat, tal com ho llegiria `SessionGroupService`:
+    // és el que decideix si aquesta sessió es pot unir amb cap altra.
+    dayWorkouts = [];
+    daySports   = [];
 
     await TestBed.configureTestingModule({
       imports: [DayFeedCardsComponent],
       providers: [
         { provide: WorkoutService, useValue: {
           startPlannedWorkout, editPlannedWorkout, deleteWorkout, setSessionGroup: setWorkoutGroup,
+          getPlannedForDate: () => dayWorkouts.filter(w => w.status === 'planned'),
+          getDoneWorkoutsForDate: () => dayWorkouts.filter(w => (w.status ?? 'done') !== 'planned'),
         } },
         { provide: SportService, useValue: {
           updateSession, deleteSession, startPlannedSession, setSessionGroup: setSportGroup,
+          getPlannedSportSessionsForDate: () => daySports.filter(p => p.session.status === 'planned'),
+          getSportSessionsForDate: () => daySports.filter(p => (p.session.status ?? 'done') !== 'planned'),
           sessions: signal([]),
           sportHistoryLoaded: () => false,
           loadSessionsForSport: jasmine.createSpy().and.resolveTo(undefined),
@@ -444,10 +467,10 @@ describe('DayFeedCardsComponent', () => {
       const el = fixture.nativeElement as HTMLElement;
       const foot = el.querySelector('.sg--grouped > .sg-foot');
       expect(foot?.querySelector('.sg-split')?.textContent).toContain('Separar sessions');
-      // I no hi és quan cada activitat ja va sola.
+      // I no hi és quan cada activitat ja va sola: no hi ha res a separar.
       fixture.componentRef.setInput('day', day());
       fixture.detectChanges();
-      expect(el.querySelector('.sg-split')).toBeNull();
+      expect(footLabels(el)).not.toContain('Separar sessions');
     });
 
     it('separar desfà la sessió sencera', async () => {
@@ -458,6 +481,52 @@ describe('DayFeedCardsComponent', () => {
 
       expect(setWorkoutGroup).toHaveBeenCalledWith('w1', undefined);
       expect(setSportGroup).toHaveBeenCalledWith('sess1', '2024-03-05', null);
+    });
+
+    // Unir i separar són les dues cares de la mateixa cosa i viuen al mateix
+    // peu: el de després, quan les dues activitats ja estan apuntades.
+    describe('unir des de la targeta', () => {
+      /** El dia, tal com el llegiria el servei: dues sessions soltes. */
+      function twoLooseSessions(): void {
+        const d = day();
+        dayWorkouts = d.workouts;
+        daySports   = d.sports;
+        fixture.componentRef.setInput('day', d);
+        fixture.detectChanges();
+      }
+
+      it('s\'ofereix quan el dia té una altra sessió', () => {
+        twoLooseSessions();
+        expect(footLabels(fixture.nativeElement).filter(t => t === 'Unir amb una altra').length).toBe(2);
+      });
+
+      it('i no quan no n\'hi ha cap més', () => {
+        fixture.componentRef.setInput('day', day());
+        fixture.detectChanges();
+        expect(footLabels(fixture.nativeElement)).not.toContain('Unir amb una altra');
+      });
+
+      it('tocar-lo desplega les altres sessions del dia, i només una alhora', () => {
+        twoLooseSessions();
+        const [first, second] = component.groups();
+
+        component.toggleMerge(first);
+        fixture.detectChanges();
+        expect((fixture.nativeElement as HTMLElement).querySelectorAll('.sg-merge').length).toBe(1);
+
+        component.toggleMerge(second);
+        expect(component.mergeOpen()).toBe(second.key);
+
+        component.toggleMerge(second);
+        expect(component.mergeOpen()).toBeNull();
+      });
+
+      // Un planificat de la rutina no és cap fila: no s'hi pot posar res dins.
+      it('una sessió que la rutina només proposa no s\'ofereix', () => {
+        const projected = makeWorkout({ id: 'routine:2024-03-05:gym:push', date: '2024-03-05', status: 'planned' });
+        expect(component.canMerge({ key: projected.id, grouped: false, items: [{ kind: 'workout', workout: projected }] }))
+          .toBeFalse();
+      });
     });
   });
 

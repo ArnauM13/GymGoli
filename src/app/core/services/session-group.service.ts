@@ -2,7 +2,10 @@ import { Injectable, inject } from '@angular/core';
 
 import { SportService } from './sport.service';
 import { WorkoutService } from './workout.service';
-import { ActivityItem, activityOf, dateOf } from '../../shared/utils/session-group.utils';
+import { isRoutineProjection } from './routine-projection.service';
+import {
+  ActivityItem, SessionGroup, activityOf, dateOf, groupDayFeed,
+} from '../../shared/utils/session-group.utils';
 
 /**
  * Ajuntar i separar activitats d'una mateixa sessió.
@@ -21,6 +24,42 @@ import { ActivityItem, activityOf, dateOf } from '../../shared/utils/session-gro
 export class SessionGroupService {
   private workoutService = inject(WorkoutService);
   private sportService   = inject(SportService);
+
+  /**
+   * Les sessions d'un dia que es poden unir entre elles.
+   *
+   * **Tot el que hi ha apuntat aquell dia**: el que ja s'ha fet i el que
+   * encara està planificat, del gimnàs i de fora. Una anada es prepara igual
+   * que es viu —el pàdel de dimarts i la cinta de després es poden deixar
+   * apuntats junts—, i abans això només valia per a les sessions fetes: unir
+   * dos plans no s'oferia enlloc.
+   *
+   * El que la rutina només projecta queda fora: no és cap fila, o sigui que no
+   * hi ha res a posar dins de cap sessió. Comença'l i llavors sí.
+   *
+   * Va acotat a un dia —un grup no surt mai d'un dia— i es llegeix d'aquí i
+   * d'enlloc més: qui pregunta «amb què puc unir això?» ha de rebre sempre la
+   * mateixa resposta, la demani des de la targeta, des de l'activitat oberta o
+   * des d'Entrenament.
+   */
+  groupsForDay(date: string): SessionGroup[] {
+    const workouts = [
+      ...this.workoutService.getPlannedForDate(date),
+      ...this.workoutService.getDoneWorkoutsForDate(date),
+    ].filter(w => !isRoutineProjection(w.id));
+    const sports = [
+      ...this.sportService.getPlannedSportSessionsForDate(date),
+      ...this.sportService.getSportSessionsForDate(date),
+    ].filter(p => !isRoutineProjection(p.session.id));
+
+    return groupDayFeed(workouts, sports);
+  }
+
+  /** Cert si aquesta sessió es pot unir amb una altra. Una que la rutina
+   *  només proposa, no: encara no existeix enlloc. */
+  canMerge(group: SessionGroup): boolean {
+    return group.items.every(i => !isRoutineProjection(activityOf(i).id));
+  }
 
   /**
    * Ajunta dues sessions que ja hi són en una de sola.

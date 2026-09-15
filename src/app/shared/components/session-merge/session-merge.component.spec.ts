@@ -3,12 +3,10 @@ import { TestBed } from '@angular/core/testing';
 
 import { SessionMergeComponent } from './session-merge.component';
 import { SessionGroupService } from '../../../core/services/session-group.service';
-import { SportService } from '../../../core/services/sport.service';
-import { WorkoutService } from '../../../core/services/workout.service';
 import { FeedbackService } from '../../services/feedback.service';
 import { Sport, SportSession } from '../../../core/models/sport.model';
 import { Workout } from '../../../core/models/workout.model';
-import { ActivityItem } from '../../utils/session-group.utils';
+import { ActivityItem, groupDayFeed } from '../../utils/session-group.utils';
 
 const DAY = '2025-04-21';
 
@@ -48,9 +46,12 @@ describe('SessionMergeComponent', () => {
     TestBed.configureTestingModule({
       imports: [SessionMergeComponent],
       providers: [
-        { provide: WorkoutService, useValue: { getDoneWorkoutsForDate: () => workouts } },
-        { provide: SportService,   useValue: { getSportSessionsForDate: () => sports } },
-        { provide: SessionGroupService, useValue: { merge } },
+        // Amb què es pot unir ho diu el servei; aquí s'hi posa el dia sencer,
+        // que és el que ell contesta a partir dels dos magatzems.
+        {
+          provide: SessionGroupService,
+          useValue: { merge, groupsForDay: () => groupDayFeed(workouts, sports) },
+        },
         { provide: FeedbackService, useValue: { success, error: jasmine.createSpy() } },
       ],
     }).overrideComponent(SessionMergeComponent, { set: { schemas: [NO_ERRORS_SCHEMA] } });
@@ -124,16 +125,32 @@ describe('SessionMergeComponent', () => {
     expect((fixture.nativeElement as HTMLElement).querySelector('.sm-card')).toBeNull();
   });
 
-  it('un pla no s\'uneix a res: encara no és cap anada', () => {
-    // Un planificat no surt entre les sessions fetes del dia, o sigui que no
-    // té sessió pròpia i no s\'ofereix res.
+  // Una anada es prepara igual que es viu: el pàdel i la cinta que penses fer
+  // seguits es poden deixar apuntats junts.
+  it('un pla s\'uneix com qualsevol altra cosa', () => {
     const planned = { ...workout('w9'), status: 'planned' as const };
     const { component } = setup({
       item: { kind: 'workout', workout: planned },
-      workouts: [workout('w1')],
+      workouts: [planned, workout('w1')],
     });
 
-    expect(component.mine()).toBeNull();
-    expect(component.targets()).toEqual([]);
+    expect(component.mine()?.key).toBe('w9');
+    expect(component.targets().map(g => g.key)).toEqual(['w1']);
+  });
+
+  // La targeta sencera surt sota l'activitat acabada de registrar; desplegada
+  // des del peu d'una del feed, la pregunta ja l'ha feta el botó que l'obre.
+  it('compacta, només la llista', () => {
+    const w = workout('w1');
+    const { fixture } = setup({
+      item: { kind: 'workout', workout: w },
+      workouts: [w], sports: [sportPair('s1')],
+    });
+    fixture.componentRef.setInput('compact', true);
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('.sm-head')).toBeNull();
+    expect(host.querySelectorAll('.sm-btn').length).toBe(1);
   });
 });

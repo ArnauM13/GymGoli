@@ -1,6 +1,7 @@
 import { Component, booleanAttribute, computed, inject, input, output, signal } from '@angular/core';
 
 import { ActivityCardComponent } from '../activity-card/activity-card.component';
+import { SessionMergeComponent } from '../session-merge/session-merge.component';
 import { SportDetailComponent } from '../sport-detail/sport-detail.component';
 import { WorkoutDetailComponent } from '../workout-detail/workout-detail.component';
 import { Sport, SportSession } from '../../../core/models/sport.model';
@@ -39,7 +40,7 @@ export interface DayFeedEntry {
 @Component({
   selector: 'app-day-feed-cards',
   standalone: true,
-  imports: [ActivityCardComponent, SportDetailComponent, WorkoutDetailComponent],
+  imports: [ActivityCardComponent, SportDetailComponent, WorkoutDetailComponent, SessionMergeComponent],
   template: `
     @for (group of groups(); track group.key) {
       <div class="sg" [class.sg--grouped]="group.grouped">
@@ -145,17 +146,39 @@ export interface DayFeedEntry {
           }
         }
 
-        <!-- ── Desfer la sessió ──
-             Unir-les es fa des de l'activitat; desfer-ho, des d'aquí: el botó
-             és de la caixa, no de cap targeta de dins, perquè el que separa és
-             la sessió sencera. A baix a la dreta, l'últim que es llegeix del
-             bloc i sense pes: no és el pas que s'espera de ningú. -->
-        @if (group.grouped) {
+        <!-- ── Ajuntar i separar ──
+             Les dues cares de la mateixa cosa, i totes dues al peu del bloc:
+             el dia amb què s'uneix o del que se separa és la sessió sencera,
+             no cap targeta de dins. «Unir» només quan el dia té alguna altra
+             sessió amb què fer-ho —fet o planificat, tant li fa— i «Separar»
+             només quan ja n'hi ha dues de juntes. A baix a la dreta i sense
+             pes: no és el pas que s'espera de ningú.
+
+             Unir des d'aquí és el camí de després: el de mentre encara hi ets
+             és la targeta que surt sota l'activitat acabada de registrar. Un i
+             altre fan la mateixa pregunta al mateix lloc. -->
+        @if (canMerge(group) || group.grouped) {
           <div class="sg-foot">
-            <button class="sg-split" (click)="split(group)" [disabled]="splitting() === group.key">
-              <span class="material-symbols-outlined" aria-hidden="true">link_off</span>
-              Separar sessions
-            </button>
+            @if (canMerge(group)) {
+              <button class="sg-split" [class.sg-split--on]="mergeOpen() === group.key"
+                      (click)="toggleMerge(group)"
+                      [attr.aria-expanded]="mergeOpen() === group.key">
+                <span class="material-symbols-outlined" aria-hidden="true">add_link</span>
+                Unir amb una altra
+              </button>
+            }
+            @if (group.grouped) {
+              <button class="sg-split" (click)="split(group)" [disabled]="splitting() === group.key">
+                <span class="material-symbols-outlined" aria-hidden="true">link_off</span>
+                Separar sessions
+              </button>
+            }
+          </div>
+        }
+
+        @if (mergeOpen() === group.key) {
+          <div class="sg-merge">
+            <app-session-merge [item]="group.items[0]" compact />
           </div>
         }
 
@@ -239,7 +262,9 @@ export interface DayFeedEntry {
     /* ── Separar la sessió, al peu de la caixa ──
        Separar és de segon terme: sense fons ni vora, a baix a la dreta i en
        el to apagat del text de suport. Qui hi arriba hi va a posta. */
-    .sg-foot { display: flex; justify-content: flex-end; padding: 2px 2px 0; }
+    .sg-foot { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 2px; padding: 2px 2px 0; }
+    /* La llista de sessions amb què unir-se, desplegada des del peu. */
+    .sg-merge { padding: 8px 2px 2px; }
     .sg-split {
       display: inline-flex; align-items: center; gap: 5px;
       height: 30px; padding: 0 9px; border-radius: 9px;
@@ -249,6 +274,7 @@ export interface DayFeedEntry {
       .material-symbols-outlined { font-size: 16px; }
       &:hover:not(:disabled) { color: var(--c-text-2); background: color-mix(in srgb, var(--c-text) 6%, transparent); }
       &:disabled { opacity: 0.5; cursor: default; }
+      &.sg-split--on { color: var(--c-brand); background: color-mix(in srgb, var(--c-brand) 10%, transparent); }
     }
   `],
 })
@@ -320,6 +346,35 @@ export class DayFeedCardsComponent {
 
   /** La sessió que s'està separant, perquè el botó no s'accioni dos cops. */
   readonly splitting = signal<string | null>(null);
+
+  /** La sessió que té la llista d'unir desplegada, si n'hi ha cap. Una de
+   *  sola: dues llistes obertes alhora demanarien triar entre dues preguntes
+   *  que són la mateixa. */
+  readonly mergeOpen = signal<string | null>(null);
+
+  /** Quantes sessions té el dia amb què es pugui unir res: les files, sense
+   *  el que la rutina només projecta. Es calcula un cop per dia i no per
+   *  targeta —la plantilla ho pregunta a cada sessió. */
+  private readonly mergeableCount = computed(() => {
+    const date = this.day()?.date;
+    return date ? this.sessionGroups.groupsForDay(date).length : 0;
+  });
+
+  /**
+   * Si aquesta sessió es pot unir amb una altra del dia.
+   *
+   * Cal que n'hi hagi una altra i que aquesta sigui de files: el que la rutina
+   * només proposa encara no existeix enlloc, i no s'hi pot posar res a dins.
+   * Fet i planificat compten igual —una anada es prepara com es viu—, i qui
+   * ho contesta és el servei, un sol cop per a tothom.
+   */
+  canMerge(group: SessionGroup): boolean {
+    return this.mergeableCount() > 1 && this.sessionGroups.canMerge(group);
+  }
+
+  toggleMerge(group: SessionGroup): void {
+    this.mergeOpen.update(key => key === group.key ? null : group.key);
+  }
 
   /**
    * Desfà la sessió: les seves activitats tornen a comptar cadascuna per ella
