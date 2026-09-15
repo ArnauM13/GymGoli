@@ -1975,10 +1975,14 @@ export class WorkoutEditorComponent implements OnDestroy {
   repeatLabel(entry: WorkoutEntry): string {
     const last = entry.sets[entry.sets.length - 1];
     const u = this.unit();
+    // El botó és estret, així que un dropset s'hi anuncia comptat, no desplegat:
+    // la cadena sencera ja es veu a la fila de la sèrie.
+    const n = last.drops?.length ?? 0;
+    const drops = n > 0 ? ` +${n} ${n === 1 ? 'tram' : 'trams'}` : '';
     if (last.weightLeft != null) {
-      return `E ${this.dispW(last.weightLeft)}${u} · D ${this.dispW(last.weightRight!)}${u} × ${last.reps}`;
+      return `E ${this.dispW(last.weightLeft)}${u} · D ${this.dispW(last.weightRight!)}${u} × ${last.reps}${drops}`;
     }
-    return `${this.dispW(last.weight)}${u} × ${last.reps}`;
+    return `${this.dispW(last.weight)}${u} × ${last.reps}${drops}`;
   }
 
   adjustWeight(delta: number): void {
@@ -2156,10 +2160,12 @@ export class WorkoutEditorComponent implements OnDestroy {
     if (!w || !entry.sets.length) return;
     const last = entry.sets.at(-1)!;
     try {
+      // Repetir és fer la mateixa sèrie una altra vegada: tot el que la
+      // definia hi va —trams de dropset, RIR i descans inclosos—. Els trams
+      // es clonen perquè les dues sèries no comparteixin el mateix array.
       await this.workoutService.addSetsToEntry(w.id, entry.exerciseId, [{
-        weight: last.weight, reps: last.reps,
-        ...(last.weightLeft != null ? { weightLeft: last.weightLeft, weightRight: last.weightRight } : {}),
-        ...(last.warmup ? { warmup: true } : {}),
+        ...last,
+        ...(last.drops ? { drops: last.drops.map(d => ({ ...d })) } : {}),
       }]);
     } catch {
       this.feedback.error('Error en repetir', 2000);
