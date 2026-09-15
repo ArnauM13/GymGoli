@@ -57,6 +57,7 @@ describe('AppComponent', () => {
           useValue: {
             settings:           mockSettings,
             loaded:             mockLoaded,
+            darkMode:           signal(false),
             metricsEnabled:     signal(false),
             weeklyActivityGoal: signal(null),
             update:             jasmine.createSpy('update'),
@@ -78,6 +79,29 @@ describe('AppComponent', () => {
     const fixture = TestBed.createComponent(AppComponent);
     const app = fixture.componentInstance;
     expect(app).toBeTruthy();
+  });
+
+  // ── La reserva de la nav ─────────────────────────────────────────────────
+
+  describe('nav-reserve', () => {
+    // El bloc buit del final del scroll és l'única cosa que paga la nav
+    // flotant. Si torna a ser un `padding-bottom` del moble, a l'iPhone
+    // desapareix i la nav tapa l'últim element de cada pàgina.
+    function reserve(): HTMLElement | null {
+      const fixture = TestBed.createComponent(AppComponent);
+      fixture.detectChanges();
+      return fixture.nativeElement.querySelector('.nav-reserve');
+    }
+
+    it('reserva l\'alçada de la nav amb sessió', () => {
+      mockUser.set({ id: 'u1' });
+      expect(reserve()).not.toBeNull();
+    });
+
+    it('no reserva res sense sessió: no hi ha cap nav pintada', () => {
+      mockUser.set(null);
+      expect(reserve()).toBeNull();
+    });
   });
 
   // ── showOnboarding ───────────────────────────────────────────────────────

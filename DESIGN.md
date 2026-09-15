@@ -109,9 +109,9 @@ Every page lives inside a `.page` wrapper:
 
 **The page never pays for the nav.** `.app-content` reserves
 `var(--nav-height)` under every page — and only while the nav is actually
-there (`.app-content--nav`; logged out there is no nav and nothing to
-reserve). So a page's bottom padding is only the air below its last element.
-There are two values and no third:
+there (`.nav-reserve`, el bloc buit que tanca el scroll; sense sessió no hi
+ha nav i no s'hi pinta). So a page's bottom padding is only the air below its
+last element. There are two values and no third:
 
 | Token | Value | When |
 |---|---|---|
@@ -123,6 +123,15 @@ Never write a raw `84px` / `88px` / `100px` there, and never give a page
 the page would scroll the top inset (and the nav) of nothing. A page that
 wants to fill the screen — a centered login card, say — uses
 `min-height: 100%`.
+
+**La reserva és una peça, no un `padding-bottom`.** WebKit no compta el
+padding de sota d'un contenidor amb scroll dins del que es pot recórrer: amb
+`padding-bottom` al moble, la reserva desapareixia a l'iPhone justament quan
+hi havia prou contingut per fer scroll —la nav tapava l'últim element i li
+robava el toc— i es veia bé a l'escriptori. Qualsevol altre lloc que hagi de
+deixar aire sota l'últim element d'una llista amb scroll (un `bottom-sheet`,
+posem per cas) té el mateix problema i la mateixa solució: un bloc al final,
+no padding al contenidor.
 
 ### 2a. Page header (title + action)
 
