@@ -1928,8 +1928,9 @@ export class WorkoutEditorComponent implements OnDestroy {
     const entries = [...w.entries];
     moveItemInArray(entries, fromFlat, toFlat);
     try {
+      // Moure una fila ja es veu: la llista queda en l'ordre nou. Dir-ho
+      // damunt seria explicar el que l'usuari acaba de fer.
       await this.workoutService.reorderEntries(w.id, entries);
-      this.feedback.success('Ordre desat', 1500, 'marley');
     } catch {
       this.feedback.error('Error en reordenar', 2000);
     }

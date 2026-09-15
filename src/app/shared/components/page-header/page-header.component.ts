@@ -7,7 +7,7 @@ import { NavigationHistoryService } from '../../../core/services/navigation-hist
   template: `
     <header class="ph">
       @if (showBack()) {
-        <button class="ph-back" (click)="navHistory.goBack(backFallback())" aria-label="Enrere">
+        <button class="ph-back" (click)="back()" aria-label="Enrere">
           <span class="material-symbols-outlined">arrow_back</span>
         </button>
       }
@@ -56,5 +56,13 @@ export class PageHeaderComponent {
   readonly subtitle     = input('');
   readonly showBack     = input(false);
   readonly backFallback = input('/home');
+  /** Cert a les pàgines de sessió: sortir-ne no torna mai al taulell
+   *  d'Entrenament, que és per on s'hi entra (vegeu `goBackFromSession()`). */
+  readonly fromSession  = input(false);
   protected readonly navHistory = inject(NavigationHistoryService);
+
+  protected back(): void {
+    if (this.fromSession()) this.navHistory.goBackFromSession();
+    else this.navHistory.goBack(this.backFallback());
+  }
 }

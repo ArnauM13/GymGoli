@@ -2093,8 +2093,10 @@ export class TrainComponent implements OnDestroy {
     this.editor?.reset();
     // Return to wherever the workout was opened from — the home feed, the
     // calendar (when registering a past day), etc. — instead of always
-    // dumping the user on /home. Falls back to home when there's no history.
-    this.navHistory.goBack('/home');
+    // dumping the user on /home. El taulell d'Entrenament no hi compta:
+    // d'allà només s'hi passa per obrir la sessió, o sigui que tornar-hi és
+    // tornar a Inici.
+    this.navHistory.goBackFromSession();
   }
 
   /** Cert mentre el pla es converteix en entrenament, perquè el botó no
@@ -2287,10 +2289,10 @@ export class TrainComponent implements OnDestroy {
     const id = await this._create(cat, entries);
     const workout = this.workoutService.workouts().find(w => w.id === id);
     if (workout) await this._joinChosenSession({ kind: 'workout', workout });
-    // Res del que s'escriu passa en silenci: el que s'acaba de crear es diu,
-    // encara que tot seguit se n'obri la pàgina.
-    this.feedback.success(
-      this.planning() ? 'Entrenament planificat' : 'Entrenament creat', 1800, 'marley');
+    // El que s'acaba de crear es diu, encara que tot seguit se n'obri la
+    // pàgina. Planificar-lo no: el pla ja s'ensenya al dia que li toca, i
+    // repetir-ho a sobre és dir dues vegades el mateix.
+    if (!this.planning()) this.feedback.success('Entrenament creat', 1800, 'marley');
     return id;
   }
 

@@ -35,17 +35,30 @@ export class NavigationHistoryService {
   }
 
   /** Navigates to the last visited place with a different route than the
-   *  current one. Falls back to `fallback` when there's nowhere to go. */
-  goBack(fallback = '/home'): void {
+   *  current one. Falls back to `fallback` when there's nowhere to go.
+   *  `skip` són rutes que no compten com a destí: s'hi passa de camí, no
+   *  s'hi torna. */
+  goBack(fallback = '/home', skip: readonly string[] = []): void {
     // `restoreScroll` avisa el `ScrollRestoreService`: anar enrere per aquí
     // no és cap `popstate`, però per a qui ho fa és tornar, i tornar vol dir
     // trobar-ho on ho havies deixat.
     const extras = { state: { restoreScroll: true } };
-    if (this.stack.length < 2) {
-      this.router.navigateByUrl(fallback, extras);
-      return;
+    while (this.stack.length >= 2) {
+      this.stack.pop();
+      const top = this.stack[this.stack.length - 1];
+      if (!skip.includes(top.split('?')[0])) {
+        this.router.navigateByUrl(top, extras);
+        return;
+      }
     }
-    this.stack.pop();
-    this.router.navigateByUrl(this.stack[this.stack.length - 1], extras);
+    this.router.navigateByUrl(fallback, extras);
+  }
+
+  /** Sortir d'una sessió —un entrenament o una sessió d'esport— no torna mai
+   *  al taulell d'Entrenament: allà només s'hi passa per obrir-la o per
+   *  crear-la. Es torna d'on es venia de debò (Inici, el Calendari,
+   *  l'Historial) i, si això era Entrenament, a Inici. */
+  goBackFromSession(): void {
+    this.goBack('/home', ['/train']);
   }
 }

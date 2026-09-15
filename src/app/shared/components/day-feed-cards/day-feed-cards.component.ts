@@ -21,7 +21,7 @@ import {
 } from '../../utils/workout-card.utils';
 import {
   ActivityItem, SessionGroup, activityOf, groupDayFeed, groupIcons, groupTitle,
-  sessionMascot, splitLine,
+  splitLine,
 } from '../../utils/session-group.utils';
 
 export interface DayFeedEntry {
@@ -393,8 +393,8 @@ export class DayFeedCardsComponent {
 
     this.moving.set(group.key);
     try {
+      // El canvi d'ordre es veu a la mateixa llista: no cal dir-lo.
       await this.sessionGroups.reorder(items);
-      this.feedback.success('Ordre desat', 1600, sessionMascot(group));
     } catch {
       this.feedback.error('Error en ordenar la sessió', 2500);
     } finally {

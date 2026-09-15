@@ -134,7 +134,7 @@ describe('TrainComponent', () => {
         { provide: MatDialog,              useValue: { open: jasmine.createSpy() } },
         { provide: FeedbackService,        useValue: { success: jasmine.createSpy(), error: jasmine.createSpy(), info: jasmine.createSpy() } },
         { provide: ConfirmDialogService,   useValue: { confirm: jasmine.createSpy('confirm').and.resolveTo(false) } },
-        { provide: NavigationHistoryService, useValue: { goBack: jasmine.createSpy('goBack') } },
+        { provide: NavigationHistoryService, useValue: { goBack: jasmine.createSpy('goBack'), goBackFromSession: jasmine.createSpy('goBackFromSession') } },
       ],
     })
       .overrideComponent(TrainComponent, {
@@ -149,9 +149,9 @@ describe('TrainComponent', () => {
     fixture.detectChanges();
     navigateSpy = spyOn(component.router, 'navigate').and.resolveTo(true);
     const navHistory = TestBed.inject(NavigationHistoryService);
-    goBackSpy = (jasmine.isSpy(navHistory.goBack)
-      ? navHistory.goBack
-      : spyOn(navHistory, 'goBack')) as jasmine.Spy;
+    goBackSpy = (jasmine.isSpy(navHistory.goBackFromSession)
+      ? navHistory.goBackFromSession
+      : spyOn(navHistory, 'goBackFromSession')) as jasmine.Spy;
     goBackSpy.calls.reset();
   });
 
@@ -229,10 +229,10 @@ describe('TrainComponent', () => {
       expect(component.activeWorkoutId()).toBeNull();
     });
 
-    it('returns to the origin on closeWorkout (home, or the calendar when registering a past day)', () => {
+    it('returns to the origin on closeWorkout (home, or the calendar when registering a past day), never the train dashboard', () => {
       component.openWorkout('abc');
       component.closeWorkout();
-      expect(goBackSpy).toHaveBeenCalledWith('/home');
+      expect(goBackSpy).toHaveBeenCalled();
     });
   });
 
@@ -624,7 +624,7 @@ describe('TrainComponent', () => {
 
       expect(workoutService.deleteWorkout).toHaveBeenCalledWith('abc');
       expect(component.activeWorkoutId()).toBeNull();
-      expect(goBackSpy).toHaveBeenCalledWith('/home');
+      expect(goBackSpy).toHaveBeenCalled();
     });
   });
 

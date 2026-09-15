@@ -37,7 +37,7 @@ import { ActivityStat, feedDayLabel, formatFeeling, sportCardStats } from '../..
       @if (pair(); as p) {
 
         <app-page-header [title]="p.sport.name" [subtitle]="dateLabel()"
-                         [showBack]="true" backFallback="/home">
+                         [showBack]="true" [fromSession]="true">
           <!-- ── El menú de la sessió ──
                El que no es fa cada dia viu aquí dins: unir-la amb una altra
                activitat del dia i esborrar-la. Abans unir era una targeta
@@ -220,7 +220,7 @@ import { ActivityStat, feedDayLabel, formatFeeling, sportCardStats } from '../..
 
       } @else if (loading()) {
 
-        <app-page-header title="Sessió" [showBack]="true" backFallback="/home" />
+        <app-page-header title="Sessió" [showBack]="true" [fromSession]="true" />
         <div class="sk-wrap">
           <div class="sk sk-hero"></div>
           <div class="sk sk-block"></div>
@@ -228,7 +228,7 @@ import { ActivityStat, feedDayLabel, formatFeeling, sportCardStats } from '../..
 
       } @else {
 
-        <app-page-header title="Sessió" [showBack]="true" backFallback="/home" />
+        <app-page-header title="Sessió" [showBack]="true" [fromSession]="true" />
         <div class="empty-state">
           <span class="material-symbols-outlined empty-icon" aria-hidden="true">search_off</span>
           <h2>Sessió no trobada</h2>
@@ -540,7 +540,7 @@ export class SportSessionComponent {
       if (has) { hadSession = true; return; }
       if (!hadSession || this.swapping) return;
       hadSession = false;
-      this.navHistory.goBack('/home');
+      this.navHistory.goBackFromSession();
     });
   }
 

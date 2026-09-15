@@ -95,7 +95,7 @@ describe('TrainComponent — today-only aids never crash the workout view', () =
         { provide: MatDialog, useValue: { open: () => {}, openDialogs: [] } },
         { provide: FeedbackService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
         { provide: ConfirmDialogService, useValue: { confirm: () => Promise.resolve(false) } },
-        { provide: NavigationHistoryService, useValue: { goBack: () => {} } },
+        { provide: NavigationHistoryService, useValue: { goBack: () => {}, goBackFromSession: () => {} } },
       ],
     }).overrideComponent(TrainComponent, { set: { imports: [LowerCasePipe], schemas: [NO_ERRORS_SCHEMA] } });
 
