@@ -797,7 +797,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
 
 
     /* ── Fatiga popup (floating bottom sheet — see global .bottom-sheet) ── */
-    .we-fatiga-popup { padding: 12px 20px 22px; }
+    .we-fatiga-popup { padding: 12px 20px 0; }
     .we-fatiga-popup-header {
       display: flex; align-items: center; justify-content: space-between;
       margin-bottom: 20px;
@@ -984,7 +984,8 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     }
 
     /* ── Exercise options sheet (floating bottom sheet — see global .bottom-sheet) ── */
-    .we-options-sheet { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 22px; }
+    .we-options-sheet { --sheet-air: 10px; /* + el gap de 12 = 22 */
+      display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 0; }
     .we-options-header { display: flex; align-items: center; gap: 8px; padding: 0 4px; }
     .we-options-title {
       font-size: 17px; font-weight: 700; color: var(--c-text); flex: 1; min-width: 0;
@@ -1011,7 +1012,8 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
     .we-option-desc  { font-size: 12px; font-weight: 500; color: var(--c-text-3); }
 
     /* ── Notes popup (floating bottom sheet — see global .bottom-sheet) ── */
-    .we-notes-popup { display: flex; flex-direction: column; gap: 14px; padding: 12px 20px 22px; }
+    .we-notes-popup { --sheet-air: 8px; /* + el gap de 14 = 22 */
+      display: flex; flex-direction: column; gap: 14px; padding: 12px 20px 0; }
     .we-notes-popup-header {
       display: flex; align-items: center; gap: 8px;
     }

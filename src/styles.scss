@@ -231,6 +231,17 @@ html.dark {
   box-shadow: 0 16px 44px rgba(0, 0, 0, 0.24), 0 4px 14px rgba(0, 0, 0, 0.10);
   animation: bottom-sheet-in 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+// L'aire de sota d'una fulla és un bloc, no el seu `padding-bottom`: la fulla
+// és qui fa el scroll, i WebKit no compta el padding de sota d'un contenidor
+// amb scroll dins del que es pot recórrer — la mateixa raó que la reserva de
+// la nav (DESIGN.md §2). Una fulla que creix prou per fer scroll —la llista de
+// plantilles, les opcions d'un exercici— hi perdia els 22px de sota i l'últim
+// botó quedava enganxat a la vora. Cada fulla posa el seu padding de dalt i
+// dels costats, i l'aire de sota el diu amb `--sheet-air` si no vol 22px.
+.bottom-sheet::after {
+  content: ''; display: block; flex: none;
+  height: var(--sheet-air, 22px);
+}
 .bottom-sheet-handle {
   display: block; width: 40px; height: 4px; margin: 2px auto 12px;
   border-radius: 999px; background: var(--c-border); flex-shrink: 0;

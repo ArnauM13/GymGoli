@@ -129,7 +129,10 @@ const MUSCLE_GROUPS: { label: string; values: string[] }[] = [
     .dlg-title { margin: 0; font-size: 17px; font-weight: 700; color: var(--c-text); }
 
     /* ── Cos desplaçable ── */
-    .dlg-body { overflow-y: auto; padding: 16px; flex: 1; }
+    /* L'aire de sota és un bloc i no padding: el cos és qui fa el scroll
+       i WebKit no el compta (vegeu DESIGN.md §2). */
+    .dlg-body { overflow-y: auto; padding: 16px 16px 0; flex: 1; }
+    .dlg-body::after { content: ''; display: block; height: 16px; }
     .form { display: flex; flex-direction: column; gap: 18px; }
 
     /* ── Accions ── */

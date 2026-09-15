@@ -334,7 +334,7 @@ const MIXED_LABEL = 'Mixt';
     }
 
     /* ── Editor sheet (floating bottom sheet — see global .bottom-sheet) ── */
-    .editor-sheet { padding: 8px 20px 22px; }
+    .editor-sheet { padding: 8px 20px 0; }
 
     .editor-header {
       display: flex; align-items: center; justify-content: space-between;

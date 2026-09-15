@@ -769,6 +769,11 @@ nav pill (inset side margins, all four corners rounded) and slide up from below.
   **only** its own `padding` and inner content styles (the shell owns position,
   size, rounding, shadow, slide-up + backdrop-fade animation, `max-height`
   with internal scroll, and `prefers-reduced-motion`).
+- **L'aire de sota el posa la closca, no el teu `padding-bottom`.** La fulla és
+  qui fa el scroll i WebKit no compta el padding de sota d'un contenidor amb
+  scroll (vegeu §2): escriu `padding: 8px 20px 0` i prou. Són 22px; si en vols
+  uns altres, `--sheet-air`. En una fulla en columna amb `gap`, el `gap` ja hi
+  posa la seva part i `--sheet-air` només diu la resta.
 - **Accessibility (always):** `role="dialog"`, `aria-modal="true"`,
   `aria-labelledby` pointing at the title, `cdkTrapFocus cdkTrapFocusAutoCapture`
   (import `A11yModule`), and Escape-to-close via a
