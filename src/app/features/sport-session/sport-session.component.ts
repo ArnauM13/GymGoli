@@ -632,7 +632,8 @@ export class SportSessionComponent {
     this.saving.set(true);
     try {
       const id = await this.sportService.startPlannedSession(p.session.id, p.session.date);
-      this.feedback.success(`${p.sport.name} registrat`, 2000, 'xoco');
+      // Registrar-la no es diu: la sessió mateixa ja deixa de ser un pla a la
+      // pantalla. Guardar-hi canvis sí, que allò no es veu.
       await this.follow(id);
     } catch {
       this.feedback.error('Error en registrar', 2500);
