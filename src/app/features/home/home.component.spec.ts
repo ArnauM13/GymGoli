@@ -293,6 +293,49 @@ describe('HomeComponent', () => {
         expect(btn().classList).not.toContain('start-workout-btn--past');
       });
     });
+
+    // ── El segon verb d'avui ──
+    //
+    // Avui es pot fer ara o deixar apuntat, i els altres dies no: un de
+    // passat ja ha passat i un de futur només es pot planificar, cosa que el
+    // botó sencer ja fa. Per això només avui es parteix.
+    describe('planificar avui, partint el botó', () => {
+      const planBtn = (): HTMLElement | null =>
+        (fixture.nativeElement as HTMLElement).querySelector('.swb-plan');
+      const mainBtn = (): HTMLElement =>
+        (fixture.nativeElement as HTMLElement).querySelector('.start-workout-btn')!;
+
+      it("hi és quan el dia triat és avui", () => {
+        fixture.detectChanges();
+        expect(planBtn()).toBeTruthy();
+        expect((fixture.nativeElement as HTMLElement).querySelector('.swb-row--split')).toBeTruthy();
+      });
+
+      it('no hi és cap altre dia: el botó va sencer', () => {
+        for (const days of [3, -3]) {
+          component.selectedDate.set(shift(days));
+          fixture.detectChanges();
+          expect(planBtn()).toBeNull();
+          expect((fixture.nativeElement as HTMLElement).querySelector('.swb-row--split')).toBeNull();
+        }
+      });
+
+      // Hi porta dient que el que s'hi faci és un pla, no una sessió d'ara:
+      // sense `plan=1`, avui a Entrenar s'entrena.
+      it("porta a Entrenar en mode pla, no a començar-lo", () => {
+        fixture.detectChanges();
+        planBtn()!.click();
+        expect(navigateSpy).toHaveBeenCalledWith(['/train'], { queryParams: { date: TODAY, plan: 1 } });
+      });
+
+      // El botó gros del costat no s'ha de moure de lloc: són dos verbs, no
+      // un que en canvia.
+      it("no toca el que fa la meitat gran", () => {
+        fixture.detectChanges();
+        mainBtn().click();
+        expect(navigateSpy).toHaveBeenCalledWith(['/train']);
+      });
+    });
   });
 
   // ── showRoutineHint() ────────────────────────────────────────────────────
