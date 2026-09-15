@@ -671,7 +671,7 @@ describe('TrainComponent', () => {
 
       expect(sportService['logSession']).toHaveBeenCalledWith(
         TODAY, 's1', jasmine.objectContaining({ duration: 60 }), 'done', undefined);
-      expect(navigateSpy).toHaveBeenCalledWith(['/sport', 'new-sess'], { queryParams: { nova: 1 } });
+      expect(navigateSpy).toHaveBeenCalledWith(['/sport', 'new-sess']);
     });
 
     it('un dia que encara ha de venir es planifica, no es registra', async () => {
@@ -687,7 +687,7 @@ describe('TrainComponent', () => {
       component.selectedDate.set('2999-01-01');
       await component.startSportSession(sport);
 
-      expect(navigateSpy).toHaveBeenCalledWith(['/sport', 'new-sess'], { queryParams: { nova: 1 } });
+      expect(navigateSpy).toHaveBeenCalledWith(['/sport', 'new-sess']);
     });
 
     it("no en crea una altra si el dia ja en té: hi va", async () => {
@@ -695,8 +695,9 @@ describe('TrainComponent', () => {
       await component.startSportSession(sport);
 
       expect(sportService['logSession']).not.toHaveBeenCalled();
-      // Sense `?nova`: no hi vas a omplir-la, hi vas a mirar-la.
-      expect(navigateSpy).toHaveBeenCalledWith(['/sport', 'sess1'], {});
+      // Una d'acabada de crear i una de vella hi arriben igual: allà les
+      // dades es toquen allà on es llegeixen, i no hi ha res per desplegar.
+      expect(navigateSpy).toHaveBeenCalledWith(['/sport', 'sess1']);
     });
   });
 

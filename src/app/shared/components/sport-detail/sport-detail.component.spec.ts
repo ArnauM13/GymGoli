@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
-import { SportDetailComponent } from './sport-detail.component';
+import { SportDetailComponent, SportSessionPatch } from './sport-detail.component';
 import { SportService } from '../../../core/services/sport.service';
 import { UserSettingsService } from '../../../core/services/user-settings.service';
 import { Sport, SportSession } from '../../../core/models/sport.model';
@@ -277,6 +277,161 @@ describe('SportDetailComponent', () => {
 
       expect(rows(el).length).toBe(5);
       expect(el.querySelector('.sdv-more')?.textContent).toContain('+1');
+    });
+  });
+  // ── Editable ──
+  // La mateixa fila que diu la dada és la que la deixa tocar: no hi ha un
+  // formulari a part, com no n'hi ha al gimnàs.
+  describe('editable', () => {
+    function buildEdit(sport: Sport, session: SportSession) {
+      const fixture = TestBed.createComponent(SportDetailComponent);
+      fixture.componentRef.setInput('sport', sport);
+      fixture.componentRef.setInput('session', session);
+      fixture.componentRef.setInput('editable', true);
+      const patches: SportSessionPatch[] = [];
+      fixture.componentInstance.patch.subscribe(p => patches.push(p));
+      fixture.detectChanges();
+      return { el: fixture.nativeElement as HTMLElement, fixture, patches };
+    }
+
+    // Llegint, una dada que no consta no fa fila. Editant sí: la fila buida
+    // és on es posa el valor.
+    it('treu les files de tot el que l\'esport sap mesurar, amb valor o sense', () => {
+      const { el } = buildEdit(makeSport(), makeSession());
+      expect(rows(el).map(r => r.label))
+        .toEqual(['Subtipus', 'Durada', 'Distància', 'Terreny', 'Sensació']);
+    });
+
+    it('cada mena de dada porta el seu control', () => {
+      const { el } = buildEdit(makeSport(), makeSession({ duration: 40 }));
+      // La durada i la distància són xifres; el terreny i el subtipus, tries
+      // curtes, que caben com a segmentat dins la fila.
+      expect(el.querySelectorAll('.num-input').length).toBe(2);
+      expect(el.querySelectorAll('.sdv-seg').length).toBe(2);
+      expect(el.querySelector('.sdv-feel')).toBeTruthy();
+      expect(el.querySelector('.sdv-notes-input')).toBeTruthy();
+    });
+
+    // Els 17 estils de ioga eren un mur de pastilles més alt que tota la
+    // resta de la sessió junta.
+    it('una tria llarga no es pinta sencera: s\'obre en una fulla', () => {
+      const sport = makeSport({
+        subtypes: [
+          { id: 'a', name: 'Hatha' }, { id: 'b', name: 'Vinyasa' },
+          { id: 'c', name: 'Yin' },   { id: 'd', name: 'Ashtanga' },
+        ],
+      });
+      const { el, fixture } = buildEdit(sport, makeSession());
+
+      const pick = el.querySelector<HTMLButtonElement>('.sdv-pick');
+      expect(pick).toBeTruthy();
+      expect(el.querySelector('.bottom-sheet')).toBeNull();
+
+      pick!.click();
+      fixture.detectChanges();
+      expect(el.querySelectorAll('.sdv-sheet-opt').length).toBe(4);
+    });
+
+    it('un toc al + puja la xifra el pas que toca', () => {
+      const { el, patches } = buildEdit(makeSport(), makeSession({ duration: 40 }));
+      const plus = el.querySelectorAll<HTMLButtonElement>('.num-input button');
+      plus[1].click();  // el + de la durada
+      expect(patches).toEqual([{ duration: 45 }]);
+    });
+
+    // Pujar des de no-res és començar per baix, no per zero: una distància
+    // que va de 0,5 en 0,5 no ha de posar-hi mig quilòmetre invisible.
+    it('la primera pujada d\'una xifra buida parteix del mínim', () => {
+      const { el, patches } = buildEdit(makeSport(), makeSession());
+      const btns = el.querySelectorAll<HTMLButtonElement>('.num-input button');
+      btns[3].click();  // el + de la distància (min 0.5)
+      expect(patches).toEqual([{ metrics: { distance_km: 0.5 } }]);
+    });
+
+    it('escriure buit treu la xifra', () => {
+      const { el, patches } = buildEdit(makeSport(), makeSession({ metrics: { distance_km: 10 } }));
+      const input = el.querySelectorAll<HTMLInputElement>('.num-input input')[1];
+      input.value = '';
+      input.dispatchEvent(new Event('change'));
+      expect(patches).toEqual([{ metrics: undefined }]);
+    });
+
+    // Zero gols és un resultat; zero minuts és no haver-hi posat res.
+    it('la durada a zero vol dir sense durada', () => {
+      const { el, patches } = buildEdit(makeSport(), makeSession({ duration: 5 }));
+      el.querySelectorAll<HTMLButtonElement>('.num-input button')[0].click();
+      expect(patches).toEqual([{ duration: undefined }]);
+    });
+
+    it('tornar a tocar la tria que ja hi era la treu', () => {
+      const { el, patches } = buildEdit(makeSport(), makeSession({ metrics: { terrain: 'muntanya' } }));
+      const segs = el.querySelectorAll<HTMLButtonElement>('.sdv-seg button');
+      segs[1].click();  // «Muntanya», que és la que ja hi era
+      expect(patches).toEqual([{ metrics: undefined }]);
+    });
+
+    it('una mètrica nova no s\'emporta les que ja hi havia', () => {
+      const session = makeSession({ metrics: { distance_km: 10 } });
+      const { el, patches } = buildEdit(makeSport(), session);
+      el.querySelectorAll<HTMLButtonElement>('.sdv-seg button')[1].click();
+      expect(patches).toEqual([{ metrics: { distance_km: 10, terrain: 'muntanya' } }]);
+    });
+
+    it('tornar a tocar la sensació que ja hi era la treu', () => {
+      const { el, patches } = buildEdit(makeSport(), makeSession({ feeling: 3 }));
+      const feels = el.querySelectorAll<HTMLButtonElement>('.sdv-feel button');
+      feels[2].click();
+      expect(patches).toEqual([{ feeling: undefined }]);
+      feels[4].click();
+      expect(patches[1]).toEqual({ feeling: 5 });
+    });
+
+    // Escriure no és decidir: la nota surt en deixar-la, no lletra a lletra.
+    it('la nota es guarda en deixar-la', () => {
+      const { el, patches } = buildEdit(makeSport(), makeSession());
+      const ta = el.querySelector<HTMLTextAreaElement>('.sdv-notes-input')!;
+      ta.value = '  Vent de cara  ';
+      ta.dispatchEvent(new Event('input'));
+      expect(patches).toEqual([]);
+      ta.dispatchEvent(new Event('change'));
+      expect(patches).toEqual([{ notes: 'Vent de cara' }]);
+    });
+
+    // El context és justament el que desapareixia quan el formulari tapava la
+    // sessió, i és el que diu si la xifra que toques val alguna cosa.
+    it('el context no desapareix mentre es toca la xifra', () => {
+      allLoaded.set(true);
+      sessions.set([
+        makeSession({ id: 'a', date: '2024-01-01', duration: 30 }),
+        makeSession({ id: 'b', date: '2024-02-01', duration: 30 }),
+      ]);
+      const { el } = buildEdit(makeSport(), makeSession({ duration: 90 }));
+
+      const durada = rows(el).find(r => r.label === 'Durada')!;
+      expect(durada.note).toBe('+60 min que de costum');
+      expect(durada.record).toBeTrue();
+    });
+
+    // Un pla del futur encara no s'ha viscut.
+    it('la sensació no hi és si el dia encara ha de venir', () => {
+      const fixture = TestBed.createComponent(SportDetailComponent);
+      fixture.componentRef.setInput('sport', makeSport());
+      fixture.componentRef.setInput('session', makeSession());
+      fixture.componentRef.setInput('editable', true);
+      fixture.componentRef.setInput('feelingEditable', false);
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('.sdv-feel')).toBeNull();
+      expect(el.querySelector('.sdv-notes-input')).toBeTruthy();
+    });
+
+    // El feed no canvia gens: allà el detall segueix sent per llegir.
+    it('llegint no hi ha cap control', () => {
+      const el = build(makeSport(), makeSession({ duration: 40 }));
+      expect(el.querySelector('.num-input')).toBeNull();
+      expect(el.querySelector('.sdv-seg')).toBeNull();
+      expect(el.querySelector('.sdv-notes-input')).toBeNull();
     });
   });
 });

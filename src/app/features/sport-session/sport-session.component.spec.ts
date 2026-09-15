@@ -149,97 +149,101 @@ describe('SportSessionComponent', () => {
     expect((fixture.nativeElement as HTMLElement).querySelector('.empty-state')).toBeNull();
   });
 
+  // ── Editar ──
+  // No hi ha mode de consulta i mode d'edició: la fila que diu la dada és la
+  // que la deixa tocar, i el que es toca puja sol. Com al gimnàs.
   describe('editar', () => {
-    // Registrar un esport et deixa aquí amb la sessió acabada de crear: hi
-    // véns a omplir-la, no a mirar-la.
-    it("una sessió acabada de registrar arriba amb el formulari obert", () => {
-      const session = makeSession({ duration: 60 });
-      allSessions.set([session]);
-      build('sess1', { nova: '1' });
-
-      expect(component.editOpen()).toBeTrue();
-      expect(component.editDuration()).toBe(60);
-    });
-
-    // Editar i llegir no es fan alhora: mentre el formulari hi és, la sessió
-    // no es dibuixa a sota — deia el mateix dues vegades i deixava el que es
-    // toca a mitja pantalla del que es llegeix.
-    it('la pàgina llegeix la sessió i ofereix un botó per editar-la', () => {
+    it('la sessió es llegeix i es toca al mateix lloc, sense cap botó pel mig', () => {
       allSessions.set([makeSession({ duration: 60 })]);
       build();
 
       const el = fixture.nativeElement as HTMLElement;
-      expect(el.querySelector('.detail-card')).toBeTruthy();
-      expect(el.querySelector('.edit-btn')).toBeTruthy();
-      expect(el.querySelector('.edit-body')).toBeNull();
-    });
-
-    it("el botó d'editar obre el formulari i amaga la sessió", () => {
-      allSessions.set([makeSession({ duration: 60 })]);
-      build();
-
-      const el = fixture.nativeElement as HTMLElement;
-      el.querySelector<HTMLButtonElement>('.edit-btn')!.click();
-      fixture.detectChanges();
-
-      expect(component.editOpen()).toBeTrue();
-      expect(el.querySelector('.edit-body')).toBeTruthy();
-      expect(el.querySelector('.detail-card')).toBeNull();
+      expect(el.querySelector('app-sport-detail')).toBeTruthy();
       expect(el.querySelector('.edit-btn')).toBeNull();
+      expect(el.querySelector('.sl-save')).toBeNull();
+      expect(el.querySelector('.sl-cancel')).toBeNull();
     });
 
-    it("editant un pla, el botó de registrar tampoc no hi és", () => {
-      allSessions.set([makeSession({ date: '2024-03-05', status: 'planned' })]);
+    // El retall es pinta per sobre de la sessió guardada: un toc es veu de
+    // seguida, sense esperar que la pujada torni.
+    it('un canvi es veu a l\'instant, abans de pujar', () => {
+      allSessions.set([makeSession({ duration: 60 })]);
       build();
 
-      const el = fixture.nativeElement as HTMLElement;
-      expect(el.querySelector('.register-btn')).toBeTruthy();
-
-      el.querySelector<HTMLButtonElement>('.edit-btn')!.click();
-      fixture.detectChanges();
-      expect(el.querySelector('.register-btn')).toBeNull();
+      component.applyPatch({ duration: 45 });
+      expect(component.shown()!.session.duration).toBe(45);
+      expect(updateSession).not.toHaveBeenCalled();
     });
 
-    it('el formulari arrenca plegat i es carrega amb el que la sessió porta', () => {
-      const session = makeSession({ duration: 75, subtypeId: 'dobles', feeling: 4, notes: 'Bé', metrics: { sets_won: 2 } });
-      allSessions.set([session]);
+    it('puja la sessió sencera, no només el que s\'ha tocat', async () => {
+      allSessions.set([makeSession({ duration: 60, subtypeId: 'dobles', feeling: 4, notes: 'Bé' })]);
       build();
 
-      expect(component.editOpen()).toBeFalse();
-      component.openEdit({ sport: SPORT, session });
+      component.applyPatch({ duration: 45 });
+      await component.flush();
 
-      expect(component.editOpen()).toBeTrue();
-      expect(component.editDuration()).toBe(75);
-      expect(component.editSubtype()).toBe('dobles');
-      expect(component.editFeeling()).toBe(4);
-      expect(component.editNotes()).toBe('Bé');
-      expect(component.editMetrics()).toEqual({ sets_won: 2 });
+      expect(updateSession).toHaveBeenCalledWith('sess1', '2024-03-05', {
+        subtypeId: 'dobles', duration: 45, feeling: 4, metrics: undefined, notes: 'Bé',
+      });
     });
 
-    it('guarda els canvis sense tocar l\'estat d\'una sessió ja feta', async () => {
-      const session = makeSession({ duration: 60 });
-      allSessions.set([session]);
+    // Diversos tocs seguits són una sola pujada: apujar la durada de 30 a 60
+    // en serien sis.
+    it('ajunta els tocs seguits en una sola pujada', async () => {
+      allSessions.set([makeSession({ duration: 30 })]);
       build();
 
-      component.openEdit({ sport: SPORT, session });
-      component.editDuration.set(45);
-      await component.save({ sport: SPORT, session });
+      component.applyPatch({ duration: 35 });
+      component.applyPatch({ duration: 40 });
+      component.applyPatch({ duration: 45 });
+      await component.flush();
 
+      expect(updateSession).toHaveBeenCalledTimes(1);
       expect(updateSession).toHaveBeenCalledWith(
         'sess1', '2024-03-05', jasmine.objectContaining({ duration: 45 }));
-      expect(component.editOpen()).toBeFalse();
+    });
+
+    // Un cop guardat, el retall ja no cal: deixar-lo taparia el que arribés
+    // d'un altre dispositiu.
+    it('el retall es buida quan ja és a la sessió', async () => {
+      allSessions.set([makeSession({ duration: 60 })]);
+      build();
+
+      component.applyPatch({ duration: 45 });
+      await component.flush();
+
+      allSessions.set([makeSession({ duration: 90 })]);
+      expect(component.shown()!.session.duration).toBe(90);
+    });
+
+    it('no puja res si no s\'ha tocat res', async () => {
+      allSessions.set([makeSession({ duration: 60 })]);
+      build();
+
+      await component.flush();
+      expect(updateSession).not.toHaveBeenCalled();
+    });
+
+    // Treure una dada és dir-ho, no callar: la clau hi va amb `undefined`.
+    it('treure un valor el treu de debò', async () => {
+      allSessions.set([makeSession({ duration: 60, feeling: 4 })]);
+      build();
+
+      component.applyPatch({ feeling: undefined });
+      await component.flush();
+
+      expect(updateSession).toHaveBeenCalledWith(
+        'sess1', '2024-03-05', jasmine.objectContaining({ feeling: undefined }));
     });
 
     // Editar un pla és afinar-lo, no fer-lo: el registra el seu botó, i tant
     // se val que el dia ja hagi arribat.
     it("guardar un pla d'un dia que ja ha arribat el deixa pla", async () => {
-      const session = makeSession({ date: '2024-03-05', status: 'planned', duration: 60 });
-      allSessions.set([session]);
+      allSessions.set([makeSession({ date: '2024-03-05', status: 'planned', duration: 60 })]);
       build();
 
-      component.openEdit({ sport: SPORT, session });
-      component.editDuration.set(90);
-      await component.save({ sport: SPORT, session });
+      component.applyPatch({ duration: 90 });
+      await component.flush();
 
       expect(updateSession).toHaveBeenCalledWith(
         'sess1', '2024-03-05', jasmine.objectContaining({ duration: 90 }));
@@ -247,16 +251,21 @@ describe('SportSessionComponent', () => {
     });
 
     it('un pla del futur es guarda i segueix sent un pla', async () => {
-      const session = makeSession({ date: '2999-01-01', status: 'planned' });
-      allSessions.set([session]);
+      allSessions.set([makeSession({ date: '2999-01-01', status: 'planned' })]);
       build();
 
-      component.openEdit({ sport: SPORT, session });
-      await component.save({ sport: SPORT, session });
+      component.applyPatch({ duration: 40 });
+      await component.flush();
 
-      expect(updateSession).toHaveBeenCalledWith(
-        'sess1', '2999-01-01', jasmine.any(Object));
+      expect(updateSession).toHaveBeenCalledWith('sess1', '2999-01-01', jasmine.any(Object));
       expect(startPlannedSession).not.toHaveBeenCalled();
+    });
+
+    // Un pla del futur no s'ha viscut: la sensació no hi té res a dir.
+    it('la sensació no es pot omplir en un pla que encara ha de venir', () => {
+      allSessions.set([makeSession({ date: '2999-01-01', status: 'planned' })]);
+      build();
+      expect(component.isFuture()).toBeTrue();
     });
   });
 
@@ -307,11 +316,14 @@ describe('SportSessionComponent', () => {
       expect(host.querySelector('app-session-merge')).toBeTruthy();
     });
 
-    it("i esborrar tampoc viu dins del formulari", () => {
+    it('i esborrar tampoc no és al cos de la pàgina', () => {
       const host = fixture.nativeElement as HTMLElement;
-      component.openEdit({ sport: SPORT, session: makeSession() });
-      fixture.detectChanges();
       expect(host.querySelector('.sl-delete-btn')).toBeNull();
+
+      component.menuOpen.set(true);
+      fixture.detectChanges();
+      expect(Array.from(host.querySelectorAll('.fab-menu-item'))
+        .some(b => b.textContent?.includes('Eliminar'))).toBeTrue();
     });
   });
 

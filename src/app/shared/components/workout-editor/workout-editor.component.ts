@@ -240,7 +240,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                         <div class="we-inline-inputs">
                           <div class="we-inline-group">
                             <label for="edit-weight">{{ weightLabel(entry, false) }}</label>
-                            <div class="we-number-input compact">
+                            <div class="num-input num-input--sm">
                               <button type="button" (click)="adjustEditWeight(-1)" aria-label="Menys pes">−</button>
                               <input id="edit-weight" type="number" formControlName="weight" min="0" [step]="editWeightStep()"
                                      (focus)="$any($event.target).select()">
@@ -250,7 +250,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                           @if (isUnilateral(entry)) {
                             <div class="we-inline-group">
                               <label for="edit-weight-right">Dreta</label>
-                              <div class="we-number-input compact">
+                              <div class="num-input num-input--sm">
                                 <button type="button" (click)="adjustEditWeightRight(-1)" aria-label="Menys pes">−</button>
                                 <input id="edit-weight-right" type="number" formControlName="weightRight" min="0" [step]="editWeightStep()"
                                        (focus)="$any($event.target).select()">
@@ -260,7 +260,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                           }
                           <div class="we-inline-group">
                             <label for="edit-reps">Reps</label>
-                            <div class="we-number-input compact">
+                            <div class="num-input num-input--sm">
                               <button type="button" (click)="adjustEditReps(-1)" aria-label="Menys repeticions">−</button>
                               <input id="edit-reps" type="number" formControlName="reps" min="1" step="1"
                                      (focus)="$any($event.target).select()">
@@ -270,7 +270,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                           @if (rirEnabled()) {
                             <div class="we-inline-group">
                               <label for="edit-rir">RIR</label>
-                              <div class="we-number-input compact">
+                              <div class="num-input num-input--sm">
                                 <button type="button" (click)="adjustEditRir(-1)" aria-label="Menys RIR">−</button>
                                 <input id="edit-rir" type="number" [value]="editRirValue() ?? ''" placeholder="—"
                                        (change)="setEditRir($any($event.target).value)" min="0" step="1"
@@ -282,7 +282,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                           @if (manualRestEnabled()) {
                             <div class="we-inline-group">
                               <label for="edit-rest">Descans (s)</label>
-                              <div class="we-number-input compact">
+                              <div class="num-input num-input--sm">
                                 <button type="button" (click)="adjustEditRest(-1)" aria-label="Menys descans">−</button>
                                 <input id="edit-rest" type="number" [value]="editRestValue() ?? ''" placeholder="—"
                                        (change)="setEditRest($any($event.target).value)" min="0" step="15"
@@ -296,12 +296,12 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                           @for (d of editDropStages(); track $index) {
                             <div class="we-drop-stage-row">
                               <span class="material-symbols-outlined we-drop-arrow">subdirectory_arrow_right</span>
-                              <div class="we-number-input compact">
+                              <div class="num-input num-input--sm">
                                 <button type="button" (click)="adjustEditDropWeight($index, -1)" aria-label="Menys pes">−</button>
                                 <input type="number" [value]="d.weight" (change)="setEditDropWeight($index, $any($event.target).value)" min="0" [step]="editWeightStep()">
                                 <button type="button" (click)="adjustEditDropWeight($index, 1)" aria-label="Més pes">+</button>
                               </div>
-                              <div class="we-number-input compact">
+                              <div class="num-input num-input--sm">
                                 <button type="button" (click)="adjustEditDropReps($index, -1)" aria-label="Menys repeticions">−</button>
                                 <input type="number" [value]="d.reps" (change)="setEditDropReps($index, $any($event.target).value)" min="1" step="1">
                                 <button type="button" (click)="adjustEditDropReps($index, 1)" aria-label="Més repeticions">+</button>
@@ -417,7 +417,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                   <div class="we-set-inputs">
                     <div class="we-input-group">
                       <label for="add-weight">{{ weightLabel(entry, true) }}</label>
-                      <div class="we-number-input">
+                      <div class="num-input">
                         <button type="button" (click)="adjustWeight(-1)" aria-label="Menys pes">−</button>
                         <input id="add-weight" type="number" formControlName="weight" min="0" [step]="addWeightStep()"
                                (focus)="$any($event.target).select()">
@@ -427,7 +427,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                     @if (isUnilateral(entry)) {
                       <div class="we-input-group">
                         <label for="add-weight-right">Dreta ({{ unit() }})</label>
-                        <div class="we-number-input">
+                        <div class="num-input">
                           <button type="button" (click)="adjustWeightRight(-1)" aria-label="Menys pes">−</button>
                           <input id="add-weight-right" type="number" formControlName="weightRight" min="0" [step]="addWeightStep()"
                                  (focus)="$any($event.target).select()">
@@ -437,7 +437,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                     }
                     <div class="we-input-group">
                       <label for="add-reps">Repeticions</label>
-                      <div class="we-number-input">
+                      <div class="num-input">
                         <button type="button" (click)="adjustReps(-1)" aria-label="Menys repeticions">−</button>
                         <input id="add-reps" type="number" formControlName="reps" min="1" step="1"
                                (focus)="$any($event.target).select()">
@@ -447,7 +447,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                     @if (rirEnabled()) {
                       <div class="we-input-group">
                         <label for="add-rir">RIR</label>
-                        <div class="we-number-input">
+                        <div class="num-input">
                           <button type="button" (click)="adjustRir(-1)" aria-label="Menys RIR">−</button>
                           <input id="add-rir" type="number" [value]="rirValue() ?? ''" placeholder="—"
                                  (change)="setRir($any($event.target).value)" min="0" step="1"
@@ -459,7 +459,7 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                     @if (manualRestEnabled()) {
                       <div class="we-input-group">
                         <label for="add-rest">Descans (s)</label>
-                        <div class="we-number-input">
+                        <div class="num-input">
                           <button type="button" (click)="adjustRest(-1)" aria-label="Menys descans">−</button>
                           <input id="add-rest" type="number" [value]="restValue() ?? ''" placeholder="—"
                                  (change)="setRest($any($event.target).value)" min="0" step="15"
@@ -482,12 +482,12 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
                     @for (d of dropStages(); track $index) {
                       <div class="we-drop-stage-row">
                         <span class="material-symbols-outlined we-drop-arrow">subdirectory_arrow_right</span>
-                        <div class="we-number-input compact">
+                        <div class="num-input num-input--sm">
                           <button type="button" (click)="adjustDropWeight($index, -1)" aria-label="Menys pes">−</button>
                           <input type="number" [value]="d.weight" (change)="setDropWeight($index, $any($event.target).value)" min="0" [step]="addWeightStep()">
                           <button type="button" (click)="adjustDropWeight($index, 1)" aria-label="Més pes">+</button>
                         </div>
-                        <div class="we-number-input compact">
+                        <div class="num-input num-input--sm">
                           <button type="button" (click)="adjustDropReps($index, -1)" aria-label="Menys repeticions">−</button>
                           <input type="number" [value]="d.reps" (change)="setDropReps($index, $any($event.target).value)" min="1" step="1">
                           <button type="button" (click)="adjustDropReps($index, 1)" aria-label="Més repeticions">+</button>
@@ -1233,10 +1233,6 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       display: flex; flex-direction: column; gap: 3px;
       label { font-size: 11px; color: var(--c-text-2); font-weight: 600; }
     }
-    .we-number-input.compact {
-      button { width: 26px; height: 30px; font-size: 15px; }
-      input  { font-size: 16px; font-weight: 600; padding: 4px 0; min-width: 48px; }
-    }
     .we-inline-actions { display: flex; justify-content: flex-end; gap: 6px; }
     .we-inline-cancel {
       padding: 7px 14px; border-radius: 8px;
@@ -1267,21 +1263,8 @@ const _collapsedByWorkout = new Map<string, Set<string>>();
       label { font-size: 12px; color: var(--c-text-2); font-weight: 500; }
     }
 
-    .we-number-input {
-      display: flex; align-items: center;
-      border: 1.5px solid var(--c-border); border-radius: 8px; overflow: hidden; background: var(--c-card);
-      button {
-        width: 30px; height: 38px; border: none; background: var(--c-subtle);
-        font-size: 18px; cursor: pointer; color: var(--c-text); touch-action: manipulation;
-        &:hover  { background: var(--c-hover); }
-        &:active { background: var(--c-border-2); }
-      }
-      input {
-        flex: 1; border: none; text-align: center;
-        font-size: 16px; font-weight: 600; outline: none;
-        width: 0; min-width: 0; padding: 8px 0; background: var(--c-card); color: var(--c-text);
-      }
-    }
+    /* El stepper és el compartit de styles.scss (.num-input): el gimnàs i
+       l'esport toquen una xifra igual. */
 
     /* ── Quantity chips + form actions ── */
     .we-qty-row {

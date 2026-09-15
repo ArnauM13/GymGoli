@@ -2447,7 +2447,7 @@ export class TrainComponent implements OnDestroy {
       // anada. Abans un pla es quedava aquí i s'havia d'anar a buscar.
       this.feedback.success(
         planning ? `${sport.name} planificat` : `${sport.name} registrat`, 2000, 'xoco');
-      this._openSportSession(id, true);
+      this._openSportSession(id);
     } catch {
       this.feedback.error('Error en registrar', 2500);
     } finally {
@@ -2455,9 +2455,10 @@ export class TrainComponent implements OnDestroy {
     }
   }
 
-  /** Una sessió acabada de crear s'obre amb el formulari desplegat: hi vas a
-   *  omplir-la, no a mirar-la. */
-  private _openSportSession(id: string, isNew = false): void {
-    this.router.navigate(['/sport', id], isNew ? { queryParams: { nova: 1 } } : {});
+  /** La sessió, a la seva pàgina. Una d'acabada de crear no hi arriba de cap
+   *  manera especial: allà les dades ja es toquen allà on es llegeixen, o
+   *  sigui que no hi ha cap formulari per desplegar-li. */
+  private _openSportSession(id: string): void {
+    this.router.navigate(['/sport', id]);
   }
 }
