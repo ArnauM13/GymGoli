@@ -67,12 +67,18 @@ describe('DayFeedCardsComponent', () => {
   });
 
   describe('handleWorkoutClick()', () => {
-    it('starts a planned workout instead of opening it directly', async () => {
+    // Tocar un pla el llegeix, no el comença: començar-lo té el seu botó.
+    it('desplega un planificat en comptes de començar-lo', async () => {
       const openSpy = spyOn(component.open, 'emit');
       const w = makeWorkout({ status: 'planned' });
       component.handleWorkoutClick(w);
-      expect(startPlannedWorkout).toHaveBeenCalledWith('1');
+      expect(component.expandedWorkoutId()).toBe('1');
+      expect(startPlannedWorkout).not.toHaveBeenCalled();
       expect(openSpy).not.toHaveBeenCalled();
+
+      // I el segon clic el plega, com qualsevol altra targeta.
+      component.handleWorkoutClick(w);
+      expect(component.expandedWorkoutId()).toBeNull();
       await fixture.whenStable();
     });
 
@@ -248,6 +254,31 @@ describe('DayFeedCardsComponent', () => {
       const btn = (fixture.nativeElement as HTMLElement).querySelector('.ac-open-btn') as HTMLElement;
       btn.click();
       expect(openSpy).toHaveBeenCalledWith('w1');
+    });
+
+    // Un planificat es llegeix igual que un esport planificat: es desplega en
+    // mode consulta i, del desplegable, se'n pot començar.
+    it('desplega un planificat en mode consulta, amb el botó de començar', async () => {
+      const openSpy = spyOn(component.open, 'emit');
+      fixture.componentRef.setInput('day', {
+        ...day,
+        workouts: [makeWorkout({ id: 'plan1', categories: ['push'], status: 'planned' })],
+      });
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+
+      expect(el.querySelector('.ac-chevron')?.textContent?.trim()).toBe('expand_more');
+      (el.querySelector('.ac-main') as HTMLElement).click();
+      fixture.detectChanges();
+
+      expect(component.expandedWorkoutId()).toBe('plan1');
+      expect(el.querySelector('app-workout-detail')).toBeTruthy();
+      expect(startPlannedWorkout).not.toHaveBeenCalled();
+
+      (el.querySelector('.ac-open-btn--start') as HTMLElement).click();
+      await fixture.whenStable();
+      expect(startPlannedWorkout).toHaveBeenCalledWith('plan1');
+      expect(openSpy).toHaveBeenCalledWith('plan1');
     });
   });
 

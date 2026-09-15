@@ -72,8 +72,7 @@ export interface DayFeedEntry {
                 [stats]="workoutStats(item.workout)"
                 [feeling]="item.workout.feeling ? emojiOf(item.workout.feeling) : ''"
                 [planned]="isPlanned(item.workout)" interactive
-                [expandable]="!isPlanned(item.workout)"
-                [expanded]="expandedWorkoutId() === item.workout.id"
+                expandable [expanded]="expandedWorkoutId() === item.workout.id"
                 (cardClick)="handleWorkoutClick(item.workout)">
 
               @if (isPlanned(item.workout)) {
@@ -88,13 +87,22 @@ export interface DayFeedEntry {
                 </div>
               }
 
-              @if (expandedWorkoutId() === item.workout.id && !isPlanned(item.workout)) {
-                <app-workout-detail [workout]="item.workout" />
+              @if (expandedWorkoutId() === item.workout.id) {
+                <app-workout-detail [workout]="item.workout" [planned]="isPlanned(item.workout)" />
                 <div class="ac-detail-actions">
-                  <button class="ac-open-btn" (click)="open.emit(item.workout.id)">
-                    <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>
-                    Obrir
-                  </button>
+                  @if (isPlanned(item.workout)) {
+                    <!-- Desplegar un pla és llegir-lo; començar-lo és un pas
+                         a part, i es diu amb totes les lletres. -->
+                    <button class="ac-open-btn ac-open-btn--start" (click)="startPlan(item.workout)">
+                      <span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>
+                      Començar
+                    </button>
+                  } @else {
+                    <button class="ac-open-btn" (click)="open.emit(item.workout.id)">
+                      <span class="material-symbols-outlined" aria-hidden="true">edit_note</span>
+                      Obrir
+                    </button>
+                  }
                 </div>
               }
             </app-activity-card>
@@ -230,6 +238,12 @@ export interface DayFeedEntry {
       cursor: pointer; touch-action: manipulation; transition: all 0.15s;
       .material-symbols-outlined { font-size: 17px; }
       &:hover { background: color-mix(in srgb, var(--ac, var(--c-card)) 15%, var(--c-card)); color: var(--c-text); }
+    }
+    /* Començar el pla és l'acció que s'espera del desplegable d'un
+       planificat: va plena, com el botó de play del costat de la targeta. */
+    .ac-open-btn--start {
+      border-color: transparent; background: var(--c-brand); color: white;
+      &:hover { background: var(--c-brand-dk); color: white; }
     }
 
     /* ── Separar la sessió, al peu de la caixa ──
@@ -381,8 +395,15 @@ export class DayFeedCardsComponent {
     }
   }
 
+  /**
+   * Tocar la targeta la desplega, i prou —també la d'un pla.
+   *
+   * Un planificat es llegeix abans de fer-se: quins exercicis porta i amb
+   * quina pauta. Abans, tocar-lo el començava de cop i l'entrenament quedava
+   * obert sense haver-lo demanat; començar-lo té el seu botó, que és el de
+   * play, igual que un esport planificat.
+   */
   handleWorkoutClick(w: Workout): void {
-    if (this.isPlanned(w)) { this.startPlan(w); return; }
     this.expandedWorkoutId.update(id => id === w.id ? null : w.id);
   }
 

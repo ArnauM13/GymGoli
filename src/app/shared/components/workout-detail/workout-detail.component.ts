@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { Component, booleanAttribute, computed, effect, inject, input, signal, untracked } from '@angular/core';
 
 import { CATEGORY_COLORS, ExerciseCategory } from '../../../core/models/exercise.model';
 import { Workout, WorkoutEntry, hasFullEntries, setMaxWeight } from '../../../core/models/workout.model';
@@ -19,6 +19,11 @@ import { kgToDisplay } from '../../utils/weight.utils';
  * És també on es demanen les sèries: de l'historial vell només se'n baixa el
  * resum que necessita la targeta, i desplegar-la és el moment en què les
  * sèries fan falta de debò. Mentre arriben, hi ha l'indicador de càrrega.
+ *
+ * Un **planificat** es llegeix aquí mateix, amb `planned`: la mateixa llista
+ * d'exercicis, però dient la pauta («4×10 · 80 kg» és el que toca fer, no el
+ * que s'ha fet). No se'n demana res al servidor — un pla ja porta a sobre tot
+ * el que és, i el de la rutina ni tan sols és cap fila.
  */
 @Component({
   selector: 'app-workout-detail',
@@ -49,7 +54,7 @@ import { kgToDisplay } from '../../utils/weight.utils';
           <span class="wd-more">+{{ more }} exercici{{ more === 1 ? '' : 's' }} més</span>
         }
       } @else {
-        <span class="no-sets">Cap exercici registrat</span>
+        <span class="no-sets">{{ planned() ? 'Aquest pla no porta exercicis' : 'Cap exercici registrat' }}</span>
       }
     </div>
   `,
@@ -106,6 +111,9 @@ export class WorkoutDetailComponent {
   private workoutService  = inject(WorkoutService);
 
   readonly workout = input.required<Workout>();
+  /** El que es llegeix és una pauta, no un registre: canvia la lletra dels
+   *  casos buits i estalvia demanar al servidor unes sèries que no existeixen. */
+  readonly planned = input(false, { transform: booleanAttribute });
 
   /** Quants exercicis caben a una ullada abans que el desplegable deixi de
    *  ser-ho. La mateixa xifra que les dades d'una sessió d'esport. */
@@ -119,14 +127,14 @@ export class WorkoutDetailComponent {
 
   /** Cert quan la sessió porta les sèries. Fals mentre només en tenim el
    *  resum amb què s'ha pintat la targeta. */
-  readonly isFull = computed(() => hasFullEntries(this.workout()));
+  readonly isFull = computed(() => this.planned() || hasFullEntries(this.workout()));
   /** Cert mentre les sèries viatgen. */
   readonly loadingEntries = signal(false);
 
   constructor() {
     effect(() => {
       const w = this.workout();
-      if (hasFullEntries(w)) { untracked(() => this.loadingEntries.set(false)); return; }
+      if (this.planned() || hasFullEntries(w)) { untracked(() => this.loadingEntries.set(false)); return; }
       untracked(() => {
         this.loadingEntries.set(true);
         this.workoutService.ensureWorkoutEntries(w.id)
@@ -147,7 +155,10 @@ export class WorkoutDetailComponent {
    */
   entrySummary(entry: WorkoutEntry): string {
     const working = entry.sets.filter(s => !s.warmup);
-    if (!working.length) return entry.sets.length ? `${entry.sets.length} esc` : 'Sense sèries';
+    if (!working.length) {
+      if (this.planned()) return 'Sense pauta';
+      return entry.sets.length ? `${entry.sets.length} esc` : 'Sense sèries';
+    }
 
     const reps = working.map(s => s.reps);
     const min  = Math.min(...reps);
