@@ -56,7 +56,9 @@ import { addDays, mondayOf } from '../../shared/utils/calendar-utils';
            Va just sota el calendari: tries el dia i hi actues. Abans vivia
            sota la targeta del dia, i com que aquesta creix amb l'activitat,
            com més entrenaves més avall queia el botó. -->
-      <button class="start-workout-btn" [class.start-workout-btn--past]="isPast()"
+      <button class="start-workout-btn"
+              [class.start-workout-btn--past]="dayAction().kind === 'past'"
+              [class.start-workout-btn--plan]="dayAction().kind === 'future'"
               data-tour="day-action"
               (click)="runDayAction()">
         <span class="swb-icon-wrap" aria-hidden="true">
@@ -102,25 +104,6 @@ import { addDays, mondayOf } from '../../shared/utils/calendar-utils';
               <span class="material-symbols-outlined today-empty-icon">bedtime</span>
               <span class="today-empty-text">Sense activitat</span>
             </div>
-          }
-
-          <!-- ── Planificar aquest dia ──
-               El botó gran de dalt comença l'entrenament ara mateix, i el de
-               la setmana planifica els set dies. Aquest és el del mig: deixar
-               apuntat **aquest** dia per a més tard, i va aquí, dins el dia,
-               perquè és del dia que parla.
-
-               Hi surt sempre que el dia es pugui planificar —avui o
-               endavant; un de passat ja ha passat—, tingui res o no. Abans
-               només sortia amb el dia buit, i això deixava sense sortida el
-               cas més normal de tots: ja tens una cosa apuntada i en vols
-               afegir una altra. El que canvia amb el dia ple és el que hi
-               diu, no si hi és. -->
-          @if (canPlanDay()) {
-            <button class="today-plan-btn" (click)="planSelectedDay()">
-              <span class="material-symbols-outlined" aria-hidden="true">event_upcoming</span>
-              {{ planDayLabel() }}
-            </button>
           }
         </div>
       </div>
@@ -260,19 +243,6 @@ import { addDays, mondayOf } from '../../shared/utils/calendar-utils';
       display: flex; flex-direction: column; align-items: center; gap: 8px;
       padding: 14px 12px; text-align: center;
     }
-    /* Discret: qui entra a Inici ve a veure el dia, no a planificar-lo. Hi
-       és quan el necessites i no compateix amb l'acció gran de dalt. */
-    .today-plan-btn {
-      display: flex; align-items: center; justify-content: center; gap: 7px;
-      width: 100%; box-sizing: border-box; margin-top: 8px;
-      padding: 10px; border-radius: 12px;
-      border: 1.5px dashed var(--c-border); background: transparent;
-      font-size: 13px; font-weight: 700; color: var(--c-text-3);
-      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
-      .material-symbols-outlined { font-size: 18px; }
-      &:hover { border-color: var(--c-brand); color: var(--c-brand); border-style: solid; }
-      &:active { transform: scale(0.99); }
-    }
     .today-empty-icon { font-size: 32px; color: color-mix(in srgb, var(--c-brand) 35%, var(--c-border)); }
     .today-empty-text { font-size: 13px; color: var(--c-text-3); line-height: 1.4; }
 
@@ -313,10 +283,17 @@ import { addDays, mondayOf } from '../../shared/utils/calendar-utils';
     @media (prefers-reduced-motion: reduce) {
       .start-workout-btn::after { animation: none; }
     }
-    /* Registrar un dia passat: accent càlid per distingir-lo de l'acció
-       d'avui. Enfosquit fins que el text blanc arriba a 4.5:1 (#b26a00 es
-       quedava a 4.2). Un dia futur es planifica, i això és marca. */
+    /* Cada cosa que es pot fer amb un dia té el seu color, i es reconeix
+       abans de llegir-la: avui s'entrena i això és marca; un dia passat es
+       registra, accent càlid; un de futur es planifica, violeta.
+
+       Planificar anava de marca, igual que entrenar, i quedava dit que eren
+       la mateixa acció quan són ben bé la contrària: una es fa ara i l'altra
+       es deixa apuntada. Els dos accents porten text blanc a més de 4.5:1
+       —el càlid es va haver d'enfosquir fins a #a06000, que #b26a00 es
+       quedava a 4.2; el violeta hi arriba de sobres. */
     .start-workout-btn--past { --sc: #a06000; }
+    .start-workout-btn--plan { --sc: #5e35b1; }
     .swb-icon-wrap {
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
       width: 40px; height: 40px; border-radius: 12px;
@@ -489,16 +466,6 @@ export class HomeComponent {
 
   readonly isToday = computed(() => this.effectiveDate() === this.today());
 
-  /** Un dia es pot planificar mentre no hagi passat: el d'avui i els que
-   *  vénen. El que ja té alguna cosa també — s'hi afegeix. */
-  readonly canPlanDay = computed(() => !this.isPast());
-
-  /** Planificar un dia buit és estrenar-lo; fer-ho en un que ja té alguna
-   *  cosa és afegir-hi, i el botó ho ha de dir: qui ja té el pàdel apuntat i
-   *  hi vol posar el gimnàs no està «planificant el dia», hi està sumant. */
-  readonly planDayLabel = computed(() =>
-    this.previewFeedEntry() ? 'Afegeix a la planificació' : 'Planificar el dia');
-
   /** A day that has already passed — the "Comença un entrenament" primary
    *  action is swapped for "Registra un entrenament", which opens the train
    *  passthrough already pinned to that day. */
@@ -557,12 +524,6 @@ export class HomeComponent {
 
   goToPlanner(): void {
     this.router.navigate(['/train/planner']);
-  }
-
-  /** Deixar apuntat el dia sense començar-lo: la pàgina d'Entrenar rep el dia
-   *  i que el que s'hi faci és un pla, no una sessió que comenci ara. */
-  planSelectedDay(): void {
-    this.router.navigate(['/train'], { queryParams: { date: this.effectiveDate(), plan: 1 } });
   }
 
   /** El botó porta a definir objectius, no al Perfil en general: hi arriba

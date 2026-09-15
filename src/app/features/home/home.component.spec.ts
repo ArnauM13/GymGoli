@@ -226,57 +226,6 @@ describe('HomeComponent', () => {
       component.goToPlanner();
       expect(navigateSpy).toHaveBeenCalledWith(['/train/planner']);
     });
-
-    // Deixar apuntat el dia d'avui sense començar-lo: entremig del botó gran
-    // («Comença un entrenament») i del de la setmana sencera.
-    it("planSelectedDay() hi porta dient que és un pla, no una sessió d'ara", () => {
-      component.planSelectedDay();
-      expect(navigateSpy).toHaveBeenCalledWith(['/train'], { queryParams: { date: TODAY, plan: 1 } });
-    });
-  });
-
-  describe('planificar el dia des de la targeta del dia', () => {
-    const shift = (days: number) => {
-      const d = new Date(TODAY + 'T12:00:00');
-      d.setDate(d.getDate() + days);
-      return d.toISOString().split('T')[0];
-    };
-
-    const planBtn = (): HTMLElement | null =>
-      (fixture.nativeElement as HTMLElement).querySelector('.today-plan-btn');
-
-    it("hi és quan el dia és avui", () => {
-      fixture.detectChanges();
-      expect(planBtn()).toBeTruthy();
-      expect(planBtn()!.textContent).toContain('Planificar el dia');
-    });
-
-    // Preparar dijous no s'ha d'esperar a dijous.
-    it("hi és també els dies que han de venir", () => {
-      component.selectedDate.set(shift(3));
-      fixture.detectChanges();
-      expect(planBtn()).toBeTruthy();
-    });
-
-    it('no hi és en un dia que ja ha passat: allò ja no es planifica', () => {
-      component.selectedDate.set(shift(-3));
-      fixture.detectChanges();
-      expect(planBtn()).toBeNull();
-    });
-
-    // El cas més normal de tots: ja tens una cosa apuntada i en vols afegir
-    // una altra. El botó hi és igual, i el que canvia és el que hi diu.
-    it("segueix sent-hi si el dia ja té alguna activitat, dient que s'hi afegeix", () => {
-      const workoutService = TestBed.inject(WorkoutService) as unknown as {
-        getDoneWorkoutsForDate: jasmine.Spy;
-      };
-      workoutService.getDoneWorkoutsForDate.and.returnValue([makeWorkout({ id: 'w1', date: TODAY })]);
-      doneWorkoutsSignal.set([makeWorkout({ id: 'w1', date: TODAY })]);
-      fixture.detectChanges();
-
-      expect(planBtn()).toBeTruthy();
-      expect(planBtn()!.textContent).toContain('Afegeix a la planificació');
-    });
   });
 
   // ── dayAction() ──────────────────────────────────────────────────────────
@@ -315,6 +264,34 @@ describe('HomeComponent', () => {
       component.selectedDate.set(past);
       component.runDayAction();
       expect(navigateSpy).toHaveBeenCalledWith(['/train'], { queryParams: { date: past } });
+    });
+
+    // Cada cosa que es pot fer amb un dia es reconeix pel color abans de
+    // llegir-la. Planificar anava de marca, igual que entrenar, i quedava dit
+    // que eren la mateixa acció quan són ben bé la contrària.
+    describe('cada acció porta el seu color', () => {
+      const btn = (): HTMLElement =>
+        (fixture.nativeElement as HTMLElement).querySelector('.start-workout-btn')!;
+
+      it("avui va de marca: ni de dia passat ni de pla", () => {
+        fixture.detectChanges();
+        expect(btn().classList).not.toContain('start-workout-btn--past');
+        expect(btn().classList).not.toContain('start-workout-btn--plan');
+      });
+
+      it('un dia passat porta l\'accent de registrar', () => {
+        component.selectedDate.set(shift(-3));
+        fixture.detectChanges();
+        expect(btn().classList).toContain('start-workout-btn--past');
+        expect(btn().classList).not.toContain('start-workout-btn--plan');
+      });
+
+      it('un dia futur porta el seu, que planificar no és entrenar', () => {
+        component.selectedDate.set(shift(3));
+        fixture.detectChanges();
+        expect(btn().classList).toContain('start-workout-btn--plan');
+        expect(btn().classList).not.toContain('start-workout-btn--past');
+      });
     });
   });
 
